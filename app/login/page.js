@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import AlohaLogo from '../../components/AlohaLogo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -41,79 +42,90 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',background:'linear-gradient(135deg,#1B4580 0%,#1D5FA6 50%,#4A90C4 100%)'}}>
-      {/* Left panel */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'40px',color:'#fff',display:'none'}}>
+    <div style={{minHeight:'100vh',display:'flex',background:'linear-gradient(135deg,#0E2B5E 0%,#1B4580 40%,#1D5FA6 100%)'}}>
+      
+      {/* Left decorative panel */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:60,color:'#fff'}}>
+        <div style={{maxWidth:400}}>
+          <div style={{fontSize:13,fontWeight:600,color:'rgba(184,212,50,1)',letterSpacing:3,textTransform:'uppercase',marginBottom:20}}>
+            Sistema de gestión
+          </div>
+          <h2 style={{fontSize:36,fontWeight:800,lineHeight:1.2,marginBottom:16,color:'#fff'}}>
+            Monitorea el desempeño de todos tus centros en tiempo real
+          </h2>
+          <p style={{fontSize:15,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}>
+            KPIs semanales, cumplimiento mensual, historial trimestral y reportes anuales — todo en un solo lugar.
+          </p>
+          <div style={{display:'flex',gap:20,marginTop:32}}>
+            {[['9','Centros'],['10','Usuarios'],['Q1','2026']].map(([n,l])=>(
+              <div key={l} style={{textAlign:'center'}}>
+                <div style={{fontSize:28,fontWeight:800,color:'#B8D432'}}>{n}</div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginTop:2,textTransform:'uppercase',letterSpacing:1}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Right panel - Login card */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',flex:1,padding:'20px'}}>
-        <div style={{background:'#fff',borderRadius:20,padding:'48px 44px',width:'100%',maxWidth:420,boxShadow:'0 20px 60px rgba(27,69,128,0.3)'}}>
+      {/* Divider */}
+      <div style={{width:1,background:'rgba(255,255,255,0.1)',margin:'60px 0'}}/>
+
+      {/* Right login card */}
+      <div style={{flex:'0 0 480px',display:'flex',alignItems:'center',justifyContent:'center',padding:40}}>
+        <div style={{background:'#fff',borderRadius:20,padding:'44px 40px',width:'100%',maxWidth:400,boxShadow:'0 25px 60px rgba(0,0,0,0.3)'}}>
           
-          {/* Logo */}
-          <div style={{textAlign:'center',marginBottom:36}}>
-            <img src="https://raw.githubusercontent.com/fernandoappsolutionss/aloha-kpi/main/public/logo.png"
-              alt="ALOHA Mental Arithmetic" 
-              style={{height:64,objectFit:'contain'}}
-              onError={e=>{e.target.style.display='none'; document.getElementById('logoFallback').style.display='block'}}
-            />
-            <div id="logoFallback" style={{display:'none',fontSize:28,fontWeight:800,color:'#1B4580',letterSpacing:2}}>ALOHA</div>
-            <div style={{fontSize:12,color:'#8896A9',marginTop:8,letterSpacing:2,textTransform:'uppercase',fontWeight:500}}>
-              Panel de Administración · KPI
-            </div>
+          <div style={{textAlign:'center',marginBottom:32}}>
+            <AlohaLogo height={44}/>
+            <div style={{height:1,background:'linear-gradient(to right,transparent,#E8EBF0,transparent)',marginTop:24}}/>
+            <p style={{fontSize:12,color:'#8896A9',marginTop:16,fontWeight:500}}>Panel de administración · Panamá</p>
           </div>
 
-          <div style={{height:1,background:'linear-gradient(to right,transparent,#E8EBF0,transparent)',marginBottom:28}}/>
-
-          <form onSubmit={handleLogin} style={{display:'flex',flexDirection:'column',gap:18}}>
+          <form onSubmit={handleLogin} style={{display:'flex',flexDirection:'column',gap:16}}>
             <div>
-              <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6,letterSpacing:'0.04em',textTransform:'uppercase'}}>
+              <label style={{fontSize:11,color:'#4A5568',fontWeight:700,display:'block',marginBottom:6,letterSpacing:'0.06em',textTransform:'uppercase'}}>
                 Correo electrónico
               </label>
               <input type="email" required autoComplete="email"
                 value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
                 placeholder="tu@aloha.com"
-                style={{width:'100%',padding:'11px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
-                  background:'#F5F7FA',color:'#1A2744',transition:'border-color 0.2s',boxSizing:'border-box'}}
-                onFocus={e=>e.target.style.borderColor='#1D5FA6'}
-                onBlur={e=>e.target.style.borderColor='#E8EBF0'}
+                style={{width:'100%',padding:'12px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
+                  background:'#F5F7FA',color:'#1A2744',boxSizing:'border-box'}}
+                onFocus={e=>{e.target.style.borderColor='#1D5FA6';e.target.style.background='#fff'}}
+                onBlur={e=>{e.target.style.borderColor='#E8EBF0';e.target.style.background='#F5F7FA'}}
               />
             </div>
             <div>
-              <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6,letterSpacing:'0.04em',textTransform:'uppercase'}}>
+              <label style={{fontSize:11,color:'#4A5568',fontWeight:700,display:'block',marginBottom:6,letterSpacing:'0.06em',textTransform:'uppercase'}}>
                 Contraseña
               </label>
               <input type="password" required autoComplete="current-password"
                 value={form.password} onChange={e=>setForm({...form,password:e.target.value})}
                 placeholder="••••••••"
-                style={{width:'100%',padding:'11px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
+                style={{width:'100%',padding:'12px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
                   background:'#F5F7FA',color:'#1A2744',boxSizing:'border-box'}}
-                onFocus={e=>e.target.style.borderColor='#1D5FA6'}
-                onBlur={e=>e.target.style.borderColor='#E8EBF0'}
+                onFocus={e=>{e.target.style.borderColor='#1D5FA6';e.target.style.background='#fff'}}
+                onBlur={e=>{e.target.style.borderColor='#E8EBF0';e.target.style.background='#F5F7FA'}}
               />
             </div>
 
             {error && (
-              <div style={{padding:'10px 14px',borderRadius:8,background:'#FBE8E8',color:'#D63C3C',fontSize:13,display:'flex',gap:8,alignItems:'center'}}>
+              <div style={{padding:'10px 14px',borderRadius:8,background:'#FBE8E8',color:'#C0392B',fontSize:13,display:'flex',gap:8,alignItems:'center',fontWeight:500}}>
                 <span>⚠</span><span>{error}</span>
               </div>
             )}
 
             <button type="submit" disabled={loading}
-              style={{padding:'13px',background:'linear-gradient(135deg,#1B4580,#1D5FA6)',color:'#fff',border:'none',
-                borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',marginTop:4,
-                letterSpacing:'0.04em',textTransform:'uppercase',opacity:loading?0.7:1,
-                boxShadow:'0 4px 15px rgba(27,69,128,0.3)',transition:'opacity 0.2s'}}>
+              style={{padding:'13px',background:'linear-gradient(135deg,#1B4580 0%,#1D5FA6 100%)',color:'#fff',border:'none',
+                borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',marginTop:6,
+                letterSpacing:'0.04em',opacity:loading?0.75:1,
+                boxShadow:'0 4px 16px rgba(27,69,128,0.35)',transition:'all 0.2s'}}>
               {loading ? 'Verificando...' : 'Ingresar al sistema'}
             </button>
           </form>
 
-          <div style={{textAlign:'center',fontSize:11,color:'#B0BAC9',marginTop:24,lineHeight:1.5}}>
-            ¿Problemas para acceder? Contacta a tu administrador.
-          </div>
-
-          <div style={{textAlign:'center',marginTop:16}}>
-            <div style={{fontSize:10,color:'#C8D4E0',letterSpacing:1}}>ALOHA Mental Arithmetic · Panamá</div>
+          <div style={{textAlign:'center',fontSize:11,color:'#C0C8D4',marginTop:24,lineHeight:1.6}}>
+            ¿Problemas para acceder? Contacta a tu administrador.<br/>
+            <span style={{color:'#B8D432',fontWeight:600}}>ALOHA Mental Arithmetic · Panamá</span>
           </div>
         </div>
       </div>
