@@ -1,9 +1,22 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+
 export default function Sidebar({ rol, centroNombre, centroId }) {
   const router = useRouter()
   const path = usePathname()
   const isAdmin = rol === 'admin_general' || rol === 'supervisor'
+  const [centros, setCentros] = useState([])
+
+  useEffect(() => {
+    if (isAdmin) {
+      supabase.from('centros').select('id, nombre').order('nombre').then(({ data }) => {
+        if (data) setCentros(data)
+      })
+    }
+  }, [isAdmin])
+
   const adminItems = [
     { label: 'Todos los centros', icon: '🏠', href: '/dashboard' },
     { label: 'Ranking centros', icon: '🏆', href: '/dashboard/ranking' },
@@ -12,23 +25,33 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Metas globales', icon: '⚙', href: '/dashboard/metas' },
     { label: 'Usuarios y centros', icon: '👤', href: '/dashboard/usuarios' },
   ]
+
   const centroItems = [
     { label: 'Resumen', icon: '📊', href: `/centro/${centroId}` },
     { label: 'KPI Semanal', icon: '📝', href: `/centro/${centroId}/kpi` },
     { label: 'Cumplimiento', icon: '✅', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: '🔍', href: `/centro/${centroId}/foda` },
   ]
+
   const items = isAdmin ? adminItems : centroItems
-  function logout() { localStorage.clear(); router.push('/login') }
+
+  function logout() {
+    supabase.auth.signOut()
+    localStorage.clear()
+    router.push('/login')
+  }
+
   return (
     <aside style={styles.sidebar}>
       <div style={styles.logo}>
         <span style={styles.logoText}>ALOHA KPI</span>
         <span style={styles.logoBadge}>{isAdmin ? 'Admin General' : centroNombre}</span>
       </div>
+
       <nav style={styles.nav}>
         {isAdmin && <div style={styles.section}>Panel</div>}
         {!isAdmin && <div style={styles.section}>Mi Centro</div>}
+
         {items.map(item => {
           const active = path === item.href
           return (
@@ -39,22 +62,30 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
             </button>
           )
         })}
-        {isAdmin && (
+
+        {isAdmin && centros.length > 0 && (
           <>
             <div style={styles.section}>Centros</div>
-            {['BRISAS DEL GOLF','ANCLAS MALL','CALLE 50','COSTA DEL ESTE','DAVID'].map(c => (
-              <button key={c} onClick={() => router.push(`/centro/demo?nombre=${encodeURIComponent(c)}`)}
-                style={styles.navItemSm}>
-                <span style={styles.dot}></span>{c.split(' ').slice(0,2).join(' ')}
-              </button>
-            ))}
+            {centros.map(c => {
+              const active = path.startsWith(`/centro/${c.id}`)
+              return (
+                <button key={c.id}
+                  onClick={() => router.push(`/centro/${c.id}`)}
+                  style={{ ...styles.navItemSm, ...(active ? { color: '#533AB7', fontWeight: 600 } : {}) }}>
+                  <span style={styles.dot}></span>
+                  {c.nombre.split(' ').slice(0, 2).join(' ')}
+                </button>
+              )
+            })}
           </>
         )}
       </nav>
+
       <button onClick={logout} style={styles.logout}>⬅ Cerrar sesión</button>
     </aside>
   )
 }
+
 const styles = {
   sidebar: { width: 210, background: '#fff', borderRight: '0.5px solid #e8e8e4', display: 'flex', flexDirection: 'column', minHeight: '100vh', flexShrink: 0 },
   logo: { padding: '20px 16px 16px', borderBottom: '0.5px solid #e8e8e4' },
