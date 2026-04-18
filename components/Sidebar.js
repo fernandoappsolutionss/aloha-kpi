@@ -21,6 +21,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Todos los centros', icon: '🏠', href: '/dashboard' },
     { label: 'Ranking centros', icon: '🏆', href: '/dashboard/ranking' },
     { label: 'Alertas', icon: '🔔', href: '/dashboard/alertas' },
+    { label: 'Historial', icon: '📅', href: '/dashboard/historial' },
     { label: 'Reporte trimestral', icon: '📄', href: '/dashboard/reporte' },
     { label: 'Metas globales', icon: '⚙', href: '/dashboard/metas' },
     { label: 'Usuarios y centros', icon: '👤', href: '/dashboard/usuarios' },
@@ -31,6 +32,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'KPI Semanal', icon: '📝', href: `/centro/${centroId}/kpi` },
     { label: 'Cumplimiento', icon: '✅', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: '🔍', href: `/centro/${centroId}/foda` },
+    { label: 'Historial', icon: '📅', href: `/centro/${centroId}/historial` },
   ]
 
   const items = isAdmin ? adminItems : centroItems
@@ -69,8 +71,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
             {centros.map(c => {
               const active = path.startsWith(`/centro/${c.id}`)
               return (
-                <button key={c.id}
-                  onClick={() => router.push(`/centro/${c.id}`)}
+                <button key={c.id} onClick={() => router.push(`/centro/${c.id}`)}
                   style={{ ...styles.navItemSm, ...(active ? { color: '#533AB7', fontWeight: 600 } : {}) }}>
                   <span style={styles.dot}></span>
                   {c.nombre.split(' ').slice(0, 2).join(' ')}
@@ -81,7 +82,15 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
         )}
       </nav>
 
-      <button onClick={logout} style={styles.logout}>⬅ Cerrar sesión</button>
+      <div style={styles.footer}>
+        <button onClick={() => router.push('/perfil')}
+          style={{ ...styles.footerBtn, borderBottom: '0.5px solid #e8e8e4' }}>
+          👤 Mi perfil / Contraseña
+        </button>
+        <button onClick={logout} style={styles.footerBtn}>
+          ⬅ Cerrar sesión
+        </button>
+      </div>
     </aside>
   )
 }
@@ -97,5 +106,6 @@ const styles = {
   navActive: { background: '#EEEDFE', color: '#533AB7', fontWeight: 600, borderLeftColor: '#533AB7' },
   navItemSm: { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 24px', background: 'none', border: 'none', textAlign: 'left', fontSize: 11.5, color: '#888', cursor: 'pointer' },
   dot: { width: 6, height: 6, borderRadius: 3, background: '#AFA9EC', flexShrink: 0 },
-  logout: { padding: '14px 16px', background: 'none', border: 'none', borderTop: '0.5px solid #e8e8e4', color: '#aaa', fontSize: 12, textAlign: 'left', cursor: 'pointer' },
+  footer: { borderTop: '0.5px solid #e8e8e4' },
+  footerBtn: { width: '100%', padding: '11px 16px', background: 'none', border: 'none', color: '#888', fontSize: 12, textAlign: 'left', cursor: 'pointer' },
 }
