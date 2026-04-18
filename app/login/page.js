@@ -13,18 +13,48 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: form.email, password: form.password
+      })
       if (authError) throw authError
-      const { data: usuario } = await supabase.from('usuarios').select('rol, centro_id').eq('email', form.email).single()
-      if (usuario?.rol === 'admin_general' || usuario?.rol === 'supervisor') router.push('/dashboard')
-      else router.push(`/centro/${usuario?.centro_id}`)
-    } catch { setError('Credenciales incorrectas.') }
-    finally { setLoading(false) }
+
+      // Get user role and centro
+      const { data: usuario, error: userError } = await supabase
+        .from('usuarios')
+        .select('rol, centro_id, nombre')
+        .eq('email', form.email)
+        .single()
+
+      if (userError || !usuario) throw new Error('Usuario no encontrado en el sistema.')
+
+      // Save session info
+      localStorage.setItem('aloha_rol', usuario.rol)
+      localStorage.setItem('aloha_centro_id', usuario.centro_id || '')
+      localStorage.setItem('aloha_nombre', usuario.nombre || '')
+
+      if (usuario.rol === 'admin_general' || usuario.rol === 'supervisor') {
+        router.push('/dashboard')
+      } else {
+        router.push('/centro/' + usuario.centro_id)
+      }
+    } catch (err) {
+      setError(err.message || 'Credenciales incorrectas.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function demoLogin(rol) {
-    if (rol === 'admin') { localStorage.setItem('demo_rol','admin_general'); router.push('/dashboard') }
-    else { localStorage.setItem('demo_rol','administradora'); localStorage.setItem('demo_centro','BRISAS DEL GOLF'); router.push('/centro/demo') }
+    if (rol === 'admin') {
+      localStorage.setItem('aloha_rol', 'admin_general')
+      localStorage.setItem('aloha_demo', 'true')
+      router.push('/dashboard')
+    } else {
+      localStorage.setItem('aloha_rol', 'administradora')
+      localStorage.setItem('aloha_demo', 'true')
+      localStorage.setItem('aloha_centro_nombre', 'BRISAS DEL GOLF')
+      router.push('/centro/demo')
+    }
   }
 
   return (
@@ -35,16 +65,18 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} style={s.form}>
           <div style={s.field}>
             <label style={s.label}>Correo electrónico</label>
-            <input type="email" style={s.input} placeholder="tu@aloha.com"
+            <input type="email" style={s.input} placeholder="tu@aloha.com" required
               value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
           </div>
           <div style={s.field}>
             <label style={s.label}>Contraseña</label>
-            <input type="password" style={s.input} placeholder="••••••••"
+            <input type="password" style={s.input} placeholder="••••••••" required
               value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
           </div>
           {error && <div style={s.error}>{error}</div>}
-          <button type="submit" style={s.btn} disabled={loading}>{loading ? 'Ingresando...' : 'Ingresar'}</button>
+          <button type="submit" style={s.btn} disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
         </form>
         <div style={s.divider}><span>o accede en modo demo</span></div>
         <div style={s.demoRow}>
