@@ -2,6 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import AlohaLogo from './AlohaLogo'
 
 const A = {
   blue: '#1B4580', blueMid: '#1D5FA6', blueLight: '#4A90C4',
@@ -66,7 +67,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       {/* Logo Header */}
       <div style={{padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <img src="https://alohapanama.com/img/logo.png" alt="ALOHA" style={{height:32,objectFit:'contain',filter:'brightness(0) invert(1)',flexShrink:0}} onError={e=>{e.target.style.display='none'}}/>
+          <AlohaLogo height={30} white={true}/>
           <div>
             <div style={{fontSize:14,fontWeight:800,color:'#fff',letterSpacing:1.5}}>ALOHA KPI</div>
             <div style={{fontSize:10,color:A.textLight,marginTop:1}}>{isAdmin ? '🛡 Administrador' : '🏫 ' + (centroNombre || 'Centro')}</div>
