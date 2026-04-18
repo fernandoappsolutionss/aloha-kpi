@@ -66,7 +66,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       {/* Logo Header */}
       <div style={{padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <div style={{width:36,height:36,background:'rgba(255,255,255,0.15)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800,color:'#fff',flexShrink:0}}>A</div>
+          <img src="https://alohapanama.com/img/logo.png" alt="ALOHA" style={{height:32,objectFit:'contain',filter:'brightness(0) invert(1)',flexShrink:0}} onError={e=>{e.target.style.display='none'}}/>
           <div>
             <div style={{fontSize:14,fontWeight:800,color:'#fff',letterSpacing:1.5}}>ALOHA KPI</div>
             <div style={{fontSize:10,color:A.textLight,marginTop:1}}>{isAdmin ? '🛡 Administrador' : '🏫 ' + (centroNombre || 'Centro')}</div>
