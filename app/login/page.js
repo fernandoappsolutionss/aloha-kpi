@@ -13,21 +13,20 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: form.email, password: form.password
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password
       })
       if (authError) throw authError
 
-      // Get user role and centro
       const { data: usuario, error: userError } = await supabase
         .from('usuarios')
         .select('rol, centro_id, nombre')
         .eq('email', form.email)
         .single()
 
-      if (userError || !usuario) throw new Error('Usuario no encontrado en el sistema.')
+      if (userError || !usuario) throw new Error('Usuario no encontrado en el sistema. Contacta al administrador.')
 
-      // Save session info
       localStorage.setItem('aloha_rol', usuario.rol)
       localStorage.setItem('aloha_centro_id', usuario.centro_id || '')
       localStorage.setItem('aloha_nombre', usuario.nombre || '')
@@ -38,68 +37,125 @@ export default function LoginPage() {
         router.push('/centro/' + usuario.centro_id)
       }
     } catch (err) {
-      setError(err.message || 'Credenciales incorrectas.')
+      setError(err.message || 'Correo o contraseña incorrectos.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  function demoLogin(rol) {
-    if (rol === 'admin') {
-      localStorage.setItem('aloha_rol', 'admin_general')
-      localStorage.setItem('aloha_demo', 'true')
-      router.push('/dashboard')
-    } else {
-      localStorage.setItem('aloha_rol', 'administradora')
-      localStorage.setItem('aloha_demo', 'true')
-      localStorage.setItem('aloha_centro_nombre', 'BRISAS DEL GOLF')
-      router.push('/centro/demo')
     }
   }
 
   return (
     <div style={s.page}>
       <div style={s.card}>
-        <div style={s.logo}>ALOHA</div>
-        <div style={s.logoSub}>Mental Arithmetic · KPI Dashboard</div>
+        <div style={s.logoWrap}>
+          <div style={s.logo}>ALOHA</div>
+          <div style={s.logoSub}>Mental Arithmetic · KPI Dashboard</div>
+        </div>
+
         <form onSubmit={handleLogin} style={s.form}>
           <div style={s.field}>
             <label style={s.label}>Correo electrónico</label>
-            <input type="email" style={s.input} placeholder="tu@aloha.com" required
-              value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+            <input
+              type="email"
+              style={s.input}
+              placeholder="tu@aloha.com"
+              required
+              autoComplete="email"
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+            />
           </div>
           <div style={s.field}>
             <label style={s.label}>Contraseña</label>
-            <input type="password" style={s.input} placeholder="••••••••" required
-              value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
+            <input
+              type="password"
+              style={s.input}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+            />
           </div>
-          {error && <div style={s.error}>{error}</div>}
-          <button type="submit" style={s.btn} disabled={loading}>
-            {loading ? 'Ingresando...' : 'Ingresar'}
+
+          {error && (
+            <div style={s.error}>
+              <span style={{marginRight:6}}>⚠</span>{error}
+            </div>
+          )}
+
+          <button type="submit" style={{...s.btn, opacity: loading ? 0.7 : 1}} disabled={loading}>
+            {loading ? 'Verificando...' : 'Ingresar al sistema'}
           </button>
         </form>
-        <div style={s.divider}><span>o accede en modo demo</span></div>
-        <div style={s.demoRow}>
-          <button onClick={() => demoLogin('admin')} style={s.demoBtn}>👑 Admin general</button>
-          <button onClick={() => demoLogin('centro')} style={s.demoBtnOutline}>🏫 Administradora</button>
+
+        <div style={s.footer}>
+          ¿Problemas para acceder? Contacta a tu administrador.
         </div>
       </div>
     </div>
   )
 }
+
 const s = {
-  page: { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)', padding:20 },
-  card: { background:'var(--white)', border:'0.5px solid var(--border)', borderRadius:16, padding:'40px 36px', width:'100%', maxWidth:380 },
-  logo: { fontSize:28, fontWeight:700, color:'var(--purple)', letterSpacing:2, marginBottom:4 },
-  logoSub: { fontSize:12, color:'var(--text-muted)', marginBottom:32 },
-  form: { display:'flex', flexDirection:'column', gap:16 },
-  field: { display:'flex', flexDirection:'column', gap:6 },
-  label: { fontSize:12, color:'var(--text-muted)', fontWeight:500 },
-  input: { padding:'10px 12px', border:'0.5px solid var(--border)', borderRadius:8, fontSize:14, outline:'none', background:'#fafaf8' },
-  error: { background:'var(--red-light)', color:'var(--red)', padding:'10px 12px', borderRadius:8, fontSize:12 },
-  btn: { padding:11, background:'var(--purple)', color:'#fff', border:'none', borderRadius:8, fontSize:14, fontWeight:500, marginTop:4, cursor:'pointer' },
-  divider: { textAlign:'center', color:'var(--text-hint)', fontSize:12, margin:'24px 0 16px', borderTop:'0.5px solid var(--border)', paddingTop:16 },
-  demoRow: { display:'flex', gap:8 },
-  demoBtn: { flex:1, padding:'9px 0', background:'var(--purple-light)', color:'var(--purple)', border:'none', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer' },
-  demoBtnOutline: { flex:1, padding:'9px 0', background:'var(--white)', color:'var(--text-muted)', border:'0.5px solid var(--border)', borderRadius:8, fontSize:12, cursor:'pointer' },
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #f5f5f0 0%, #EEEDFE 100%)',
+    padding: 20
+  },
+  card: {
+    background: '#ffffff',
+    border: '0.5px solid #e8e8e4',
+    borderRadius: 16,
+    padding: '44px 40px 32px',
+    width: '100%',
+    maxWidth: 400,
+    boxShadow: '0 4px 24px rgba(83,58,183,0.08)'
+  },
+  logoWrap: { textAlign: 'center', marginBottom: 36 },
+  logo: { fontSize: 32, fontWeight: 700, color: '#533AB7', letterSpacing: 3 },
+  logoSub: { fontSize: 12, color: '#888', marginTop: 6 },
+  form: { display: 'flex', flexDirection: 'column', gap: 18 },
+  field: { display: 'flex', flexDirection: 'column', gap: 7 },
+  label: { fontSize: 12, color: '#555', fontWeight: 600, letterSpacing: '0.02em' },
+  input: {
+    padding: '11px 14px',
+    border: '1px solid #e0e0dc',
+    borderRadius: 8,
+    fontSize: 14,
+    outline: 'none',
+    background: '#fafaf8',
+    transition: 'border-color 0.2s',
+    color: '#1a1a1a'
+  },
+  error: {
+    background: '#FAECE7',
+    color: '#993C1D',
+    padding: '10px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  btn: {
+    padding: '12px',
+    background: '#533AB7',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: 4,
+    letterSpacing: '0.02em'
+  },
+  footer: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: '#bbb',
+    marginTop: 24,
+    lineHeight: 1.5
+  }
 }
