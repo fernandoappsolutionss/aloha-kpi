@@ -1,20 +1,30 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { supabase } from '../../../lib/supabase'
 
-const CENTROS = ['BRISAS DEL GOLF','ANCLAS MALL','CALLE 50','COSTA DEL ESTE','CONDADO DEL REY','DAVID','AGUADULCE','SANTIAGO','CHITRE']
-const ROLES = [{v:'administradora',l:'Administradora de Centro'},{v:'supervisor',l:'Supervisor Regional'},{v:'admin_general',l:'Administrador General'}]
+// Roles: admin_general = ve todo | administradora = ve solo su centro
+const ROLES = [
+  { v:'admin_general', l:'Administrador', desc:'Acceso completo a todos los centros' },
+  { v:'administradora', l:'Usuario de Centro', desc:'Solo ve su centro asignado' }
+]
+
+const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', greenLime:'#B8D432', gray:'#F5F7FA', text:'#1A2744' }
+
+const ROL_BADGE = {
+  admin_general: { bg:'#EEF3FB', color:'#1D5FA6', label:'Administrador' },
+  supervisor:    { bg:'#FEF3CD', color:'#D97706', label:'Supervisor' },
+  administradora:{ bg:'#E6F4EC', color:'#2D7D46', label:'Usuario Centro' }
+}
 
 export default function UsuariosPage() {
-  const router = useRouter()
   const [usuarios, setUsuarios] = useState([])
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [status, setStatus] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
   const [form, setForm] = useState({ nombre:'', email:'', password:'', rol:'administradora', centro_id:'' })
 
   useEffect(() => { loadData() }, [])
@@ -30,105 +40,121 @@ export default function UsuariosPage() {
     setLoading(false)
   }
 
-  async function createUser(e) {
+  async function saveUser(e) {
     e.preventDefault()
-    if (!form.nombre || !form.email || !form.password) { setStatus('❌ Completa todos los campos.'); return }
+    if (!form.nombre || !form.email) { setStatus('❌ Completa nombre y correo.'); return }
+    if (!editingUser && !form.password) { setStatus('❌ La contraseña es requerida.'); return }
+    if (form.rol === 'administradora' && !form.centro_id) { setStatus('❌ Selecciona un centro para el usuario.'); return }
     setCreating(true); setStatus('')
     try {
-      // Create auth user via Supabase Admin API using service role
-      // We use signUp which works with anon key + email confirmation disabled
-      const { data: authData, error: authError } = await supabase.auth.admin 
-        ? await supabase.auth.admin.createUser({ email: form.email, password: form.password, email_confirm: true, user_metadata: { nombre: form.nombre } })
-        : await supabase.auth.signUp({ email: form.email, password: form.password })
-      
-      if (authError) throw authError
-
-      // Insert into usuarios table
-      const { error: userError } = await supabase.from('usuarios').insert({
-        email: form.email,
-        nombre: form.nombre,
-        rol: form.rol,
-        centro_id: form.centro_id || null
-      })
-      if (userError) throw userError
-
-      setStatus('✅ Usuario ' + form.nombre + ' creado exitosamente.')
+      if (editingUser) {
+        // Update existing user
+        const updates = { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id || null }
+        const { error } = await supabase.from('usuarios').update(updates).eq('email', editingUser.email)
+        if (error) throw error
+        setStatus('✅ Usuario ' + form.nombre + ' actualizado.')
+      } else {
+        // Create new auth user via signUp
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: form.email, password: form.password,
+          options: { data: { nombre: form.nombre } }
+        })
+        if (authError) throw authError
+        const { error: userError } = await supabase.from('usuarios').upsert({
+          email: form.email, nombre: form.nombre, rol: form.rol,
+          centro_id: form.centro_id || null
+        })
+        if (userError) throw userError
+        setStatus('✅ Usuario ' + form.nombre + ' creado. Se enviará un correo de confirmación.')
+      }
       setForm({ nombre:'', email:'', password:'', rol:'administradora', centro_id:'' })
-      setShowForm(false)
+      setShowForm(false); setEditingUser(null)
       loadData()
-    } catch (e) {
-      setStatus('❌ Error: ' + (e.message || JSON.stringify(e)))
-    }
+    } catch (e) { setStatus('❌ Error: ' + (e.message || JSON.stringify(e))) }
     setCreating(false)
   }
 
   async function deleteUser(email, nombre) {
     if (!confirm('¿Eliminar a ' + nombre + '? Esta acción no se puede deshacer.')) return
     const { error } = await supabase.from('usuarios').delete().eq('email', email)
-    if (error) { setStatus('❌ Error eliminando: ' + error.message); return }
-    setStatus('✅ Usuario ' + nombre + ' eliminado.')
+    if (error) { setStatus('❌ Error: ' + error.message); return }
+    setStatus('✅ ' + nombre + ' eliminado.')
     loadData()
   }
 
-  const ROL_LABELS = { admin_general: 'Admin General', supervisor: 'Supervisor', administradora: 'Administradora' }
-  const ROL_COLORS = { admin_general: {bg:'#EEEDFE',color:'#533AB7'}, supervisor: {bg:'#FAEEDA',color:'#854F0B'}, administradora: {bg:'#E1F5EE',color:'#0F6E56'} }
+  function startEdit(u) {
+    setEditingUser(u)
+    setForm({ nombre: u.nombre, email: u.email, password: '', rol: u.rol, centro_id: u.centro_id || '' })
+    setShowForm(true)
+  }
+
+  function cancelForm() {
+    setShowForm(false); setEditingUser(null)
+    setForm({ nombre:'', email:'', password:'', rol:'administradora', centro_id:'' })
+  }
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
       <Sidebar rol="admin_general"/>
       <main style={{flex:1,padding:28,overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
           <div>
-            <h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Usuarios y centros</h1>
-            <p style={{fontSize:12,color:'#888'}}>{usuarios.length} usuarios registrados</p>
+            <h1 style={{fontSize:20,fontWeight:700,color:A.text,marginBottom:4}}>Gestión de usuarios</h1>
+            <p style={{fontSize:12,color:'#8896A9'}}>{usuarios.length} usuarios registrados</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>
+          <button onClick={() => { cancelForm(); setShowForm(!showForm) }}
+            style={{padding:'9px 20px',background:`linear-gradient(135deg,${A.blue},${A.blueMid})`,color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',boxShadow:'0 4px 12px rgba(27,69,128,0.25)'}}>
             {showForm ? '✕ Cancelar' : '+ Nuevo usuario'}
           </button>
         </div>
 
         {status && (
-          <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FAECE7':'#E1F5EE',color:status.includes('❌')?'#993C1D':'#0F6E56',fontSize:13,fontWeight:500}}>
+          <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FBE8E8':'#E6F4EC',color:status.includes('❌')?'#D63C3C':'#2D7D46',fontSize:13,fontWeight:500}}>
             {status}
           </div>
         )}
 
         {showForm && (
-          <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:24,marginBottom:20}}>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:20,color:'#444'}}>Crear nuevo usuario</h3>
-            <form onSubmit={createUser}>
+          <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,padding:24,marginBottom:20,boxShadow:'0 2px 12px rgba(27,69,128,0.08)'}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:A.text,marginBottom:6}}>{editingUser ? 'Editar usuario' : 'Crear nuevo usuario'}</h3>
+            <p style={{fontSize:12,color:'#8896A9',marginBottom:20}}>
+              <strong>Administrador</strong> — acceso completo a todos los centros · <strong>Usuario de Centro</strong> — solo ve su centro
+            </p>
+            <form onSubmit={saveUser}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
                 <div>
-                  <label style={{fontSize:12,color:'#666',display:'block',marginBottom:6,fontWeight:500}}>Nombre completo *</label>
+                  <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Nombre completo *</label>
                   <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
                     placeholder="Ej: Laura Martínez"
-                    style={{width:'100%',padding:'9px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,outline:'none',background:'#fafaf8'}}/>
+                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA',boxSizing:'border-box'}}/>
                 </div>
                 <div>
-                  <label style={{fontSize:12,color:'#666',display:'block',marginBottom:6,fontWeight:500}}>Correo electrónico *</label>
+                  <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Correo electrónico *</label>
                   <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
-                    placeholder="Ej: laura@aloha.com"
-                    style={{width:'100%',padding:'9px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,outline:'none',background:'#fafaf8'}}/>
+                    disabled={!!editingUser}
+                    placeholder="correo@aloha.com"
+                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:editingUser?'#F0F2F6':'#F5F7FA',boxSizing:'border-box',cursor:editingUser?'not-allowed':'text'}}/>
                 </div>
+                {!editingUser && (
+                  <div>
+                    <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Contraseña inicial *</label>
+                    <input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}
+                      placeholder="Mínimo 8 caracteres"
+                      style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA',boxSizing:'border-box'}}/>
+                  </div>
+                )}
                 <div>
-                  <label style={{fontSize:12,color:'#666',display:'block',marginBottom:6,fontWeight:500}}>Contraseña inicial *</label>
-                  <input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}
-                    placeholder="Mínimo 8 caracteres"
-                    style={{width:'100%',padding:'9px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,outline:'none',background:'#fafaf8'}}/>
-                </div>
-                <div>
-                  <label style={{fontSize:12,color:'#666',display:'block',marginBottom:6,fontWeight:500}}>Rol *</label>
+                  <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Rol de acceso *</label>
                   <select value={form.rol} onChange={e=>setForm({...form,rol:e.target.value})}
-                    style={{width:'100%',padding:'9px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,outline:'none',background:'#fafaf8'}}>
-                    {ROLES.map(r=><option key={r.v} value={r.v}>{r.l}</option>)}
+                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA'}}>
+                    {ROLES.map(r=><option key={r.v} value={r.v}>{r.l} — {r.desc}</option>)}
                   </select>
                 </div>
                 {form.rol === 'administradora' && (
                   <div style={{gridColumn:'span 2'}}>
-                    <label style={{fontSize:12,color:'#666',display:'block',marginBottom:6,fontWeight:500}}>Centro asignado *</label>
+                    <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Centro asignado *</label>
                     <select value={form.centro_id} onChange={e=>setForm({...form,centro_id:e.target.value})}
-                      style={{width:'100%',padding:'9px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,outline:'none',background:'#fafaf8'}}>
+                      style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA'}}>
                       <option value="">— Selecciona un centro —</option>
                       {centros.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
                     </select>
@@ -136,13 +162,11 @@ export default function UsuariosPage() {
                 )}
               </div>
               <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-                <button type="button" onClick={()=>setShowForm(false)}
-                  style={{padding:'9px 20px',background:'none',border:'0.5px solid #ddd',borderRadius:8,fontSize:13,cursor:'pointer',color:'#666'}}>
-                  Cancelar
-                </button>
+                <button type="button" onClick={cancelForm}
+                  style={{padding:'9px 20px',background:'none',border:'1px solid #E8EBF0',borderRadius:8,fontSize:13,cursor:'pointer',color:'#4A5568'}}>Cancelar</button>
                 <button type="submit" disabled={creating}
-                  style={{padding:'9px 24px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:creating?0.7:1}}>
-                  {creating ? 'Creando...' : 'Crear usuario'}
+                  style={{padding:'9px 24px',background:`linear-gradient(135deg,${A.blue},${A.blueMid})`,color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',opacity:creating?0.7:1}}>
+                  {creating ? 'Guardando...' : (editingUser ? 'Actualizar' : 'Crear usuario')}
                 </button>
               </div>
             </form>
@@ -150,53 +174,50 @@ export default function UsuariosPage() {
         )}
 
         {loading ? (
-          <div style={{padding:40,textAlign:'center',color:'#888'}}>Cargando usuarios...</div>
+          <div style={{padding:40,textAlign:'center',color:'#8896A9'}}>Cargando...</div>
         ) : (
-          <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:20}}>
+          <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 12px rgba(27,69,128,0.06)'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-              <thead>
-                <tr>{['Nombre','Correo','Rol','Centro','Acciones'].map(h=>
-                  <th key={h} style={{padding:'8px 14px',textAlign:'left',fontSize:11,fontWeight:600,color:'#888',borderBottom:'0.5px solid #e8e8e4',textTransform:'uppercase',letterSpacing:'0.04em'}}>{h}</th>
+              <thead style={{background:`linear-gradient(135deg,${A.blue},${A.blueMid})`}}>
+                <tr>{['Nombre','Correo','Rol','Centro asignado','Acciones'].map(h=>
+                  <th key={h} style={{padding:'12px 16px',textAlign:'left',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.9)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{h}</th>
                 )}</tr>
               </thead>
               <tbody>
                 {usuarios.map((u,i)=>(
-                  <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{padding:'12px 14px',borderBottom:'0.5px solid #f5f5f2',fontWeight:500}}>{u.nombre}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'0.5px solid #f5f5f2',color:'#666'}}>{u.email}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'0.5px solid #f5f5f2'}}>
-                      <span style={{fontSize:11,padding:'3px 10px',borderRadius:10,fontWeight:500,...(ROL_COLORS[u.rol]||{})}}>
-                        {ROL_LABELS[u.rol] || u.rol}
+                  <tr key={i} style={{background:i%2===0?'#fff':'#F9FAFC'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='#EEF3FB'}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#F9FAFC'}>
+                    <td style={{padding:'12px 16px',borderBottom:'1px solid #F0F2F6',fontWeight:600,color:A.text}}>{u.nombre}</td>
+                    <td style={{padding:'12px 16px',borderBottom:'1px solid #F0F2F6',color:'#4A5568',fontSize:12}}>{u.email}</td>
+                    <td style={{padding:'12px 16px',borderBottom:'1px solid #F0F2F6'}}>
+                      <span style={{fontSize:11,padding:'3px 10px',borderRadius:12,fontWeight:600,...(ROL_BADGE[u.rol]||{})}}>
+                        {ROL_BADGE[u.rol]?.label || u.rol}
                       </span>
                     </td>
-                    <td style={{padding:'12px 14px',borderBottom:'0.5px solid #f5f5f2',color:u.centros?.nombre?'#333':'#bbb'}}>
+                    <td style={{padding:'12px 16px',borderBottom:'1px solid #F0F2F6',color:u.centros?.nombre?A.text:'#B0BAC9',fontSize:12}}>
                       {u.centros?.nombre || (u.rol==='admin_general'?'Todos los centros':'—')}
                     </td>
-                    <td style={{padding:'12px 14px',borderBottom:'0.5px solid #f5f5f2'}}>
-                      {u.email !== 'fperez@teamsolutionss.com' && (
-                        <button onClick={()=>deleteUser(u.email, u.nombre)}
-                          style={{padding:'4px 12px',border:'0.5px solid #F0997B',borderRadius:6,background:'none',color:'#993C1D',fontSize:11,cursor:'pointer'}}>
-                          Eliminar
+                    <td style={{padding:'12px 16px',borderBottom:'1px solid #F0F2F6'}}>
+                      <div style={{display:'flex',gap:8}}>
+                        <button onClick={()=>startEdit(u)}
+                          style={{padding:'5px 12px',border:`1px solid ${A.blueMid}`,borderRadius:6,background:'none',color:A.blueMid,fontSize:12,cursor:'pointer',fontWeight:500}}>
+                          Editar
                         </button>
-                      )}
+                        {u.email !== 'fperez@teamsolutionss.com' && (
+                          <button onClick={()=>deleteUser(u.email, u.nombre)}
+                            style={{padding:'5px 12px',border:'1px solid #D63C3C',borderRadius:6,background:'none',color:'#D63C3C',fontSize:12,cursor:'pointer'}}>
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {usuarios.length === 0 && (
-              <div style={{textAlign:'center',padding:40,color:'#bbb',fontSize:13}}>
-                No hay usuarios registrados aún. Crea el primero.
-              </div>
-            )}
           </div>
         )}
-
-        <div style={{background:'#EEEDFE',borderRadius:10,padding:'14px 18px',marginTop:20,fontSize:12,color:'#533AB7',lineHeight:1.7}}>
-          <strong>Instrucciones:</strong> Al crear un usuario, recibirá su correo y contraseña para acceder al sistema. 
-          Las administradoras de centro solo verán los datos de su propio centro. 
-          Los supervisores y administradores generales tienen acceso a todos los centros.
-        </div>
       </main>
     </div>
   )
