@@ -1,12 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
+import { supabase } from '../../../../lib/supabase'
 
 export default function FodaPage() {
   const params = useParams()
   const sp = useSearchParams()
-  const nombre = sp.get('nombre') || 'BRISAS DEL GOLF'
+  const [nombre, setNombre] = useState('Centro')
+  useEffect(() => { supabase.from('centros').select('nombre').eq('id', params.id).single().then(({data}) => { if (data) setNombre(data.nombre) }) }, [params.id])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [foda, setFoda] = useState({
@@ -29,7 +31,7 @@ export default function FodaPage() {
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
-      <Sidebar rol="administradora" centroNombre={nombre} centroId={params.id}/>
+      <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
       <main style={{flex:1,padding:28,overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
           <div><h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>FODA Trimestral</h1>
