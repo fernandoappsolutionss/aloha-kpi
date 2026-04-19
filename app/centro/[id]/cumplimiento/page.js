@@ -16,7 +16,8 @@ const DEFS = {classdojo_activo:'si',ninos_completos_classdojo:'si',padres_conect
 export default function CumplimientoPage() {
   const params = useParams()
   const sp = useSearchParams()
-  const nombre = sp.get('nombre') || localStorage.getItem('aloha_centro_nombre') || 'MI CENTRO'
+  const [nombre, setNombre] = useState('Centro')
+  useEffect(() => { supabase.from('centros').select('nombre').eq('id', params.id).single().then(({data}) => { if (data) setNombre(data.nombre) }) }, [params.id])
   const centroId = params.id === 'demo' ? null : params.id
 
   const [mes, setMes] = useState(1)
@@ -71,7 +72,7 @@ export default function CumplimientoPage() {
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
-      <Sidebar rol="administradora" centroNombre={nombre} centroId={params.id}/>
+      <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
       <main style={{flex:1,padding:28,overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
           <div><h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Cumplimiento mensual</h1>
