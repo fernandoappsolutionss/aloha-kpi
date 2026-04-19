@@ -26,12 +26,52 @@ const ESTADO_STYLE = {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [centros, setCentros] = useState(CENTROS_DEMO)
+  const [centros, setCentros] = useState([])
   const [nombre, setNombre] = useState('')
   const critcos = centros.filter(c => c.estado === 'Crítico').length
 
   useEffect(() => {
     setNombre(localStorage.getItem('aloha_nombre') || 'Administrador')
+  }, [])
+
+  useEffect(() => {
+    (async () => {
+      const { data: centrosData } = await supabase.from('centros').select('id, nombre').order('nombre')
+      if (!centrosData || centrosData.length === 0) return
+      const ids = centrosData.map(c => c.id)
+      const { data: metasData } = await supabase.from('metas').select('*').eq('anio', 2026).eq('trimestre', 1).single()
+      const metaNuevosMes = metasData?.meta_nuevos_ingresos_mes || 20
+      const metaDesMes = Number(metasData?.meta_desercion_mes || 18.4)
+      const metaCobMes = metasData?.meta_cobranza_max || 1
+      const [{ data: rsData }, { data: ksData }, { data: usuariosData }] = await Promise.all([
+        supabase.from('resumen_mes').select('*').eq('year', 2026).in('month', [1,2,3]).in('centro_id', ids),
+        supabase.from('kpi_semanas').select('*').eq('year', 2026).in('month', [1,2,3]).in('centro_id', ids),
+        supabase.from('usuarios').select('nombre, centro_id').in('centro_id', ids)
+      ])
+      const enriched = centrosData.map(c => {
+        const rs = (rsData || []).filter(r => r.centro_id === c.id)
+        const ks = (ksData || []).filter(k => k.centro_id === c.id)
+        const admin = (usuariosData || []).find(u => u.centro_id === c.id)?.nombre || '—'
+        const months = [1,2,3].map(mo => {
+          const r = rs.find(x => x.month === mo)
+          const ws = ks.filter(x => x.month === mo)
+          const nuevos = ws.reduce((s,w) => s+(w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)
+          const desercion = ws.reduce((s,w) => s+(w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
+          let cob = 0
+          if (ws.length) { const last = [...ws].sort((a,b)=>b.semana-a.semana)[0]; cob = last.cob_d5 || last.cob_d4 || last.cob_d3 || last.cob_d2 || last.cob_d1 || 0 }
+          const ok = nuevos >= metaNuevosMes && desercion <= metaDesMes && cob <= metaCobMes
+          return { nuevos, desercion, cob, ok, ninosInicio: r?.ninos_inicio_mes||0, nuevosActivos: r?.nuevos_activos_mes||0 }
+        })
+        const totNuevos = months.reduce((s,m) => s+m.nuevos, 0)
+        const totDes = months.reduce((s,m) => s+m.desercion, 0)
+        const last = months[2]
+        const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
+        const cumpl = Math.round((months.filter(m => m.ok).length / 3) * 100)
+        const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
+        return { nombre: c.nombre, admin, ninos, nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes, cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado }
+      })
+      setCentros(enriched)
+    })()
   }, [])
 
   const totNinos = centros.reduce((a,c)=>a+c.ninos,0)
