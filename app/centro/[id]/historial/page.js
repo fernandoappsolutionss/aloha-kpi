@@ -144,7 +144,7 @@ export default function HistorialPage() {
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
-      <Sidebar/>
+      <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id}/>
       <main style={{flex:1,padding:24,overflowY:'auto'}}>
 
         {/* Header */}
