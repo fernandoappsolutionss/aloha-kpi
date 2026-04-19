@@ -5,6 +5,7 @@ import Sidebar from '../../../components/Sidebar'
 import { supabase } from '../../../lib/supabase'
 
 const REGIONES = ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste']
+const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', gray:'#F5F7FA', text:'#1A2744' }
 
 export default function CentrosPage() {
   const [centros, setCentros] = useState([])
@@ -14,12 +15,16 @@ export default function CentrosPage() {
   const [status, setStatus] = useState('')
   const [form, setForm] = useState({ nombre: '', region: 'Ciudad de Panamá' })
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(null)
 
   useEffect(() => { loadCentros() }, [])
 
   async function loadCentros() {
     setLoading(true)
-    const { data } = await supabase.from('centros').select('*, usuarios(count)').order('nombre')
+    const { data } = await supabase
+      .from('centros')
+      .select('id, nombre, region, usuarios(count)')
+      .order('nombre')
     setCentros(data || [])
     setLoading(false)
   }
@@ -44,19 +49,38 @@ export default function CentrosPage() {
     setSaving(false)
   }
 
-  async function deleteCenter(id, nombre) {
-    if (!confirm(`¿Eliminar "${nombre}"? Esta acción también eliminará todos sus datos.`)) return
-    const { error } = await supabase.from('centros').delete().eq('id', id)
-    if (error) { setStatus('❌ Error: ' + error.message); return }
-    setStatus('✅ Centro eliminado.')
-    loadCentros()
+  async function deleteCenter(id, nombre, userCount) {
+    const msg = userCount > 0
+      ? `¿Eliminar "${nombre}"? Tiene ${userCount} usuario(s) asignado(s). Serán desvinculados del centro.`
+      : `¿Eliminar "${nombre}"?`
+    if (!confirm(msg)) return
+
+    setDeleting(id); setStatus('')
+    try {
+      // Step 1: Desvincular usuarios de este centro (poner centro_id en null)
+      if (userCount > 0) {
+        const { error: unlinkError } = await supabase
+          .from('usuarios')
+          .update({ centro_id: null })
+          .eq('centro_id', id)
+        if (unlinkError) throw new Error('No se pudo desvincular usuarios: ' + unlinkError.message)
+      }
+
+      // Step 2: Eliminar el centro
+      const { error } = await supabase.from('centros').delete().eq('id', id)
+      if (error) throw error
+
+      setStatus('✅ Centro "' + nombre + '" eliminado correctamente.')
+      loadCentros()
+    } catch (e) {
+      setStatus('❌ Error al eliminar: ' + e.message)
+    }
+    setDeleting(null)
   }
 
   function editCentro(c) {
     setEditing(c.id); setForm({ nombre: c.nombre, region: c.region || 'Ciudad de Panamá' }); setShowForm(true)
   }
-
-  const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', greenLime:'#B8D432', gray:'#F5F7FA', text:'#1A2744' }
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
@@ -73,7 +97,11 @@ export default function CentrosPage() {
           </button>
         </div>
 
-        {status && <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FBE8E8':'#E6F4EC',color:status.includes('❌')?'#D63C3C':'#2D7D46',fontSize:13,fontWeight:500}}>{status}</div>}
+        {status && (
+          <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FBE8E8':'#E6F4EC',color:status.includes('❌')?'#D63C3C':'#2D7D46',fontSize:13,fontWeight:500}}>
+            {status}
+          </div>
+        )}
 
         {showForm && (
           <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,padding:24,marginBottom:20,boxShadow:'0 2px 12px rgba(27,69,128,0.08)'}}>
@@ -116,33 +144,36 @@ export default function CentrosPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#8896A9'}}>Cargando...</td></tr>
-              ) : centros.map((c,i) => (
-                <tr key={c.id} style={{background:i%2===0?'#fff':'#F9FAFC'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='#EEF3FB'}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#F9FAFC'}>
-                  <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
-                    <div style={{fontWeight:600,color:A.text}}>{c.nombre}</div>
-                  </td>
-                  <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',color:'#4A5568'}}>{c.region || '—'}</td>
-                  <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
-                    <span style={{background:'#EEF3FB',color:A.blueMid,padding:'2px 10px',borderRadius:12,fontSize:12,fontWeight:600}}>
-                      {c.usuarios?.[0]?.count || 0} usuarios
-                    </span>
-                  </td>
-                  <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
-                    <div style={{display:'flex',gap:8}}>
-                      <button onClick={()=>editCentro(c)}
-                        style={{padding:'5px 14px',border:`1px solid ${A.blueMid}`,borderRadius:6,background:'none',color:A.blueMid,fontSize:12,cursor:'pointer',fontWeight:500}}>
-                        Editar
-                      </button>
-                      <button onClick={()=>deleteCenter(c.id, c.nombre)}
-                        style={{padding:'5px 14px',border:'1px solid #D63C3C',borderRadius:6,background:'none',color:'#D63C3C',fontSize:12,cursor:'pointer'}}>
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              ) : centros.map((c,i) => {
+                const userCount = c.usuarios?.[0]?.count || 0
+                return (
+                  <tr key={c.id} style={{background:i%2===0?'#fff':'#F9FAFC'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='#EEF3FB'}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#F9FAFC'}>
+                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',fontWeight:600,color:A.text}}>{c.nombre}</td>
+                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',color:'#4A5568'}}>{c.region || '—'}</td>
+                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
+                      <span style={{background:'#EEF3FB',color:A.blueMid,padding:'2px 10px',borderRadius:12,fontSize:12,fontWeight:600}}>
+                        {userCount} usuario{userCount!==1?'s':''}
+                      </span>
+                    </td>
+                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
+                      <div style={{display:'flex',gap:8}}>
+                        <button onClick={()=>editCentro(c)}
+                          style={{padding:'5px 14px',border:`1px solid ${A.blueMid}`,borderRadius:6,background:'none',color:A.blueMid,fontSize:12,cursor:'pointer',fontWeight:500}}>
+                          Editar
+                        </button>
+                        <button
+                          onClick={()=>deleteCenter(c.id, c.nombre, userCount)}
+                          disabled={deleting===c.id}
+                          style={{padding:'5px 14px',border:'1px solid #D63C3C',borderRadius:6,background:'none',color:'#D63C3C',fontSize:12,cursor:deleting===c.id?'wait':'pointer',opacity:deleting===c.id?0.6:1}}>
+                          {deleting===c.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
               {!loading && centros.length === 0 && (
                 <tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#8896A9'}}>No hay centros. Crea el primero.</td></tr>
               )}
