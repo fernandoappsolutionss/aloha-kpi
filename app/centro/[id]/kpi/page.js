@@ -1,231 +1,406 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { supabase } from '../../../../lib/supabase'
 
-const METAS = { cob: 0.69, des: 3.68, ing: 4 }
-const MESES_N = ['', 'Enero', 'Febrero', 'Marzo']
-const initSems = () => Array.from({length:5},(_,i) => ({semana:i+1,cob:[0,0,0,0,0],des:[0,0,0,0,0],ing:[0,0,0,0,0]}))
-const calc = (arr, tipo) => tipo==='cob' ? Math.min(...arr) : arr.reduce((a,b)=>a+b,0)
+const MESES = ['Enero', 'Febrero', 'Marzo']
+const SEMANAS = [1, 2, 3, 4, 5]
+const DIAS = ['Día 1', 'Día 2', 'Día 3', 'Día 4', 'Día 5']
+const A = { blue: '#1B4580', blueMid: '#1D5FA6', green: '#4A8C3F', lime: '#B8D432', red: '#D63C3C', orange: '#E67E22', gray: '#F5F7FA', text: '#1A2744' }
+
+// ======= FÓRMULAS SEGÚN EXCEL KPI ALOHA =======
+// COBRANZA: Resultado = ÚLTIMO día ingresado (no suma). Meta = (niños_inicio × 1.5%) / 5. Cumple = Meta > Resultado
+// DESERCIÓN: Resultado = SUMA todos los días. Meta = (niños_inicio × 8%) / 5. Cumple = Meta >= Resultado
+// NUEVOS INGRESOS: Resultado = SUMA todos los días. Meta = meta_mensual / num_semanas. Cumple = Meta <= Resultado
+// NIÑOS ACTIVOS semana = inicio + nuevos_sem - desercion_sem (acumulado)
+// NIÑOS FINAL MES = ninos_inicio + nuevos_activos - total_desercion
+// PROM NIÑOS/GRUPO = niños_final / grupos_activos (Meta: > 8)
+// %CV = (120 / prom_niños_grupo) + 16
+// GPN = ((niños_final × 108) × (1 - %CV/100) - 7800) / niños_final
+
+function calcResultado(tipo, dias) {
+  const vals = dias.map(v => parseInt(v) || 0)
+  if (tipo === 'cob') {
+    // Cobranza = último día CON valor ingresado (de derecha a izquierda)
+    for (let i = vals.length - 1; i >= 0; i--) {
+      if (vals[i] > 0) return vals[i]
+    }
+    return 0
+  }
+  return vals.reduce((a, b) => a + b, 0)
+}
+
+function calcMeta(tipo, ninos_inicio, meta_nuevos, num_semanas = 5) {
+  if (tipo === 'cob') return Math.round((ninos_inicio * 0.015) / 5 * 10) / 10
+  if (tipo === 'des') return Math.round((ninos_inicio * 0.08) / 5 * 10) / 10
+  return Math.round(meta_nuevos / num_semanas * 10) / 10
+}
+
+function cumple(tipo, resultado, meta) {
+  if (tipo === 'cob') return meta > resultado
+  if (tipo === 'des') return meta >= resultado
+  return resultado >= meta
+}
 
 export default function KPIPage() {
-  const params = useParams()
-  const sp = useSearchParams()
-  const nombre = sp.get('nombre') || localStorage.getItem('aloha_centro_nombre') || 'MI CENTRO'
-  const centroId = params.id === 'demo' ? null : params.id
-
-  const [mes, setMes] = useState(1)
-  const [sems, setSems] = useState(initSems())
-  const [resumen, setResumen] = useState({ni:0,nf:0,grupos:0,cp_inv:0,cp_as:0,cp_mat:0,mot_p:0,mot_e:0,mot_t:0,mot_h:0,or_ref:0,or_mkt:0,or_cen:0,or_act:0,or_med:0})
-  const [trimestreId, setTrimestreId] = useState(null)
+  const { id } = useParams()
+  const [mesActivo, setMesActivo] = useState(0)
+  const [centroNombre, setCentroNombre] = useState('')
+  const [trimId, setTrimId] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { loadData() }, [mes, centroId])
+  // Config del mes
+  const [config, setConfig] = useState({
+    ninos_inicio: 0,
+    grupos_activos: 0,
+    meta_nuevos_mensual: 20,
+    nuevos_activos_mes: 0,
+    cp_invitados: 0,
+    cp_asistieron: 0,
+    cp_matriculados: 0,
+    mot_tecnica: 0,
+    mot_perdida_clase: 0,
+    mot_economico: 0,
+    mot_horario: 0,
+    orig_referido: 0,
+    orig_marketing: 0,
+    orig_centro: 0,
+    orig_activaciones: 0,
+    orig_medios: 0,
+  })
 
-  async function loadData() {
-    if (!centroId) { setLoading(false); return }
+  // Semanas: [{ cob:[5], des:[5], ing:[5] }, ...]
+  const emptyWeek = () => ({ cob: ['','','','',''], des: ['','','','',''], ing: ['','','','',''] })
+  const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyWeek()))
+
+  const loadData = useCallback(async () => {
     setLoading(true)
-    try {
-      // Get or create trimestre
-      let { data: trim } = await supabase
-        .from('trimestres')
-        .select('id')
-        .eq('centro_id', centroId)
-        .eq('anio', 2026)
-        .eq('trimestre', 1)
-        .single()
+    const { data: centro } = await supabase.from('centros').select('nombre').eq('id', id).single()
+    if (centro) setCentroNombre(centro.nombre)
 
-      if (!trim) {
-        const { data: newTrim } = await supabase
-          .from('trimestres')
-          .insert({ centro_id: centroId, anio: 2026, trimestre: 1 })
-          .select('id').single()
-        trim = newTrim
+    const { data: trim } = await supabase.from('trimestres').select('id').eq('centro_id', id).order('created_at', { ascending: false }).limit(1)
+    const tId = trim?.[0]?.id
+    setTrimId(tId)
+
+    if (!tId) { setLoading(false); return }
+
+    // Load resumen del mes
+    const mes = mesActivo + 1
+    const { data: resumen } = await supabase.from('resumen_mes').select('*').eq('trimestre_id', tId).eq('mes', mes).single()
+    if (resumen) {
+      setConfig({
+        ninos_inicio: resumen.ninos_inicio_mes || 0,
+        grupos_activos: resumen.grupos_activos || 0,
+        meta_nuevos_mensual: resumen.meta_nuevos_mensual || 20,
+        nuevos_activos_mes: resumen.nuevos_activos_mes || 0,
+        cp_invitados: resumen.cp_invitados || 0,
+        cp_asistieron: resumen.cp_asistieron || 0,
+        cp_matriculados: resumen.cp_matriculados || 0,
+        mot_tecnica: resumen.mot_tecnica || 0,
+        mot_perdida_clase: resumen.mot_perdida_clase || 0,
+        mot_economico: resumen.mot_economico || 0,
+        mot_horario: resumen.mot_horario || 0,
+        orig_referido: resumen.orig_referido || 0,
+        orig_marketing: resumen.orig_marketing || 0,
+        orig_centro: resumen.orig_centro || 0,
+        orig_activaciones: resumen.orig_activaciones || 0,
+        orig_medios: resumen.orig_medios || 0,
+      })
+    }
+
+    // Load semanas
+    const { data: kpiRows } = await supabase.from('kpi_semanas').select('*').eq('trimestre_id', tId).eq('mes', mes).order('semana')
+    const newSems = SEMANAS.map((s) => {
+      const row = kpiRows?.find(r => r.semana === s)
+      if (!row) return emptyWeek()
+      return {
+        cob: [row.cob_d1 ?? '', row.cob_d2 ?? '', row.cob_d3 ?? '', row.cob_d4 ?? '', row.cob_d5 ?? ''],
+        des: [row.des_d1 ?? '', row.des_d2 ?? '', row.des_d3 ?? '', row.des_d4 ?? '', row.des_d5 ?? ''],
+        ing: [row.ing_d1 ?? '', row.ing_d2 ?? '', row.ing_d3 ?? '', row.ing_d4 ?? '', row.ing_d5 ?? ''],
       }
-      setTrimestreId(trim.id)
-
-      // Load semanas for this mes
-      const { data: semsData } = await supabase
-        .from('kpi_semanas')
-        .select('*')
-        .eq('trimestre_id', trim.id)
-        .eq('mes', mes)
-        .order('semana')
-
-      if (semsData && semsData.length > 0) {
-        const loaded = initSems()
-        semsData.forEach(s => {
-          const idx = s.semana - 1
-          loaded[idx].cob = [s.cob_d1,s.cob_d2,s.cob_d3,s.cob_d4,s.cob_d5]
-          loaded[idx].des = [s.des_d1,s.des_d2,s.des_d3,s.des_d4,s.des_d5]
-          loaded[idx].ing = [s.ing_d1,s.ing_d2,s.ing_d3,s.ing_d4,s.ing_d5]
-        })
-        setSems(loaded)
-      } else {
-        setSems(initSems())
-      }
-
-      // Load resumen mes
-      const { data: res } = await supabase
-        .from('resumen_mes')
-        .select('*')
-        .eq('trimestre_id', trim.id)
-        .eq('mes', mes)
-        .single()
-
-      if (res) {
-        setResumen({ni:res.ninos_inicio_mes||0,nf:res.ninos_final_mes||0,grupos:res.grupos_activos||0,
-          cp_inv:res.cp_invitados||0,cp_as:res.cp_asistieron||0,cp_mat:res.cp_matriculados||0,
-          mot_p:res.mot_perdida_clase||0,mot_e:res.mot_economico||0,mot_t:res.mot_tecnica||0,mot_h:res.mot_horario||0,
-          or_ref:res.orig_referido||0,or_mkt:res.orig_marketing||0,or_cen:res.orig_centro||0,or_act:res.orig_activaciones||0,or_med:res.orig_medios||0})
-      } else {
-        setResumen({ni:0,nf:0,grupos:0,cp_inv:0,cp_as:0,cp_mat:0,mot_p:0,mot_e:0,mot_t:0,mot_h:0,or_ref:0,or_mkt:0,or_cen:0,or_act:0,or_med:0})
-      }
-    } catch (e) { setStatus('Error cargando datos: ' + e.message) }
+    })
+    setSemanas(newSems)
     setLoading(false)
-  }
+  }, [id, mesActivo])
 
-  function upd(si, tipo, di, val) {
-    setSems(prev => { const n = prev.map(s => ({...s,[tipo]:[...s[tipo]]})); n[si][tipo][di]=parseInt(val)||0; return n })
-  }
+  useEffect(() => { loadData() }, [loadData])
 
-  async function save() {
-    if (!centroId) { setStatus('Modo demo — conéctate con tu cuenta real para guardar.'); return }
+  async function handleSave() {
+    if (!trimId) { setStatus('❌ No hay trimestre activo.'); return }
     setSaving(true); setStatus('')
+    const mes = mesActivo + 1
     try {
-      // Upsert cada semana
-      for (const sem of sems) {
-        await supabase.from('kpi_semanas').upsert({
-          trimestre_id: trimestreId, mes, semana: sem.semana,
-          cob_d1:sem.cob[0],cob_d2:sem.cob[1],cob_d3:sem.cob[2],cob_d4:sem.cob[3],cob_d5:sem.cob[4],
-          des_d1:sem.des[0],des_d2:sem.des[1],des_d3:sem.des[2],des_d4:sem.des[3],des_d5:sem.des[4],
-          ing_d1:sem.ing[0],ing_d2:sem.ing[1],ing_d3:sem.ing[2],ing_d4:sem.ing[3],ing_d5:sem.ing[4],
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'trimestre_id,mes,semana' })
-      }
-      // Upsert resumen mes
-      await supabase.from('resumen_mes').upsert({
-        trimestre_id: trimestreId, mes,
-        ninos_inicio_mes:resumen.ni, ninos_final_mes:resumen.nf, grupos_activos:resumen.grupos,
-        cp_invitados:resumen.cp_inv, cp_asistieron:resumen.cp_as, cp_matriculados:resumen.cp_mat,
-        mot_perdida_clase:resumen.mot_p, mot_economico:resumen.mot_e, mot_tecnica:resumen.mot_t, mot_horario:resumen.mot_h,
-        orig_referido:resumen.or_ref, orig_marketing:resumen.or_mkt, orig_centro:resumen.or_cen,
-        orig_activaciones:resumen.or_act, orig_medios:resumen.or_med,
+      // Save config (resumen_mes)
+      const configData = {
+        trimestre_id: trimId, mes,
+        ninos_inicio_mes: parseInt(config.ninos_inicio) || 0,
+        grupos_activos: parseInt(config.grupos_activos) || 0,
+        meta_nuevos_mensual: parseInt(config.meta_nuevos_mensual) || 20,
+        nuevos_activos_mes: parseInt(config.nuevos_activos_mes) || 0,
+        cp_invitados: parseInt(config.cp_invitados) || 0,
+        cp_asistieron: parseInt(config.cp_asistieron) || 0,
+        cp_matriculados: parseInt(config.cp_matriculados) || 0,
+        mot_tecnica: parseInt(config.mot_tecnica) || 0,
+        mot_perdida_clase: parseInt(config.mot_perdida_clase) || 0,
+        mot_economico: parseInt(config.mot_economico) || 0,
+        mot_horario: parseInt(config.mot_horario) || 0,
+        orig_referido: parseInt(config.orig_referido) || 0,
+        orig_marketing: parseInt(config.orig_marketing) || 0,
+        orig_centro: parseInt(config.orig_centro) || 0,
+        orig_activaciones: parseInt(config.orig_activaciones) || 0,
+        orig_medios: parseInt(config.orig_medios) || 0,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'trimestre_id,mes' })
-      setSaved(true); setStatus('✅ Datos guardados correctamente en Supabase.')
-      setTimeout(() => { setSaved(false); setStatus('') }, 4000)
-    } catch (e) { setStatus('❌ Error guardando: ' + e.message) }
+      }
+      const { error: resErr } = await supabase.from('resumen_mes').upsert(configData, { onConflict: 'trimestre_id,mes' })
+      if (resErr) throw new Error('Resumen: ' + resErr.message)
+
+      // Save semanas
+      for (let i = 0; i < SEMANAS.length; i++) {
+        const s = semanas[i]
+        const kpiData = {
+          trimestre_id: trimId, mes, semana: i + 1,
+          cob_d1: parseInt(s.cob[0]) || 0, cob_d2: parseInt(s.cob[1]) || 0,
+          cob_d3: parseInt(s.cob[2]) || 0, cob_d4: parseInt(s.cob[3]) || 0,
+          cob_d5: parseInt(s.cob[4]) || 0,
+          des_d1: parseInt(s.des[0]) || 0, des_d2: parseInt(s.des[1]) || 0,
+          des_d3: parseInt(s.des[2]) || 0, des_d4: parseInt(s.des[3]) || 0,
+          des_d5: parseInt(s.des[4]) || 0,
+          ing_d1: parseInt(s.ing[0]) || 0, ing_d2: parseInt(s.ing[1]) || 0,
+          ing_d3: parseInt(s.ing[2]) || 0, ing_d4: parseInt(s.ing[3]) || 0,
+          ing_d5: parseInt(s.ing[4]) || 0,
+          updated_at: new Date().toISOString()
+        }
+        const { error: kErr } = await supabase.from('kpi_semanas').upsert(kpiData, { onConflict: 'trimestre_id,mes,semana' })
+        if (kErr) throw new Error('Semana ' + (i+1) + ': ' + kErr.message)
+      }
+      setStatus('✅ KPI guardado correctamente.')
+    } catch(e) { setStatus('❌ Error al guardar: ' + e.message) }
     setSaving(false)
   }
 
-  const totIng = sems.reduce((a,s)=>a+calc(s.ing,'ing'),0)
-  const totDes = sems.reduce((a,s)=>a+calc(s.des,'des'),0)
-  const totCob = calc(sems.map(s=>calc(s.cob,'cob')),'cob')
-  const tipos = [{k:'cob',l:'Cobranza vencida (N°)',c:'#533AB7'},{k:'des',l:'Deserción (retirados)',c:'#D85A30'},{k:'ing',l:'Nuevos ingresos — ventas',c:'#0F6E56'}]
+  // Calculated totals
+  const nI = parseInt(config.ninos_inicio) || 0
+  const nA = parseInt(config.nuevos_activos_mes) || 0
+  const gA = parseInt(config.grupos_activos) || 1
+  const metaN = parseInt(config.meta_nuevos_mensual) || 20
+  const totalDes = semanas.reduce((a,s) => a + s.des.reduce((b,v) => b + (parseInt(v)||0), 0), 0)
+  const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b + (parseInt(v)||0), 0), 0)
+  const ninosFinal = Math.max(0, nI + nA - totalDes)
+  const promGrupo = gA > 0 ? (ninosFinal / gA) : 0
+  const pcv = gA > 0 ? ((120 / Math.max(promGrupo, 0.1)) + 16) : 0
+  const gpn = ninosFinal > 0 ? (((ninosFinal * 108) * (1 - pcv/100) - 7800) / ninosFinal) : 0
+
+  function updateDia(semIdx, tipo, diaIdx, val) {
+    setSemanas(prev => {
+      const next = prev.map((s,i) => i === semIdx ? { ...s, [tipo]: s[tipo].map((d,j) => j === diaIdx ? val : d) } : s)
+      return next
+    })
+  }
+
+  const inp = (val, onChange) => (
+    <input type="number" min="0" value={val} onChange={e => onChange(e.target.value)}
+      style={{ width: 60, padding: '4px 6px', border: '1px solid #D0D7E3', borderRadius: 6, fontSize: 13, textAlign: 'center', background: '#fff', outline: 'none' }}/>
+  )
+
+  const badge = (ok) => (
+    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: ok ? '#E6F4EC' : '#FBE8E8', color: ok ? A.green : A.red }}>
+      {ok ? 'Sí ✓' : 'No ✗'}
+    </span>
+  )
+
+  const sectionHeader = (title, color = A.blue) => (
+    <div style={{ background: color, color: '#fff', padding: '6px 14px', borderRadius: '8px 8px 0 0', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{title}</div>
+  )
+
+  const kpiTable = (tipo, label, semIdx) => {
+    const s = semanas[semIdx]
+    const dias = s[tipo]
+    const res = calcResultado(tipo, dias)
+    const meta = calcMeta(tipo, nI, metaN)
+    const ok = cumple(tipo, res, meta)
+    return (
+      <div style={{ marginBottom: 2 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <tbody>
+            <tr style={{ background: '#F9FAFC' }}>
+              <td style={{ padding: '6px 10px', width: 200, fontWeight: 600, color: A.text, fontSize: 11 }}>{label}</td>
+              {dias.map((d, di) => (
+                <td key={di} style={{ padding: '4px 3px', textAlign: 'center' }}>
+                  {inp(d, v => updateDia(semIdx, tipo, di, v))}
+                </td>
+              ))}
+              <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: tipo === 'cob' ? A.blue : tipo === 'des' ? A.red : A.green, minWidth: 50 }}>{res}</td>
+              <td style={{ padding: '4px 6px', textAlign: 'center', color: '#666', fontSize: 11, minWidth: 55 }}>{meta}</td>
+              <td style={{ padding: '4px 6px', textAlign: 'center', minWidth: 55 }}>{badge(ok)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center'}}>Cargando KPI...</div>
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
-      <Sidebar rol="administradora" centroNombre={nombre} centroId={params.id}/>
-      <main style={{flex:1,padding:28,overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: A.gray }}>
+      <Sidebar/>
+      <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Registro KPI Semanal</h1>
-            <p style={{fontSize:12,color:'#888'}}>{nombre} · Q1 2026</p>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: A.text }}>Registro KPI Semanal</h1>
+            <p style={{ fontSize: 12, color: '#8896A9' }}>{centroNombre} · Q1 2026</p>
           </div>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            {status && <span style={{fontSize:12,color:status.includes('❌')?'#993C1D':'#0F6E56',fontWeight:500,maxWidth:300}}>{status}</span>}
-            <button onClick={save} disabled={saving||loading} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>
-              {saving?'Guardando...':'💾 Guardar'}
-            </button>
-          </div>
+          <button onClick={handleSave} disabled={saving}
+            style={{ padding: '10px 28px', background: `linear-gradient(135deg,${A.blue},${A.blueMid})`, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, boxShadow: '0 4px 12px rgba(27,69,128,0.25)' }}>
+            {saving ? 'Guardando...' : '💾 Guardar'}
+          </button>
         </div>
 
-        {loading && <div style={{padding:20,textAlign:'center',color:'#888'}}>Cargando datos...</div>}
-
-        {!loading && <>
-          <div style={{display:'flex',marginBottom:20,borderBottom:'0.5px solid #e8e8e4'}}>
-            {['Enero','Febrero','Marzo'].map((m,i)=>
-              <button key={m} onClick={()=>setMes(i+1)}
-                style={{padding:'9px 20px',background:'none',border:'none',fontSize:13,cursor:'pointer',borderBottom:mes===i+1?'2px solid #533AB7':'2px solid transparent',color:mes===i+1?'#533AB7':'#888',fontWeight:mes===i+1?600:400,marginBottom:-1}}>
-                {m}
-              </button>
-            )}
+        {status && (
+          <div style={{ padding: '10px 16px', borderRadius: 8, marginBottom: 16, background: status.includes('❌') ? '#FBE8E8' : '#E6F4EC', color: status.includes('❌') ? A.red : A.green, fontSize: 13, fontWeight: 500 }}>
+            {status}
           </div>
+        )}
 
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20}}>
-            {[
-              {l:'Nuevos ingresos',v:totIng,ok:totIng>=20,meta:'Meta mes: 20'},
-              {l:'Deserción total',v:totDes,ok:totDes<=18.4,meta:'Meta máx: 18.4'},
-              {l:'Cobranza vencida',v:totCob,ok:totCob<=1,meta:'Meta: ≤ 1'}
-            ].map((m,i)=><div key={i} style={{background:'#fff',border:`1.5px solid ${m.ok?'#5DCAA5':'#F0997B'}`,borderRadius:10,padding:'16px 18px'}}>
-              <label style={{fontSize:11,color:'#888',display:'block',marginBottom:6,fontWeight:500}}>{m.l}</label>
-              <div style={{fontSize:28,fontWeight:700,color:m.ok?'#0F6E56':'#993C1D'}}>{m.v}</div>
-              <div style={{fontSize:11,color:'#888'}}>{m.meta}</div>
-            </div>)}
-          </div>
-
-          {tipos.map(({k,l,c}) => (
-            <div key={k} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:18,marginBottom:16}}>
-              <h3 style={{fontSize:12,fontWeight:600,marginBottom:14,textTransform:'uppercase',letterSpacing:'0.04em',color:c}}>{l}</h3>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead><tr>
-                    <th style={{padding:'7px 10px',textAlign:'left',fontSize:11,fontWeight:500,color:'#aaa',borderBottom:'0.5px solid #f0f0ec'}}>Semana</th>
-                    {['Día 1','Día 2','Día 3','Día 4','Día 5'].map(d=><th key={d} style={{padding:'7px 10px',textAlign:'left',fontSize:11,fontWeight:500,color:'#aaa',borderBottom:'0.5px solid #f0f0ec'}}>{d}</th>)}
-                    <th style={{padding:'7px 10px',textAlign:'left',fontSize:11,fontWeight:500,color:'#aaa',borderBottom:'0.5px solid #f0f0ec'}}>Resultado</th>
-                    <th style={{padding:'7px 10px',textAlign:'left',fontSize:11,fontWeight:500,color:'#aaa',borderBottom:'0.5px solid #f0f0ec'}}>¿Cumple?</th>
-                  </tr></thead>
-                  <tbody>{sems.map((sem,si)=>{
-                    const r = calc(sem[k],k)
-                    const meta = k==='cob'?METAS.cob:k==='des'?METAS.des:METAS.ing
-                    const ok = k==='cob'?r<=meta:k==='des'?r<=meta:r>=meta
-                    return <tr key={si}>
-                      <td style={{padding:'6px 10px',fontWeight:500,fontSize:12,color:'#555'}}>Sem {sem.semana}</td>
-                      {sem[k].map((val,di)=><td key={di} style={{padding:'6px 6px'}}>
-                        <input type="number" min="0" value={val||''} onChange={e=>upd(si,k,di,e.target.value)}
-                          style={{width:56,padding:'6px 8px',border:'0.5px solid #e0e0dc',borderRadius:6,fontSize:13,textAlign:'center',background:'#fafaf8',outline:'none'}} placeholder="0"/>
-                      </td>)}
-                      <td style={{padding:'6px 6px'}}>
-                        <span style={{padding:'4px 12px',borderRadius:6,fontWeight:600,fontSize:13,background:ok?'#E1F5EE':'#FAECE7',color:ok?'#0F6E56':'#993C1D'}}>{r}</span>
-                      </td>
-                      <td style={{padding:'6px 10px'}}>
-                        <span style={{fontSize:11,fontWeight:600,color:ok?'#0F6E56':'#993C1D'}}>{ok?'Sí ✓':'No ✗'}</span>
-                      </td>
-                    </tr>
-                  })}</tbody>
-                </table>
-              </div>
-            </div>
+        {/* Tabs meses */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+          {MESES.map((m, i) => (
+            <button key={m} onClick={() => setMesActivo(i)}
+              style={{ padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: mesActivo === i ? A.blue : '#fff', color: mesActivo === i ? '#fff' : '#4A5568', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+              {m}
+            </button>
           ))}
+        </div>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-            {[
-              {t:'Niños y grupos',fields:[{l:'Niños inicio del mes',k:'ni'},{l:'Niños final del mes',k:'nf'},{l:'Grupos activos',k:'grupos'}]},
-              {t:'Clase de prueba',fields:[{l:'Invitados',k:'cp_inv'},{l:'Asistieron',k:'cp_as'},{l:'Matriculados',k:'cp_mat'}]},
-              {t:'Motivo deserción',fields:[{l:'Pérdida de clase',k:'mot_p'},{l:'Económico',k:'mot_e'},{l:'Técnica',k:'mot_t'},{l:'Horario',k:'mot_h'}]},
-              {t:'Origen nuevos ingresos',fields:[{l:'Referido',k:'or_ref'},{l:'Marketing',k:'or_mkt'},{l:'Centro',k:'or_cen'},{l:'Activaciones',k:'or_act'},{l:'Medios',k:'or_med'}]},
-            ].map(({t,fields})=>(
-              <div key={t} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:18}}>
-                <h3 style={{fontSize:12,fontWeight:600,color:'#666',marginBottom:14,textTransform:'uppercase',letterSpacing:'0.04em'}}>{t}</h3>
-                {fields.map(f=><div key={f.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:10,marginBottom:10,borderBottom:'0.5px solid #f5f5f2'}}>
-                  <label style={{fontSize:12,color:'#555',flex:1}}>{f.l}</label>
-                  <input type="number" min="0" value={resumen[f.k]||''} onChange={e=>setResumen({...resumen,[f.k]:parseInt(e.target.value)||0})}
-                    style={{width:80,padding:'6px 8px',border:'0.5px solid #e0e0dc',borderRadius:6,fontSize:13,textAlign:'center',background:'#fafaf8',outline:'none'}} placeholder="0"/>
-                </div>)}
+        {/* Config del mes */}
+        <div style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 2px 8px rgba(27,69,128,0.06)' }}>
+          <h3 style={{ fontSize: 12, fontWeight: 700, color: A.blue, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Configuración del mes — {MESES[mesActivo]}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            {[['Niños inicio mes', 'ninos_inicio'], ['Grupos activos', 'grupos_activos'], ['Meta nuevos (mensual)', 'meta_nuevos_mensual'], ['Nuevos activos mes', 'nuevos_activos_mes']].map(([lbl, key]) => (
+              <div key={key}>
+                <label style={{ fontSize: 11, color: '#4A5568', fontWeight: 600, display: 'block', marginBottom: 4 }}>{lbl}</label>
+                <input type="number" min="0" value={config[key]}
+                  onChange={e => setConfig(c => ({ ...c, [key]: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #E8EBF0', borderRadius: 8, fontSize: 13, background: '#F5F7FA', boxSizing: 'border-box' }}/>
               </div>
             ))}
           </div>
-          <div style={{textAlign:'right',marginTop:20}}>
-            <button onClick={save} disabled={saving} style={{padding:'10px 24px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>
-              {saving?'Guardando...':'💾 Guardar todos los datos'}
-            </button>
+        </div>
+
+        {/* Indicadores calculados */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+          {[
+            { label: 'Total Deserción', val: totalDes, color: A.red },
+            { label: 'Total Nuevos', val: totalIng, color: A.green },
+            { label: 'Niños Final Mes', val: ninosFinal, color: A.blue },
+            { label: 'Prom. Niños/Grupo', val: promGrupo.toFixed(2), color: promGrupo >= 8 ? A.green : A.red, meta: '≥ 8', ok: promGrupo >= 8 },
+            { label: '%CV', val: pcv.toFixed(1) + '%', color: '#7B68EE' },
+          ].map(({ label, val, color, meta, ok }) => (
+            <div key={label} style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 10, padding: '12px 14px', textAlign: 'center', boxShadow: '0 1px 6px rgba(27,69,128,0.06)' }}>
+              <p style={{ fontSize: 10, color: '#8896A9', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</p>
+              <p style={{ fontSize: 22, fontWeight: 800, color }}>{val}</p>
+              {meta && <p style={{ fontSize: 10, color: ok ? A.green : A.red, fontWeight: 600, marginTop: 2 }}>{ok ? '✓ Cumple (meta ' + meta + ')' : '✗ No cumple (meta ' + meta + ')'}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* GPN */}
+        <div style={{ background: gpn >= 0 ? '#E6F4EC' : '#FBE8E8', border: '1px solid ' + (gpn >= 0 ? '#4A8C3F' : A.red), borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: gpn >= 0 ? A.green : A.red, textTransform: 'uppercase', letterSpacing: '0.06em' }}>GPN (Ganancia por Niño):</span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: gpn >= 0 ? A.green : A.red }}>${gpn.toFixed(2)}</span>
+          <span style={{ fontSize: 11, color: '#666' }}>Fórmula: ((Niños final × 108) × (1 - %CV/100) - 7800) / Niños final</span>
+        </div>
+
+        {/* Tabla encabezado columnas */}
+        <div style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(27,69,128,0.06)', marginBottom: 20 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: `linear-gradient(135deg,${A.blue},${A.blueMid})` }}>
+                <th style={{ padding: '10px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#fff', width: 200 }}>Semana / Indicador</th>
+                {DIAS.map(d => <th key={d} style={{ padding: '10px 3px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', width: 70 }}>{d}</th>)}
+                <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', width: 60 }}>Resultado</th>
+                <th style={{ padding: '10px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', width: 60 }}>Meta</th>
+                <th style={{ padding: '10px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', width: 65 }}>¿Cumple?</th>
+              </tr>
+            </thead>
+          </table>
+
+          {SEMANAS.map((s, i) => (
+            <div key={s} style={{ borderBottom: i < SEMANAS.length - 1 ? '2px solid #E8EBF0' : 'none', padding: '10px 0 6px' }}>
+              <div style={{ padding: '2px 10px 6px', fontSize: 11, fontWeight: 700, color: '#8896A9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Semana {s}</div>
+              {kpiTable('cob', 'Cobranza Vencida (N°)', i)}
+              {kpiTable('des', 'Deserción (Retirados)', i)}
+              {kpiTable('ing', 'Nuevos Ingresos - Ventas', i)}
+            </div>
+          ))}
+        </div>
+
+        {/* Clase de prueba y motivos */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+          <div style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(27,69,128,0.06)' }}>
+            {sectionHeader('Clase de Prueba')}
+            <div style={{ padding: 16 }}>
+              {[['Invitados', 'cp_invitados'], ['Asistieron', 'cp_asistieron'], ['Matriculados', 'cp_matriculados']].map(([lbl, key]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, color: A.text }}>{lbl}</span>
+                  <input type="number" min="0" value={config[key]}
+                    onChange={e => setConfig(c => ({ ...c, [key]: e.target.value }))}
+                    style={{ width: 70, padding: '5px 8px', border: '1.5px solid #E8EBF0', borderRadius: 6, fontSize: 13, textAlign: 'center', background: '#F5F7FA' }}/>
+                </div>
+              ))}
+              {config.cp_invitados > 0 && (
+                <div style={{ fontSize: 11, color: '#666', marginTop: 8 }}>
+                  Efectividad: {Math.round((parseInt(config.cp_asistieron)||0)/(parseInt(config.cp_invitados)||1)*100)}% asistencia · {Math.round((parseInt(config.cp_matriculados)||0)/(parseInt(config.cp_asistieron)||1)*100)}% conversión
+                </div>
+              )}
+            </div>
           </div>
-        </>}
+
+          <div style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(27,69,128,0.06)' }}>
+            {sectionHeader('Motivo Deserción', A.red)}
+            <div style={{ padding: 16 }}>
+              {[['Técnica', 'mot_tecnica'], ['Pérdida de clase', 'mot_perdida_clase'], ['Económico', 'mot_economico'], ['Horario', 'mot_horario']].map(([lbl, key]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, color: A.text }}>{lbl}</span>
+                  <input type="number" min="0" value={config[key]}
+                    onChange={e => setConfig(c => ({ ...c, [key]: e.target.value }))}
+                    style={{ width: 70, padding: '5px 8px', border: '1.5px solid #E8EBF0', borderRadius: 6, fontSize: 13, textAlign: 'center', background: '#F5F7FA' }}/>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: '#666', marginTop: 8 }}>
+                Total: {['mot_tecnica','mot_perdida_clase','mot_economico','mot_horario'].reduce((a,k) => a + (parseInt(config[k])||0), 0)}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', border: '1px solid #E8EBF0', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(27,69,128,0.06)' }}>
+            {sectionHeader('Origen Nuevos Ingresos', A.green)}
+            <div style={{ padding: 16 }}>
+              {[['Referido', 'orig_referido'], ['Marketing', 'orig_marketing'], ['Centro', 'orig_centro'], ['Activaciones', 'orig_activaciones'], ['Medios (Radio/TV)', 'orig_medios']].map(([lbl, key]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, color: A.text }}>{lbl}</span>
+                  <input type="number" min="0" value={config[key]}
+                    onChange={e => setConfig(c => ({ ...c, [key]: e.target.value }))}
+                    style={{ width: 70, padding: '5px 8px', border: '1.5px solid #E8EBF0', borderRadius: 6, fontSize: 13, textAlign: 'center', background: '#F5F7FA' }}/>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: '#666', marginTop: 8 }}>
+                Total: {['orig_referido','orig_marketing','orig_centro','orig_activaciones','orig_medios'].reduce((a,k) => a + (parseInt(config[k])||0), 0)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nota sobre fórmulas */}
+        <div style={{ background: '#F0F4FF', border: '1px solid #C5D5F5', borderRadius: 10, padding: '10px 16px', fontSize: 11, color: '#4A5568' }}>
+          <strong style={{ color: A.blue }}>Fórmulas según KPI ALOHA:</strong> Cobranza = último día registrado | Deserción = suma de días | Nuevos = suma de días | 
+          Meta Cob = (niños_inicio × 1.5%) ÷ 5 semanas | Meta Des = (niños_inicio × 8%) ÷ 5 semanas | 
+          %CV = (120 ÷ prom_niños_grupo) + 16 | GPN = ((niños_final × 108) × (1 − %CV%) − 7800) ÷ niños_final
+        </div>
       </main>
     </div>
   )
