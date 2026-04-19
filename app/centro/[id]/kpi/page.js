@@ -147,7 +147,7 @@ export default function KPIPage() {
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
-      <Sidebar/>
+      <Sidebar rol="usuario" centroNombre={centroNombre} centroId={id}/>
       <main style={{flex:1,padding:24,overflowY:'auto'}}>
 
         {/* Header */}
