@@ -2,7 +2,6 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import AlohaLogo from './AlohaLogo'
 
 const A = {
   blue: '#1B4580', blueMid: '#1D5FA6', blueLight: '#4A90C4',
@@ -35,7 +34,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   ]
 
   const adminConfig = [
-    { label: 'Centros', icon: '🏫', href: '/dashboard/centros' },
+    { label: 'Gestión centros', icon: '🏫', href: '/dashboard/centros' },
     { label: 'Usuarios', icon: '👥', href: '/dashboard/usuarios' },
   ]
 
@@ -59,19 +58,19 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   return (
     <aside style={{
-      width: 220, minHeight: '100vh', flexShrink: 0,
+      width: 220,
+      minHeight: '100vh',
+      flexShrink: 0,
       background: `linear-gradient(180deg, ${A.blue} 0%, #163870 100%)`,
-      display: 'flex', flexDirection: 'column',
+      display: 'flex',
+      flexDirection: 'column',
       boxShadow: '4px 0 20px rgba(27,69,128,0.3)'
     }}>
       {/* Logo Header */}
       <div style={{padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <AlohaLogo height={30} white={true}/>
-          <div>
-            <div style={{fontSize:14,fontWeight:800,color:'#fff',letterSpacing:1.5}}>ALOHA KPI</div>
-            <div style={{fontSize:10,color:A.textLight,marginTop:1}}>{isAdmin ? '🛡 Administrador' : '🏫 ' + (centroNombre || 'Centro')}</div>
-          </div>
+        <div style={{fontSize:18,fontWeight:800,color:'#fff',letterSpacing:1.5,lineHeight:1}}>ALOHA KPI</div>
+        <div style={{fontSize:10,color:A.textLight,marginTop:6,letterSpacing:'0.04em'}}>
+          {isAdmin ? '🛡 Administrador' : '🏫 ' + (centroNombre || 'Centro')}
         </div>
       </div>
 
@@ -80,12 +79,11 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
         <div style={{padding:'8px 12px 4px',fontSize:10,color:A.textLight,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:600}}>
           {isAdmin ? 'Panel' : 'Mi Centro'}
         </div>
-
         {items.map(item => (
           <button key={item.href} onClick={() => router.push(item.href)}
             style={{
-              width:'100%', display:'flex', alignItems:'center', gap:10,
-              padding:'9px 14px', background: isActive(item.href) ? A.blueActive : 'none',
+              width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
+              background: isActive(item.href) ? A.blueActive : 'none',
               border:'none', textAlign:'left', fontSize:13, cursor:'pointer',
               color: isActive(item.href) ? '#fff' : A.textLight,
               fontWeight: isActive(item.href) ? 600 : 400,
@@ -107,11 +105,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
               style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 14px',background:'none',border:'none',cursor:'pointer',color:A.textLight,fontSize:13,margin:'4px 0 0'}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:14,width:18,textAlign:'center'}}>🏫</span>
-                <span>Centros</span>
+                <span>Ir a centro</span>
               </div>
               <span style={{fontSize:10,transition:'transform 0.2s',transform:centrosOpen?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
             </button>
-
             {centrosOpen && centros.map(c => {
               const active = path.startsWith(`/centro/${c.id}`)
               return (
@@ -138,8 +135,8 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
             {adminConfig.map(item => (
               <button key={item.href} onClick={() => router.push(item.href)}
                 style={{
-                  width:'100%', display:'flex', alignItems:'center', gap:10,
-                  padding:'9px 14px', background: isActive(item.href) ? A.blueActive : 'none',
+                  width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
+                  background: isActive(item.href) ? A.blueActive : 'none',
                   border:'none', textAlign:'left', fontSize:13, cursor:'pointer',
                   color: isActive(item.href) ? '#fff' : A.textLight,
                   fontWeight: isActive(item.href) ? 600 : 400,
