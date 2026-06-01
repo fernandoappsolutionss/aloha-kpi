@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
-import { supabase } from '../../../lib/supabase'
+import { listUsuarios, createUsuario, updateUsuario, deleteUsuario } from '../../actions/usuarios'
+import { listCentros } from '../../actions/centros'
 
 const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', gray:'#F5F7FA', text:'#1A2744' }
 const ROLES = [ { val:'admin_general', label:'Administrador General' }, { val:'administradora', label:'Usuario Centro' } ]
@@ -21,12 +22,11 @@ export default function UsuariosPage() {
 
   async function loadData() {
     setLoading(true)
-    const [u, c] = await Promise.all([
-      supabase.from('usuarios').select('*, centros(nombre)').order('nombre'),
-      supabase.from('centros').select('id, nombre').order('nombre')
-    ])
-    setUsuarios(u.data || [])
-    setCentros(c.data || [])
+    try {
+      const [u, c] = await Promise.all([listUsuarios(), listCentros()])
+      setUsuarios(u || [])
+      setCentros(c || [])
+    } catch { setUsuarios([]); setCentros([]) }
     setLoading(false)
   }
 
@@ -37,25 +37,13 @@ export default function UsuariosPage() {
     setSaving(true); setStatus('')
     try {
       if (editing) {
-        const upd = { nombre: form.nombre, rol: form.rol, centro_id: form.rol==='admin_general' ? null : (form.centro_id || null) }
-        const { error } = await supabase.from('usuarios').update(upd).eq('id', editing)
-        if (error) throw error
+        const res = await updateUsuario(editing, { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id })
+        if (res.error) throw new Error(res.error)
         setStatus('✅ Usuario actualizado.')
       } else {
-        // Create auth user
-        const { data: authData, error: authErr } = await supabase.auth.admin
-          ? await supabase.auth.signUp({ email: form.email, password: form.password })
-          : await supabase.auth.signUp({ email: form.email, password: form.password })
-        if (authErr && !authErr.message.includes('already registered')) throw authErr
-        // Insert into usuarios table
-        const { error } = await supabase.from('usuarios').insert({
-          nombre: form.nombre,
-          email: form.email,
-          rol: form.rol,
-          centro_id: form.rol==='admin_general' ? null : (form.centro_id || null)
-        })
-        if (error) throw error
-        setStatus('✅ Usuario creado. Se enviará email de confirmación.')
+        const res = await createUsuario({ nombre: form.nombre, email: form.email, password: form.password, rol: form.rol, centro_id: form.centro_id })
+        if (res.error) throw new Error(res.error)
+        setStatus('✅ Usuario creado.')
       }
       setShowForm(false); setEditing(null)
       setForm({ nombre:'', email:'', password:'', rol:'administradora', centro_id:'' })
@@ -68,8 +56,8 @@ export default function UsuariosPage() {
     if (!confirm(`¿Eliminar usuario "${nombre}"? Esta acción no se puede deshacer.`)) return
     setDeleting(id); setStatus('')
     try {
-      const { error } = await supabase.from('usuarios').delete().eq('id', id)
-      if (error) throw error
+      const res = await deleteUsuario(id)
+      if (res.error) throw new Error(res.error)
       setStatus(`✅ Usuario "${nombre}" eliminado.`)
       loadData()
     } catch(e) { setStatus('❌ Error: ' + e.message) }
@@ -180,7 +168,7 @@ export default function UsuariosPage() {
                     </span>
                   </td>
                   <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',color:'#4A5568',fontSize:12}}>
-                    {u.centros?.nombre || (u.rol==='admin_general' ? <span style={{color:'#8896A9',fontStyle:'italic'}}>Todos los centros</span> : <span style={{color:'#8896A9',fontStyle:'italic'}}>Sin asignar</span>)}
+                    {u.centro_nombre || (u.rol==='admin_general' ? <span style={{color:'#8896A9',fontStyle:'italic'}}>Todos los centros</span> : <span style={{color:'#8896A9',fontStyle:'italic'}}>Sin asignar</span>)}
                   </td>
                   <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
                     <div style={{display:'flex',gap:8}}>

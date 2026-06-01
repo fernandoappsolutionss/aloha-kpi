@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { supabase } from '../../../../lib/supabase'
+import { loadCumplimiento, saveCumplimiento } from '../../../actions/cumplimiento'
+import { getCentroNombre } from '../../../actions/centros'
 
 const CHECKS = [
   {g:'Classdojo',items:[{k:'classdojo_activo',l:'Classdojo activo'},{k:'ninos_completos_classdojo',l:'Niños completos en Classdojo'},{k:'padres_conectados',l:'Padres conectados'},{k:'muro_informacion',l:'Muro con información'},{k:'bienvenida',l:'Bienvenida publicada'},{k:'calendario',l:'Calendario publicado'},{k:'clase_padres',l:'Clase de padres'},{k:'fotos_grupo',l:'Fotos de grupo'},{k:'seguimiento_evolucion',l:'Seguimiento evolución'},{k:'asistente_classdojo',l:'Asistente activa'},{k:'portafolio',l:'Portafolio con retroalimentación'}]},
@@ -17,8 +18,8 @@ export default function CumplimientoPage() {
   const params = useParams()
   const sp = useSearchParams()
   const [nombre, setNombre] = useState('Centro')
-  useEffect(() => { supabase.from('centros').select('nombre').eq('id', params.id).single().then(({data}) => { if (data) setNombre(data.nombre) }) }, [params.id])
   const centroId = params.id === 'demo' ? null : params.id
+  useEffect(() => { if (centroId) getCentroNombre(centroId).then((n) => { if (n) setNombre(n) }).catch(() => {}) }, [centroId])
 
   const [mes, setMes] = useState(1)
   const [vals, setVals] = useState(DEFS)
@@ -37,20 +38,9 @@ export default function CumplimientoPage() {
     if (!centroId) { setLoading(false); return }
     setLoading(true)
     try {
-      let { data: trim } = await supabase.from('trimestres').select('id').eq('centro_id', centroId).eq('anio',2026).eq('trimestre',1).single()
-      if (!trim) {
-        const { data: nt } = await supabase.from('trimestres').insert({centro_id:centroId,anio:2026,trimestre:1}).select('id').single()
-        trim = nt
-      }
-      setTrimestreId(trim.id)
-      const { data: cum } = await supabase.from('cumplimiento').select('*').eq('trimestre_id',trim.id).eq('mes',mes).single()
-      if (cum) {
-        const loaded = {}
-        allKeys.forEach(k => { loaded[k] = cum[k] || 'no' })
-        setVals(loaded)
-      } else {
-        setVals({...DEFS})
-      }
+      const { trimestreId, vals } = await loadCumplimiento(centroId, 2026, 1, mes)
+      setTrimestreId(trimestreId)
+      setVals(vals || {...DEFS})
     } catch (e) { setStatus('Error cargando: ' + e.message) }
     setLoading(false)
   }
@@ -61,9 +51,8 @@ export default function CumplimientoPage() {
     if (!centroId) { setStatus('Modo demo — conéctate con cuenta real para guardar.'); return }
     setSaving(true); setStatus('')
     try {
-      const payload = { trimestre_id: trimestreId, mes, updated_at: new Date().toISOString(), ...vals }
-      const { error } = await supabase.from('cumplimiento').upsert(payload, { onConflict: 'trimestre_id,mes' })
-      if (error) throw error
+      const res = await saveCumplimiento(centroId, 2026, 1, mes, vals)
+      if (res.error) throw new Error(res.error)
       setStatus('✅ Cumplimiento guardado correctamente.')
       setTimeout(() => setStatus(''), 4000)
     } catch (e) { setStatus('❌ Error: ' + e.message) }

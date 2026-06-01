@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { supabase } from '../../../../lib/supabase'
+import { getCentroNombre } from '../../../actions/centros'
 
 export default function FodaPage() {
   const params = useParams()
   const sp = useSearchParams()
   const [nombre, setNombre] = useState('Centro')
-  useEffect(() => { supabase.from('centros').select('nombre').eq('id', params.id).single().then(({data}) => { if (data) setNombre(data.nombre) }) }, [params.id])
+  useEffect(() => { getCentroNombre(params.id).then((n) => { if (n) setNombre(n) }).catch(() => {}) }, [params.id])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [foda, setFoda] = useState({

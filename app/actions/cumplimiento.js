@@ -23,8 +23,9 @@ export async function loadCumplimiento(centroId, anio, trimestre, mes) {
   await requireCentroAccess(centroId)
   const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
   const [row] = await sql`SELECT * FROM cumplimiento WHERE trimestre_id = ${trimestreId} AND mes = ${mes}`
+  if (!row) return { trimestreId, vals: null } // sin registro: la UI usará sus valores por defecto
   const vals = {}
-  for (const k of CUMPLIMIENTO_KEYS) vals[k] = row?.[k] || 'no'
+  for (const k of CUMPLIMIENTO_KEYS) vals[k] = row[k] || 'no'
   return { trimestreId, vals }
 }
 

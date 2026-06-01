@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
-import { supabase } from '../../../lib/supabase'
+import { getHistorialAdmin } from '../../actions/dashboard'
+import { listCentros } from '../../actions/centros'
 
 const MESES_BASE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const TRIMESTRES_N = ['','Q1','Q2','Q3','Q4']
@@ -20,40 +21,20 @@ export default function HistorialAdminPage() {
   useEffect(() => { loadDatos() }, [centroSel, anio, trimSel])
 
   async function loadCentros() {
-    const { data } = await supabase.from('centros').select('id, nombre').order('nombre')
-    setCentros(data || [])
+    try {
+      const data = await listCentros()
+      setCentros(data || [])
+    } catch { setCentros([]) }
   }
 
   async function loadDatos() {
     setLoading(true)
     try {
-      let query = supabase.from('trimestres').select(`
-        id, trimestre, anio,
-        centros(id, nombre),
-        resumen_mes(mes, ninos_final_mes, grupos_activos, cp_invitados, cp_matriculados),
-        kpi_semanas(mes, ing_d1, ing_d2, ing_d3, ing_d4, ing_d5, des_d1, des_d2, des_d3, des_d4, des_d5),
-        cumplimiento(mes, meta_desercion, meta_nuevos_ingresos, meta_cobranza)
-      `).eq('anio', anio).order('trimestre')
-
-      if (centroSel !== 'todos') query = query.eq('centro_id', centroSel)
-      if (trimSel !== 'todos') query = query.eq('trimestre', parseInt(trimSel))
-
-      const { data } = await query
+      const data = await getHistorialAdmin(anio, centroSel, trimSel)
       setDatos(data || [])
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); setDatos([]) }
     setLoading(false)
   }
-
-  function calcMes(trim, mes) {
-    const sems = (trim.kpi_semanas || []).filter(s => s.mes === mes)
-    const res = (trim.resumen_mes || []).find(r => r.mes === mes)
-    const cum = (trim.cumplimiento || []).find(c => c.mes === mes)
-    const nuevos = sems.reduce((a,s) => a+s.ing_d1+s.ing_d2+s.ing_d3+s.ing_d4+s.ing_d5, 0)
-    const des = sems.reduce((a,s) => a+s.des_d1+s.des_d2+s.des_d3+s.des_d4+s.des_d5, 0)
-    return { nuevos, des, ninos: res?.ninos_final_mes||0, grupos: res?.grupos_activos||0, cp_inv: res?.cp_invitados||0, cp_mat: res?.cp_matriculados||0, tieneData: sems.length > 0 }
-  }
-
-  const mesOffset = (trimestre) => (trimestre - 1) * 3
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
@@ -94,49 +75,45 @@ export default function HistorialAdminPage() {
             <div style={{fontSize:14,fontWeight:500}}>No hay registros con los filtros seleccionados</div>
             <div style={{fontSize:12,marginTop:6}}>Los datos aparecerán aquí cuando las administradoras registren sus KPIs.</div>
           </div>
-        ) : datos.map(trim => {
-          const offset = mesOffset(trim.trimestre)
-          return (
-            <div key={trim.id} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,marginBottom:16,overflow:'hidden'}}>
-              <div style={{padding:'14px 20px',borderBottom:'0.5px solid #f0f0ec',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fafaf8',cursor:'pointer'}}
-                onClick={() => router.push(`/centro/${trim.centros?.id}`)}>
-                <div>
-                  <span style={{fontSize:15,fontWeight:700,color:'#533AB7'}}>{trim.centros?.nombre}</span>
-                  <span style={{fontSize:12,color:'#888',marginLeft:12}}>{TRIMESTRES_N[trim.trimestre]} {trim.anio}</span>
-                </div>
-                <span style={{fontSize:11,color:'#aaa'}}>Ver centro →</span>
+        ) : datos.map(item => (
+          <div key={item.key} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,marginBottom:16,overflow:'hidden'}}>
+            <div style={{padding:'14px 20px',borderBottom:'0.5px solid #f0f0ec',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fafaf8',cursor:'pointer'}}
+              onClick={() => router.push(`/centro/${item.centro_id}`)}>
+              <div>
+                <span style={{fontSize:15,fontWeight:700,color:'#533AB7'}}>{item.centro_nombre}</span>
+                <span style={{fontSize:12,color:'#888',marginLeft:12}}>{TRIMESTRES_N[item.trimestre]} {item.anio}</span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
-                {[1,2,3].map((mes,i) => {
-                  const m = calcMes(trim, mes)
-                  const mesNombre = MESES_BASE[offset + mes - 1]
-                  return (
-                    <div key={mes} style={{padding:'14px 18px',borderRight:i<2?'0.5px solid #f0f0ec':'none',borderTop:'0.5px solid #f0f0ec'}}>
-                      <div style={{fontSize:12,fontWeight:600,color:'#444',marginBottom:10}}>{mesNombre}</div>
-                      {m.tieneData ? (
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                          {[
-                            {l:'Nuevos',v:m.nuevos,ok:m.nuevos>=20},
-                            {l:'Deserción',v:m.des,ok:m.des<=18},
-                            {l:'Niños',v:m.ninos},
-                            {l:'Grupos',v:m.grupos},
-                          ].map((item,j)=>(
-                            <div key={j} style={{background:'#f8f8f5',borderRadius:6,padding:'6px 10px'}}>
-                              <div style={{fontSize:10,color:'#aaa'}}>{item.l}</div>
-                              <div style={{fontSize:15,fontWeight:600,color:item.ok===false?'#993C1D':item.ok===true?'#0F6E56':'#1a1a1a'}}>{item.v}</div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{color:'#ccc',fontSize:12,padding:'8px 0'}}>Sin datos registrados</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              <span style={{fontSize:11,color:'#aaa'}}>Ver centro →</span>
             </div>
-          )
-        })}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
+              {item.meses.map((m,i) => {
+                const mesNombre = MESES_BASE[m.month - 1]
+                return (
+                  <div key={m.month} style={{padding:'14px 18px',borderRight:i<2?'0.5px solid #f0f0ec':'none',borderTop:'0.5px solid #f0f0ec'}}>
+                    <div style={{fontSize:12,fontWeight:600,color:'#444',marginBottom:10}}>{mesNombre}</div>
+                    {m.tieneData ? (
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        {[
+                          {l:'Nuevos',v:m.nuevos,ok:m.nuevos>=20},
+                          {l:'Deserción',v:m.des,ok:m.des<=18},
+                          {l:'Niños',v:m.ninos},
+                          {l:'Grupos',v:m.grupos},
+                        ].map((it,j)=>(
+                          <div key={j} style={{background:'#f8f8f5',borderRadius:6,padding:'6px 10px'}}>
+                            <div style={{fontSize:10,color:'#aaa'}}>{it.l}</div>
+                            <div style={{fontSize:15,fontWeight:600,color:it.ok===false?'#993C1D':it.ok===true?'#0F6E56':'#1a1a1a'}}>{it.v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{color:'#ccc',fontSize:12,padding:'8px 0'}}>Sin datos registrados</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </main>
     </div>
   )

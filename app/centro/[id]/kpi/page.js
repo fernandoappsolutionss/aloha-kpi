@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { supabase } from '../../../../lib/supabase'
+import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const SEMANAS = [1, 2, 3, 4, 5]
@@ -39,15 +39,11 @@ export default function KPIPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true); setStatus('')
-    const { data: c } = await supabase.from('centros').select('nombre').eq('id', id).single()
-    if (c) setCentroNombre(c.nombre)
-
-    // Estado del mes actual
-    const { data: mes } = await supabase.from('mes_kpi').select('estado').eq('centro_id', id).eq('year', year).eq('month', month).single()
-    setMesEstado(mes?.estado || 'abierto')
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist } = await loadKpiMes(id, year, month)
+    setCentroNombre(cNombre || '')
+    setMesEstado(estado || 'abierto')
 
     // Resumen del mes
-    const { data: res } = await supabase.from('resumen_mes').select('*').eq('centro_id', id).eq('year', year).eq('month', month).single()
     if (res) {
       setConfig({ ninos_inicio: res.ninos_inicio_mes||0, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
     } else {
@@ -55,7 +51,6 @@ export default function KPIPage() {
     }
 
     // Semanas
-    const { data: kpi } = await supabase.from('kpi_semanas').select('*').eq('centro_id', id).eq('year', year).eq('month', month).order('semana')
     const sems = SEMANAS.map(s => {
       const r = kpi?.find(x => x.semana === s)
       if (!r) return emptyW()
@@ -64,7 +59,6 @@ export default function KPIPage() {
     setSemanas(sems)
 
     // Historial: meses cerrados
-    const { data: hist } = await supabase.from('mes_kpi').select('year,month,estado,cerrado_at').eq('centro_id', id).eq('estado','cerrado').order('year', {ascending:false}).order('month', {ascending:false})
     setHistorial(hist || [])
     setLoading(false)
   }, [id, year, month])
@@ -82,15 +76,8 @@ export default function KPIPage() {
     if (mesEstado === 'cerrado') { setStatus('❌ Este mes está cerrado. No se puede editar.'); return }
     setSaving(true); setStatus('')
     try {
-      const configData = { centro_id: id, year, month, ninos_inicio_mes: parseInt(config.ninos_inicio)||0, grupos_activos: parseInt(config.grupos_activos)||0, meta_nuevos_mensual: parseInt(config.meta_nuevos_mensual)||20, nuevos_activos_mes: parseInt(config.nuevos_activos_mes)||0, cp_invitados: parseInt(config.cp_invitados)||0, cp_asistieron: parseInt(config.cp_asistieron)||0, cp_matriculados: parseInt(config.cp_matriculados)||0, mot_tecnica: parseInt(config.mot_tecnica)||0, mot_perdida_clase: parseInt(config.mot_perdida_clase)||0, mot_economico: parseInt(config.mot_economico)||0, mot_horario: parseInt(config.mot_horario)||0, orig_referido: parseInt(config.orig_referido)||0, orig_marketing: parseInt(config.orig_marketing)||0, orig_centro: parseInt(config.orig_centro)||0, orig_activaciones: parseInt(config.orig_activaciones)||0, orig_medios: parseInt(config.orig_medios)||0, updated_at: new Date().toISOString() }
-      const { error: rErr } = await supabase.from('resumen_mes').upsert(configData, { onConflict: 'centro_id,year,month' })
-      if (rErr) throw new Error(rErr.message)
-      for (let i = 0; i < SEMANAS.length; i++) {
-        const s = semanas[i]
-        const kData = { centro_id: id, year, month, semana: i+1, cob_d1:parseInt(s.cob[0])||0, cob_d2:parseInt(s.cob[1])||0, cob_d3:parseInt(s.cob[2])||0, cob_d4:parseInt(s.cob[3])||0, cob_d5:parseInt(s.cob[4])||0, des_d1:parseInt(s.des[0])||0, des_d2:parseInt(s.des[1])||0, des_d3:parseInt(s.des[2])||0, des_d4:parseInt(s.des[3])||0, des_d5:parseInt(s.des[4])||0, ing_d1:parseInt(s.ing[0])||0, ing_d2:parseInt(s.ing[1])||0, ing_d3:parseInt(s.ing[2])||0, ing_d4:parseInt(s.ing[3])||0, ing_d5:parseInt(s.ing[4])||0, updated_at: new Date().toISOString() }
-        const { error: kErr } = await supabase.from('kpi_semanas').upsert(kData, { onConflict: 'centro_id,year,month,semana' })
-        if (kErr) throw new Error('Sem '+(i+1)+': '+kErr.message)
-      }
+      const res = await saveKpiMes(id, year, month, config, semanas)
+      if (res.error) throw new Error(res.error)
       setStatus('✅ KPI de ' + NOMBRES_MES[month-1] + ' ' + year + ' guardado.')
     } catch(e) { setStatus('❌ Error: ' + e.message) }
     setSaving(false)
@@ -100,16 +87,16 @@ export default function KPIPage() {
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
     await handleSave()
-    const { error } = await supabase.from('mes_kpi').upsert({ centro_id: id, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() }, { onConflict: 'centro_id,year,month' })
-    if (!error) { setMesEstado('cerrado'); setStatus('🔒 Mes cerrado. Datos guardados como historial.') }
-    else setStatus('❌ Error al cerrar: ' + error.message)
+    const res = await cerrarMes(id, year, month)
+    if (res.ok) { setMesEstado('cerrado'); setStatus('🔒 Mes cerrado. Datos guardados como historial.') }
+    else setStatus('❌ Error al cerrar: ' + (res.error || ''))
     setCerrando(false)
   }
 
   async function handleReabrirMes() {
     if (!confirm('¿Reabrir ' + NOMBRES_MES[month-1] + ' ' + year + ' para edición?')) return
-    const { error } = await supabase.from('mes_kpi').upsert({ centro_id: id, year, month, estado: 'abierto', cerrado_at: null }, { onConflict: 'centro_id,year,month' })
-    if (!error) { setMesEstado('abierto'); setStatus('✅ Mes reabierto para edición.') }
+    const res = await reabrirMes(id, year, month)
+    if (res.ok) { setMesEstado('abierto'); setStatus('✅ Mes reabierto para edición.') }
   }
 
   const ni = parseInt(config.ninos_inicio)||0

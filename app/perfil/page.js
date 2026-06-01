@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
+import { changePassword } from '../actions/auth'
 import Sidebar from '../../components/Sidebar'
 
 export default function PerfilPage() {
@@ -27,8 +27,8 @@ export default function PerfilPage() {
     if (form.nueva !== form.confirmar) { setStatus('❌ Las contraseñas no coinciden.'); return }
     setLoading(true); setStatus('')
     try {
-      const { error } = await supabase.auth.updateUser({ password: form.nueva })
-      if (error) throw error
+      const res = await changePassword(form.nueva)
+      if (res.error) throw new Error(res.error)
       setStatus('✅ Contraseña actualizada exitosamente.')
       setForm({ actual: '', nueva: '', confirmar: '' })
     } catch (err) {

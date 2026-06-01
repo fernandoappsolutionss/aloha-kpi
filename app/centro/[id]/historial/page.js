@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
-import { supabase } from '../../../../lib/supabase'
+import { getHistorialCentro } from '../../../actions/centro'
 
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -44,21 +44,8 @@ export default function HistorialPage() {
 
   const loadHistorial = useCallback(async () => {
     setLoading(true)
-    const { data: c } = await supabase.from('centros').select('nombre').eq('id', id).single()
-    if (c) setCentroNombre(c.nombre)
-
-    // Todos los meses (abiertos y cerrados) con datos
-    const { data: resumen } = await supabase
-      .from('resumen_mes')
-      .select('*')
-      .eq('centro_id', id)
-      .order('year', { ascending: true })
-      .order('month', { ascending: true })
-
-    const { data: estados } = await supabase
-      .from('mes_kpi')
-      .select('year,month,estado,cerrado_at')
-      .eq('centro_id', id)
+    const { nombre, resumen, estados } = await getHistorialCentro(id)
+    if (nombre) setCentroNombre(nombre)
 
     // Calcular métricas derivadas
     const data = (resumen || []).map((r, i) => {

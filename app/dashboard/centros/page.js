@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
-import { supabase } from '../../../lib/supabase'
+import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
 const REGIONES = ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste']
 const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', gray:'#F5F7FA', text:'#1A2744' }
@@ -21,11 +21,10 @@ export default function CentrosPage() {
 
   async function loadCentros() {
     setLoading(true)
-    const { data } = await supabase
-      .from('centros')
-      .select('id, nombre, region, usuarios(count)')
-      .order('nombre')
-    setCentros(data || [])
+    try {
+      const data = await listCentrosConUsuarios()
+      setCentros(data || [])
+    } catch { setCentros([]) }
     setLoading(false)
   }
 
@@ -35,12 +34,12 @@ export default function CentrosPage() {
     setSaving(true); setStatus('')
     try {
       if (editing) {
-        const { error } = await supabase.from('centros').update({ nombre: form.nombre.toUpperCase(), region: form.region }).eq('id', editing)
-        if (error) throw error
+        const res = await updateCentro(editing, { nombre: form.nombre, region: form.region })
+        if (res.error) throw new Error(res.error)
         setStatus('✅ Centro actualizado.')
       } else {
-        const { error } = await supabase.from('centros').insert({ nombre: form.nombre.toUpperCase(), region: form.region })
-        if (error) throw error
+        const res = await createCentro({ nombre: form.nombre, region: form.region })
+        if (res.error) throw new Error(res.error)
         setStatus('✅ Centro creado.')
       }
       setShowForm(false); setEditing(null); setForm({ nombre: '', region: 'Ciudad de Panamá' })
@@ -57,19 +56,9 @@ export default function CentrosPage() {
 
     setDeleting(id); setStatus('')
     try {
-      // Step 1: Desvincular usuarios de este centro (poner centro_id en null)
-      if (userCount > 0) {
-        const { error: unlinkError } = await supabase
-          .from('usuarios')
-          .update({ centro_id: null })
-          .eq('centro_id', id)
-        if (unlinkError) throw new Error('No se pudo desvincular usuarios: ' + unlinkError.message)
-      }
-
-      // Step 2: Eliminar el centro
-      const { error } = await supabase.from('centros').delete().eq('id', id)
-      if (error) throw error
-
+      // Las FK se encargan: usuarios.centro_id -> NULL; resto en cascada.
+      const res = await deleteCentro(id)
+      if (res.error) throw new Error(res.error)
       setStatus('✅ Centro "' + nombre + '" eliminado correctamente.')
       loadCentros()
     } catch (e) {
@@ -145,7 +134,7 @@ export default function CentrosPage() {
               {loading ? (
                 <tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#8896A9'}}>Cargando...</td></tr>
               ) : centros.map((c,i) => {
-                const userCount = c.usuarios?.[0]?.count || 0
+                const userCount = c.user_count || 0
                 return (
                   <tr key={c.id} style={{background:i%2===0?'#fff':'#F9FAFC'}}
                     onMouseEnter={e=>e.currentTarget.style.background='#EEF3FB'}
