@@ -2,6 +2,7 @@
 import { sql } from '../../lib/db'
 import { requireAdmin } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
+import { nivelPorNinos } from '../../lib/nivel'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -51,10 +52,13 @@ export async function getCentrosKpi(year, quarter) {
       const b = conDatos[conDatos.length - 1].nuevos
       trend = b > a ? '↑' : b < a ? '↓' : '→'
     }
+    // Nivel ALOHA: por niños activos, requiere deserción < 8% los 3 meses del trimestre.
+    const desPctOk = months.every((m) => m.has && m.ninosInicio > 0 && (m.desercion / m.ninosInicio) * 100 < 8)
+    const nivel = desPctOk ? nivelPorNinos(ninos) : 0
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
       nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes,
-      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado, trend,
+      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado, trend, nivel,
     }
   })
 }
