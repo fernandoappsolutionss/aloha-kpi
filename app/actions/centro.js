@@ -3,6 +3,7 @@ import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
+import { cumplimientoPct } from '../../lib/checklist'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -36,7 +37,14 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const nivelEnCurso = cur.desOk ? nivelPorNinos(cur.ninos) : 0
   const sig = siguienteNivel(cur.ninos)
 
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk }
+  // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) del trimestre.
+  const cumpRows = await sql`
+    SELECT cu.* FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
+    WHERE t.centro_id = ${centroId} AND t.anio = ${year} AND t.trimestre = ${trimestre}
+  `
+  const cumplChecklist = cumplimientoPct(cumpRows)
+
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).

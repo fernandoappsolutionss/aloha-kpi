@@ -68,6 +68,7 @@ export default function CentroPage() {
   })
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
   const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
+  const [cumplReal, setCumplReal] = useState(null)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
@@ -83,9 +84,10 @@ export default function CentroPage() {
       const trimestre = period.quarter
       const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual } = await getCentroResumen(id, year, trimestre)
+      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
       setNivelInfo({ nivel, nivelEnCurso, sig, desOkActual })
+      setCumplReal(cumplimientoPct ?? null)
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
@@ -155,7 +157,8 @@ export default function CentroPage() {
   )
 
   const cumplCount = meses.filter(m => m.cumpl === 'Sí').length
-  const cumplPct = meses.length ? Math.round((cumplCount / meses.length) * 100) : 0
+  const cumplPctMetas = meses.length ? Math.round((cumplCount / meses.length) * 100) : 0
+  const cumplPct = cumplReal != null ? cumplReal : cumplPctMetas
   const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, 1)
   const maxOri = Math.max(totals.origen.marketing, totals.origen.centro, totals.origen.activaciones, totals.origen.referidos, totals.origen.medios, 1)
   const metaNuevosTrim = meta.nuevos * meses.length
