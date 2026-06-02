@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className="login__brandfoot">
           <Logo size={26} />
           <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
-            ALOHA Mental Arithmetic · Panamá
+            ALOHA Mental Arithmetic · Panamá · Venezuela
           </p>
         </div>
       </aside>
