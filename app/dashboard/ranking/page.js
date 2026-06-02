@@ -65,7 +65,12 @@ export default function RankingPage() {
                     <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>{c.nuevos} nuevos</span>
                     <span style={{ color: 'var(--text-muted)' }}>{c.ninos} niños</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}><NivelBadge nivel={c.nivel} /></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 14 }}>
+                    <NivelBadge nivel={c.nivel} />
+                    {c.sig
+                      ? <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Próximo: <b style={{ color: 'var(--ts-green)' }}>Nivel {c.sig.nivel}</b> · faltan {c.sig.faltan}</div>
+                      : <div style={{ fontSize: 11, color: 'var(--ts-green)' }}>Nivel máximo</div>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -121,10 +126,10 @@ export default function RankingPage() {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.5, maxWidth: 720 }}>
-            Se otorga el nivel según la cantidad de niños activos, siempre que la deserción haya sido{' '}
-            <strong style={{ color: 'var(--text-muted)' }}>menor al 8% durante los 3 meses</strong> del trimestre.
-            Si no se cumple, el centro queda <strong style={{ color: 'var(--text-muted)' }}>Sin nivel</strong>.
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.5, maxWidth: 760 }}>
+            El nivel se <strong style={{ color: 'var(--text-muted)' }}>gana al cerrar un trimestre</strong> cumpliendo la condición
+            (niños + deserción <strong style={{ color: 'var(--text-muted)' }}>menor al 8% los 3 meses</strong>) y aplica al
+            <strong style={{ color: 'var(--text-muted)' }}> trimestre siguiente</strong>. Sube de nivel aumentando tus niños activos y manteniendo baja la deserción.
           </p>
         </div>
       </main>

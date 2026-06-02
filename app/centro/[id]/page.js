@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
 import { getCurrentPeriod, readStoredPeriod, periodLabel } from '../../../lib/period'
+import NivelBadge from '../../../components/NivelBadge'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -63,6 +64,7 @@ export default function CentroPage() {
     origen: { marketing: 0, centro: 0, activaciones: 0, referidos: 0, medios: 0 },
   })
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
+  const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
 
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   const label = periodLabel(period.year, period.quarter)
@@ -73,8 +75,9 @@ export default function CentroPage() {
       const trimestre = period.quarter
       const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const { nombre: cNombre, metas: m, rs, ks } = await getCentroResumen(id, year, trimestre)
+      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
+      setNivelInfo({ nivel, nivelEnCurso, sig, desOkActual })
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
@@ -167,6 +170,36 @@ export default function CentroPage() {
           <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
             <span className="dot" />{cumplPct}% cumplimiento
           </span>
+        </div>
+
+        {/* Nivel del centro — motivacional */}
+        <div className="card" style={{ padding: '18px 22px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', borderLeft: '2px solid var(--ts-green)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <NivelBadge nivel={nivelInfo.nivel} />
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {nivelInfo.nivel ? `Tu centro es Nivel ${nivelInfo.nivel}` : 'Tu centro aún no tiene nivel'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                Otorgado por el trimestre anterior · vigente este trimestre
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', minWidth: 240 }}>
+            {nivelInfo.sig ? (
+              <>
+                <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                  Para <b style={{ color: 'var(--ts-green)' }}>Nivel {nivelInfo.sig.nivel}</b>: te faltan{' '}
+                  <b className="num">{nivelInfo.sig.faltan}</b> niños
+                </div>
+                <div style={{ fontSize: 11, color: nivelInfo.desOkActual ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
+                  {nivelInfo.desOkActual ? '✓ Deserción dentro de meta (menor al 8%)' : 'Mantén la deserción por debajo del 8% los 3 meses'}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 14, color: 'var(--ts-green)', fontWeight: 600 }}>Nivel máximo alcanzado 🎉</div>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>

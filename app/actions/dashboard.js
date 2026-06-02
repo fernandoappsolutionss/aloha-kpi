@@ -2,7 +2,8 @@
 import { sql } from '../../lib/db'
 import { requireAdmin } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
-import { nivelPorNinos } from '../../lib/nivel'
+import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
+import { quarterMetrics } from '../../lib/kpi-calc'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -19,6 +20,12 @@ export async function getCentrosKpi(year, quarter) {
   const rs = await sql`SELECT * FROM resumen_mes WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
   const ks = await sql`SELECT * FROM kpi_semanas WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
+  // Trimestre anterior → define el nivel GANADO que aplica a este trimestre.
+  const prevQ = quarter > 1 ? quarter - 1 : 4
+  const prevY = quarter > 1 ? year : year - 1
+  const pqm = Q_MONTHS[prevQ]
+  const prs = await sql`SELECT * FROM resumen_mes WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
+  const pks = await sql`SELECT * FROM kpi_semanas WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
 
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
   const metaDesMes = Number(metas?.meta_desercion_mes || 18.4)
@@ -52,13 +59,18 @@ export async function getCentrosKpi(year, quarter) {
       const b = conDatos[conDatos.length - 1].nuevos
       trend = b > a ? '↑' : b < a ? '↓' : '→'
     }
-    // Nivel ALOHA: por niños activos, requiere deserción < 8% los 3 meses del trimestre.
-    const desPctOk = months.every((m) => m.has && m.ninosInicio > 0 && (m.desercion / m.ninosInicio) * 100 < 8)
-    const nivel = desPctOk ? nivelPorNinos(ninos) : 0
+    // Nivel GANADO: se obtiene al cerrar el TRIMESTRE ANTERIOR cumpliendo la condición.
+    const pm = quarterMetrics(prs, pks, c.id, pqm)
+    const nivel = pm.desOk ? nivelPorNinos(pm.ninos) : 0
+    // En curso (motivación): lo que ganaría si el trimestre actual cerrara hoy.
+    const desOkActual = months.every((m) => m.has && m.ninosInicio > 0 && (m.desercion / m.ninosInicio) * 100 < 8)
+    const nivelEnCurso = desOkActual ? nivelPorNinos(ninos) : 0
+    const sig = siguienteNivel(ninos)
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
       nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes,
-      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado, trend, nivel,
+      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado, trend,
+      nivel, nivelEnCurso, sig, desOkActual,
     }
   })
 }
