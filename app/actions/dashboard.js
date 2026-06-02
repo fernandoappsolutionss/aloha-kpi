@@ -1,17 +1,22 @@
 'use server'
 import { sql } from '../../lib/db'
 import { requireAdmin } from '../../lib/auth'
+import { getCurrentPeriod } from '../../lib/period'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
-// Métricas agregadas por centro (Q1 2026) — usado por panel, ranking,
-// alertas y reporte. Calcula todo en el servidor para mantener consistencia.
-export async function getCentrosKpi() {
+// Métricas agregadas por centro para un (año, trimestre). Por defecto usa el
+// trimestre actual. Usado por panel, ranking, alertas y reporte. Calcula todo
+// en el servidor para mantener consistencia.
+export async function getCentrosKpi(year, quarter) {
   await requireAdmin()
+  if (!year || !quarter) { const p = getCurrentPeriod(); year = year || p.year; quarter = quarter || p.quarter }
+  const qm = Q_MONTHS[quarter] || [1, 2, 3]
+  const lo = qm[0], hi = qm[qm.length - 1]
   const centros = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
-  const [metas] = await sql`SELECT * FROM metas WHERE anio = 2026 AND trimestre = 1`
-  const rs = await sql`SELECT * FROM resumen_mes WHERE year = 2026 AND month BETWEEN 1 AND 3`
-  const ks = await sql`SELECT * FROM kpi_semanas WHERE year = 2026 AND month BETWEEN 1 AND 3`
+  const [metas] = await sql`SELECT * FROM metas WHERE anio = ${year} AND trimestre = ${quarter}`
+  const rs = await sql`SELECT * FROM resumen_mes WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
+  const ks = await sql`SELECT * FROM kpi_semanas WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
 
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
@@ -22,7 +27,7 @@ export async function getCentrosKpi() {
     const crs = rs.filter((r) => r.centro_id === c.id)
     const cks = ks.filter((k) => k.centro_id === c.id)
     const admin = usuarios.find((u) => u.centro_id === c.id)?.nombre || '—'
-    const months = [1, 2, 3].map((mo) => {
+    const months = qm.map((mo) => {
       const r = crs.find((x) => x.month === mo)
       const ws = cks.filter((x) => x.month === mo)
       const nuevos = ws.reduce((s, w) => s + (w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)

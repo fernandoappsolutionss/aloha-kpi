@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
 const MEDAL = { 1:'🥇', 2:'🥈', 3:'🥉' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -10,16 +12,21 @@ const podioAccent = (pos) => pos === 1 ? 'var(--ts-green)' : pos === 2 ? 'var(--
 export default function RankingPage() {
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState(getCurrentPeriod())
+  const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    getCentrosKpi()
+    setLoading(true)
+    getCentrosKpi(period.year, period.quarter)
       .then((data) => {
         const sorted = [...(data || [])].sort((a, b) => b.cumpl - a.cumpl || b.nuevos - a.nuevos)
         setCentros(sorted.map((c, i) => ({ ...c, pos: i + 1 })))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   return (
     <div className="shell">
@@ -27,10 +34,11 @@ export default function RankingPage() {
       <main className="main">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Ranking · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Ranking · {label}</div>
             <h1 className="h-title">Ranking de centros</h1>
-            <p className="h-sub">Clasificación por % de cumplimiento — Q1 2026</p>
+            <p className="h-sub">Clasificación por % de cumplimiento — {label}</p>
           </div>
+          <PeriodSelector value={period} onChange={changePeriod} />
         </div>
 
         {loading ? (
@@ -64,7 +72,7 @@ export default function RankingPage() {
             <div className="panel">
               <div className="panel__head">
                 <h2 className="panel__title">Clasificación completa</h2>
-                <span className="label">Q1 2026</span>
+                <span className="label">{label}</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">

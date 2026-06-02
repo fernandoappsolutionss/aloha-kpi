@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import PeriodSelector from '../../../components/PeriodSelector'
 import { getMetas, saveMetas } from '../../actions/metas'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
 const METAS_INIT = {
   nuevos_mes: 20,
@@ -15,9 +17,11 @@ export default function MetasPage() {
   const [metas, setMetas] = useState(METAS_INIT)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [period, setPeriod] = useState(getCurrentPeriod())
 
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    getMetas(2026, 1).then((m) => {
+    getMetas(period.year, period.quarter).then((m) => {
       if (m) setMetas({
         nuevos_mes: m.meta_nuevos_ingresos_mes ?? 20,
         desercion_mes: Number(m.meta_desercion_mes ?? 18.4),
@@ -25,13 +29,17 @@ export default function MetasPage() {
         gpn_min: Number(m.gpn_min ?? 8),
         cp_conversion: Number(m.cp_conversion ?? 50),
       })
+      else setMetas(METAS_INIT)
     }).catch(() => {})
-  }, [])
+  }, [period])
+
+  const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   async function save() {
     setSaving(true)
     try {
-      const res = await saveMetas(2026, 1, {
+      const res = await saveMetas(period.year, period.quarter, {
         meta_nuevos_ingresos_mes: metas.nuevos_mes,
         meta_desercion_mes: metas.desercion_mes,
         meta_cobranza_max: metas.cobranza_max,
@@ -57,11 +65,12 @@ export default function MetasPage() {
       <main className="main">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Configuración · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Configuración · {label}</div>
             <h1 className="h-title">Metas globales</h1>
-            <p className="h-sub">Estas metas aplican a todos los centros · Q1 2026</p>
+            <p className="h-sub">Estas metas aplican a todos los centros · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
             {saved && (
               <span className="pill pill--ok"><span className="dot" />Metas guardadas</span>
             )}

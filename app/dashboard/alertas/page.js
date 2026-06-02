@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
 const COLORS = {
   critico: { bg:'var(--bad-bg)', border:'var(--bad-line)', title:'#FCA5A5', dot:'var(--bad)' },
@@ -9,19 +11,19 @@ const COLORS = {
   info: { bg:'var(--ok-bg)', border:'var(--ok-line)', title:'#6EE7B7', dot:'var(--ok)' },
 }
 
-function buildAlertas(centros) {
+function buildAlertas(centros, label) {
   const out = []
   for (const c of centros) {
     if (c.estado === 'Crítico') {
-      out.push({ tipo:'critico', centro:c.nombre, icon:'🔴', fecha:'Q1 2026',
+      out.push({ tipo:'critico', centro:c.nombre, icon:'🔴', fecha: label,
         msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
     } else if (c.estado === 'Parcial') {
-      out.push({ tipo:'advertencia', centro:c.nombre, icon:'🟡', fecha:'Q1 2026',
+      out.push({ tipo:'advertencia', centro:c.nombre, icon:'🟡', fecha: label,
         msg: c.nuevos < c.meta
           ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para alcanzar la meta.`
           : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
     } else {
-      out.push({ tipo:'info', centro:c.nombre, icon:'🟢', fecha:'Q1 2026',
+      out.push({ tipo:'info', centro:c.nombre, icon:'🟢', fecha: label,
         msg:`Buen trimestre: ${c.cumpl}% de cumplimiento y ${c.nuevos} nuevos ingresos.` })
     }
   }
@@ -31,13 +33,18 @@ function buildAlertas(centros) {
 export default function AlertasPage() {
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState(getCurrentPeriod())
+  const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    getCentrosKpi()
-      .then((data) => setAlertas(buildAlertas(data || [])))
+    setLoading(true)
+    getCentrosKpi(period.year, period.quarter)
+      .then((data) => setAlertas(buildAlertas(data || [], label)))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   const criticas = alertas.filter(a => a.tipo === 'critico')
   const advertencias = alertas.filter(a => a.tipo === 'advertencia')
@@ -49,10 +56,11 @@ export default function AlertasPage() {
       <main className="main">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Alertas · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Alertas · {label}</div>
             <h1 className="h-title">Alertas</h1>
             <p className="h-sub">{criticas.length} críticas · {advertencias.length} advertencias · {info.length} positivas</p>
           </div>
+          <PeriodSelector value={period} onChange={changePeriod} />
         </div>
 
         {loading ? (

@@ -1,20 +1,27 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 
 export default function ReportePage() {
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState(getCurrentPeriod())
+  const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    getCentrosKpi()
+    setLoading(true)
+    getCentrosKpi(period.year, period.quarter)
       .then((data) => setCentros(data || []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   const tot = centros.reduce((a, c) => ({ ninos: a.ninos + c.ninos, nuevos: a.nuevos + c.nuevos, desercion: a.desercion + c.desercion }), { ninos: 0, nuevos: 0, desercion: 0 })
   const promCumpl = centros.length ? Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / centros.length) : 0
@@ -27,7 +34,7 @@ export default function ReportePage() {
     const csv = rows.map(r=>r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = 'ALOHA_KPI_Q1_2026.csv'
+    a.download = `TeamSolutionss_KPI_Q${period.quarter}_${period.year}.csv`
     a.click()
   }
 
@@ -39,14 +46,17 @@ export default function ReportePage() {
         {/* Header */}
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Reporte · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Reporte · {label}</div>
             <h1 className="h-title">Reporte trimestral</h1>
-            <p className="h-sub">Resumen consolidado Q1 2026 · {centros.length} centros</p>
+            <p className="h-sub">Resumen consolidado {label} · {centros.length} centros</p>
           </div>
-          <button onClick={exportCSV} disabled={loading||centros.length===0} className="btn btn--primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar CSV
-          </button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
+            <button onClick={exportCSV} disabled={loading||centros.length===0} className="btn btn--primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -66,7 +76,7 @@ export default function ReportePage() {
             <div className="panel">
               <div className="panel__head">
                 <h2 className="panel__title">Detalle por centro</h2>
-                <span className="label">Q1 2026</span>
+                <span className="label">{label}</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">

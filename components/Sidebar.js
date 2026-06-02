@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
 import { logout as logoutAction } from '../app/actions/auth'
 import Logo from './Logo'
+import ThemeToggle from './ThemeToggle'
 
 /* Inline stroke icons (no emojis) */
 const P = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' }
@@ -124,6 +125,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
       {/* Footer */}
       <div className="sb__foot">
+        <ThemeToggle />
         <button onClick={() => router.push('/perfil')} className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
           <Icon name="user" /><span>Mi perfil</span>
         </button>
