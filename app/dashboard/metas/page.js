@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import { getMetas, saveMetas } from '../../actions/metas'
 
 const METAS_INIT = {
   nuevos_mes: 20,
@@ -13,10 +14,33 @@ const METAS_INIT = {
 export default function MetasPage() {
   const [metas, setMetas] = useState(METAS_INIT)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  function save() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+  useEffect(() => {
+    getMetas(2026, 1).then((m) => {
+      if (m) setMetas({
+        nuevos_mes: m.meta_nuevos_ingresos_mes ?? 20,
+        desercion_mes: Number(m.meta_desercion_mes ?? 18.4),
+        cobranza_max: Number(m.meta_cobranza_max ?? 1),
+        gpn_min: Number(m.gpn_min ?? 8),
+        cp_conversion: Number(m.cp_conversion ?? 50),
+      })
+    }).catch(() => {})
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await saveMetas(2026, 1, {
+        meta_nuevos_ingresos_mes: metas.nuevos_mes,
+        meta_desercion_mes: metas.desercion_mes,
+        meta_cobranza_max: metas.cobranza_max,
+        gpn_min: metas.gpn_min,
+        cp_conversion: metas.cp_conversion,
+      })
+      if (!res.error) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+    } catch {}
+    setSaving(false)
   }
 
   const campos = [
@@ -38,8 +62,8 @@ export default function MetasPage() {
           </div>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
             {saved && <span style={{fontSize:12,color:'#0F6E56',fontWeight:500}}>✅ Metas guardadas</span>}
-            <button onClick={save} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>
-              💾 Guardar metas
+            <button onClick={save} disabled={saving} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>
+              {saving ? 'Guardando...' : '💾 Guardar metas'}
             </button>
           </div>
         </div>

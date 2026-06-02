@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
+import { login } from '../actions/auth'
 import AlohaLogo from '../../components/AlohaLogo'
 
 export default function LoginPage() {
@@ -14,28 +14,18 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: form.email, password: form.password
-      })
-      if (authError) throw new Error('Correo o contraseña incorrectos.')
-      if (!authData.session) throw new Error('No se pudo iniciar sesión.')
-      await supabase.auth.setSession(authData.session)
+      const res = await login(form.email, form.password)
+      if (res.error) throw new Error(res.error)
 
-      const { data: usuario, error: userError } = await supabase
-        .from('usuarios').select('rol, centro_id, nombre').eq('email', form.email).single()
-      if (userError || !usuario) {
-        await supabase.auth.signOut()
-        throw new Error('Tu cuenta no está registrada en el sistema.')
-      }
-      localStorage.setItem('aloha_rol', usuario.rol)
-      localStorage.setItem('aloha_centro_id', usuario.centro_id || '')
-      localStorage.setItem('aloha_nombre', usuario.nombre || '')
-      localStorage.setItem('aloha_email', form.email)
+      localStorage.setItem('aloha_rol', res.rol)
+      localStorage.setItem('aloha_centro_id', res.centro_id || '')
+      localStorage.setItem('aloha_nombre', res.nombre || '')
+      localStorage.setItem('aloha_email', res.email)
 
-      if (usuario.rol === 'admin_general' || usuario.rol === 'supervisor') {
+      if (res.rol === 'admin_general' || res.rol === 'supervisor') {
         router.push('/dashboard')
       } else {
-        router.push('/centro/' + usuario.centro_id)
+        router.push('/centro/' + res.centro_id)
       }
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }

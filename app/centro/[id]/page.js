@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
-import { supabase } from '../../../lib/supabase'
+import { getCentroResumen } from '../../actions/centro'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -55,19 +55,15 @@ export default function CentroPage() {
       const trimestre = 1
       const months = Q_MONTHS[trimestre]
 
-      const { data: c } = await supabase.from('centros').select('nombre').eq('id', id).single()
-      if (c) setNombre(c.nombre)
+      const { nombre: cNombre, metas: m, rs, ks } = await getCentroResumen(id, year, trimestre)
+      if (cNombre) setNombre(cNombre)
 
-      const { data: m } = await supabase.from('metas').select('*').eq('anio', year).eq('trimestre', trimestre).single()
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
         desercion: Number(m?.meta_desercion_mes ?? 18.4),
         cobranza: m?.meta_cobranza_max ?? 1,
       }
       setMeta(metaFetched)
-
-      const { data: rs } = await supabase.from('resumen_mes').select('*').eq('centro_id', id).eq('year', year).in('month', months).order('month')
-      const { data: ks } = await supabase.from('kpi_semanas').select('*').eq('centro_id', id).eq('year', year).in('month', months)
 
       const mensual = months.map(mo => {
         const r = (rs || []).find(x => x.month === mo)

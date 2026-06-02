@@ -1,7 +1,8 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { listCentros } from '../app/actions/centros'
+import { logout as logoutAction } from '../app/actions/auth'
 
 const A = {
   blue: '#1B4580', blueMid: '#1D5FA6', blueLight: '#4A90C4',
@@ -18,9 +19,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   useEffect(() => {
     if (isAdmin) {
-      supabase.from('centros').select('id, nombre').order('nombre').then(({ data }) => {
-        if (data) setCentros(data)
-      })
+      listCentros().then((data) => { if (data) setCentros(data) }).catch(() => {})
     }
   }, [isAdmin])
 
@@ -48,8 +47,8 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   const items = isAdmin ? adminItems : centroItems
 
-  function logout() {
-    supabase.auth.signOut()
+  async function logout() {
+    try { await logoutAction() } catch {}
     localStorage.clear()
     router.push('/login')
   }
