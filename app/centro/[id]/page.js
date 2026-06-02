@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
+import { getCurrentPeriod, readStoredPeriod, periodLabel } from '../../../lib/period'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -51,6 +52,7 @@ const sectionTitle = {
 
 export default function CentroPage() {
   const { id } = useParams()
+  const [period, setPeriod] = useState(getCurrentPeriod())
   const [loading, setLoading] = useState(true)
   const [nombre, setNombre] = useState('')
   const [meses, setMeses] = useState([])
@@ -62,12 +64,14 @@ export default function CentroPage() {
   })
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
 
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
+  const label = periodLabel(period.year, period.quarter)
   useEffect(() => {
     (async () => {
       setLoading(true)
-      const year = 2026
-      const trimestre = 1
-      const months = Q_MONTHS[trimestre]
+      const year = period.year
+      const trimestre = period.quarter
+      const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
       const { nombre: cNombre, metas: m, rs, ks } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
@@ -129,7 +133,7 @@ export default function CentroPage() {
       })
       setLoading(false)
     })()
-  }, [id])
+  }, [id, period])
 
   if (loading) return (
     <div className="shell">
@@ -156,9 +160,9 @@ export default function CentroPage() {
       <main className="main">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · {label}</div>
             <h1 className="h-title">{nombre}</h1>
-            <p className="h-sub">Primer Trimestre 2026</p>
+            <p className="h-sub">Vista consolidada del trimestre</p>
           </div>
           <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
             <span className="dot" />{cumplPct}% cumplimiento
