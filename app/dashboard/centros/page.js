@@ -4,7 +4,10 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
-const REGIONES = ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste']
+const REGIONES = {
+  'Panamá': ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste'],
+  'Venezuela': ['Distrito Capital','Amazonas','Anzoátegui','Apure','Aragua','Barinas','Bolívar','Carabobo','Cojedes','Delta Amacuro','Falcón','Guárico','La Guaira','Lara','Mérida','Miranda','Monagas','Nueva Esparta','Portuguesa','Sucre','Táchira','Trujillo','Yaracuy','Zulia'],
+}
 
 export default function CentrosPage() {
   const [centros, setCentros] = useState([])
@@ -109,9 +112,13 @@ export default function CentrosPage() {
                     placeholder="Ej: BRISAS DEL GOLF" className="input"/>
                 </div>
                 <div className="field">
-                  <label className="label">Región / Provincia</label>
+                  <label className="label">País / Región</label>
                   <select value={form.region} onChange={e=>setForm({...form,region:e.target.value})} className="input">
-                    {REGIONES.map(r=><option key={r}>{r}</option>)}
+                    {Object.entries(REGIONES).map(([pais, regs]) => (
+                      <optgroup key={pais} label={pais}>
+                        {regs.map(r => <option key={r} value={r}>{r}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
               </div>
