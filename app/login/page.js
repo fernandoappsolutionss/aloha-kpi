@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { login } from '../actions/auth'
-import AlohaLogo from '../../components/AlohaLogo'
+import Logo from '../../components/Logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,93 +32,91 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',background:'linear-gradient(135deg,#0E2B5E 0%,#1B4580 40%,#1D5FA6 100%)'}}>
-      
-      {/* Left decorative panel */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:60,color:'#fff'}}>
-        <div style={{maxWidth:400}}>
-          <div style={{fontSize:13,fontWeight:600,color:'rgba(184,212,50,1)',letterSpacing:3,textTransform:'uppercase',marginBottom:20}}>
-            Sistema de gestión
-          </div>
-          <h2 style={{fontSize:36,fontWeight:800,lineHeight:1.2,marginBottom:16,color:'#fff'}}>
-            Monitorea el desempeño de todos tus centros en tiempo real
-          </h2>
-          <p style={{fontSize:15,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}>
-            KPIs semanales, cumplimiento mensual, historial trimestral y reportes anuales — todo en un solo lugar.
+    <div className="login">
+
+      {/* ---- Brand panel ---- */}
+      <aside className="login__brand">
+        <div className="login__kicker" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Logo size={46} animate wordmark={false} />
+          <div className="label" style={{ color: 'var(--text-muted)' }}>Sistema de gestión · KPI</div>
+        </div>
+
+        <div className="login__copy">
+          <h1 className="login__headline">
+            El desempeño de cada centro,<br /><em>medible en tiempo real.</em>
+          </h1>
+          <p className="login__lead">
+            KPIs semanales, cumplimiento mensual, historial trimestral y reportes anuales —
+            todos tus centros en un solo tablero.
           </p>
-          <div style={{display:'flex',gap:20,marginTop:32}}>
-            {[['9','Centros'],['10','Usuarios'],['Q1','2026']].map(([n,l])=>(
-              <div key={l} style={{textAlign:'center'}}>
-                <div style={{fontSize:28,fontWeight:800,color:'#B8D432'}}>{n}</div>
-                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginTop:2,textTransform:'uppercase',letterSpacing:1}}>{l}</div>
+
+          <div className="login__stats">
+            {[['9', 'Centros'], ['10', 'Usuarios'], ['Q1', '2026']].map(([n, l]) => (
+              <div key={l}>
+                <div className="stat__num">{n}</div>
+                <div className="stat__label">{l}</div>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Divider */}
-      <div style={{width:1,background:'rgba(255,255,255,0.1)',margin:'60px 0'}}/>
+        <div className="login__brandfoot">
+          <Logo size={26} />
+          <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
+            ALOHA Mental Arithmetic · Panamá
+          </p>
+        </div>
+      </aside>
 
-      {/* Right login card */}
-      <div style={{flex:'0 0 480px',display:'flex',alignItems:'center',justifyContent:'center',padding:40}}>
-        <div style={{background:'#fff',borderRadius:20,padding:'44px 40px',width:'100%',maxWidth:400,boxShadow:'0 25px 60px rgba(0,0,0,0.3)'}}>
-          
-          <div style={{textAlign:'center',marginBottom:32}}>
-            <AlohaLogo height={44}/>
-            <div style={{height:1,background:'linear-gradient(to right,transparent,#E8EBF0,transparent)',marginTop:24}}/>
-            <p style={{fontSize:12,color:'#8896A9',marginTop:16,fontWeight:500}}>Panel de administración · Panamá</p>
+      {/* ---- Login card ---- */}
+      <main className="login__panel">
+        <div className="login__card">
+          <div className="login__cardhead">
+            <div style={{ marginBottom: 22 }}><Logo size={30} /></div>
+            <h2 className="login__welcome">Bienvenido de nuevo</h2>
+            <p className="login__cardsub">Ingresa tus credenciales para acceder al panel.</p>
           </div>
 
-          <form onSubmit={handleLogin} style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div>
-              <label style={{fontSize:11,color:'#4A5568',fontWeight:700,display:'block',marginBottom:6,letterSpacing:'0.06em',textTransform:'uppercase'}}>
-                Correo electrónico
-              </label>
-              <input type="email" required autoComplete="email"
-                value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
-                placeholder="tu@aloha.com"
-                style={{width:'100%',padding:'12px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
-                  background:'#F5F7FA',color:'#1A2744',boxSizing:'border-box'}}
-                onFocus={e=>{e.target.style.borderColor='#1D5FA6';e.target.style.background='#fff'}}
-                onBlur={e=>{e.target.style.borderColor='#E8EBF0';e.target.style.background='#F5F7FA'}}
-              />
+          <form onSubmit={handleLogin} className="login__form">
+            <div className="field">
+              <label className="label" htmlFor="email">Correo electrónico</label>
+              <input id="email" className="input" type="email" required autoComplete="email"
+                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+                placeholder="tu@correo.com" />
             </div>
-            <div>
-              <label style={{fontSize:11,color:'#4A5568',fontWeight:700,display:'block',marginBottom:6,letterSpacing:'0.06em',textTransform:'uppercase'}}>
-                Contraseña
-              </label>
-              <input type="password" required autoComplete="current-password"
-                value={form.password} onChange={e=>setForm({...form,password:e.target.value})}
-                placeholder="••••••••"
-                style={{width:'100%',padding:'12px 14px',border:'1.5px solid #E8EBF0',borderRadius:10,fontSize:14,outline:'none',
-                  background:'#F5F7FA',color:'#1A2744',boxSizing:'border-box'}}
-                onFocus={e=>{e.target.style.borderColor='#1D5FA6';e.target.style.background='#fff'}}
-                onBlur={e=>{e.target.style.borderColor='#E8EBF0';e.target.style.background='#F5F7FA'}}
-              />
+
+            <div className="field">
+              <label className="label" htmlFor="password">Contraseña</label>
+              <input id="password" className="input" type="password" required autoComplete="current-password"
+                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                placeholder="••••••••" />
             </div>
 
             {error && (
-              <div style={{padding:'10px 14px',borderRadius:8,background:'#FBE8E8',color:'#C0392B',fontSize:13,display:'flex',gap:8,alignItems:'center',fontWeight:500}}>
-                <span>⚠</span><span>{error}</span>
+              <div className="alert alert--error" role="alert">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" disabled={loading}
-              style={{padding:'13px',background:'linear-gradient(135deg,#1B4580 0%,#1D5FA6 100%)',color:'#fff',border:'none',
-                borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',marginTop:6,
-                letterSpacing:'0.04em',opacity:loading?0.75:1,
-                boxShadow:'0 4px 16px rgba(27,69,128,0.35)',transition:'all 0.2s'}}>
-              {loading ? 'Verificando...' : 'Ingresar al sistema'}
+            <button type="submit" disabled={loading} className="btn btn--primary btn--block" style={{ marginTop: 6, padding: '13px' }}>
+              {loading ? 'Verificando…' : 'Ingresar al sistema'}
+              {!loading && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                </svg>
+              )}
             </button>
           </form>
 
-          <div style={{textAlign:'center',fontSize:11,color:'#C0C8D4',marginTop:24,lineHeight:1.6}}>
-            ¿Problemas para acceder? Contacta a tu administrador.<br/>
-            <span style={{color:'#B8D432',fontWeight:600}}>ALOHA Mental Arithmetic · Panamá</span>
-          </div>
+          <p className="login__help">
+            ¿Problemas para acceder? Contacta a tu administrador.<br />
+            <b>Operado por Team Solutionss</b>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

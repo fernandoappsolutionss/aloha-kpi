@@ -45,64 +45,78 @@ export default function FodaPage() {
     setSaving(false)
   }
 
+  // accent = color de la barra superior y del título · tone = color del cuerpo
   const cuads = [
-    {t:'✅ Fortalezas',c:'#0F6E56',bc:'#1D9E75',auto:true,items:fortalezas},
-    {t:'⚠ Debilidades',c:'#993C1D',bc:'#D85A30',auto:true,items:debilidades},
-    {t:'🔵 Oportunidades',c:'#185FA5',bc:'#378ADD',k:'oportunidades',prompts:['Tendencias educativas: ¿nuevas demandas?','Alianzas locales: colegios, empresas','Eventos y actividades comunitarias']},
-    {t:'🟡 Amenazas',c:'#854F0B',bc:'#EF9F27',k:'amenazas',prompts:['Competencia directa e indirecta','Factores económicos locales','Cambios en regulaciones']},
+    {t:'Fortalezas',      accent:'var(--ok)',       tone:'#6EE7B7', auto:true, items:fortalezas},
+    {t:'Debilidades',     accent:'var(--bad)',      tone:'#FCA5A5', auto:true, items:debilidades},
+    {t:'Oportunidades',   accent:'var(--ts-green)', tone:'var(--text)', k:'oportunidades', prompts:['Tendencias educativas: ¿nuevas demandas?','Alianzas locales: colegios, empresas','Eventos y actividades comunitarias']},
+    {t:'Amenazas',        accent:'var(--warn)',     tone:'#FCD34D', k:'amenazas', prompts:['Competencia directa e indirecta','Factores económicos locales','Cambios en regulaciones']},
   ]
 
+  const taStyle = { width:'100%', padding:'10px 12px', background:'var(--bg)', border:'1px solid var(--border-strong)', borderRadius:'var(--r-sm)', fontSize:13, resize:'vertical', marginTop:10, outline:'none', lineHeight:1.6, color:'var(--text)', minHeight:100, fontFamily:'var(--font-sans)' }
+
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
-      <main style={{flex:1,padding:28,overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
-          <div><h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>FODA Trimestral</h1>
-            <p style={{fontSize:12,color:'#888'}}>{nombre} · Q1 2026</p></div>
-          <div style={{display:'flex',gap:10,alignItems:'center'}}>
-            {saved && <span style={{color:'#0F6E56',fontSize:12,fontWeight:500}}>✅ Guardado</span>}
-            <button onClick={save} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>{saving?'Guardando...':'💾 Guardar FODA'}</button>
+      <main className="main">
+
+        {/* Header */}
+        <div className="main__head">
+          <div>
+            <div className="label" style={{ marginBottom: 10 }}>Análisis estratégico · Q1 2026</div>
+            <h1 className="h-title">FODA Trimestral</h1>
+            <p className="h-sub">{nombre} · Q1 2026</p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {saved && <span className="pill pill--ok"><span className="dot" />Guardado</span>}
+            <button onClick={save} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
           </div>
         </div>
 
-        <div style={{background:'#EEEDFE',borderRadius:10,padding:'10px 16px',marginBottom:20,fontSize:12,color:'#533AB7'}}>
-          💡 Las fortalezas y debilidades se generan automáticamente desde tu checklist de cumplimiento.
+        <div className="alert" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', marginBottom: 20 }}>
+          <span style={{ color: 'var(--ts-green)' }}>›</span>
+          Las fortalezas y debilidades se generan automáticamente desde tu checklist de cumplimiento.
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-          {cuads.map(({t,c,bc,auto,items,k,prompts})=>(
-            <div key={t} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:18,borderTop:`3px solid ${bc}`}}>
-              <h3 style={{fontSize:13,fontWeight:700,color:c,marginBottom:6}}>{t}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {cuads.map(({t,accent,tone,auto,items,k,prompts})=>(
+            <div key={t} className="card" style={{ padding: 18, borderTop: `2px solid ${accent}` }}>
+              <h3 className="label" style={{ color: tone, fontSize: 12, marginBottom: 8 }}>{t}</h3>
               {auto ? (
                 <>
-                  <p style={{fontSize:11,color:'#aaa',marginBottom:12,fontStyle:'italic'}}>Generado automáticamente del cumplimiento</p>
-                  <ul style={{paddingLeft:16,display:'flex',flexDirection:'column',gap:6}}>
-                    {items.map((f,i)=><li key={i} style={{fontSize:12,color:c==='#0F6E56'?'#333':'#993C1D',lineHeight:1.5}}>{f}</li>)}
+                  <p className="h-sub" style={{ marginTop: 0, marginBottom: 12, fontStyle: 'italic' }}>Generado automáticamente del cumplimiento</p>
+                  <ul style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {items.map((f,i)=><li key={i} style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{f}</li>)}
                   </ul>
                 </>
               ) : (
                 <>
-                  <p style={{fontSize:11,color:'#888',marginBottom:8}}>Editable por la administradora</p>
-                  {prompts.map((p,i)=><p key={i} style={{fontSize:11,color:'#aaa',marginBottom:3,paddingLeft:8,borderLeft:'2px solid #eee'}}>{p}</p>)}
-                  <textarea value={foda[k]} onChange={e=>setFoda({...foda,[k]:e.target.value})}
-                    style={{width:'100%',padding:'10px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,resize:'vertical',marginTop:10,background:'#fafaf8',outline:'none',lineHeight:1.6,color:'#333',minHeight:100}}/>
+                  <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>Editable por la administradora</p>
+                  {prompts.map((p,i)=><p key={i} style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{p}</p>)}
+                  <textarea value={foda[k]} onChange={e=>setFoda({...foda,[k]:e.target.value})} style={taStyle}/>
                 </>
               )}
             </div>
           ))}
         </div>
 
-        <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:18,marginTop:16}}>
-          <h3 style={{fontSize:13,fontWeight:600,marginBottom:6}}>💬 Comentarios del administrador</h3>
-          <p style={{fontSize:12,color:'#888',marginBottom:12}}>Solicitudes de presupuesto, sugerencias, notas para la gerencia</p>
+        <div className="card" style={{ padding: 18, marginTop: 16 }}>
+          <h3 className="panel__title" style={{ fontSize: 16, marginBottom: 4 }}>Comentarios del administrador</h3>
+          <p className="h-sub" style={{ marginTop: 0, marginBottom: 12 }}>Solicitudes de presupuesto, sugerencias, notas para la gerencia</p>
           <textarea value={foda.comentarios} onChange={e=>setFoda({...foda,comentarios:e.target.value})}
-            style={{width:'100%',padding:'10px 12px',border:'0.5px solid #e0e0dc',borderRadius:8,fontSize:13,resize:'vertical',background:'#fafaf8',outline:'none',lineHeight:1.6,color:'#333',minHeight:100}}
+            style={{ ...taStyle, marginTop: 0 }}
             placeholder="Escribe aquí tus comentarios, solicitudes o sugerencias..."/>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,flexWrap:'wrap'}}>
-            <span style={{fontSize:12,color:'#555',fontWeight:500}}>Estado:</span>
-            {['Próximo trimestre','Negado','Aprobado','En proceso','Cumplido'].map(s=>(
-              <button key={s} onClick={()=>setEstado(s)} style={{padding:'4px 12px',border:'0.5px solid '+(estado===s?'#533AB7':'#ddd'),borderRadius:6,background:estado===s?'#EEEDFE':'#f5f5f0',fontSize:11,color:estado===s?'#533AB7':'#666',cursor:'pointer',fontWeight:estado===s?600:400}}>{s}</button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+            <span className="label" style={{ color: 'var(--text-muted)' }}>Estado:</span>
+            {['Próximo trimestre','Negado','Aprobado','En proceso','Cumplido'].map(s=>{
+              const on = estado === s
+              return (
+                <button key={s} onClick={()=>setEstado(s)}
+                  style={{ padding: '5px 13px', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? 'var(--ts-green-soft)' : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.02em', color: on ? 'var(--ts-green)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 500, transition: 'all 0.15s' }}>
+                  {s}
+                </button>
+              )
+            })}
           </div>
         </div>
       </main>

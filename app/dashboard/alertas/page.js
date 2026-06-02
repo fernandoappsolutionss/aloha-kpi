@@ -4,9 +4,9 @@ import Sidebar from '../../../components/Sidebar'
 import { getCentrosKpi } from '../../actions/dashboard'
 
 const COLORS = {
-  critico: { bg:'#FAECE7', border:'#F0997B', title:'#993C1D' },
-  advertencia: { bg:'#FAEEDA', border:'#FAC775', title:'#854F0B' },
-  info: { bg:'#E1F5EE', border:'#5DCAA5', title:'#0F6E56' },
+  critico: { bg:'var(--bad-bg)', border:'var(--bad-line)', title:'#FCA5A5', dot:'var(--bad)' },
+  advertencia: { bg:'var(--warn-bg)', border:'var(--warn-line)', title:'#FCD34D', dot:'var(--warn)' },
+  info: { bg:'var(--ok-bg)', border:'var(--ok-line)', title:'#6EE7B7', dot:'var(--ok)' },
 }
 
 function buildAlertas(centros) {
@@ -44,46 +44,59 @@ export default function AlertasPage() {
   const info = alertas.filter(a => a.tipo === 'info')
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main style={{flex:1,padding:28}}>
-        <div style={{marginBottom:24}}>
-          <h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Alertas</h1>
-          <p style={{fontSize:12,color:'#888'}}>{criticas.length} críticas · {advertencias.length} advertencias · {info.length} positivas</p>
+      <main className="main">
+        <div className="main__head">
+          <div>
+            <div className="label" style={{ marginBottom: 10 }}>Alertas · Q1 2026</div>
+            <h1 className="h-title">Alertas</h1>
+            <p className="h-sub">{criticas.length} críticas · {advertencias.length} advertencias · {info.length} positivas</p>
+          </div>
         </div>
 
         {loading ? (
-          <div style={{padding:40,textAlign:'center',color:'#888'}}>Generando alertas...</div>
+          <div className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Generando alertas…</div>
         ) : alertas.length === 0 ? (
-          <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:48,textAlign:'center',color:'#aaa'}}>
-            <div style={{fontSize:32,marginBottom:12}}>🔔</div>
-            <div style={{fontSize:14,fontWeight:500}}>No hay alertas todavía</div>
-            <div style={{fontSize:12,marginTop:6}}>Las alertas se generan a partir del cumplimiento de cada centro.</div>
+          <div className="panel" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔔</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>No hay alertas todavía</div>
+            <div style={{ fontSize: 12, marginTop: 6 }}>Las alertas se generan a partir del cumplimiento de cada centro.</div>
           </div>
         ) : (
           <>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:24}}>
-              {[{l:'Alertas críticas',v:criticas.length,c:'#993C1D',bg:'#FAECE7'},{l:'Advertencias',v:advertencias.length,c:'#854F0B',bg:'#FAEEDA'},{l:'Noticias positivas',v:info.length,c:'#0F6E56',bg:'#E1F5EE'}]
-                .map((m,i) => <div key={i} style={{background:m.bg,borderRadius:10,padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span style={{fontSize:13,color:m.c,fontWeight:500}}>{m.l}</span>
-                  <span style={{fontSize:28,fontWeight:700,color:m.c}}>{m.v}</span>
-                </div>)}
+            {/* Resumen */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 26 }}>
+              {[{ l:'Alertas críticas', v:criticas.length, pill:'pill--bad', accent:'var(--bad)' },
+                { l:'Advertencias', v:advertencias.length, pill:'pill--warn', accent:'var(--warn)' },
+                { l:'Noticias positivas', v:info.length, pill:'pill--ok', accent:'var(--ts-green)' }]
+                .map((m, i) => (
+                  <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s`, '--accent': m.accent }}>
+                    <div className="kpi__top">
+                      <span className="label">{m.l}</span>
+                      <span className={`pill ${m.pill}`}><span className="dot" /></span>
+                    </div>
+                    <div className="kpi__value" style={{ color: m.accent }}>{m.v}</div>
+                  </div>
+                ))}
             </div>
 
-            {[{t:'🔴 Críticas — Acción inmediata requerida', items:criticas},{t:'🟡 Advertencias — Revisar esta semana', items:advertencias},{t:'🟢 Positivas', items:info}]
-              .map(({t, items}) => items.length > 0 && (
-                <div key={t} style={{marginBottom:24}}>
-                  <h2 style={{fontSize:13,fontWeight:600,color:'#444',marginBottom:12,textTransform:'uppercase',letterSpacing:'0.04em'}}>{t}</h2>
-                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                    {items.map((a,i) => (
-                      <div key={i} style={{background:COLORS[a.tipo].bg,border:`0.5px solid ${COLORS[a.tipo].border}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'flex-start',gap:12}}>
-                        <span style={{fontSize:18,flexShrink:0,marginTop:1}}>{a.icon}</span>
-                        <div style={{flex:1}}>
-                          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                            <span style={{fontSize:13,fontWeight:600,color:COLORS[a.tipo].title}}>{a.centro}</span>
-                            <span style={{fontSize:11,color:'#aaa'}}>{a.fecha}</span>
+            {[{ t:'Críticas — Acción inmediata requerida', items:criticas },
+              { t:'Advertencias — Revisar esta semana', items:advertencias },
+              { t:'Positivas', items:info }]
+              .map(({ t, items }) => items.length > 0 && (
+                <div key={t} style={{ marginBottom: 26 }}>
+                  <h2 className="label" style={{ marginBottom: 12 }}>{t}</h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {items.map((a, i) => (
+                      <div key={i} style={{ background: COLORS[a.tipo].bg, border: `1px solid ${COLORS[a.tipo].border}`, borderRadius: 'var(--r)', padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[a.tipo].dot, flexShrink: 0, marginTop: 7 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS[a.tipo].title }}>{a.centro}</span>
+                            <span className="label" style={{ color: 'var(--text-faint)' }}>{a.fecha}</span>
                           </div>
-                          <p style={{fontSize:13,color:'#444',lineHeight:1.5}}>{a.msg}</p>
+                          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{a.msg}</p>
                         </div>
                       </div>
                     ))}
