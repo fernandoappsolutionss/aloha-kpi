@@ -7,32 +7,46 @@ import { getCentroResumen } from '../../actions/centro'
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
 
-function Bar({ val, max, color = '#533AB7' }) {
+const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+
+function Bar({ val, max, color = 'var(--ts-green)' }) {
   const pct = Math.min((val / (max || 1)) * 100, 100)
   return (
-    <div style={{ flex: 1, height: 8, background: '#f0f0ec', borderRadius: 4, overflow: 'hidden' }}>
-      <div style={{ width: pct + '%', height: '100%', background: color, borderRadius: 4 }} />
+    <div className="bar">
+      <div className="bar__fill" style={{ width: pct + '%', background: color }} />
     </div>
   )
 }
 
 function Card({ l, v, s, warn }) {
   return (
-    <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 10, padding: '14px 16px' }}>
-      <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6 }}>{l}</label>
-      <div style={{ fontSize: 24, fontWeight: 600 }}>{v}</div>
-      <div style={{ fontSize: 11, marginTop: 4, color: warn ? '#993C1D' : '#888' }}>{s}</div>
+    <div className="kpi">
+      <div className="kpi__top">
+        <span className="label">{l}</span>
+      </div>
+      <div className="kpi__value">{v}</div>
+      <div className="kpi__sub" style={warn ? { color: 'var(--bad)' } : undefined}>{s}</div>
     </div>
   )
 }
 
 function Kpi({ l, v }) {
   return (
-    <div style={{ background: '#f8f8f5', borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 11, color: '#888' }}>{l}</div>
-      <div style={{ fontSize: 16, fontWeight: 600 }}>{v}</div>
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '10px 14px' }}>
+      <div className="label" style={{ fontSize: 10 }}>{l}</div>
+      <div className="num" style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginTop: 3 }}>{v}</div>
     </div>
   )
+}
+
+const sectionTitle = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10.5,
+  fontWeight: 500,
+  color: 'var(--text-dim)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  marginBottom: 14,
 }
 
 export default function CentroPage() {
@@ -118,9 +132,9 @@ export default function CentroPage() {
   }, [id])
 
   if (loading) return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f5f0' }}>
+    <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 14 }}>Cargando…</main>
+      <main className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Cargando…</main>
     </div>
   )
 
@@ -137,18 +151,21 @@ export default function CentroPage() {
   const pctCpMat = totals.cpAsi ? Math.round(totals.cpMat / totals.cpAsi * 100) : 0
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f5f0' }}>
+    <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
-      <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <main className="main">
+        <div className="main__head">
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{nombre}</h1>
-            <p style={{ fontSize: 12, color: '#888' }}>Primer Trimestre 2026</p>
+            <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · Q1 2026</div>
+            <h1 className="h-title">{nombre}</h1>
+            <p className="h-sub">Primer Trimestre 2026</p>
           </div>
-          <span style={{ background: '#EEEDFE', color: '#533AB7', fontSize: 12, padding: '5px 14px', borderRadius: 20, fontWeight: 600 }}>{cumplPct}% cumplimiento</span>
+          <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
+            <span className="dot" />{cumplPct}% cumplimiento
+          </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
           <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
           <Card l="Deserción" v={totals.desercion} s={'Meta máx: ' + metaMaxDesTrim} warn={totals.desercion > metaMaxDesTrim} />
@@ -156,42 +173,42 @@ export default function CentroPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 12, padding: 18 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Resultados por mes</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr>{['Mes', 'Nuevos', 'Deserción', 'Niños', 'Cobranza', 'Meta'].map(h => <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontSize: 10, fontWeight: 500, color: '#aaa', borderBottom: '0.5px solid #f0f0ec' }}>{h}</th>)}</tr></thead>
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={sectionTitle}>Resultados por mes</h3>
+            <table className="table">
+              <thead><tr>{['Mes', 'Nuevos', 'Deserción', 'Niños', 'Cobranza', 'Meta'].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>{meses.map((m, i) => (
-                <tr key={i}>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2', fontSize: 13, fontWeight: 500 }}>{m.mes}</td>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2', fontSize: 13, color: m.nuevos >= meta.nuevos ? '#0F6E56' : '#993C1D' }}>{m.nuevos}</td>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2', fontSize: 13, color: m.desercion > meta.desercion ? '#993C1D' : 'inherit' }}>{m.desercion}</td>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2', fontSize: 13 }}>{m.ninos}</td>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2', fontSize: 13 }}>{m.cobranza}</td>
-                  <td style={{ padding: '9px 8px', borderBottom: '0.5px solid #f5f5f2' }}>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, fontWeight: 500, background: m.cumpl === 'Sí' ? '#E1F5EE' : '#FAECE7', color: m.cumpl === 'Sí' ? '#0F6E56' : '#993C1D' }}>{m.cumpl}</span>
+                <tr key={i} style={{ cursor: 'default' }}>
+                  <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{m.mes}</td>
+                  <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
+                  <td className="num" style={{ color: m.desercion > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}</td>
+                  <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
+                  <td className="num">{m.cobranza}</td>
+                  <td>
+                    <span className={`pill ${m.cumpl === 'Sí' ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{m.cumpl}</span>
                   </td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
 
-          <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 12, padding: 18 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Clase de prueba</h3>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={sectionTitle}>Clase de prueba</h3>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
               {[
                 { l: 'Invitados', v: totals.cpInv },
                 { l: 'Asistieron', v: totals.cpAsi, p: totals.cpInv ? pctCpAsi + '%' : null },
                 { l: 'Matriculados', v: totals.cpMat, p: totals.cpAsi ? pctCpMat + '%' : null },
               ].map((item, i) => (
-                <div key={i} style={{ textAlign: 'center', flex: 1, background: '#f8f8f5', borderRadius: 8, padding: '12px 8px' }}>
-                  <div style={{ fontSize: 22, fontWeight: 600 }}>{item.v}</div>
-                  <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{item.l}</div>
-                  {item.p && <div style={{ fontSize: 10, color: '#0F6E56', marginTop: 2 }}>{item.p}</div>}
+                <div key={i} style={{ textAlign: 'center', flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '14px 8px' }}>
+                  <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>{item.v}</div>
+                  <div className="label" style={{ fontSize: 10, marginTop: 4 }}>{item.l}</div>
+                  {item.p && <div className="num" style={{ fontSize: 11, color: 'var(--ts-green)', marginTop: 3 }}>{item.p}</div>}
                 </div>
               ))}
             </div>
 
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Motivo deserción</h3>
+            <h3 style={sectionTitle}>Motivo deserción</h3>
             {[
               { l: 'Pérd. clase', n: totals.motivos.perdida },
               { l: 'Económico', n: totals.motivos.economico },
@@ -199,15 +216,15 @@ export default function CentroPage() {
               { l: 'Horario', n: totals.motivos.horario },
             ].map((m, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <span style={{ width: 100, fontSize: 11, color: '#666', textAlign: 'right' }}>{m.l}</span>
-                <Bar val={m.n} max={maxMot} color="#D85A30" />
-                <span style={{ width: 24, fontSize: 12, fontWeight: 500 }}>{m.n}</span>
+                <span className="label" style={{ width: 100, fontSize: 10, textAlign: 'right' }}>{m.l}</span>
+                <Bar val={m.n} max={maxMot} color="var(--warn)" />
+                <span className="num" style={{ width: 24, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{m.n}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 12, padding: 18 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Origen nuevos ingresos</h3>
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={sectionTitle}>Origen nuevos ingresos</h3>
             {[
               { l: 'Marketing', n: totals.origen.marketing },
               { l: 'Centro', n: totals.origen.centro },
@@ -216,18 +233,18 @@ export default function CentroPage() {
               { l: 'Medios', n: totals.origen.medios },
             ].map((o, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <span style={{ width: 90, fontSize: 11, color: '#666', textAlign: 'right' }}>{o.l}</span>
+                <span className="label" style={{ width: 90, fontSize: 10, textAlign: 'right' }}>{o.l}</span>
                 <Bar val={o.n} max={maxOri} />
-                <span style={{ width: 30, fontSize: 11 }}>{o.n}</span>
+                <span className="num" style={{ width: 30, fontSize: 12, color: 'var(--text)' }}>{o.n}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 12, padding: 18 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cumplimiento trimestral</h3>
-            <div style={{ fontSize: 36, fontWeight: 700, color: '#533AB7', marginBottom: 8 }}>{cumplPct}%</div>
-            <div style={{ height: 12, background: '#eee', borderRadius: 6, overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ height: '100%', width: cumplPct + '%', background: '#533AB7', borderRadius: 6 }} />
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={sectionTitle}>Cumplimiento trimestral</h3>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 500, color: cumplColor(cumplPct), marginBottom: 10, letterSpacing: '-0.02em', lineHeight: 1 }}>{cumplPct}%</div>
+            <div className="bar" style={{ height: 10, marginBottom: 16 }}>
+              <div className="bar__fill" style={{ width: cumplPct + '%', background: cumplColor(cumplPct) }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <Kpi l="Meses cumplidos" v={cumplCount + '/' + meses.length} />

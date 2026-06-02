@@ -6,7 +6,6 @@ import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const SEMANAS = [1, 2, 3, 4, 5]
-const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', red:'#D63C3C', orange:'#E67E22', gray:'#F5F7FA', text:'#1A2744' }
 
 // Fórmulas KPI ALOHA (según Excel)
 const calcRes = (tipo, dias) => {
@@ -111,51 +110,61 @@ export default function KPIPage() {
   const gpn = ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
 
   const upd = (semIdx, tipo, di, val) => setSemanas(p => p.map((s,i) => i===semIdx ? {...s,[tipo]:s[tipo].map((d,j) => j===di?val:d)} : s))
-  const inp = (val, onChange, disabled) => <input type="number" min="0" value={val} onChange={e=>onChange(e.target.value)} disabled={disabled} style={{width:60,padding:'4px 6px',border:'1px solid #D0D7E3',borderRadius:6,fontSize:13,textAlign:'center',background:disabled?'#F0F0F0':'#fff',outline:'none'}}/>
-  const badge = ok => <span style={{padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:700,background:ok?'#E6F4EC':'#FBE8E8',color:ok?A.green:A.red}}>{ok?'Sí ✓':'No ✗'}</span>
+  const inp = (val, onChange, disabled) => <input type="number" min="0" value={val} onChange={e=>onChange(e.target.value)} disabled={disabled} className="num" style={{width:58,padding:'5px 6px',border:'1px solid var(--border-strong)',borderRadius:6,fontSize:13,textAlign:'center',background:disabled?'var(--surface-3)':'var(--bg)',color:'var(--text)',outline:'none',opacity:disabled?0.6:1}}/>
+  const badge = ok => <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Sí' : 'No'}</span>
   const locked = mesEstado === 'cerrado'
 
   const kpiRow = (tipo, label, semIdx) => {
     const s = semanas[semIdx], dias = s[tipo]
     const res = calcRes(tipo, dias), meta = calcMeta(tipo, ni, metaN)
     const ok = cumple(tipo, res, meta)
+    const resColor = tipo==='cob' ? 'var(--text)' : tipo==='des' ? 'var(--bad)' : 'var(--ok)'
     return (
-      <tr key={tipo} style={{background:'#F9FAFC'}}>
-        <td style={{padding:'6px 10px',width:200,fontWeight:600,color:A.text,fontSize:11}}>{label}</td>
-        {dias.map((d,di) => <td key={di} style={{padding:'4px 3px',textAlign:'center'}}>{inp(d, v => upd(semIdx,tipo,di,v), locked)}</td>)}
-        <td style={{padding:'4px 8px',textAlign:'center',fontWeight:700,color:tipo==='cob'?A.blue:tipo==='des'?A.red:A.green,minWidth:50}}>{res}</td>
-        <td style={{padding:'4px 6px',textAlign:'center',color:'#666',fontSize:11}}>{meta}</td>
-        <td style={{padding:'4px 6px',textAlign:'center'}}>{badge(ok)}</td>
+      <tr key={tipo}>
+        <td style={{padding:'8px 16px',width:210,fontWeight:600,color:'var(--text-muted)',fontSize:12}}>{label}</td>
+        {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{inp(d, v => upd(semIdx,tipo,di,v), locked)}</td>)}
+        <td className="num" style={{padding:'5px 8px',textAlign:'center',fontWeight:700,color:resColor,minWidth:50}}>{res}</td>
+        <td className="num" style={{padding:'5px 6px',textAlign:'center',color:'var(--text-dim)',fontSize:12}}>{meta}</td>
+        <td style={{padding:'5px 6px',textAlign:'center'}}>{badge(ok)}</td>
       </tr>
     )
   }
 
-  if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center'}}>Cargando...</div>
+  if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text-dim)'}}>Cargando…</div>
+
+  // Estilo input de "Configuración" / cards de categoría
+  const cfgInput = (key, full) => (
+    <input type="number" min="0" value={config[key]} disabled={locked}
+      onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
+      className="input num"
+      style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: locked ? 0.6 : 1, background: locked ? 'var(--surface-3)' : 'var(--bg)' }}/>
+  )
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
+    <div className="shell">
       <Sidebar rol="usuario" centroNombre={centroNombre} centroId={id}/>
-      <main style={{flex:1,padding:24,overflowY:'auto'}}>
+      <main className="main">
 
         {/* Header */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div className="main__head">
           <div>
-            <h1 style={{fontSize:18,fontWeight:700,color:A.text}}>Registro KPI Mensual</h1>
-            <p style={{fontSize:12,color:'#8896A9'}}>{centroNombre}</p>
+            <div className="label" style={{ marginBottom: 10 }}>Captura mensual · KPI</div>
+            <h1 className="h-title">Registro KPI Mensual</h1>
+            <p className="h-sub">{centroNombre}</p>
           </div>
-          <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {!locked ? (
               <>
-                <button onClick={handleSave} disabled={saving} style={{padding:'9px 22px',background:`linear-gradient(135deg,${A.blue},${A.blueMid})`,color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1,boxShadow:'0 4px 12px rgba(27,69,128,0.25)'}}>
-                  {saving?'Guardando...':'💾 Guardar'}
+                <button onClick={handleSave} disabled={saving} className="btn btn--primary">
+                  {saving ? 'Guardando…' : 'Guardar'}
                 </button>
-                <button onClick={handleCerrarMes} disabled={cerrando} style={{padding:'9px 18px',background:'linear-gradient(135deg,#4A8C3F,#3A7A30)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',boxShadow:'0 4px 12px rgba(74,140,63,0.25)'}}>
-                  {cerrando?'Cerrando...':'🔒 Cerrar Mes'}
+                <button onClick={handleCerrarMes} disabled={cerrando} className="btn">
+                  {cerrando ? 'Cerrando…' : 'Cerrar mes'}
                 </button>
               </>
             ) : (
-              <button onClick={handleReabrirMes} style={{padding:'9px 18px',background:'linear-gradient(135deg,#E67E22,#D35400)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                🔓 Reabrir Mes
+              <button onClick={handleReabrirMes} className="btn" style={{ borderColor: 'var(--warn-line)', color: 'var(--warn)' }}>
+                Reabrir mes
               </button>
             )}
           </div>
@@ -163,120 +172,124 @@ export default function KPIPage() {
 
         {/* Estado del mes */}
         {locked && (
-          <div style={{background:'#FFF8E1',border:'1px solid #F9A825',borderRadius:10,padding:'10px 16px',marginBottom:16,fontSize:13,color:'#856404',fontWeight:600}}>
-            🔒 Mes cerrado — Solo lectura. Los datos están guardados como historial.
+          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
+            Mes cerrado — Solo lectura. Los datos están guardados como historial.
           </div>
         )}
 
         {status && (
-          <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FBE8E8':status.includes('🔒')?'#FFF8E1':'#E6F4EC',color:status.includes('❌')?A.red:status.includes('🔒')?'#856404':A.green,fontSize:13,fontWeight:500}}>
-            {status}
+          <div className={`alert ${status.includes('❌') ? 'alert--error' : ''}`}
+            style={status.includes('❌') ? { marginBottom: 16 } : { marginBottom: 16, background: status.includes('🔒') ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1px solid ${status.includes('🔒') ? 'var(--warn-line)' : 'var(--ok-line)'}`, color: status.includes('🔒') ? '#FCD34D' : '#6EE7B7' }}>
+            {status.replace(/^[❌✅🔒]\s*/, '')}
           </div>
         )}
 
         {/* Navegador de mes */}
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-          <button onClick={()=>navMonth(-1)} style={{padding:'8px 14px',background:'#fff',border:'1px solid #E8EBF0',borderRadius:8,cursor:'pointer',fontSize:16}}>‹</button>
-          <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:10,padding:'10px 28px',textAlign:'center',minWidth:180,boxShadow:'0 1px 6px rgba(0,0,0,0.06)'}}>
-            <p style={{fontSize:18,fontWeight:800,color:A.blue,margin:0}}>{NOMBRES_MES[month-1]}</p>
-            <p style={{fontSize:13,color:'#8896A9',margin:0}}>{year}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          <button onClick={()=>navMonth(-1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>‹</button>
+          <div className="card" style={{ padding: '12px 28px', textAlign: 'center', minWidth: 180 }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--text)', margin: 0 }}>{NOMBRES_MES[month-1]}</p>
+            <p className="num" style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0 }}>{year}</p>
           </div>
-          <button onClick={()=>navMonth(1)} style={{padding:'8px 14px',background:'#fff',border:'1px solid #E8EBF0',borderRadius:8,cursor:'pointer',fontSize:16}}>›</button>
+          <button onClick={()=>navMonth(1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>›</button>
           {historial.length > 0 && (
-            <div style={{marginLeft:16,display:'flex',gap:6,flexWrap:'wrap'}}>
-              <span style={{fontSize:11,color:'#8896A9',alignSelf:'center'}}>Historial cerrado:</span>
-              {historial.map(h => (
-                <button key={h.year+'-'+h.month} onClick={()=>{setYear(h.year);setMonth(h.month)}}
-                  style={{padding:'4px 10px',background:year===h.year&&month===h.month?A.blue:'#F0F4FF',color:year===h.year&&month===h.month?'#fff':A.blueMid,border:'1px solid #C5D5F5',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:600}}>
-                  {NOMBRES_MES[h.month-1].slice(0,3)} {h.year}
-                </button>
-              ))}
+            <div style={{ marginLeft: 16, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="label">Historial cerrado:</span>
+              {historial.map(h => {
+                const on = year===h.year && month===h.month
+                return (
+                  <button key={h.year+'-'+h.month} onClick={()=>{setYear(h.year);setMonth(h.month)}}
+                    style={{ padding: '4px 11px', background: on ? 'var(--ts-green-soft)' : 'transparent', color: on ? 'var(--ts-green)' : 'var(--text-dim)', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+                    {NOMBRES_MES[h.month-1].slice(0,3)} {h.year}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
 
         {/* Config del mes */}
-        <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,padding:16,marginBottom:16,boxShadow:'0 1px 6px rgba(27,69,128,0.06)'}}>
-          <h3 style={{fontSize:11,fontWeight:700,color:A.blue,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:12}}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+          <h3 className="label" style={{ marginBottom: 14 }}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta nuevos (mensual)','meta_nuevos_mensual'],['Nuevos activos mes','nuevos_activos_mes']].map(([lbl,key]) => (
-              <div key={key}>
-                <label style={{fontSize:11,color:'#4A5568',fontWeight:600,display:'block',marginBottom:4}}>{lbl}</label>
-                <input type="number" min="0" value={config[key]} disabled={locked}
-                  onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
-                  style={{width:'100%',padding:'8px 10px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,background:locked?'#F0F0F0':'#F5F7FA',boxSizing:'border-box'}}/>
+              <div key={key} className="field">
+                <label className="label">{lbl}</label>
+                {cfgInput(key, true)}
               </div>
             ))}
           </div>
         </div>
 
         {/* Indicadores calculados */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 16 }}>
           {[
-            {l:'Total Deserción',v:totalDes,c:A.red},
-            {l:'Total Nuevos',v:totalIng,c:A.green},
-            {l:'Niños Final Mes',v:ninosFinal,c:A.blue},
-            {l:'Prom. Niños/Grupo',v:promG.toFixed(2),c:promG>=8?A.green:A.red,m:'≥ 8',ok:promG>=8},
-            {l:'%CV',v:pcv.toFixed(1)+'%',c:'#7B68EE'},
+            {l:'Total Deserción', v:totalDes, c:'var(--bad)'},
+            {l:'Total Nuevos', v:totalIng, c:'var(--ok)'},
+            {l:'Niños Final Mes', v:ninosFinal, c:'var(--text)'},
+            {l:'Prom. Niños/Grupo', v:promG.toFixed(2), c:promG>=8?'var(--ok)':'var(--bad)', m:'≥ 8', ok:promG>=8},
+            {l:'%CV', v:pcv.toFixed(1)+'%', c:'var(--text)'},
           ].map(({l,v,c,m,ok}) => (
-            <div key={l} style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:10,padding:'10px 12px',textAlign:'center',boxShadow:'0 1px 4px rgba(27,69,128,0.05)'}}>
-              <p style={{fontSize:10,color:'#8896A9',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>{l}</p>
-              <p style={{fontSize:20,fontWeight:800,color:c,margin:0}}>{v}</p>
-              {m && <p style={{fontSize:10,color:ok?A.green:A.red,fontWeight:600,marginTop:2}}>{ok?'✓ meta '+m:'✗ meta '+m}</p>}
+            <div key={l} className="kpi" style={{ padding: '16px 16px 14px' }}>
+              <div className="kpi__top"><span className="label">{l}</span></div>
+              <div className="kpi__value num" style={{ fontSize: 28, color: c }}>{v}</div>
+              {m && <div className="kpi__sub" style={{ color: ok ? 'var(--ok)' : 'var(--bad)' }}>{ok ? '✓ meta '+m : '✗ meta '+m}</div>}
             </div>
           ))}
         </div>
 
         {/* GPN */}
-        <div style={{background:gpn>=0?'#E6F4EC':'#FBE8E8',border:'1px solid '+(gpn>=0?'#4A8C3F':A.red),borderRadius:10,padding:'10px 18px',marginBottom:16,display:'flex',alignItems:'center',gap:14}}>
-          <span style={{fontSize:12,fontWeight:700,color:gpn>=0?A.green:A.red}}>GPN — Ganancia por Niño:</span>
-          <span style={{fontSize:22,fontWeight:800,color:gpn>=0?A.green:A.red}}>${gpn.toFixed(2)}</span>
-          <span style={{fontSize:11,color:'#666',flex:1}}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
+        <div className="card" style={{ background: gpn>=0 ? 'var(--ok-bg)' : 'var(--bad-bg)', border: `1px solid ${gpn>=0 ? 'var(--ok-line)' : 'var(--bad-line)'}`, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span className="label" style={{ color: gpn>=0 ? '#6EE7B7' : '#FCA5A5' }}>GPN — Ganancia por Niño:</span>
+          <span className="num" style={{ fontSize: 24, fontWeight: 700, color: gpn>=0 ? 'var(--ok)' : 'var(--bad)', fontFamily: 'var(--font-serif)' }}>${gpn.toFixed(2)}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
         </div>
 
         {/* Tabla KPI semanal */}
-        <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,overflow:'hidden',boxShadow:'0 1px 6px rgba(27,69,128,0.06)',marginBottom:20}}>
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
-            <thead>
-              <tr style={{background:`linear-gradient(135deg,${A.blue},${A.blueMid})`}}>
-                <th style={{padding:'10px',textAlign:'left',fontSize:11,fontWeight:700,color:'#fff',width:200}}>Semana / Indicador</th>
-                {['Día 1','Día 2','Día 3','Día 4','Día 5'].map(d=><th key={d} style={{padding:'10px 3px',textAlign:'center',fontSize:11,fontWeight:700,color:'#fff',width:70}}>{d}</th>)}
-                <th style={{padding:'10px',textAlign:'center',fontSize:11,fontWeight:700,color:'#fff',width:65}}>Resultado</th>
-                <th style={{padding:'10px',textAlign:'center',fontSize:11,fontWeight:700,color:'#fff',width:60}}>Meta</th>
-                <th style={{padding:'10px',textAlign:'center',fontSize:11,fontWeight:700,color:'#fff',width:65}}>¿Cumple?</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SEMANAS.map((s,i) => (
-                <>
-                  <tr key={'sh'+i} style={{background:'#F0F4FF'}}>
-                    <td colSpan={9} style={{padding:'6px 12px',fontSize:11,fontWeight:700,color:A.blue,textTransform:'uppercase',letterSpacing:'0.08em'}}>Semana {s}</td>
-                  </tr>
-                  {kpiRow('cob','Cobranza Vencida (N°)',i)}
-                  {kpiRow('des','Deserción (Retirados)',i)}
-                  {kpiRow('ing','Nuevos Ingresos - Ventas',i)}
-                </>
-              ))}
-            </tbody>
-          </table>
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 210 }}>Semana / Indicador</th>
+                  {['Día 1','Día 2','Día 3','Día 4','Día 5'].map(d=><th key={d} style={{ textAlign: 'center', width: 70 }}>{d}</th>)}
+                  <th style={{ textAlign: 'center', width: 65 }}>Resultado</th>
+                  <th style={{ textAlign: 'center', width: 60 }}>Meta</th>
+                  <th style={{ textAlign: 'center', width: 65 }}>¿Cumple?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SEMANAS.map((s,i) => (
+                  <>
+                    <tr key={'sh'+i} style={{ cursor: 'default', background: 'var(--surface-2)' }}>
+                      <td colSpan={9} className="label" style={{ padding: '8px 16px', color: 'var(--ts-green)' }}>Semana {s}</td>
+                    </tr>
+                    {kpiRow('cob','Cobranza Vencida (N°)',i)}
+                    {kpiRow('des','Deserción (Retirados)',i)}
+                    {kpiRow('ing','Nuevos Ingresos - Ventas',i)}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Clase de prueba / Motivos / Origen */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:20}}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba',color:A.blue,fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
-            {title:'Motivo Deserción',color:A.red,fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario']]},
-            {title:'Origen Nuevos Ingresos',color:A.green,fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios']]},
-          ].map(({title,color,fields}) => (
-            <div key={title} style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,overflow:'hidden',boxShadow:'0 1px 6px rgba(27,69,128,0.06)'}}>
-              <div style={{background:color,color:'#fff',padding:'7px 14px',fontSize:11,fontWeight:700,letterSpacing:'0.07em',textTransform:'uppercase'}}>{title}</div>
-              <div style={{padding:14}}>
+            {title:'Clase de Prueba', accent:'var(--ts-green)', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Motivo Deserción', accent:'var(--bad)', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario']]},
+            {title:'Origen Nuevos Ingresos', accent:'var(--ok)', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios']]},
+          ].map(({title,accent,fields}) => (
+            <div key={title} className="panel">
+              <div className="panel__head" style={{ padding: '12px 16px', borderTop: `2px solid ${accent}` }}>
+                <span className="label">{title}</span>
+              </div>
+              <div style={{ padding: 14 }}>
                 {fields.map(([lbl,key]) => (
-                  <div key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
-                    <span style={{fontSize:12,color:A.text}}>{lbl}</span>
-                    <input type="number" min="0" value={config[key]} disabled={locked}
-                      onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
-                      style={{width:65,padding:'5px 8px',border:'1.5px solid #E8EBF0',borderRadius:6,fontSize:13,textAlign:'center',background:locked?'#F0F0F0':'#F5F7FA'}}/>
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
+                    {cfgInput(key, false)}
                   </div>
                 ))}
               </div>
@@ -285,8 +298,8 @@ export default function KPIPage() {
         </div>
 
         {/* Nota fórmulas */}
-        <div style={{background:'#F0F4FF',border:'1px solid #C5D5F5',borderRadius:10,padding:'10px 16px',fontSize:11,color:'#4A5568'}}>
-          <strong style={{color:A.blue}}>Fórmulas ALOHA:</strong> Cobranza = último día | Deserción = suma | Nuevos = suma | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
+        <div className="card" style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+          <strong style={{ color: 'var(--ts-green)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Deserción = suma | Nuevos = suma | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
         </div>
       </main>
     </div>

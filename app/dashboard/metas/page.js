@@ -52,55 +52,61 @@ export default function MetasPage() {
   ]
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main style={{flex:1,padding:28}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+      <main className="main">
+        <div className="main__head">
           <div>
-            <h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Metas globales</h1>
-            <p style={{fontSize:12,color:'#888'}}>Estas metas aplican a todos los centros · Q1 2026</p>
+            <div className="label" style={{ marginBottom: 10 }}>Configuración · Q1 2026</div>
+            <h1 className="h-title">Metas globales</h1>
+            <p className="h-sub">Estas metas aplican a todos los centros · Q1 2026</p>
           </div>
-          <div style={{display:'flex',gap:10,alignItems:'center'}}>
-            {saved && <span style={{fontSize:12,color:'#0F6E56',fontWeight:500}}>✅ Metas guardadas</span>}
-            <button onClick={save} disabled={saving} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>
-              {saving ? 'Guardando...' : '💾 Guardar metas'}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {saved && (
+              <span className="pill pill--ok"><span className="dot" />Metas guardadas</span>
+            )}
+            <button onClick={save} disabled={saving} className="btn btn--primary">
+              {saving ? 'Guardando…' : 'Guardar metas'}
             </button>
           </div>
         </div>
 
-        <div style={{background:'#EEEDFE',borderRadius:10,padding:'12px 18px',marginBottom:20,fontSize:12,color:'#533AB7',lineHeight:1.6}}>
-          <strong>Nota:</strong> Los cambios en estas metas se aplicarán al cálculo de cumplimiento de todos los centros a partir del siguiente registro semanal.
+        <div className="card" style={{ padding: '13px 18px', marginBottom: 22, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6, borderLeft: '2px solid var(--ts-green)' }}>
+          <strong style={{ color: 'var(--text)' }}>Nota:</strong> Los cambios en estas metas se aplicarán al cálculo de cumplimiento de todos los centros a partir del siguiente registro semanal.
         </div>
 
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {campos.map(f => (
-            <div key={f.k} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:'20px 24px',display:'flex',alignItems:'center',gap:24}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:'#1a1a1a'}}>{f.l}</div>
-                <div style={{fontSize:12,color:'#888',lineHeight:1.5}}>{f.desc}</div>
+            <div key={f.k} className="card" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 24 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 5, color: 'var(--text)' }}>{f.l}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.5 }}>{f.desc}</div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                 <input
                   type={f.tipo}
+                  className="input num"
                   value={metas[f.k]}
                   min="0"
-                  step={f.k==='desercion_mes'?'0.1':'1'}
-                  onChange={e => setMetas({...metas,[f.k]:parseFloat(e.target.value)||0})}
-                  style={{width:90,padding:'9px 12px',border:'1px solid #e0e0dc',borderRadius:8,fontSize:16,fontWeight:600,textAlign:'center',outline:'none',background:'#fafaf8',color:'#533AB7'}}
+                  step={f.k === 'desercion_mes' ? '0.1' : '1'}
+                  onChange={e => setMetas({ ...metas, [f.k]: parseFloat(e.target.value) || 0 })}
+                  style={{ width: 96, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--ts-green)' }}
                 />
-                <span style={{fontSize:12,color:'#888',minWidth:80}}>{f.suffix}</span>
+                <span className="label" style={{ minWidth: 84, color: 'var(--text-dim)' }}>{f.suffix}</span>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:20,marginTop:20}}>
-          <h3 style={{fontSize:13,fontWeight:600,color:'#444',marginBottom:16,textTransform:'uppercase',letterSpacing:'0.04em'}}>Resumen de metas actuales</h3>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:12}}>
+        <div className="panel" style={{ marginTop: 22 }}>
+          <div className="panel__head">
+            <h3 className="panel__title">Resumen de metas actuales</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, padding: 22 }}>
             {campos.map(f => (
-              <div key={f.k} style={{textAlign:'center',background:'#f8f8f5',borderRadius:8,padding:'12px 8px'}}>
-                <div style={{fontSize:22,fontWeight:700,color:'#533AB7'}}>{metas[f.k]}</div>
-                <div style={{fontSize:10,color:'#888',marginTop:4,lineHeight:1.4}}>{f.suffix}</div>
+              <div key={f.k} style={{ textAlign: 'center', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '16px 8px' }}>
+                <div className="num" style={{ fontSize: 24, fontWeight: 700, color: 'var(--ts-green)', fontFamily: 'var(--font-serif)' }}>{metas[f.k]}</div>
+                <div className="label" style={{ marginTop: 6, lineHeight: 1.4, color: 'var(--text-dim)' }}>{f.suffix}</div>
               </div>
             ))}
           </div>

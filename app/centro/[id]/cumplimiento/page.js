@@ -59,50 +59,55 @@ export default function CumplimientoPage() {
     setSaving(false)
   }
 
+  const pctColor = pct >= 85 ? 'var(--ok)' : pct >= 70 ? 'var(--warn)' : 'var(--bad)'
+
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
-      <main style={{flex:1,padding:28,overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
-          <div><h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Cumplimiento mensual</h1>
-            <p style={{fontSize:12,color:'#888'}}>{nombre} · Q1 2026</p></div>
-          <div style={{display:'flex',gap:10,alignItems:'center'}}>
-            {status && <span style={{fontSize:12,color:status.includes('❌')?'#993C1D':'#0F6E56',fontWeight:500}}>{status}</span>}
-            <button onClick={save} disabled={saving||loading} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer'}}>
-              {saving?'Guardando...':'💾 Guardar'}
+      <main className="main">
+        <div className="main__head">
+          <div>
+            <div className="label" style={{ marginBottom: 10 }}>Checklist operativo · Q1 2026</div>
+            <h1 className="h-title">Cumplimiento mensual</h1>
+            <p className="h-sub">{nombre} · Q1 2026</p>
+          </div>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            {status && <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad)' : 'var(--ok)', fontWeight: 500 }}>{status}</span>}
+            <button onClick={save} disabled={saving||loading} className="btn btn--primary">
+              {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </div>
 
-        <div style={{display:'flex',marginBottom:20,borderBottom:'0.5px solid #e8e8e4'}}>
+        <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border)', gap: 4 }}>
           {['Enero','Febrero','Marzo'].map((m,i)=>
-            <button key={m} onClick={()=>setMes(i+1)} style={{padding:'9px 20px',background:'none',border:'none',fontSize:13,cursor:'pointer',borderBottom:mes===i+1?'2px solid #533AB7':'2px solid transparent',color:mes===i+1?'#533AB7':'#888',fontWeight:mes===i+1?600:400,marginBottom:-1}}>{m}</button>
+            <button key={m} onClick={()=>setMes(i+1)} style={{ padding: '10px 20px', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', borderBottom: mes===i+1 ? '2px solid var(--ts-green)' : '2px solid transparent', color: mes===i+1 ? 'var(--text)' : 'var(--text-dim)', fontWeight: mes===i+1 ? 600 : 500, marginBottom: -1 }}>{m}</button>
           )}
         </div>
 
-        {loading ? <div style={{padding:20,textAlign:'center',color:'#888'}}>Cargando...</div> : <>
-          <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        {loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</div> : <>
+          <div className="card" style={{ padding: '18px 20px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:'#444'}}>Cumplimiento del mes</div>
-                <div style={{fontSize:12,color:'#888',marginTop:2}}>{totalSi} de {allKeys.length} criterios cumplidos</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Cumplimiento del mes</div>
+                <div className="label" style={{ marginTop: 4 }}>{totalSi} de {allKeys.length} criterios cumplidos</div>
               </div>
-              <div style={{fontSize:36,fontWeight:700,color:pct>=85?'#0F6E56':pct>=70?'#854F0B':'#993C1D'}}>{pct}%</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 500, color: pctColor, letterSpacing: '-0.02em', lineHeight: 1 }}>{pct}%</div>
             </div>
-            <div style={{height:10,background:'#eee',borderRadius:5,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${pct}%`,background:pct>=85?'#1D9E75':pct>=70?'#EF9F27':'#D85A30',borderRadius:5,transition:'width 0.3s'}}/>
+            <div className="bar" style={{ height: 10 }}>
+              <div className="bar__fill" style={{ width: `${pct}%`, background: pctColor }} />
             </div>
           </div>
 
           {CHECKS.map(group => (
-            <div key={group.g} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:'16px 20px',marginBottom:12}}>
-              <h3 style={{fontSize:11,fontWeight:700,color:'#533AB7',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:12,paddingBottom:8,borderBottom:'0.5px solid #f0f0ec'}}>{group.g}</h3>
-              {group.items.map(item => (
-                <div key={item.k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderBottom:'0.5px solid #f8f8f5'}}>
-                  <span style={{fontSize:13,color:'#333',flex:1,paddingRight:16}}>{item.l}</span>
-                  <div style={{display:'flex',gap:6,flexShrink:0}}>
-                    <button onClick={()=>toggle(item.k,'si')} style={{padding:'4px 14px',borderRadius:6,border:'0.5px solid',fontSize:12,cursor:'pointer',background:vals[item.k]==='si'?'#E1F5EE':'#f5f5f0',color:vals[item.k]==='si'?'#0F6E56':'#888',borderColor:vals[item.k]==='si'?'#5DCAA5':'#ddd',fontWeight:vals[item.k]==='si'?600:400}}>Sí</button>
-                    <button onClick={()=>toggle(item.k,'no')} style={{padding:'4px 14px',borderRadius:6,border:'0.5px solid',fontSize:12,cursor:'pointer',background:vals[item.k]==='no'?'#FAECE7':'#f5f5f0',color:vals[item.k]==='no'?'#993C1D':'#888',borderColor:vals[item.k]==='no'?'#F0997B':'#ddd',fontWeight:vals[item.k]==='no'?600:400}}>No</button>
+            <div key={group.g} className="card" style={{ padding: '16px 20px', marginBottom: 12 }}>
+              <h3 className="label" style={{ color: 'var(--ts-green)', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>{group.g}</h3>
+              {group.items.map((item, idx) => (
+                <div key={item.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: idx < group.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', flex: 1, paddingRight: 16 }}>{item.l}</span>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={()=>toggle(item.k,'si')} style={{ padding: '5px 16px', borderRadius: 'var(--r-pill)', border: '1px solid', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', background: vals[item.k]==='si' ? 'var(--ok-bg)' : 'transparent', color: vals[item.k]==='si' ? '#6EE7B7' : 'var(--text-dim)', borderColor: vals[item.k]==='si' ? 'var(--ok-line)' : 'var(--border-strong)', fontWeight: vals[item.k]==='si' ? 600 : 400 }}>Sí</button>
+                    <button onClick={()=>toggle(item.k,'no')} style={{ padding: '5px 16px', borderRadius: 'var(--r-pill)', border: '1px solid', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', background: vals[item.k]==='no' ? 'var(--bad-bg)' : 'transparent', color: vals[item.k]==='no' ? '#FCA5A5' : 'var(--text-dim)', borderColor: vals[item.k]==='no' ? 'var(--bad-line)' : 'var(--border-strong)', fontWeight: vals[item.k]==='no' ? 600 : 400 }}>No</button>
                   </div>
                 </div>
               ))}

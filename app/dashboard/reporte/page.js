@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import { getCentrosKpi } from '../../actions/dashboard'
 
+const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+
 export default function ReportePage() {
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
@@ -30,71 +32,80 @@ export default function ReportePage() {
   }
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#f5f5f0'}}>
+    <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main style={{flex:1,padding:28}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+      <main className="main">
+
+        {/* Header */}
+        <div className="main__head">
           <div>
-            <h1 style={{fontSize:20,fontWeight:600,marginBottom:4}}>Reporte trimestral</h1>
-            <p style={{fontSize:12,color:'#888'}}>Resumen consolidado Q1 2026 · {centros.length} centros</p>
+            <div className="label" style={{ marginBottom: 10 }}>Reporte · Q1 2026</div>
+            <h1 className="h-title">Reporte trimestral</h1>
+            <p className="h-sub">Resumen consolidado Q1 2026 · {centros.length} centros</p>
           </div>
-          <button onClick={exportCSV} disabled={loading||centros.length===0} style={{padding:'9px 20px',background:'#533AB7',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',opacity:(loading||centros.length===0)?0.6:1}}>
-            📥 Exportar CSV
+          <button onClick={exportCSV} disabled={loading||centros.length===0} className="btn btn--primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
           </button>
         </div>
 
         {loading ? (
-          <div style={{padding:40,textAlign:'center',color:'#888'}}>Cargando reporte...</div>
+          <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando reporte...</div>
         ) : (
           <>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:24}}>
-              {[{l:'Total niños activos',v:tot.ninos.toLocaleString()},{l:'Nuevos ingresos',v:tot.nuevos},{l:'Deserción total',v:tot.desercion},{l:'Prom. cumplimiento',v:promCumpl+'%'}]
-                .map((m,i)=><div key={i} style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:10,padding:'14px 18px'}}>
-                  <label style={{fontSize:11,color:'#888',display:'block',marginBottom:6}}>{m.l}</label>
-                  <div style={{fontSize:24,fontWeight:700}}>{m.v}</div>
-                </div>)}
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+              {[{l:'Total niños activos',v:tot.ninos.toLocaleString()},{l:'Nuevos ingresos',v:tot.nuevos,color:'var(--ts-green)'},{l:'Deserción total',v:tot.desercion},{l:'Prom. cumplimiento',v:promCumpl+'%',color:cumplColor(promCumpl)}]
+                .map((m,i)=>(
+                  <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s`, ['--accent']: m.color || 'var(--ts-green)' }}>
+                    <div className="kpi__top"><span className="label">{m.l}</span></div>
+                    <div className="kpi__value" style={m.color ? { color: m.color } : undefined}>{m.v}</div>
+                  </div>
+                ))}
             </div>
 
-            <div style={{background:'#fff',border:'0.5px solid #e8e8e4',borderRadius:12,padding:20}}>
-              <h2 style={{fontSize:13,fontWeight:600,color:'#444',marginBottom:16,textTransform:'uppercase',letterSpacing:'0.04em'}}>Detalle por centro</h2>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr>{['Centro','Niños activos','Nuevos ingresos','Meta','Deserción','% Cumplimiento'].map(h=>
-                    <th key={h} style={{padding:'8px 14px',textAlign:'left',fontSize:11,fontWeight:600,color:'#888',borderBottom:'0.5px solid #e8e8e4',textTransform:'uppercase',letterSpacing:'0.04em'}}>{h}</th>
-                  )}</tr>
-                </thead>
-                <tbody>
-                  {centros.map((c,i)=>(
-                    <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2',fontWeight:500}}>{c.nombre}</td>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2'}}>{c.ninos}</td>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2',color:c.nuevos>=c.meta?'#0F6E56':'#993C1D',fontWeight:500}}>{c.nuevos}</td>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2'}}>
-                        <span style={{fontSize:11,padding:'2px 8px',borderRadius:8,fontWeight:500,background:c.nuevos>=c.meta?'#E1F5EE':'#FAECE7',color:c.nuevos>=c.meta?'#0F6E56':'#993C1D'}}>{c.nuevos>=c.meta?'✓ Meta':'✗ No'}</span>
-                      </td>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2',color:c.desercion>55?'#993C1D':'#0F6E56'}}>{c.desercion}</td>
-                      <td style={{padding:'11px 14px',borderBottom:'0.5px solid #f5f5f2'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontWeight:600,color:c.cumpl>=85?'#0F6E56':c.cumpl>=70?'#854F0B':'#993C1D',width:36}}>{c.cumpl}%</span>
-                          <div style={{flex:1,height:6,background:'#eee',borderRadius:3,overflow:'hidden'}}>
-                            <div style={{height:'100%',width:c.cumpl+'%',background:c.cumpl>=85?'#1D9E75':c.cumpl>=70?'#EF9F27':'#D85A30',borderRadius:3}}/>
+            <div className="panel">
+              <div className="panel__head">
+                <h2 className="panel__title">Detalle por centro</h2>
+                <span className="label">Q1 2026</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>{['Centro','Niños activos','Nuevos ingresos','Meta','Deserción','% Cumplimiento'].map(h=>
+                      <th key={h}>{h}</th>
+                    )}</tr>
+                  </thead>
+                  <tbody>
+                    {centros.map((c,i)=>(
+                      <tr key={i} style={{ cursor: 'default' }}>
+                        <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
+                        <td className="num" style={{ color: 'var(--text)' }}>{c.ninos}</td>
+                        <td className="num" style={{ fontWeight: 600, color: c.nuevos>=c.meta?'var(--ok)':'var(--bad)' }}>{c.nuevos}</td>
+                        <td>
+                          <span className={`pill ${c.nuevos>=c.meta ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{c.nuevos>=c.meta?'Meta':'No'}</span>
+                        </td>
+                        <td className="num" style={{ color: c.desercion>55?'var(--bad)':'var(--text-muted)' }}>{c.desercion}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{c.cumpl}%</span>
+                            <div className="bar"><div className="bar__fill" style={{ width: c.cumpl+'%', background: cumplColor(c.cumpl) }}/></div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {centros.length > 0 && (
-                    <tr style={{background:'#EEEDFE'}}>
-                      <td style={{padding:'11px 14px',fontWeight:700,color:'#533AB7'}}>TOTALES</td>
-                      <td style={{padding:'11px 14px',fontWeight:700}}>{tot.ninos}</td>
-                      <td style={{padding:'11px 14px',fontWeight:700}}>{tot.nuevos}</td>
-                      <td style={{padding:'11px 14px'}}></td>
-                      <td style={{padding:'11px 14px',fontWeight:700}}>{tot.desercion}</td>
-                      <td style={{padding:'11px 14px',fontWeight:700,color:'#533AB7'}}>{promCumpl}%</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                    {centros.length > 0 && (
+                      <tr style={{ cursor: 'default', background: 'var(--surface-3)' }}>
+                        <td style={{ fontWeight: 700, color: 'var(--ts-green)', fontFamily: 'var(--font-sans)' }}>TOTALES</td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--text)' }}>{tot.ninos}</td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--text)' }}>{tot.nuevos}</td>
+                        <td></td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--text)' }}>{tot.desercion}</td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--ts-green)' }}>{promCumpl}%</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

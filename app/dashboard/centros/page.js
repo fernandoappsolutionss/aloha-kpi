@@ -5,7 +5,6 @@ import Sidebar from '../../../components/Sidebar'
 import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
 const REGIONES = ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste']
-const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', gray:'#F5F7FA', text:'#1A2744' }
 
 export default function CentrosPage() {
   const [centros, setCentros] = useState([])
@@ -71,51 +70,54 @@ export default function CentrosPage() {
     setEditing(c.id); setForm({ nombre: c.nombre, region: c.region || 'Ciudad de Panamá' }); setShowForm(true)
   }
 
+  const isError = status.includes('❌')
+  const statusText = status.replace(/^[❌✅]\s*/, '')
+
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
+    <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main style={{flex:1,padding:28,overflowY:'auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+      <main className="main">
+
+        {/* Header */}
+        <div className="main__head">
           <div>
-            <h1 style={{fontSize:20,fontWeight:700,color:A.text,marginBottom:4}}>Gestión de centros</h1>
-            <p style={{fontSize:12,color:'#8896A9'}}>{centros.length} centros registrados</p>
+            <div className="label" style={{ marginBottom: 10 }}>Configuración · Centros</div>
+            <h1 className="h-title">Gestión de centros</h1>
+            <p className="h-sub">{centros.length} centros registrados</p>
           </div>
           <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá'}); setShowForm(!showForm) }}
-            style={{padding:'9px 20px',background:`linear-gradient(135deg,${A.blue},${A.blueMid})`,color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',boxShadow:'0 4px 12px rgba(27,69,128,0.25)'}}>
+            className={`btn${showForm ? '' : ' btn--primary'}`}>
             {showForm ? '✕ Cancelar' : '+ Nuevo centro'}
           </button>
         </div>
 
         {status && (
-          <div style={{padding:'10px 16px',borderRadius:8,marginBottom:16,background:status.includes('❌')?'#FBE8E8':'#E6F4EC',color:status.includes('❌')?'#D63C3C':'#2D7D46',fontSize:13,fontWeight:500}}>
-            {status}
+          <div className={`alert${isError ? ' alert--error' : ''}`}
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+            {statusText}
           </div>
         )}
 
         {showForm && (
-          <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,padding:24,marginBottom:20,boxShadow:'0 2px 12px rgba(27,69,128,0.08)'}}>
-            <h3 style={{fontSize:14,fontWeight:700,color:A.text,marginBottom:20}}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h3>
+          <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+            <h3 className="panel__title" style={{ marginBottom: 20 }}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h3>
             <form onSubmit={saveCentro}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
-                <div>
-                  <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Nombre del centro *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+                <div className="field">
+                  <label className="label">Nombre del centro *</label>
                   <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
-                    placeholder="Ej: BRISAS DEL GOLF"
-                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA',boxSizing:'border-box'}}/>
+                    placeholder="Ej: BRISAS DEL GOLF" className="input"/>
                 </div>
-                <div>
-                  <label style={{fontSize:12,color:'#4A5568',fontWeight:600,display:'block',marginBottom:6}}>Región / Provincia</label>
-                  <select value={form.region} onChange={e=>setForm({...form,region:e.target.value})}
-                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid #E8EBF0',borderRadius:8,fontSize:13,outline:'none',background:'#F5F7FA'}}>
+                <div className="field">
+                  <label className="label">Región / Provincia</label>
+                  <select value={form.region} onChange={e=>setForm({...form,region:e.target.value})} className="input">
                     {REGIONES.map(r=><option key={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
-              <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-                <button type="button" onClick={()=>setShowForm(false)}
-                  style={{padding:'9px 20px',background:'none',border:'1px solid #E8EBF0',borderRadius:8,fontSize:13,cursor:'pointer',color:'#4A5568'}}>Cancelar</button>
-                <button type="submit" disabled={saving}
-                  style={{padding:'9px 24px',background:`linear-gradient(135deg,${A.blue},${A.blueMid})`,color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',opacity:saving?0.7:1}}>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={()=>setShowForm(false)} className="btn">Cancelar</button>
+                <button type="submit" disabled={saving} className="btn btn--primary">
                   {saving ? 'Guardando...' : (editing ? 'Actualizar' : 'Crear centro')}
                 </button>
               </div>
@@ -123,51 +125,49 @@ export default function CentrosPage() {
           </div>
         )}
 
-        <div style={{background:'#fff',border:'1px solid #E8EBF0',borderRadius:12,overflow:'hidden',boxShadow:'0 2px 12px rgba(27,69,128,0.06)'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead style={{background:`linear-gradient(135deg,${A.blue},${A.blueMid})`}}>
-              <tr>{['Centro','Región','Usuarios','Acciones'].map(h=>
-                <th key={h} style={{padding:'12px 16px',textAlign:'left',fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.9)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{h}</th>
-              )}</tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#8896A9'}}>Cargando...</td></tr>
-              ) : centros.map((c,i) => {
-                const userCount = c.user_count || 0
-                return (
-                  <tr key={c.id} style={{background:i%2===0?'#fff':'#F9FAFC'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='#EEF3FB'}
-                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'#fff':'#F9FAFC'}>
-                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',fontWeight:600,color:A.text}}>{c.nombre}</td>
-                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6',color:'#4A5568'}}>{c.region || '—'}</td>
-                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
-                      <span style={{background:'#EEF3FB',color:A.blueMid,padding:'2px 10px',borderRadius:12,fontSize:12,fontWeight:600}}>
-                        {userCount} usuario{userCount!==1?'s':''}
-                      </span>
-                    </td>
-                    <td style={{padding:'13px 16px',borderBottom:'1px solid #F0F2F6'}}>
-                      <div style={{display:'flex',gap:8}}>
-                        <button onClick={()=>editCentro(c)}
-                          style={{padding:'5px 14px',border:`1px solid ${A.blueMid}`,borderRadius:6,background:'none',color:A.blueMid,fontSize:12,cursor:'pointer',fontWeight:500}}>
-                          Editar
-                        </button>
-                        <button
-                          onClick={()=>deleteCenter(c.id, c.nombre, userCount)}
-                          disabled={deleting===c.id}
-                          style={{padding:'5px 14px',border:'1px solid #D63C3C',borderRadius:6,background:'none',color:'#D63C3C',fontSize:12,cursor:deleting===c.id?'wait':'pointer',opacity:deleting===c.id?0.6:1}}>
-                          {deleting===c.id ? 'Eliminando...' : 'Eliminar'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {!loading && centros.length === 0 && (
-                <tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#8896A9'}}>No hay centros. Crea el primero.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div className="panel">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>{['Centro','Región','Usuarios','Acciones'].map(h=>
+                  <th key={h}>{h}</th>
+                )}</tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr style={{ cursor: 'default' }}><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando...</td></tr>
+                ) : centros.map((c) => {
+                  const userCount = c.user_count || 0
+                  return (
+                    <tr key={c.id} style={{ cursor: 'default' }}>
+                      <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
+                      <td style={{ color: 'var(--text-dim)' }}>{c.region || '—'}</td>
+                      <td>
+                        <span className="pill pill--ok"><span className="dot" />{userCount} usuario{userCount!==1?'s':''}</span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={()=>editCentro(c)}
+                            style={{ padding: '5px 14px', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
+                            Editar
+                          </button>
+                          <button
+                            onClick={()=>deleteCenter(c.id, c.nombre, userCount)}
+                            disabled={deleting===c.id}
+                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: '#FCA5A5', fontSize: 12, cursor: deleting===c.id?'wait':'pointer', opacity: deleting===c.id?0.6:1 }}>
+                            {deleting===c.id ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {!loading && centros.length === 0 && (
+                  <tr style={{ cursor: 'default' }}><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No hay centros. Crea el primero.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
     </div>
