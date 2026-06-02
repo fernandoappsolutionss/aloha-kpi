@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
+import PeriodSelector from '../../components/PeriodSelector'
 import { getCentrosKpi } from '../actions/dashboard'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../lib/period'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -20,10 +22,14 @@ export default function DashboardPage() {
   const router = useRouter()
   const [centros, setCentros] = useState([])
   const [nombre, setNombre] = useState('')
+  const [period, setPeriod] = useState(getCurrentPeriod())
   const criticos = centros.filter(c => c.estado === 'Crítico').length
 
-  useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador') }, [])
-  useEffect(() => { getCentrosKpi().then((data) => setCentros(data || [])).catch(() => {}) }, [])
+  useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setPeriod(readStoredPeriod()) }, [])
+  useEffect(() => { getCentrosKpi(period.year, period.quarter).then((data) => setCentros(data || [])).catch(() => {}) }, [period])
+
+  const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   const n = centros.length || 1
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
@@ -34,7 +40,7 @@ export default function DashboardPage() {
 
   const cards = [
     { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros' },
-    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: 'Q1 2026', color: 'var(--ts-green)' },
+    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)' },
     { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre' },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
     { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl) },
@@ -48,21 +54,24 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Panel general · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Panel general · {label}</div>
             <h1 className="h-title">Hola, {(nombre.split(' ')[0]) || '—'}.</h1>
             <p className="h-sub">{centros.length} centros activos · seguimiento en tiempo real</p>
           </div>
-          {criticos > 0 && (
-            <div className="alert alert--error" style={{ alignItems: 'flex-start' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
-                <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <div>
-                <div style={{ fontWeight: 600 }}>{criticos} centro{criticos > 1 ? 's' : ''} en estado crítico</div>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>Requiere atención inmediata</div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
+            {criticos > 0 && (
+              <div className="alert alert--error" style={{ alignItems: 'flex-start' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                  <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{criticos} centro{criticos > 1 ? 's' : ''} en estado crítico</div>
+                  <div style={{ fontSize: 12, opacity: 0.85 }}>Requiere atención inmediata</div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* KPI cards */}
@@ -83,7 +92,7 @@ export default function DashboardPage() {
         <div className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Estado de todos los centros</h2>
-            <span className="label">Q1 2026</span>
+            <span className="label">{label}</span>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">

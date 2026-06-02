@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
 import { loadFoda, saveFoda } from '../../../actions/foda'
+import { getCurrentPeriod, periodLabel } from '../../../../lib/period'
 
 export default function FodaPage() {
   const params = useParams()
@@ -18,10 +19,12 @@ export default function FodaPage() {
     comentarios: '',
   })
   const [estado, setEstado] = useState('')
+  const { year, quarter } = getCurrentPeriod()
+  const label = periodLabel(year, quarter)
 
   useEffect(() => {
     if (params.id === 'demo') return
-    loadFoda(params.id, 2026, 1).then((d) => {
+    loadFoda(params.id, year, quarter).then((d) => {
       if (!d) return
       setFoda({
         oportunidades: d.oportunidades ?? '',
@@ -39,7 +42,7 @@ export default function FodaPage() {
     if (params.id === 'demo') { setSaved(true); setTimeout(()=>setSaved(false),3000); return }
     setSaving(true)
     try {
-      await saveFoda(params.id, 2026, 1, { ...foda, comentario_estado: estado })
+      await saveFoda(params.id, year, quarter, { ...foda, comentario_estado: estado })
       setSaved(true); setTimeout(()=>setSaved(false),3000)
     } catch {}
     setSaving(false)
@@ -63,9 +66,9 @@ export default function FodaPage() {
         {/* Header */}
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Análisis estratégico · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Análisis estratégico · {label}</div>
             <h1 className="h-title">FODA Trimestral</h1>
-            <p className="h-sub">{nombre} · Q1 2026</p>
+            <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {saved && <span className="pill pill--ok"><span className="dot" />Guardado</span>}

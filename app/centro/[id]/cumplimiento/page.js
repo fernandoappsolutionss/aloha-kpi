@@ -4,6 +4,9 @@ import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadCumplimiento, saveCumplimiento } from '../../../actions/cumplimiento'
 import { getCentroNombre } from '../../../actions/centros'
+import { getCurrentPeriod, quarterMonths, periodLabel } from '../../../../lib/period'
+
+const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const CHECKS = [
   {g:'Classdojo',items:[{k:'classdojo_activo',l:'Classdojo activo'},{k:'ninos_completos_classdojo',l:'Niños completos en Classdojo'},{k:'padres_conectados',l:'Padres conectados'},{k:'muro_informacion',l:'Muro con información'},{k:'bienvenida',l:'Bienvenida publicada'},{k:'calendario',l:'Calendario publicado'},{k:'clase_padres',l:'Clase de padres'},{k:'fotos_grupo',l:'Fotos de grupo'},{k:'seguimiento_evolucion',l:'Seguimiento evolución'},{k:'asistente_classdojo',l:'Asistente activa'},{k:'portafolio',l:'Portafolio con retroalimentación'}]},
@@ -17,6 +20,9 @@ const DEFS = {classdojo_activo:'si',ninos_completos_classdojo:'si',padres_conect
 export default function CumplimientoPage() {
   const params = useParams()
   const sp = useSearchParams()
+  const { year, quarter } = getCurrentPeriod()
+  const label = periodLabel(year, quarter)
+  const qMonths = quarterMonths(quarter)
   const [nombre, setNombre] = useState('Centro')
   const centroId = params.id === 'demo' ? null : params.id
   useEffect(() => { if (centroId) getCentroNombre(centroId).then((n) => { if (n) setNombre(n) }).catch(() => {}) }, [centroId])
@@ -38,7 +44,7 @@ export default function CumplimientoPage() {
     if (!centroId) { setLoading(false); return }
     setLoading(true)
     try {
-      const { trimestreId, vals } = await loadCumplimiento(centroId, 2026, 1, mes)
+      const { trimestreId, vals } = await loadCumplimiento(centroId, year, quarter, mes)
       setTrimestreId(trimestreId)
       setVals(vals || {...DEFS})
     } catch (e) { setStatus('Error cargando: ' + e.message) }
@@ -51,7 +57,7 @@ export default function CumplimientoPage() {
     if (!centroId) { setStatus('Modo demo — conéctate con cuenta real para guardar.'); return }
     setSaving(true); setStatus('')
     try {
-      const res = await saveCumplimiento(centroId, 2026, 1, mes, vals)
+      const res = await saveCumplimiento(centroId, year, quarter, mes, vals)
       if (res.error) throw new Error(res.error)
       setStatus('✅ Cumplimiento guardado correctamente.')
       setTimeout(() => setStatus(''), 4000)
@@ -67,9 +73,9 @@ export default function CumplimientoPage() {
       <main className="main">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Checklist operativo · Q1 2026</div>
+            <div className="label" style={{ marginBottom: 10 }}>Checklist operativo · {label}</div>
             <h1 className="h-title">Cumplimiento mensual</h1>
-            <p className="h-sub">{nombre} · Q1 2026</p>
+            <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             {status && <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad)' : 'var(--ok)', fontWeight: 500 }}>{status}</span>}
@@ -80,8 +86,8 @@ export default function CumplimientoPage() {
         </div>
 
         <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border)', gap: 4 }}>
-          {['Enero','Febrero','Marzo'].map((m,i)=>
-            <button key={m} onClick={()=>setMes(i+1)} style={{ padding: '10px 20px', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', borderBottom: mes===i+1 ? '2px solid var(--ts-green)' : '2px solid transparent', color: mes===i+1 ? 'var(--text)' : 'var(--text-dim)', fontWeight: mes===i+1 ? 600 : 500, marginBottom: -1 }}>{m}</button>
+          {qMonths.map((mAbs,i)=>
+            <button key={mAbs} onClick={()=>setMes(i+1)} style={{ padding: '10px 20px', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', borderBottom: mes===i+1 ? '2px solid var(--ts-green)' : '2px solid transparent', color: mes===i+1 ? 'var(--text)' : 'var(--text-dim)', fontWeight: mes===i+1 ? 600 : 500, marginBottom: -1 }}>{NOMBRES_MES[mAbs-1]}</button>
           )}
         </div>
 

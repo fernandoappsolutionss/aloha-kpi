@@ -1,14 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { login } from '../actions/auth'
+import { getPublicStats } from '../actions/public'
 import Logo from '../../components/Logo'
+import { getCurrentPeriod } from '../../lib/period'
 
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ email: '', password: '' })
+  const { year, quarter } = getCurrentPeriod()
+  const [stats, setStats] = useState(null)
+  useEffect(() => { getPublicStats().then(setStats).catch(() => {}) }, [])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -51,7 +56,7 @@ export default function LoginPage() {
           </p>
 
           <div className="login__stats">
-            {[['9', 'Centros'], ['10', 'Usuarios'], ['Q1', '2026']].map(([n, l]) => (
+            {[[stats ? String(stats.centros) : '—', 'Centros'], [stats ? String(stats.usuarios) : '—', 'Usuarios'], [`Q${quarter}`, String(year)]].map(([n, l]) => (
               <div key={l}>
                 <div className="stat__num">{n}</div>
                 <div className="stat__label">{l}</div>
@@ -63,7 +68,7 @@ export default function LoginPage() {
         <div className="login__brandfoot">
           <Logo size={26} />
           <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
-            ALOHA Mental Arithmetic · Panamá
+            ALOHA Mental Arithmetic · Panamá · Venezuela
           </p>
         </div>
       </aside>
