@@ -4,6 +4,7 @@ import { requireAdmin } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
+import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -26,6 +27,19 @@ export async function getCentrosKpi(year, quarter) {
   const pqm = Q_MONTHS[prevQ]
   const prs = await sql`SELECT * FROM resumen_mes WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
   const pks = await sql`SELECT * FROM kpi_semanas WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
+
+  // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) por (año, trimestre).
+  const cumpRows = await sql`
+    SELECT t.centro_id AS centro_id, cu.*
+    FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
+    WHERE t.anio = ${year} AND t.trimestre = ${quarter}
+  `
+  const cumpAgg = {}
+  for (const row of cumpRows) {
+    const e = cumpAgg[row.centro_id] || { si: 0, tot: 0 }
+    for (const k of CUMPLIMIENTO_KEYS) { e.tot++; if (row[k] === 'si') e.si++ }
+    cumpAgg[row.centro_id] = e
+  }
 
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
   const metaDesMes = Number(metas?.meta_desercion_mes || 8) // % máximo de deserción mensual
@@ -52,7 +66,10 @@ export async function getCentrosKpi(year, quarter) {
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
     const last = months[2]
     const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
-    const cumpl = Math.round((months.filter((m) => m.ok).length / 3) * 100)
+    // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
+    const metasCumpl = Math.round((months.filter((m) => m.ok).length / 3) * 100)
+    const ag = cumpAgg[c.id]
+    const cumpl = ag && ag.tot ? Math.round((ag.si / ag.tot) * 100) : 0
     const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
     const conDatos = months.filter((m) => m.has)
     let trend = '→'
@@ -76,7 +93,7 @@ export async function getCentrosKpi(year, quarter) {
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
       nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes,
-      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado, trend,
+      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, metasCumpl, estado, trend,
       nivel, nivelEnCurso, sig, desOkActual,
       grupos, ninosGrupo, gpnBajo, metaGpn,
     }

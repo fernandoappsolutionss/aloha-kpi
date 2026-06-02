@@ -23,12 +23,16 @@ const ic = {
 export default function DashboardPage() {
   const router = useRouter()
   const [centros, setCentros] = useState([])
+  const [prev, setPrev] = useState([])
   const [nombre, setNombre] = useState('')
   const [period, setPeriod] = useState(getCurrentPeriod())
   const criticos = centros.filter(c => c.estado === 'Crítico').length
 
   useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setPeriod(readStoredPeriod()) }, [])
-  useEffect(() => { getCentrosKpi(period.year, period.quarter).then((data) => setCentros(data || [])).catch(() => {}) }, [period])
+  useEffect(() => {
+    getCentrosKpi(period.year, period.quarter).then((data) => setCentros(data || [])).catch(() => {})
+    getCentrosKpi(period.year - 1, period.quarter).then((data) => setPrev(data || [])).catch(() => setPrev([]))
+  }, [period])
 
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -44,12 +48,20 @@ export default function DashboardPage() {
   const metaGpn = centros[0]?.metaGpn || 8
   const centrosBajoGpn = centros.filter(c => c.gpnBajo).length
 
+  // Comparativa vs mismo trimestre del año anterior.
+  const pTotNinos = prev.reduce((a, c) => a + c.ninos, 0)
+  const pTotNuevos = prev.reduce((a, c) => a + c.nuevos, 0)
+  const pTotDes = prev.reduce((a, c) => a + c.desercion, 0)
+  const pPromCumpl = prev.length ? Math.round(prev.reduce((a, c) => a + c.cumpl, 0) / prev.length) : 0
+  const delta = (cur, prv) => (prv > 0 ? Math.round(((cur - prv) / prv) * 100) : null)
+  const prevLabel = `Q${period.quarter} ${period.year - 1}`
+
   const cards = [
-    { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros' },
-    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)' },
-    { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre' },
+    { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros', yoy: { delta: delta(totNinos, pTotNinos), upGood: true } },
+    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
+    { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre', yoy: { delta: delta(totDes, pTotDes), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
-    { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl) },
+    { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
     { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },
   ]
 
@@ -91,6 +103,13 @@ export default function DashboardPage() {
               </div>
               <div className="kpi__value" style={m.color ? { color: m.color } : undefined}>{m.value}</div>
               <div className="kpi__sub">{m.sub}</div>
+              {m.yoy && m.yoy.delta != null && (
+                <div style={{ marginTop: 7, fontSize: 11.5, fontFamily: 'var(--font-mono)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
+                  color: m.yoy.delta === 0 ? 'var(--text-dim)' : ((m.yoy.delta > 0) === m.yoy.upGood ? 'var(--ok)' : 'var(--bad)') }}>
+                  <span>{m.yoy.delta > 0 ? '▲' : m.yoy.delta < 0 ? '▼' : '—'} {Math.abs(m.yoy.delta)}%</span>
+                  <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>vs {prevLabel}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
