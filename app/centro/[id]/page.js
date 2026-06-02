@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
 import { getCurrentPeriod, readStoredPeriod, periodLabel } from '../../../lib/period'
@@ -53,6 +53,8 @@ const sectionTitle = {
 
 export default function CentroPage() {
   const { id } = useParams()
+  const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
   const [loading, setLoading] = useState(true)
   const [nombre, setNombre] = useState('')
@@ -66,7 +68,11 @@ export default function CentroPage() {
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
   const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
 
-  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
+  useEffect(() => {
+    setPeriod(readStoredPeriod())
+    const r = localStorage.getItem('aloha_rol')
+    setIsAdmin(r === 'admin_general' || r === 'supervisor')
+  }, [])
   const label = periodLabel(period.year, period.quarter)
   useEffect(() => {
     (async () => {
@@ -162,6 +168,12 @@ export default function CentroPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <main className="main">
+        {isAdmin && (
+          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+            Volver al panel de administrador
+          </button>
+        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · {label}</div>

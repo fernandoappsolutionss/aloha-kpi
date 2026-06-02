@@ -187,7 +187,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .h-sub { color: var(--text-dim); font-size: 13px; margin-top: 7px; }
 
 /* KPI cards */
-.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 26px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 16px; margin-bottom: 26px; }
 .kpi {
   position: relative;
   background: var(--surface-1);
