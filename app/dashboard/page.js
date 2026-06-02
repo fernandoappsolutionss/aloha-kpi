@@ -4,134 +4,132 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
 import { getCentrosKpi } from '../actions/dashboard'
 
-const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', greenLime:'#B8D432', gray:'#F0F3F8', text:'#1A2744' }
+const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
+const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 
-const ESTADO_STYLE = {
-  Cumplido: { bg:'#E6F4EC', color:'#2D7D46', dot:'#4A8C3F' },
-  Parcial:  { bg:'#FEF3CD', color:'#92600A', dot:'#D97706' },
-  Crítico:  { bg:'#FBE8E8', color:'#B91C1C', dot:'#D63C3C' },
+/* tiny dim icons for KPI cards */
+const ic = {
+  ninos:  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg>,
+  nuevos: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M3 12h18"/></svg>,
+  des:    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
+  meta:   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>,
+  gauge:  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 14 18 8"/><path d="M3.5 18a9 9 0 1 1 17 0"/></svg>,
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const [centros, setCentros] = useState([])
   const [nombre, setNombre] = useState('')
-  const critcos = centros.filter(c => c.estado === 'Crítico').length
+  const criticos = centros.filter(c => c.estado === 'Crítico').length
 
-  useEffect(() => {
-    setNombre(localStorage.getItem('aloha_nombre') || 'Administrador')
-  }, [])
+  useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador') }, [])
+  useEffect(() => { getCentrosKpi().then((data) => setCentros(data || [])).catch(() => {}) }, [])
 
-  useEffect(() => {
-    getCentrosKpi().then((data) => setCentros(data || [])).catch(() => {})
-  }, [])
+  const n = centros.length || 1
+  const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
+  const totNuevos = centros.reduce((a, c) => a + c.nuevos, 0)
+  const totDes = centros.reduce((a, c) => a + c.desercion, 0)
+  const promCumpl = Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / n)
+  const enMeta = centros.filter(c => c.nuevos >= c.meta).length
 
-  const totNinos = centros.reduce((a,c)=>a+c.ninos,0)
-  const totNuevos = centros.reduce((a,c)=>a+c.nuevos,0)
-  const totDes = centros.reduce((a,c)=>a+c.desercion,0)
-  const promCumpl = Math.round(centros.reduce((a,c)=>a+c.cumpl,0)/centros.length)
-  const enMeta = centros.filter(c=>c.nuevos>=c.meta).length
+  const cards = [
+    { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros' },
+    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: 'Q1 2026', color: 'var(--ts-green)' },
+    { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre' },
+    { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
+    { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl) },
+  ]
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:A.gray}}>
-      <Sidebar rol="admin_general"/>
-      <main style={{flex:1,padding:28,overflowY:'auto'}}>
+    <div className="shell">
+      <Sidebar rol="admin_general" />
+      <main className="main">
 
         {/* Header */}
-        <div style={{marginBottom:24}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div>
-              <h1 style={{fontSize:22,fontWeight:800,color:A.text,marginBottom:4}}>
-                Hola, {nombre.split(' ')[0]} 👋
-              </h1>
-              <p style={{fontSize:13,color:'#6B7A99'}}>Panel general · Q1 2026 · {centros.length} centros activos</p>
-            </div>
-            {critcos > 0 && (
-              <div style={{background:'#FBE8E8',border:'1px solid #F0A0A0',borderRadius:10,padding:'10px 16px',display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:20}}>🔴</span>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:'#B91C1C'}}>{critcos} centro{critcos>1?'s':''} en estado crítico</div>
-                  <div style={{fontSize:11,color:'#C0392B'}}>Requiere atención inmediata</div>
-                </div>
-              </div>
-            )}
+        <div className="main__head">
+          <div>
+            <div className="label" style={{ marginBottom: 10 }}>Panel general · Q1 2026</div>
+            <h1 className="h-title">Hola, {(nombre.split(' ')[0]) || '—'}.</h1>
+            <p className="h-sub">{centros.length} centros activos · seguimiento en tiempo real</p>
           </div>
+          {criticos > 0 && (
+            <div className="alert alert--error" style={{ alignItems: 'flex-start' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <div>
+                <div style={{ fontWeight: 600 }}>{criticos} centro{criticos > 1 ? 's' : ''} en estado crítico</div>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>Requiere atención inmediata</div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* KPI Cards */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:14,marginBottom:24}}>
-          {[
-            {label:'Niños activos',value:totNinos.toLocaleString(),icon:'👧',color:A.blueMid,sub:'en todos los centros'},
-            {label:'Nuevos ingresos',value:totNuevos,icon:'✨',color:A.green,sub:'Q1 2026'},
-            {label:'Deserción total',value:totDes,icon:'📉',color:'#D97706',sub:'en el trimestre'},
-            {label:'Centros en meta',value:`${enMeta}/${centros.length}`,icon:'🎯',color:A.blue,sub:'meta de ingresos'},
-            {label:'Cumplimiento prom.',value:`${promCumpl}%`,icon:'📊',color:promCumpl>=85?A.green:promCumpl>=70?'#D97706':'#D63C3C',sub:'promedio general'},
-          ].map((m,i)=>(
-            <div key={i} style={{background:'#fff',border:'1px solid #E0E6F0',borderRadius:12,padding:'16px 18px',boxShadow:'0 2px 8px rgba(27,69,128,0.06)',position:'relative',overflow:'hidden'}}>
-              <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${m.color},${m.color}80)`}}/>
-              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:10}}>
-                <span style={{fontSize:22}}>{m.icon}</span>
-                <span style={{fontSize:10,color:'#8896A9',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',textAlign:'right',lineHeight:1.3}}>{m.label}</span>
+        {/* KPI cards */}
+        <div className="kpi-grid">
+          {cards.map((m, i) => (
+            <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s` }}>
+              <div className="kpi__top">
+                <span className="label">{m.label}</span>
+                {m.icon}
               </div>
-              <div style={{fontSize:28,fontWeight:800,color:m.color,lineHeight:1}}>{m.value}</div>
-              <div style={{fontSize:11,color:'#8896A9',marginTop:4}}>{m.sub}</div>
+              <div className="kpi__value" style={m.color ? { color: m.color } : undefined}>{m.value}</div>
+              <div className="kpi__sub">{m.sub}</div>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div style={{background:'#fff',border:'1px solid #E0E6F0',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(27,69,128,0.07)'}}>
-          <div style={{padding:'16px 20px',borderBottom:'1px solid #E8EBF0',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <h2 style={{fontSize:15,fontWeight:700,color:A.text}}>Estado de todos los centros</h2>
-            <span style={{fontSize:12,color:'#8896A9'}}>Q1 2026</span>
+        <div className="panel">
+          <div className="panel__head">
+            <h2 className="panel__title">Estado de todos los centros</h2>
+            <span className="label">Q1 2026</span>
           </div>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead>
-              <tr style={{background:'#F5F8FF'}}>
-                {['Centro','Administradora','Niños','Nuevos','Deserción','Cobranza','Cumpl.','Tendencia','Estado'].map(h=>
-                  <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'#6B7A99',borderBottom:'1px solid #E8EBF0',textTransform:'uppercase',letterSpacing:'0.06em'}}>{h}</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {centros.map((c,i)=>{
-                const st = ESTADO_STYLE[c.estado]
-                return (
-                  <tr key={i}
-                    style={{cursor:'pointer',transition:'background 0.15s'}}
-                    onClick={()=>router.push('/dashboard/ranking')}
-                    onMouseEnter={e=>e.currentTarget.style.background='#F0F5FF'}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',fontWeight:700,color:A.text}}>{c.nombre}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',color:'#6B7A99',fontSize:12}}>{c.admin}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',fontWeight:600}}>{c.ninos}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',fontWeight:700,color:c.nuevos>=c.meta?A.green:'#D63C3C',fontSize:14}}>{c.nuevos} <span style={{fontSize:11,color:'#B0BAC9',fontWeight:400}}>/{c.meta}</span></td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',color:c.desercion>55?'#D63C3C':'#4A5568'}}>{c.desercion}</td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8'}}>
-                      <span style={{fontSize:11,padding:'2px 10px',borderRadius:20,fontWeight:600,background:c.cobranza==='Sí'?'#E6F4EC':'#FBE8E8',color:c.cobranza==='Sí'?'#2D7D46':'#B91C1C'}}>{c.cobranza}</span>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  {['Centro', 'Administradora', 'Niños', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado'].map(h =>
+                    <th key={h}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {centros.map((c, i) => (
+                  <tr key={i} onClick={() => router.push('/dashboard/ranking')}>
+                    <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
+                    <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
+                    <td className="num" style={{ color: 'var(--text)' }}>{c.ninos}</td>
+                    <td className="num" style={{ fontWeight: 600, color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
+                      {c.nuevos}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> /{c.meta}</span>
                     </td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <span style={{fontWeight:700,color:c.cumpl>=85?A.green:c.cumpl>=70?'#D97706':'#D63C3C',minWidth:32}}>{c.cumpl}%</span>
-                        <div style={{flex:1,height:5,background:'#EEF0F6',borderRadius:3,overflow:'hidden',minWidth:60}}>
-                          <div style={{height:'100%',width:c.cumpl+'%',background:c.cumpl>=85?'#4A8C3F':c.cumpl>=70?'#EF9F27':'#D63C3C',borderRadius:3,transition:'width 0.3s'}}/>
-                        </div>
+                    <td className="num" style={{ color: c.desercion > 55 ? 'var(--bad)' : 'var(--text-muted)' }}>{c.desercion}</td>
+                    <td>
+                      <span className={`pill ${c.cobranza === 'Sí' ? 'pill--ok' : 'pill--bad'}`}>{c.cobranza}</span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{c.cumpl}%</span>
+                        <div className="bar"><div className="bar__fill" style={{ width: c.cumpl + '%', background: cumplColor(c.cumpl) }} /></div>
                       </div>
                     </td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8',fontSize:18,textAlign:'center',color:c.nuevos>=c.meta?A.green:'#D63C3C'}}>
-                      {c.nuevos>=c.meta?'↑':'↓'}
+                    <td style={{ textAlign: 'center', color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
+                      {c.nuevos >= c.meta
+                        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
+                        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="18 13 12 19 6 13" /></svg>}
                     </td>
-                    <td style={{padding:'12px 14px',borderBottom:'1px solid #F0F2F8'}}>
-                      <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:600,background:st.bg,color:st.color,display:'flex',alignItems:'center',gap:5,width:'fit-content'}}>
-                        <span style={{width:6,height:6,borderRadius:3,background:st.dot,flexShrink:0}}/>
-                        {c.estado}
+                    <td>
+                      <span className={`pill ${ESTADO_PILL[c.estado] || 'pill--warn'}`}>
+                        <span className="dot" />{c.estado}
                       </span>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+                {centros.length === 0 && (
+                  <tr style={{ cursor: 'default' }}><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
     </div>

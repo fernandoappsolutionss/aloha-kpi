@@ -3,11 +3,29 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
 import { logout as logoutAction } from '../app/actions/auth'
+import Logo from './Logo'
 
-const A = {
-  blue: '#1B4580', blueMid: '#1D5FA6', blueLight: '#4A90C4',
-  bluePale: 'rgba(255,255,255,0.08)', blueActive: 'rgba(255,255,255,0.15)',
-  greenLime: '#B8D432', white: '#fff', textLight: 'rgba(255,255,255,0.7)'
+/* Inline stroke icons (no emojis) */
+const P = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' }
+function Icon({ name }) {
+  switch (name) {
+    case 'grid': return <svg viewBox="0 0 24 24" {...P}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>
+    case 'trophy': return <svg viewBox="0 0 24 24" {...P}><path d="M6 4h12v4a6 6 0 0 1-12 0V4Z" /><path d="M6 6H4a2 2 0 0 0 0 4h2M18 6h2a2 2 0 0 1 0 4h-2" /><path d="M10 14.5V18M14 14.5V18M8 20h8" /></svg>
+    case 'bell': return <svg viewBox="0 0 24 24" {...P}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+    case 'calendar': return <svg viewBox="0 0 24 24" {...P}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+    case 'doc': return <svg viewBox="0 0 24 24" {...P}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M9 13h6M9 17h6" /></svg>
+    case 'target': return <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg>
+    case 'building': return <svg viewBox="0 0 24 24" {...P}><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M10 21v-3h4v3" /></svg>
+    case 'users': return <svg viewBox="0 0 24 24" {...P}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" /></svg>
+    case 'edit': return <svg viewBox="0 0 24 24" {...P}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z" /></svg>
+    case 'check': return <svg viewBox="0 0 24 24" {...P}><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+    case 'search': return <svg viewBox="0 0 24 24" {...P}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+    case 'user': return <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+    case 'logout': return <svg viewBox="0 0 24 24" {...P}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+    case 'shield': return <svg viewBox="0 0 24 24" {...P}><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5Z" /></svg>
+    case 'chevron': return <svg viewBox="0 0 24 24" {...P}><polyline points="6 9 12 15 18 9" /></svg>
+    default: return null
+  }
 }
 
 export default function Sidebar({ rol, centroNombre, centroId }) {
@@ -24,27 +42,24 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   }, [isAdmin])
 
   const adminItems = [
-    { label: 'Panel general', icon: '▦', href: '/dashboard' },
-    { label: 'Ranking', icon: '🏆', href: '/dashboard/ranking' },
-    { label: 'Alertas', icon: '🔔', href: '/dashboard/alertas' },
-    { label: 'Historial', icon: '📅', href: '/dashboard/historial' },
-    { label: 'Reporte', icon: '📄', href: '/dashboard/reporte' },
-    { label: 'Metas', icon: '⚙', href: '/dashboard/metas' },
+    { label: 'Panel general', icon: 'grid', href: '/dashboard' },
+    { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
+    { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
+    { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
+    { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
+    { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
   ]
-
   const adminConfig = [
-    { label: 'Gestión centros', icon: '🏫', href: '/dashboard/centros' },
-    { label: 'Usuarios', icon: '👥', href: '/dashboard/usuarios' },
+    { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
+    { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
   ]
-
   const centroItems = [
-    { label: 'Resumen', icon: '▦', href: `/centro/${centroId}` },
-    { label: 'KPI Semanal', icon: '📝', href: `/centro/${centroId}/kpi` },
-    { label: 'Cumplimiento', icon: '✅', href: `/centro/${centroId}/cumplimiento` },
-    { label: 'FODA', icon: '🔍', href: `/centro/${centroId}/foda` },
-    { label: 'Historial', icon: '📅', href: `/centro/${centroId}/historial` },
+    { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}` },
+    { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi` },
+    { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
+    { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
+    { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
   ]
-
   const items = isAdmin ? adminItems : centroItems
 
   async function logout() {
@@ -52,97 +67,55 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     localStorage.clear()
     router.push('/login')
   }
-
   const isActive = (href) => path === href
 
   return (
-    <aside style={{
-      width: 220,
-      minHeight: '100vh',
-      flexShrink: 0,
-      background: `linear-gradient(180deg, ${A.blue} 0%, #163870 100%)`,
-      display: 'flex',
-      flexDirection: 'column',
-      boxShadow: '4px 0 20px rgba(27,69,128,0.3)'
-    }}>
-      {/* Logo Header */}
-      <div style={{padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
-        <div style={{fontSize:18,fontWeight:800,color:'#fff',letterSpacing:1.5,lineHeight:1}}>ALOHA KPI</div>
-        <div style={{fontSize:10,color:A.textLight,marginTop:6,letterSpacing:'0.04em'}}>
-          {isAdmin ? '🛡 Administrador' : '🏫 ' + (centroNombre || 'Centro')}
+    <aside className="sb">
+      {/* Brand */}
+      <div className="sb__brand">
+        <Logo size={28} />
+        <div className="sb__role">
+          <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isAdmin ? 'shield' : 'building'} /></span>
+          <span className="label">{isAdmin ? 'Administrador' : (centroNombre || 'Centro')}</span>
         </div>
       </div>
 
-      <nav style={{flex: 1, padding: '12px 0', overflowY: 'auto'}}>
-        {/* Main items */}
-        <div style={{padding:'8px 12px 4px',fontSize:10,color:A.textLight,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:600}}>
-          {isAdmin ? 'Panel' : 'Mi Centro'}
-        </div>
+      <nav className="sb__nav">
+        <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => (
           <button key={item.href} onClick={() => router.push(item.href)}
-            style={{
-              width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
-              background: isActive(item.href) ? A.blueActive : 'none',
-              border:'none', textAlign:'left', fontSize:13, cursor:'pointer',
-              color: isActive(item.href) ? '#fff' : A.textLight,
-              fontWeight: isActive(item.href) ? 600 : 400,
-              borderLeft: isActive(item.href) ? `3px solid ${A.greenLime}` : '3px solid transparent',
-              borderRadius: isActive(item.href) ? '0 8px 8px 0' : 0,
-              transition: 'all 0.15s', margin:'1px 0'
-            }}
-            onMouseEnter={e => { if (!isActive(item.href)) { e.currentTarget.style.background=A.bluePale; e.currentTarget.style.color='#fff' }}}
-            onMouseLeave={e => { if (!isActive(item.href)) { e.currentTarget.style.background='none'; e.currentTarget.style.color=A.textLight }}}>
-            <span style={{fontSize:14,width:18,textAlign:'center'}}>{item.icon}</span>
-            <span>{item.label}</span>
+            className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
+            <Icon name={item.icon} /><span>{item.label}</span>
           </button>
         ))}
 
-        {/* Centros list for admin */}
+        {/* Centros expandible (admin) */}
         {isAdmin && centros.length > 0 && (
           <>
-            <button onClick={() => setCentrosOpen(!centrosOpen)}
-              style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 14px',background:'none',border:'none',cursor:'pointer',color:A.textLight,fontSize:13,margin:'4px 0 0'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:14,width:18,textAlign:'center'}}>🏫</span>
-                <span>Ir a centro</span>
-              </div>
-              <span style={{fontSize:10,transition:'transform 0.2s',transform:centrosOpen?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
+            <button onClick={() => setCentrosOpen(!centrosOpen)} className="sb__item">
+              <Icon name="building" /><span>Ir a centro</span>
+              <span className="sb__chev" style={{ transform: centrosOpen ? 'rotate(180deg)' : 'none' }}><Icon name="chevron" /></span>
             </button>
             {centrosOpen && centros.map(c => {
               const active = path.startsWith(`/centro/${c.id}`)
               return (
                 <button key={c.id} onClick={() => router.push(`/centro/${c.id}`)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,
-                    padding:'7px 14px 7px 40px',background:active?A.blueActive:'none',
-                    border:'none',textAlign:'left',fontSize:11.5,cursor:'pointer',
-                    color:active?'#fff':A.textLight,fontWeight:active?600:400,
-                    borderLeft:active?`3px solid ${A.greenLime}`:'3px solid transparent'}}>
-                  <span style={{width:5,height:5,borderRadius:3,background:active?A.greenLime:'rgba(255,255,255,0.3)',flexShrink:0}}/>
-                  {c.nombre.length > 16 ? c.nombre.split(' ').slice(0,2).join(' ') : c.nombre}
+                  className={`sb__item sb__sub${active ? ' sb__item--active' : ''}`}>
+                  <span style={{ width: 5, height: 5, borderRadius: 3, background: active ? 'var(--ts-green)' : 'var(--text-faint)', flexShrink: 0 }} />
+                  <span>{c.nombre.length > 18 ? c.nombre.split(' ').slice(0, 2).join(' ') : c.nombre}</span>
                 </button>
               )
             })}
           </>
         )}
 
-        {/* Admin config */}
         {isAdmin && (
           <>
-            <div style={{padding:'12px 12px 4px',fontSize:10,color:A.textLight,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:600,marginTop:8}}>
-              Configuración
-            </div>
+            <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
             {adminConfig.map(item => (
               <button key={item.href} onClick={() => router.push(item.href)}
-                style={{
-                  width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
-                  background: isActive(item.href) ? A.blueActive : 'none',
-                  border:'none', textAlign:'left', fontSize:13, cursor:'pointer',
-                  color: isActive(item.href) ? '#fff' : A.textLight,
-                  fontWeight: isActive(item.href) ? 600 : 400,
-                  borderLeft: isActive(item.href) ? `3px solid ${A.greenLime}` : '3px solid transparent',
-                }}>
-                <span style={{fontSize:14,width:18,textAlign:'center'}}>{item.icon}</span>
-                <span>{item.label}</span>
+                className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
+                <Icon name={item.icon} /><span>{item.label}</span>
               </button>
             ))}
           </>
@@ -150,18 +123,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       </nav>
 
       {/* Footer */}
-      <div style={{borderTop:'1px solid rgba(255,255,255,0.1)'}}>
-        <button onClick={() => router.push('/perfil')}
-          style={{width:'100%',padding:'11px 14px',background:'none',border:'none',color:A.textLight,fontSize:12,textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}
-          onMouseEnter={e=>{e.currentTarget.style.color='#fff';e.currentTarget.style.background=A.bluePale}}
-          onMouseLeave={e=>{e.currentTarget.style.color=A.textLight;e.currentTarget.style.background='none'}}>
-          <span>👤</span><span>Mi perfil / Contraseña</span>
+      <div className="sb__foot">
+        <button onClick={() => router.push('/perfil')} className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
+          <Icon name="user" /><span>Mi perfil</span>
         </button>
-        <button onClick={logout}
-          style={{width:'100%',padding:'11px 14px',background:'none',border:'none',color:A.textLight,fontSize:12,textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:8,borderTop:'1px solid rgba(255,255,255,0.06)'}}
-          onMouseEnter={e=>{e.currentTarget.style.color='#fff';e.currentTarget.style.background=A.bluePale}}
-          onMouseLeave={e=>{e.currentTarget.style.color=A.textLight;e.currentTarget.style.background='none'}}>
-          <span>⬅</span><span>Cerrar sesión</span>
+        <button onClick={logout} className="sb__item">
+          <Icon name="logout" /><span>Cerrar sesión</span>
         </button>
       </div>
     </aside>
