@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
-import { getCurrentPeriod, readStoredPeriod, periodLabel } from '../../../lib/period'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import NivelBadge from '../../../components/NivelBadge'
+import PeriodSelector from '../../../components/PeriodSelector'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -74,6 +75,7 @@ export default function CentroPage() {
     setIsAdmin(r === 'admin_general' || r === 'supervisor')
   }, [])
   const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
   useEffect(() => {
     (async () => {
       setLoading(true)
@@ -180,9 +182,12 @@ export default function CentroPage() {
             <h1 className="h-title">{nombre}</h1>
             <p className="h-sub">Vista consolidada del trimestre</p>
           </div>
-          <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
-            <span className="dot" />{cumplPct}% cumplimiento
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
+            <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
+              <span className="dot" />{cumplPct}% cumplimiento
+            </span>
+          </div>
         </div>
 
         {/* Nivel del centro — motivacional */}
