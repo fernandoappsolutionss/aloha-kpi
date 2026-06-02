@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
-import { getCurrentPeriod, readStoredPeriod, periodLabel } from '../../../lib/period'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import NivelBadge from '../../../components/NivelBadge'
+import PeriodSelector from '../../../components/PeriodSelector'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -53,6 +54,8 @@ const sectionTitle = {
 
 export default function CentroPage() {
   const { id } = useParams()
+  const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
   const [loading, setLoading] = useState(true)
   const [nombre, setNombre] = useState('')
@@ -66,8 +69,13 @@ export default function CentroPage() {
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
   const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
 
-  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
+  useEffect(() => {
+    setPeriod(readStoredPeriod())
+    const r = localStorage.getItem('aloha_rol')
+    setIsAdmin(r === 'admin_general' || r === 'supervisor')
+  }, [])
   const label = periodLabel(period.year, period.quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
   useEffect(() => {
     (async () => {
       setLoading(true)
@@ -81,7 +89,7 @@ export default function CentroPage() {
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
-        desercion: Number(m?.meta_desercion_mes ?? 18.4),
+        desercion: Number(m?.meta_desercion_mes ?? 8),
         cobranza: m?.meta_cobranza_max ?? 1,
       }
       setMeta(metaFetched)
@@ -99,11 +107,12 @@ export default function CentroPage() {
         const ninosInicio = r?.ninos_inicio_mes || 0
         const nuevosActivosMes = r?.nuevos_activos_mes || 0
         const ninosFin = Math.max(0, ninosInicio + nuevosActivosMes - desercion)
-        const cumple = nuevos >= metaFetched.nuevos && desercion <= metaFetched.desercion && cobMes <= metaFetched.cobranza
+        const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
+        const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
         return {
           mes: NOMBRES_MES[mo - 1],
           mesNum: mo,
-          nuevos, desercion, cobranza: cobMes, ninos: ninosFin,
+          nuevos, desercion, desPct: desPctMes, cobranza: cobMes, ninos: ninosFin,
           ninosInicio, nuevosActivos: nuevosActivosMes,
           cumpl: cumple ? 'Sí' : 'No'
         }
@@ -150,7 +159,7 @@ export default function CentroPage() {
   const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, 1)
   const maxOri = Math.max(totals.origen.marketing, totals.origen.centro, totals.origen.activaciones, totals.origen.referidos, totals.origen.medios, 1)
   const metaNuevosTrim = meta.nuevos * meses.length
-  const metaMaxDesTrim = Math.ceil(meta.desercion * meses.length)
+  const desercionAlta = meses.some(m => (m.desPct || 0) > meta.desercion)
   const promGrupo = totals.grupos > 0 ? (totals.ninosActivos / totals.grupos) : 0
   const pcv = promGrupo > 0 ? (120 / promGrupo) + 16 : 0
   const gpn = totals.ninosActivos > 0 ? ((totals.ninosActivos * 108) * (1 - pcv / 100) - 7800) / totals.ninosActivos : 0
@@ -161,15 +170,24 @@ export default function CentroPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <main className="main">
+        {isAdmin && (
+          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+            Volver al panel de administrador
+          </button>
+        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · {label}</div>
             <h1 className="h-title">{nombre}</h1>
             <p className="h-sub">Vista consolidada del trimestre</p>
           </div>
-          <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
-            <span className="dot" />{cumplPct}% cumplimiento
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
+            <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
+              <span className="dot" />{cumplPct}% cumplimiento
+            </span>
+          </div>
         </div>
 
         {/* Nivel del centro — motivacional */}
@@ -205,7 +223,7 @@ export default function CentroPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
           <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
-          <Card l="Deserción" v={totals.desercion} s={'Meta máx: ' + metaMaxDesTrim} warn={totals.desercion > metaMaxDesTrim} />
+          <Card l="Deserción" v={totals.desercion} s={'Meta: <' + meta.desercion + '% mensual'} warn={desercionAlta} />
           <Card l="Grupos activos" v={totals.grupos} s={totals.grupos > 0 ? 'GPN: $' + gpn.toFixed(2) : '—'} />
         </div>
 
@@ -218,7 +236,7 @@ export default function CentroPage() {
                 <tr key={i} style={{ cursor: 'default' }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{m.mes}</td>
                   <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
-                  <td className="num" style={{ color: m.desercion > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}</td>
+                  <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%</span></td>
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
                   <td className="num">{m.cobranza}</td>
                   <td>

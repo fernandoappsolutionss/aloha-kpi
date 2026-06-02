@@ -17,6 +17,7 @@ const ic = {
   des:    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
   meta:   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>,
   gauge:  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 14 18 8"/><path d="M3.5 18a9 9 0 1 1 17 0"/></svg>,
+  grupo:  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>,
 }
 
 export default function DashboardPage() {
@@ -38,6 +39,10 @@ export default function DashboardPage() {
   const totDes = centros.reduce((a, c) => a + c.desercion, 0)
   const promCumpl = Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / n)
   const enMeta = centros.filter(c => c.nuevos >= c.meta).length
+  const totGrupos = centros.reduce((a, c) => a + (c.grupos || 0), 0)
+  const ninosGrupoProm = totGrupos > 0 ? (totNinos / totGrupos) : 0
+  const metaGpn = centros[0]?.metaGpn || 8
+  const centrosBajoGpn = centros.filter(c => c.gpnBajo).length
 
   const cards = [
     { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros' },
@@ -45,6 +50,7 @@ export default function DashboardPage() {
     { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre' },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
     { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl) },
+    { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },
   ]
 
   return (
@@ -89,6 +95,23 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* Alerta de ocupación de grupos (rentabilidad) */}
+        {centrosBajoGpn > 0 && (
+          <div className="card" style={{ marginBottom: 26, padding: '16px 20px', borderLeft: '3px solid var(--bad)', background: 'var(--bad-bg)', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--bad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                {centrosBajoGpn} centro{centrosBajoGpn > 1 ? 's' : ''} por debajo de {metaGpn} niños por grupo
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 780 }}>
+                La baja ocupación de grupos golpea directo la rentabilidad: un grupo cuesta casi lo mismo con 4 que con 8 niños. Prioriza <b style={{ color: 'var(--text)' }}>llenar los grupos actuales</b> antes de abrir nuevos.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="panel">
           <div className="panel__head">
@@ -99,7 +122,7 @@ export default function DashboardPage() {
             <table className="table">
               <thead>
                 <tr>
-                  {['Centro', 'Administradora', 'Niños', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
+                  {['Centro', 'Administradora', 'Niños', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
                     <th key={h}>{h}</th>)}
                 </tr>
               </thead>
@@ -109,6 +132,7 @@ export default function DashboardPage() {
                     <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
                     <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
                     <td className="num" style={{ color: 'var(--text)' }}>{c.ninos}</td>
+                    <td className="num" style={{ fontWeight: 600, color: c.grupos > 0 ? (c.ninosGrupo >= c.metaGpn ? 'var(--ok)' : 'var(--bad)') : 'var(--text-faint)' }} title={c.grupos > 0 ? `${c.grupos} grupos · meta ≥ ${c.metaGpn}` : 'sin datos de grupos'}>{c.grupos > 0 ? c.ninosGrupo.toFixed(1) : '—'}</td>
                     <td className="num" style={{ fontWeight: 600, color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
                       {c.nuevos}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> /{c.meta}</span>
                     </td>
@@ -136,7 +160,7 @@ export default function DashboardPage() {
                   </tr>
                 ))}
                 {centros.length === 0 && (
-                  <tr style={{ cursor: 'default' }}><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={11} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
                 )}
               </tbody>
             </table>

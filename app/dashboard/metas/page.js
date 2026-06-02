@@ -7,7 +7,7 @@ import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } fr
 
 const METAS_INIT = {
   nuevos_mes: 20,
-  desercion_mes: 18.4,
+  desercion_mes: 8,
   cobranza_max: 1,
   gpn_min: 8,
   cp_conversion: 50,
@@ -24,7 +24,7 @@ export default function MetasPage() {
     getMetas(period.year, period.quarter).then((m) => {
       if (m) setMetas({
         nuevos_mes: m.meta_nuevos_ingresos_mes ?? 20,
-        desercion_mes: Number(m.meta_desercion_mes ?? 18.4),
+        desercion_mes: Number(m.meta_desercion_mes ?? 8),
         cobranza_max: Number(m.meta_cobranza_max ?? 1),
         gpn_min: Number(m.gpn_min ?? 8),
         cp_conversion: Number(m.cp_conversion ?? 50),
@@ -53,7 +53,7 @@ export default function MetasPage() {
 
   const campos = [
     { k:'nuevos_mes', l:'Meta nuevos ingresos por mes', desc:'Número mínimo de nuevas matrículas que cada centro debe lograr mensualmente.', suffix:'alumnos', tipo:'number' },
-    { k:'desercion_mes', l:'Meta máxima de deserción por mes', desc:'Número máximo de retiros permitidos por mes. Si se supera, el mes no cumple.', suffix:'retiros', tipo:'number' },
+    { k:'desercion_mes', l:'Meta máxima de deserción mensual (%)', desc:'Porcentaje máximo de retiros sobre los niños activos del mes. Si se supera ese %, el mes no cumple.', suffix:'%', tipo:'number' },
     { k:'cobranza_max', l:'Meta máxima de cobranza vencida', desc:'Número máximo de facturas vencidas al cierre del mes.', suffix:'facturas', tipo:'number' },
     { k:'gpn_min', l:'Promedio mínimo niños por grupo (GPN)', desc:'Cada grupo activo debe tener al menos este número de alumnos en promedio.', suffix:'niños/grupo', tipo:'number' },
     { k:'cp_conversion', l:'Meta efectividad clase de prueba', desc:'Porcentaje mínimo de invitados que deben matricularse tras asistir a la clase de prueba.', suffix:'%', tipo:'number' },
