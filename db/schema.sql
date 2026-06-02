@@ -134,6 +134,19 @@ CREATE TABLE IF NOT EXISTS cumplimiento (
   PRIMARY KEY (trimestre_id, mes)
 );
 
+-- FODA trimestral por centro (campos editables por la administradora)
+CREATE TABLE IF NOT EXISTS foda (
+  centro_id          INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  anio               INTEGER NOT NULL,
+  trimestre          INTEGER NOT NULL,
+  oportunidades      TEXT,
+  amenazas           TEXT,
+  comentarios        TEXT,
+  comentario_estado  TEXT,
+  updated_at         TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (centro_id, anio, trimestre)
+);
+
 -- Índices útiles para las consultas del panel/historial
 CREATE INDEX IF NOT EXISTS idx_resumen_centro_year ON resumen_mes (centro_id, year);
 CREATE INDEX IF NOT EXISTS idx_kpi_centro_year      ON kpi_semanas (centro_id, year);

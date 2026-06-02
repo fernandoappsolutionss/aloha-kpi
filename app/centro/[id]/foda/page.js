@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
+import { loadFoda, saveFoda } from '../../../actions/foda'
 
 export default function FodaPage() {
   const params = useParams()
@@ -16,11 +17,33 @@ export default function FodaPage() {
     amenazas: 'Competencia directa e indirecta\nFactores económicos familiares\nVacaciones escolares / verano',
     comentarios: '',
   })
+  const [estado, setEstado] = useState('')
+
+  useEffect(() => {
+    if (params.id === 'demo') return
+    loadFoda(params.id, 2026, 1).then((d) => {
+      if (!d) return
+      setFoda({
+        oportunidades: d.oportunidades ?? '',
+        amenazas: d.amenazas ?? '',
+        comentarios: d.comentarios ?? '',
+      })
+      if (d.comentario_estado) setEstado(d.comentario_estado)
+    }).catch(() => {})
+  }, [params.id])
 
   const fortalezas = ['Classdojo activo y completo','Padres conectados','Grupo Study activo','Centro en buen estado','Reuniones mensuales con equipo','Meta de deserción lograda']
   const debilidades = ['No se premió al Coach estrella','Sin encuestas de satisfacción al equipo','Meta de cobranza no cumplida','Meta de 20+ nuevos ingresos no alcanzada']
 
-  async function save() { setSaving(true); await new Promise(r=>setTimeout(r,700)); setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),3000) }
+  async function save() {
+    if (params.id === 'demo') { setSaved(true); setTimeout(()=>setSaved(false),3000); return }
+    setSaving(true)
+    try {
+      await saveFoda(params.id, 2026, 1, { ...foda, comentario_estado: estado })
+      setSaved(true); setTimeout(()=>setSaved(false),3000)
+    } catch {}
+    setSaving(false)
+  }
 
   const cuads = [
     {t:'✅ Fortalezas',c:'#0F6E56',bc:'#1D9E75',auto:true,items:fortalezas},
@@ -78,7 +101,7 @@ export default function FodaPage() {
           <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,flexWrap:'wrap'}}>
             <span style={{fontSize:12,color:'#555',fontWeight:500}}>Estado:</span>
             {['Próximo trimestre','Negado','Aprobado','En proceso','Cumplido'].map(s=>(
-              <button key={s} style={{padding:'4px 12px',border:'0.5px solid #ddd',borderRadius:6,background:'#f5f5f0',fontSize:11,color:'#666',cursor:'pointer'}}>{s}</button>
+              <button key={s} onClick={()=>setEstado(s)} style={{padding:'4px 12px',border:'0.5px solid '+(estado===s?'#533AB7':'#ddd'),borderRadius:6,background:estado===s?'#EEEDFE':'#f5f5f0',fontSize:11,color:estado===s?'#533AB7':'#666',cursor:'pointer',fontWeight:estado===s?600:400}}>{s}</button>
             ))}
           </div>
         </div>

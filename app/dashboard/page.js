@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
-import { getDashboardData } from '../actions/dashboard'
+import { getCentrosKpi } from '../actions/dashboard'
 
 const A = { blue:'#1B4580', blueMid:'#1D5FA6', green:'#4A8C3F', greenLime:'#B8D432', gray:'#F0F3F8', text:'#1A2744' }
 
@@ -23,36 +23,7 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    (async () => {
-      const { centros: centrosData, metas: metasData, rs: rsData, ks: ksData, usuarios: usuariosData } = await getDashboardData()
-      if (!centrosData || centrosData.length === 0) return
-      const metaNuevosMes = metasData?.meta_nuevos_ingresos_mes || 20
-      const metaDesMes = Number(metasData?.meta_desercion_mes || 18.4)
-      const metaCobMes = metasData?.meta_cobranza_max || 1
-      const enriched = centrosData.map(c => {
-        const rs = (rsData || []).filter(r => r.centro_id === c.id)
-        const ks = (ksData || []).filter(k => k.centro_id === c.id)
-        const admin = (usuariosData || []).find(u => u.centro_id === c.id)?.nombre || '—'
-        const months = [1,2,3].map(mo => {
-          const r = rs.find(x => x.month === mo)
-          const ws = ks.filter(x => x.month === mo)
-          const nuevos = ws.reduce((s,w) => s+(w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)
-          const desercion = ws.reduce((s,w) => s+(w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
-          let cob = 0
-          if (ws.length) { const last = [...ws].sort((a,b)=>b.semana-a.semana)[0]; cob = last.cob_d5 || last.cob_d4 || last.cob_d3 || last.cob_d2 || last.cob_d1 || 0 }
-          const ok = nuevos >= metaNuevosMes && desercion <= metaDesMes && cob <= metaCobMes
-          return { nuevos, desercion, cob, ok, ninosInicio: r?.ninos_inicio_mes||0, nuevosActivos: r?.nuevos_activos_mes||0 }
-        })
-        const totNuevos = months.reduce((s,m) => s+m.nuevos, 0)
-        const totDes = months.reduce((s,m) => s+m.desercion, 0)
-        const last = months[2]
-        const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
-        const cumpl = Math.round((months.filter(m => m.ok).length / 3) * 100)
-        const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
-        return { nombre: c.nombre, admin, ninos, nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes, cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, estado }
-      })
-      setCentros(enriched)
-    })()
+    getCentrosKpi().then((data) => setCentros(data || [])).catch(() => {})
   }, [])
 
   const totNinos = centros.reduce((a,c)=>a+c.ninos,0)
