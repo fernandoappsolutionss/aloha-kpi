@@ -1,6 +1,8 @@
 'use server'
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
+import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
+import { quarterMetrics } from '../../lib/kpi-calc'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -21,7 +23,20 @@ export async function getCentroResumen(centroId, year, trimestre) {
     SELECT * FROM kpi_semanas
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks }
+
+  // Nivel GANADO = cierre del trimestre ANTERIOR. En curso + próximo = trimestre actual.
+  const prevQ = trimestre > 1 ? trimestre - 1 : 4
+  const prevY = trimestre > 1 ? year : year - 1
+  const pqm = Q_MONTHS[prevQ]
+  const prs = await sql`SELECT * FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
+  const pks = await sql`SELECT * FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
+  const pm = quarterMetrics(prs, pks, centroId, pqm)
+  const cur = quarterMetrics(rs, ks, centroId, months)
+  const nivel = pm.desOk ? nivelPorNinos(pm.ninos) : 0
+  const nivelEnCurso = cur.desOk ? nivelPorNinos(cur.ninos) : 0
+  const sig = siguienteNivel(cur.ninos)
+
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).

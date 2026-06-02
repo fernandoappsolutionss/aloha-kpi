@@ -4,6 +4,7 @@ import Sidebar from '../../../components/Sidebar'
 import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
+import NivelBadge from '../../../components/NivelBadge'
 
 const MEDAL = { 1:'🥇', 2:'🥈', 3:'🥉' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -64,6 +65,12 @@ export default function RankingPage() {
                     <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>{c.nuevos} nuevos</span>
                     <span style={{ color: 'var(--text-muted)' }}>{c.ninos} niños</span>
                   </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 14 }}>
+                    <NivelBadge nivel={c.nivel} />
+                    {c.sig
+                      ? <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Próximo: <b style={{ color: 'var(--ts-green)' }}>Nivel {c.sig.nivel}</b> · faltan {c.sig.faltan}</div>
+                      : <div style={{ fontSize: 11, color: 'var(--ts-green)' }}>Nivel máximo</div>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -77,7 +84,7 @@ export default function RankingPage() {
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
                   <thead>
-                    <tr>{['Pos.','Centro','Administradora','Cumplimiento','Nuevos ing.','Niños activos','Tendencia'].map(h =>
+                    <tr>{['Pos.','Centro','Administradora','Cumplimiento','Nuevos ing.','Niños activos','Nivel','Tendencia'].map(h =>
                       <th key={h}>{h}</th>
                     )}</tr>
                   </thead>
@@ -97,6 +104,7 @@ export default function RankingPage() {
                         </td>
                         <td className="num" style={{ color: 'var(--text)' }}>{c.nuevos}</td>
                         <td className="num" style={{ color: 'var(--text-muted)' }}>{c.ninos}</td>
+                        <td><NivelBadge nivel={c.nivel} size="sm" /></td>
                         <td style={{ fontSize: 16, color: c.trend === '↑' ? 'var(--ok)' : c.trend === '↓' ? 'var(--bad)' : 'var(--text-dim)' }}>{c.trend}</td>
                       </tr>
                     ))}
@@ -106,6 +114,24 @@ export default function RankingPage() {
             </div>
           </>
         )}
+
+        {/* Leyenda de niveles — siempre visible */}
+        <div className="card" style={{ marginTop: 16, padding: '16px 20px' }}>
+          <div className="label" style={{ marginBottom: 12 }}>Niveles de centro · ALOHA 2026</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+            {[[1, '> 170'], [2, '> 200'], [3, '> 240'], [4, '> 325'], [5, '> 410']].map(([n, r]) => (
+              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <NivelBadge nivel={n} size="sm" />
+                <span className="num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r} niños</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.5, maxWidth: 760 }}>
+            El nivel se <strong style={{ color: 'var(--text-muted)' }}>gana al cerrar un trimestre</strong> cumpliendo la condición
+            (niños + deserción <strong style={{ color: 'var(--text-muted)' }}>menor al 8% los 3 meses</strong>) y aplica al
+            <strong style={{ color: 'var(--text-muted)' }}> trimestre siguiente</strong>. Sube de nivel aumentando tus niños activos y manteniendo baja la deserción.
+          </p>
+        </div>
       </main>
     </div>
   )

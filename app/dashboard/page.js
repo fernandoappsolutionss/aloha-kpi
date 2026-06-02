@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
 import PeriodSelector from '../../components/PeriodSelector'
+import NivelBadge from '../../components/NivelBadge'
 import { getCentrosKpi } from '../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../lib/period'
 
@@ -98,7 +99,7 @@ export default function DashboardPage() {
             <table className="table">
               <thead>
                 <tr>
-                  {['Centro', 'Administradora', 'Niños', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado'].map(h =>
+                  {['Centro', 'Administradora', 'Niños', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
                     <th key={h}>{h}</th>)}
                 </tr>
               </thead>
@@ -131,10 +132,11 @@ export default function DashboardPage() {
                         <span className="dot" />{c.estado}
                       </span>
                     </td>
+                    <td><NivelBadge nivel={c.nivel} size="sm" /></td>
                   </tr>
                 ))}
                 {centros.length === 0 && (
-                  <tr style={{ cursor: 'default' }}><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
                 )}
               </tbody>
             </table>
