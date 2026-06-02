@@ -28,7 +28,7 @@ export async function getCentrosKpi(year, quarter) {
   const pks = await sql`SELECT * FROM kpi_semanas WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
 
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
-  const metaDesMes = Number(metas?.meta_desercion_mes || 18.4)
+  const metaDesMes = Number(metas?.meta_desercion_mes || 8) // % máximo de deserción mensual
   const metaCobMes = metas?.meta_cobranza_max || 1
 
   return centros.map((c) => {
@@ -43,8 +43,10 @@ export async function getCentrosKpi(year, quarter) {
       let cob = 0
       if (ws.length) { const last = [...ws].sort((a, b) => b.semana - a.semana)[0]; cob = last.cob_d5||last.cob_d4||last.cob_d3||last.cob_d2||last.cob_d1||0 }
       const has = ws.length > 0 || !!r
-      const ok = nuevos >= metaNuevosMes && desercion <= metaDesMes && cob <= metaCobMes
-      return { nuevos, desercion, cob, ok, has, ninosInicio: r?.ninos_inicio_mes||0, nuevosActivos: r?.nuevos_activos_mes||0 }
+      const ninosIni = r?.ninos_inicio_mes || 0
+      const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
+      const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
+      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, nuevosActivos: r?.nuevos_activos_mes||0 }
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)

@@ -81,7 +81,7 @@ export default function CentroPage() {
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
-        desercion: Number(m?.meta_desercion_mes ?? 18.4),
+        desercion: Number(m?.meta_desercion_mes ?? 8),
         cobranza: m?.meta_cobranza_max ?? 1,
       }
       setMeta(metaFetched)
@@ -99,11 +99,12 @@ export default function CentroPage() {
         const ninosInicio = r?.ninos_inicio_mes || 0
         const nuevosActivosMes = r?.nuevos_activos_mes || 0
         const ninosFin = Math.max(0, ninosInicio + nuevosActivosMes - desercion)
-        const cumple = nuevos >= metaFetched.nuevos && desercion <= metaFetched.desercion && cobMes <= metaFetched.cobranza
+        const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
+        const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
         return {
           mes: NOMBRES_MES[mo - 1],
           mesNum: mo,
-          nuevos, desercion, cobranza: cobMes, ninos: ninosFin,
+          nuevos, desercion, desPct: desPctMes, cobranza: cobMes, ninos: ninosFin,
           ninosInicio, nuevosActivos: nuevosActivosMes,
           cumpl: cumple ? 'Sí' : 'No'
         }
@@ -150,7 +151,7 @@ export default function CentroPage() {
   const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, 1)
   const maxOri = Math.max(totals.origen.marketing, totals.origen.centro, totals.origen.activaciones, totals.origen.referidos, totals.origen.medios, 1)
   const metaNuevosTrim = meta.nuevos * meses.length
-  const metaMaxDesTrim = Math.ceil(meta.desercion * meses.length)
+  const desercionAlta = meses.some(m => (m.desPct || 0) > meta.desercion)
   const promGrupo = totals.grupos > 0 ? (totals.ninosActivos / totals.grupos) : 0
   const pcv = promGrupo > 0 ? (120 / promGrupo) + 16 : 0
   const gpn = totals.ninosActivos > 0 ? ((totals.ninosActivos * 108) * (1 - pcv / 100) - 7800) / totals.ninosActivos : 0
@@ -205,7 +206,7 @@ export default function CentroPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
           <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
-          <Card l="Deserción" v={totals.desercion} s={'Meta máx: ' + metaMaxDesTrim} warn={totals.desercion > metaMaxDesTrim} />
+          <Card l="Deserción" v={totals.desercion} s={'Meta: <' + meta.desercion + '% mensual'} warn={desercionAlta} />
           <Card l="Grupos activos" v={totals.grupos} s={totals.grupos > 0 ? 'GPN: $' + gpn.toFixed(2) : '—'} />
         </div>
 
@@ -218,7 +219,7 @@ export default function CentroPage() {
                 <tr key={i} style={{ cursor: 'default' }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{m.mes}</td>
                   <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
-                  <td className="num" style={{ color: m.desercion > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}</td>
+                  <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%</span></td>
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
                   <td className="num">{m.cobranza}</td>
                   <td>
