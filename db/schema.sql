@@ -147,7 +147,20 @@ CREATE TABLE IF NOT EXISTS foda (
   PRIMARY KEY (centro_id, anio, trimestre)
 );
 
+-- Peticiones / comentarios del administrador (varios por trimestre, cada uno con su estado)
+CREATE TABLE IF NOT EXISTS peticiones (
+  id          SERIAL PRIMARY KEY,
+  centro_id   INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  anio        INTEGER NOT NULL,
+  trimestre   INTEGER NOT NULL,
+  texto       TEXT NOT NULL,
+  estado      TEXT NOT NULL DEFAULT 'Próximo trimestre',
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
 -- Índices útiles para las consultas del panel/historial
+CREATE INDEX IF NOT EXISTS idx_peticiones_centro   ON peticiones (centro_id, anio, trimestre);
 CREATE INDEX IF NOT EXISTS idx_resumen_centro_year ON resumen_mes (centro_id, year);
 CREATE INDEX IF NOT EXISTS idx_kpi_centro_year      ON kpi_semanas (centro_id, year);
 CREATE INDEX IF NOT EXISTS idx_mes_kpi_centro       ON mes_kpi (centro_id);
