@@ -4,11 +4,22 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
 import PeriodSelector from '../../components/PeriodSelector'
 import NivelBadge from '../../components/NivelBadge'
-import { getCentrosKpi } from '../actions/dashboard'
+import { getCentrosKpi, getNinosSerie } from '../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../lib/period'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+const MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const NinosTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 12px', fontSize: 12, boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+      <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</div>
+      <div style={{ color: 'var(--ts-green)' }}>Niños: <b>{payload[0].value}</b></div>
+    </div>
+  )
+}
 
 /* tiny dim icons for KPI cards */
 const ic = {
@@ -26,6 +37,9 @@ export default function DashboardPage() {
   const [prev, setPrev] = useState([])
   const [nombre, setNombre] = useState('')
   const [period, setPeriod] = useState(getCurrentPeriod())
+  const [rango, setRango] = useState('ytd')
+  const [custom, setCustom] = useState({ from: '', to: '' })
+  const [serie, setSerie] = useState([])
   const criticos = centros.filter(c => c.estado === 'Crítico').length
 
   useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setPeriod(readStoredPeriod()) }, [])
@@ -33,6 +47,18 @@ export default function DashboardPage() {
     getCentrosKpi(period.year, period.quarter).then((data) => setCentros(data || [])).catch(() => {})
     getCentrosKpi(period.year - 1, period.quarter).then((data) => setPrev(data || [])).catch(() => setPrev([]))
   }, [period])
+  useEffect(() => {
+    const now = new Date(); const cy = now.getFullYear(), cm = now.getMonth() + 1
+    let d, h
+    if (rango === 'prev') { d = [cy - 1, 1]; h = [cy - 1, 12] }
+    else if (rango === 'custom' && custom.from && custom.to) {
+      const [fy, fm] = custom.from.split('-').map(Number); const [ty, tm] = custom.to.split('-').map(Number)
+      d = [fy, fm]; h = [ty, tm]
+    } else { d = [cy, 1]; h = [cy, cm] }
+    getNinosSerie(d[0], d[1], h[0], h[1])
+      .then((rows) => setSerie((rows || []).map((r) => ({ ...r, label: MES_CORTO[r.month - 1] + " '" + String(r.year).slice(2) }))))
+      .catch(() => setSerie([]))
+  }, [rango, custom.from, custom.to])
 
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -112,6 +138,54 @@ export default function DashboardPage() {
               )}
             </div>
           ))}
+        </div>
+
+        {/* Gráfico general de niños + filtros rápidos */}
+        <div className="panel" style={{ marginBottom: 26 }}>
+          <div className="panel__head" style={{ flexWrap: 'wrap', gap: 10 }}>
+            <h2 className="panel__title">Evolución de niños activos</h2>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {[['ytd', 'Este año'], ['prev', 'Año anterior'], ['custom', 'Personalizado']].map(([k, l]) => {
+                const on = rango === k
+                return (
+                  <button key={k} onClick={() => setRango(k)}
+                    style={{ padding: '5px 13px', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? 'var(--ts-green-soft)' : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: on ? 'var(--ts-green)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: on ? 600 : 500 }}>
+                    {l}
+                  </button>
+                )
+              })}
+              {rango === 'custom' && (
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
+                  <input type="month" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
+                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
+                  <span style={{ color: 'var(--text-dim)' }}>→</span>
+                  <input type="month" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
+                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
+                </span>
+              )}
+            </div>
+          </div>
+          <div style={{ padding: '18px 12px 8px' }}>
+            {serie.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 0', fontSize: 13 }}>Sin datos de niños para el rango seleccionado.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <Tooltip content={<NinosTooltip />} />
+                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="#10B981" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
 
         {/* Alerta de ocupación de grupos (rentabilidad) */}
