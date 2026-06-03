@@ -139,3 +139,16 @@ export async function getHistorialAdmin(anio, centroSel, trimSel) {
   }
   return out
 }
+
+// Serie mensual de niños (suma de todos los centros) para un rango [desde, hasta].
+export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
+  await requireAdmin()
+  const lo = desdeY * 100 + desdeM
+  const hi = hastaY * 100 + hastaM
+  return await sql`
+    SELECT year, month, SUM(ninos_final_mes)::int ninos, SUM(nuevos_activos_mes)::int nuevos
+    FROM resumen_mes
+    WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}
+    GROUP BY year, month ORDER BY year, month
+  `
+}
