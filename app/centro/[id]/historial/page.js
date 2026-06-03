@@ -120,7 +120,7 @@ export default function HistorialPage() {
   const last = meses[meses.length - 1]
   const prev = meses[meses.length - 2]
 
-  const StatCard = ({ label, val, prev, unit='', color=C.text, meta, metaOp, invertTrend }) => {
+  const StatCard = ({ label, val, prev, unit='', color='var(--text)', meta, metaOp, invertTrend }) => {
     const prevVal = prev
     const diff = prevVal !== undefined ? val - prevVal : null
     const trendUp = diff !== null && diff !== 0 ? diff > 0 : null
@@ -191,12 +191,12 @@ export default function HistorialPage() {
                   </span>
                 </h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 14 }}>
-                  <StatCard label="Niños Final Mes" val={last.ninos_final} prev={prev?.ninos_final} color={C.text}/>
+                  <StatCard label="Niños Final Mes" val={last.ninos_final} prev={prev?.ninos_final} color="var(--text)"/>
                   <StatCard label="Prom. Niños/Grupo" val={last.prom_grupo} prev={prev?.prom_grupo} color={last.cumple_prom?C.green:C.bad} meta={8} metaOp="≥"/>
-                  <StatCard label="%CV" val={last.pcv} prev={prev?.pcv} unit="%" color={C.text} invertTrend/>
+                  <StatCard label="%CV" val={last.pcv} prev={prev?.pcv} unit="%" color="var(--text)" invertTrend/>
                   <StatCard label="GPN" val={last.gpn} prev={prev?.gpn} unit="" color={last.gpn>=0?C.green:C.bad}/>
                   <StatCard label="Nuevos Activos" val={last.nuevos_activos} prev={prev?.nuevos_activos} color={C.green} meta={last.meta_nuevos} metaOp="≥"/>
-                  <StatCard label="Grupos Activos" val={last.grupos_activos} prev={prev?.grupos_activos} color={C.text}/>
+                  <StatCard label="Grupos Activos" val={last.grupos_activos} prev={prev?.grupos_activos} color="var(--text)"/>
                 </div>
               </div>
             )}
