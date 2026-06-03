@@ -148,9 +148,12 @@ export default function HistorialPage() {
     )
   }
 
-  // Wrapper para cada tarjeta de gráfica
+  // Wrapper para cada tarjeta de gráfica.
+  // minWidth:0 es imprescindible: como cada tarjeta es un ítem de un grid
+  // `1fr 1fr` (cuyo min-width por defecto es `auto`), sin esto el
+  // ResponsiveContainer de recharts mide ancho 0 y la gráfica sale en blanco.
   const ChartCard = ({ title, sub, children }) => (
-    <div className="card" style={{ padding: 20 }}>
+    <div className="card" style={{ padding: 20, minWidth: 0 }}>
       <h3 className="panel__title" style={{ fontSize: 16, marginBottom: sub ? 4 : 16 }}>{title}</h3>
       {sub && <p className="h-sub" style={{ marginTop: 0, marginBottom: 12 }}>{sub}</p>}
       {children}
