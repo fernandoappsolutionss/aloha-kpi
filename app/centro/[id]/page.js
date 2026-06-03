@@ -121,7 +121,8 @@ export default function CentroPage() {
       })
       setMeses(mensual)
 
-      const lastMonth = mensual[mensual.length - 1]
+      const conDatosMes = mensual.filter(mm => mm.ninosInicio > 0 || mm.nuevos > 0 || mm.desercion > 0 || mm.nuevosActivos > 0)
+      const lastMonth = conDatosMes.length ? conDatosMes[conDatosMes.length - 1] : mensual[mensual.length - 1]
       const ultResumen = (rs || [])[(rs || []).length - 1]
       setTotals({
         ninosActivos: lastMonth.ninos,

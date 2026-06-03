@@ -64,14 +64,14 @@ export async function getCentrosKpi(year, quarter) {
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
-    const last = months[2]
+    const conDatos = months.filter((m) => m.has)
+    const last = conDatos.length ? conDatos[conDatos.length - 1] : months[2]
     const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / 3) * 100)
     const ag = cumpAgg[c.id]
     const cumpl = ag && ag.tot ? Math.round((ag.si / ag.tot) * 100) : 0
     const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
-    const conDatos = months.filter((m) => m.has)
     let trend = '→'
     if (conDatos.length >= 2) {
       const a = conDatos[conDatos.length - 2].nuevos
