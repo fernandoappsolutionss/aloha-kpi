@@ -19,6 +19,7 @@ export default function FodaPage() {
     comentarios: '',
   })
   const [estado, setEstado] = useState('')
+  const [status, setStatus] = useState('')
   const { year, quarter } = getCurrentPeriod()
   const label = periodLabel(year, quarter)
 
@@ -39,12 +40,15 @@ export default function FodaPage() {
   const debilidades = ['No se premió al Coach estrella','Sin encuestas de satisfacción al equipo','Meta de cobranza no cumplida','Meta de 20+ nuevos ingresos no alcanzada']
 
   async function save() {
-    if (params.id === 'demo') { setSaved(true); setTimeout(()=>setSaved(false),3000); return }
-    setSaving(true)
+    if (params.id === 'demo') { setStatus('Modo demo — no se guarda.'); return }
+    setSaving(true); setStatus('')
     try {
-      await saveFoda(params.id, year, quarter, { ...foda, comentario_estado: estado })
-      setSaved(true); setTimeout(()=>setSaved(false),3000)
-    } catch {}
+      const res = await saveFoda(params.id, year, quarter, { ...foda, comentario_estado: estado })
+      if (res?.error) throw new Error(res.error)
+      setSaved(true); setStatus('✓ Guardado'); setTimeout(() => { setSaved(false); setStatus('') }, 3500)
+    } catch (e) {
+      setStatus('Error al guardar: ' + (e?.message || 'desconocido'))
+    }
     setSaving(false)
   }
 
@@ -71,8 +75,8 @@ export default function FodaPage() {
             <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {saved && <span className="pill pill--ok"><span className="dot" />Guardado</span>}
-            <button onClick={save} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
+            {status && <span style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') ? 'var(--bad)' : 'var(--ok)' }}>{status}</span>}
+            <button onClick={save} disabled={saving} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
           </div>
         </div>
 
