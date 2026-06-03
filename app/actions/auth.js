@@ -21,7 +21,7 @@ export async function login(email, password) {
 }
 
 export async function logout() {
-  destroySession()
+  await destroySession()
   return { ok: true }
 }
 
