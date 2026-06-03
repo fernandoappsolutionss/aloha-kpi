@@ -95,6 +95,11 @@ export default function LoginPage() {
               <input id="password" className="input" type="password" required autoComplete="current-password"
                 value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                 placeholder="••••••••" />
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <a href="/forgot-password" className="label" style={{ color: 'var(--ts-green)', fontWeight: 600, textDecoration: 'none' }}>
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
             </div>
 
             {error && (
