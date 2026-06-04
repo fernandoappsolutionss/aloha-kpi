@@ -140,54 +140,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Gráfico general de niños + filtros rápidos */}
-        <div className="panel" style={{ marginBottom: 26 }}>
-          <div className="panel__head" style={{ flexWrap: 'wrap', gap: 10 }}>
-            <h2 className="panel__title">Evolución de niños activos</h2>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              {[['ytd', 'Este año'], ['prev', 'Año anterior'], ['custom', 'Personalizado']].map(([k, l]) => {
-                const on = rango === k
-                return (
-                  <button key={k} onClick={() => setRango(k)}
-                    style={{ padding: '5px 13px', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? 'var(--ts-green-soft)' : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: on ? 'var(--ts-green)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: on ? 600 : 500 }}>
-                    {l}
-                  </button>
-                )
-              })}
-              {rango === 'custom' && (
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
-                  <input type="month" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
-                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
-                  <span style={{ color: 'var(--text-dim)' }}>→</span>
-                  <input type="month" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
-                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
-                </span>
-              )}
-            </div>
-          </div>
-          <div style={{ padding: '18px 12px 8px' }}>
-            {serie.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 0', fontSize: 13 }}>Sin datos de niños para el rango seleccionado.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
-                  <Tooltip content={<NinosTooltip />} />
-                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="#10B981" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
         {/* Alerta de ocupación de grupos (rentabilidad) */}
         {centrosBajoGpn > 0 && (
           <div className="card" style={{ marginBottom: 26, padding: '16px 20px', borderLeft: '3px solid var(--bad)', background: 'var(--bad-bg)', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -206,7 +158,7 @@ export default function DashboardPage() {
         )}
 
         {/* Table */}
-        <div className="panel">
+        <div className="panel" style={{ marginBottom: 26 }}>
           <div className="panel__head">
             <h2 className="panel__title">Estado de todos los centros</h2>
             <span className="label">{label}</span>
@@ -257,6 +209,54 @@ export default function DashboardPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Gráfico general de niños + filtros rápidos (al final del panel) */}
+        <div className="panel">
+          <div className="panel__head" style={{ flexWrap: 'wrap', gap: 10 }}>
+            <h2 className="panel__title">Evolución de niños activos</h2>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {[['ytd', 'Este año'], ['prev', 'Año anterior'], ['custom', 'Personalizado']].map(([k, l]) => {
+                const on = rango === k
+                return (
+                  <button key={k} onClick={() => setRango(k)}
+                    style={{ padding: '5px 13px', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? 'var(--ts-green-soft)' : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: on ? 'var(--ts-green)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: on ? 600 : 500 }}>
+                    {l}
+                  </button>
+                )
+              })}
+              {rango === 'custom' && (
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
+                  <input type="month" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
+                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
+                  <span style={{ color: 'var(--text-dim)' }}>→</span>
+                  <input type="month" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
+                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
+                </span>
+              )}
+            </div>
+          </div>
+          <div style={{ padding: '18px 12px 8px' }}>
+            {serie.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 0', fontSize: 13 }}>Sin datos de niños para el rango seleccionado.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <Tooltip content={<NinosTooltip />} />
+                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="#10B981" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </main>
