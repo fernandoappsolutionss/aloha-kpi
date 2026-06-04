@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
@@ -40,8 +40,10 @@ const EMPTY = {
 
 export default function EventosPage() {
   const { id } = useParams()
+  const router = useRouter()
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
   const [rol, setRol] = useState('usuario')
+  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
   const [config, setConfig] = useState({ configured: true, baseUrl: '' })
   const [opts, setOpts] = useState({ sales_teams: [], pipeline_stages: [] })
   const [events, setEvents] = useState([])
@@ -82,15 +84,15 @@ export default function EventosPage() {
 
   async function onDelete(ev) {
     setMenuId(null)
-    if (!confirm(`¿Eliminar el evento "${ev.name}"? Esta acción no se puede deshacer.`)) return
+    if (!confirm(`¿Eliminar la clase de prueba "${ev.name}"? Esta acción no se puede deshacer.`)) return
     setStatus('')
     const res = await eliminarEvento(id, ev.id)
-    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Evento eliminado.'); load() }
+    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba eliminada.'); load() }
   }
   async function onDuplicate(ev) {
     setMenuId(null); setStatus('')
     const res = await duplicarEvento(id, ev.id)
-    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Evento duplicado (queda en borrador).'); load() }
+    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba duplicada (queda en borrador).'); load() }
   }
   function copy(text, msg) {
     setMenuId(null)
@@ -112,15 +114,21 @@ export default function EventosPage() {
 
   return (
     <div className="shell">
-      <Sidebar rol={rol} centroId={id} />
+      <Sidebar rol="usuario" centroId={id} />
       <main className="main" onClick={() => setMenuId(null)}>
+        {isAdmin && (
+          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+            Volver al panel de administrador
+          </button>
+        )}
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Mi centro · Eventos</div>
-            <h1 className="h-title">Eventos</h1>
-            <p className="h-sub">Clases de prueba y eventos · sincronizados con el CRM</p>
+            <div className="label" style={{ marginBottom: 10 }}>Mi centro · Clases de prueba</div>
+            <h1 className="h-title">Clases de Prueba</h1>
+            <p className="h-sub">Clases de prueba sincronizadas con el CRM</p>
           </div>
-          <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" disabled={!config.configured}>+ Nuevo evento</button>
+          <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" disabled={!config.configured}>+ Nueva clase de prueba</button>
         </div>
 
         {!config.configured && (
@@ -158,12 +166,12 @@ export default function EventosPage() {
         <div className="panel">
           <div style={{ overflowX: 'visible' }}>
             <table className="table">
-              <thead><tr>{['Evento', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
                 {loading ? (
                   <tr style={{ cursor: 'default' }}><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</td></tr>
                 ) : visible.length === 0 ? (
-                  <tr style={{ cursor: 'default' }}><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{events.length === 0 ? 'Aún no hay eventos. Crea el primero con “+ Nuevo evento”.' : 'Sin resultados para el filtro.'}</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{events.length === 0 ? 'Aún no hay clases de prueba. Crea la primera con “+ Nueva clase de prueba”.' : 'Sin resultados para el filtro.'}</td></tr>
                 ) : visible.map((ev) => {
                   const count = ev.stats?.total ?? ev.registration_count ?? 0
                   return (
@@ -254,7 +262,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
     }
     const res = isEdit ? await actualizarEvento(centroId, f.id, data) : await crearEvento(centroId, data)
     setSaving(false)
-    if (res.error) setErr(res.error); else onSaved(isEdit ? 'Evento actualizado.' : 'Evento creado en el CRM.')
+    if (res.error) setErr(res.error); else onSaved(isEdit ? 'Clase de prueba actualizada.' : 'Clase de prueba creada en el CRM.')
   }
 
   const stages = opts.pipeline_stages || []
@@ -264,7 +272,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
       <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 640, maxWidth: '100%', padding: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
-          <h3 className="panel__title">{isEdit ? 'Editar evento' : 'Crear evento'}</h3>
+          <h3 className="panel__title">{isEdit ? 'Editar clase de prueba' : 'Crear clase de prueba'}</h3>
           <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '12px 22px 0' }}>
@@ -278,7 +286,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
 
           {tab === 'info' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Field full label="Nombre del evento *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
+              <Field full label="Nombre de la clase de prueba *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
               <Field full label="Descripción"><textarea className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
               <Field label="Zona horaria">
                 <select className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
@@ -359,7 +367,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear evento')}</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear clase de prueba')}</button>
         </div>
       </div>
     </div>

@@ -76,7 +76,7 @@ async function eventoDelCentro(centroId, eventId) {
 
 export async function actualizarEvento(centroId, eventId, data) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
   const ev = pickEvent(data, accountId)
   delete ev.account_id // no se cambia la cuenta en update
@@ -88,7 +88,7 @@ export async function actualizarEvento(centroId, eventId, data) {
 
 export async function eliminarEvento(centroId, eventId) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('delete_event', { event_id: eventId })
   if (res.error) return { error: res.error }
   await sql`DELETE FROM centro_eventos WHERE crm_event_id = ${eventId}`
@@ -97,7 +97,7 @@ export async function eliminarEvento(centroId, eventId) {
 
 export async function duplicarEvento(centroId, eventId) {
   const s = await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
   const res = await crmCall('duplicate_event', { event_id: eventId })
   if (res.error) return { error: res.error }
@@ -112,7 +112,7 @@ export async function duplicarEvento(centroId, eventId) {
 
 export async function listarRegistros(centroId, eventId) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.', registrations: [] }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.', registrations: [] }
   const res = await crmCall('list_registrations', { event_id: eventId })
   if (res.error) return { error: res.error, registrations: [] }
   return { registrations: res.registrations || [] }
@@ -120,7 +120,7 @@ export async function listarRegistros(centroId, eventId) {
 
 export async function agregarInvitado(centroId, eventId, data) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   if (!data?.first_name?.trim()) return { error: 'El nombre es requerido.' }
   const res = await crmCall('add_registration', {
     event_id: eventId,
@@ -136,7 +136,7 @@ export async function agregarInvitado(centroId, eventId, data) {
 
 export async function marcarAsistencia(centroId, eventId, registrationId, attended) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,
     attendance_status: attended ? 'attended' : 'no_show',
@@ -147,7 +147,7 @@ export async function marcarAsistencia(centroId, eventId, registrationId, attend
 
 export async function marcarPago(centroId, eventId, registrationId, paid) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'Evento no pertenece a este centro.' }
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,
     payment_status: paid ? 'paid' : 'pending',
