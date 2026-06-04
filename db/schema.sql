@@ -171,6 +171,21 @@ CREATE TABLE IF NOT EXISTS peticiones (
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
+-- Espejo de eventos creados desde ALOHA KPI hacia el CRM (Team Solutionss).
+-- Solo guarda qué evento del CRM creó cada centro, para listar "los suyos".
+-- Los datos vivos (registros, asistencia) se leen del CRM en tiempo real.
+CREATE TABLE IF NOT EXISTS centro_eventos (
+  id             SERIAL PRIMARY KEY,
+  centro_id      INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  crm_event_id   TEXT NOT NULL UNIQUE,
+  crm_account_id TEXT NOT NULL,
+  nombre         TEXT,
+  start_date     TIMESTAMPTZ,
+  created_by     TEXT,
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_centro_eventos_centro ON centro_eventos (centro_id);
+
 -- Índices útiles para las consultas del panel/historial
 CREATE INDEX IF NOT EXISTS idx_peticiones_centro   ON peticiones (centro_id, anio, trimestre);
 CREATE INDEX IF NOT EXISTS idx_resumen_centro_year ON resumen_mes (centro_id, year);
