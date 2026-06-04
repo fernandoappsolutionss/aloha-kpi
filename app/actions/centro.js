@@ -25,16 +25,10 @@ export async function getCentroResumen(centroId, year, trimestre) {
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
 
-  // Nivel GANADO = cierre del trimestre ANTERIOR. En curso + próximo = trimestre actual.
-  const prevQ = trimestre > 1 ? trimestre - 1 : 4
-  const prevY = trimestre > 1 ? year : year - 1
-  const pqm = Q_MONTHS[prevQ]
-  const prs = await sql`SELECT * FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
-  const pks = await sql`SELECT * FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
-  const pm = quarterMetrics(prs, pks, centroId, pqm)
+  // Nivel del centro = niños del trimestre vs umbrales (igual que el Excel; sin condición de deserción).
   const cur = quarterMetrics(rs, ks, centroId, months)
-  const nivel = pm.desOk ? nivelPorNinos(pm.ninos) : 0
-  const nivelEnCurso = cur.desOk ? nivelPorNinos(cur.ninos) : 0
+  const nivel = nivelPorNinos(cur.ninos)
+  const nivelEnCurso = nivel
   const sig = siguienteNivel(cur.ninos)
 
   // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) del trimestre.

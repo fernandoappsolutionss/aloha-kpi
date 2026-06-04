@@ -203,7 +203,7 @@ export default function CentroPage() {
                 {nivelInfo.nivel ? `Tu centro es Nivel ${nivelInfo.nivel}` : 'Tu centro aún no tiene nivel'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                Otorgado por el trimestre anterior · vigente este trimestre
+                Según los niños activos de este trimestre
               </div>
             </div>
           </div>
@@ -213,9 +213,6 @@ export default function CentroPage() {
                 <div style={{ fontSize: 13, color: 'var(--text)' }}>
                   Para <b style={{ color: 'var(--ts-green)' }}>Nivel {nivelInfo.sig.nivel}</b>: te faltan{' '}
                   <b className="num">{nivelInfo.sig.faltan}</b> niños
-                </div>
-                <div style={{ fontSize: 11, color: nivelInfo.desOkActual ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
-                  {nivelInfo.desOkActual ? '✓ Deserción dentro de meta (menor al 8%)' : 'Mantén la deserción por debajo del 8% los 3 meses'}
                 </div>
               </>
             ) : (
