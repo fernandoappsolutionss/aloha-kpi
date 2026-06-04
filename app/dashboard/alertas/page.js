@@ -11,21 +11,49 @@ const COLORS = {
   info: { bg:'var(--ok-bg)', border:'var(--ok-line)', title:'#6EE7B7', dot:'var(--ok)' },
 }
 
-function buildAlertas(centros, label) {
+const nivelTxt = (n) => (n ? `Nivel ${n}` : 'Sin nivel')
+
+// Genera VARIAS alertas por centro según la condición (no una sola por estado).
+// prevNivel: mapa centro_id -> nivel del trimestre anterior (para detectar bajadas).
+function buildAlertas(centros, prevNivel, label) {
   const out = []
   for (const c of centros) {
-    if (c.estado === 'Crítico') {
-      out.push({ tipo:'critico', centro:c.nombre, icon:'🔴', fecha: label,
-        msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
-    } else if (c.estado === 'Parcial') {
-      out.push({ tipo:'advertencia', centro:c.nombre, icon:'🟡', fecha: label,
-        msg: c.nuevos < c.meta
-          ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para alcanzar la meta.`
-          : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
-    } else {
-      out.push({ tipo:'info', centro:c.nombre, icon:'🟢', fecha: label,
-        msg:`Buen trimestre: ${c.cumpl}% de cumplimiento y ${c.nuevos} nuevos ingresos.` })
+    const propias = []
+
+    // ── Críticas ──
+    const pv = prevNivel[c.id] || 0
+    if (c.nivel < pv) {
+      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
+        msg:`Bajó de ${nivelTxt(pv)} a ${nivelTxt(c.nivel)} este trimestre (${c.ninos} niños).` })
     }
+    if (c.gpnBajo) {
+      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
+        msg:`Niños por grupo por debajo de la meta: ${c.ninosGrupo.toFixed(1)} (meta ≥ ${c.metaGpn}). La baja ocupación golpea la rentabilidad.` })
+    }
+    if (c.estado === 'Crítico') {
+      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
+        msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
+    }
+
+    // ── Advertencias ──
+    if (c.trend === '↓') {
+      propias.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
+        msg:`Tendencia a la baja: los nuevos ingresos cayeron respecto al mes anterior.` })
+    }
+    if (c.estado === 'Parcial') {
+      propias.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
+        msg: c.nuevos < c.meta
+          ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para la meta.`
+          : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
+    }
+
+    // ── Positiva (solo si el centro no tiene ninguna alerta) ──
+    if (propias.length === 0) {
+      propias.push({ tipo:'info', centro:c.nombre, fecha: label,
+        msg:`Buen trimestre: ${c.cumpl}% de cumplimiento, ${c.nuevos} nuevos ingresos${c.nivel ? ` y ${nivelTxt(c.nivel)}` : ''}.` })
+    }
+
+    out.push(...propias)
   }
   return out
 }
@@ -40,8 +68,17 @@ export default function AlertasPage() {
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
     setLoading(true)
-    getCentrosKpi(period.year, period.quarter)
-      .then((data) => setAlertas(buildAlertas(data || [], label)))
+    const prevQ = period.quarter > 1 ? period.quarter - 1 : 4
+    const prevY = period.quarter > 1 ? period.year : period.year - 1
+    Promise.all([
+      getCentrosKpi(period.year, period.quarter),
+      getCentrosKpi(prevY, prevQ),
+    ])
+      .then(([cur, prev]) => {
+        const prevNivel = {}
+        for (const c of (prev || [])) prevNivel[c.id] = c.nivel
+        setAlertas(buildAlertas(cur || [], prevNivel, label))
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [period])
