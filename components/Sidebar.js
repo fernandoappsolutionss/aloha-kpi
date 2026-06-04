@@ -57,7 +57,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}` },
     { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi` },
-    { label: 'Eventos', icon: 'calendar', href: `/centro/${centroId}/eventos` },
+    { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos` },
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
