@@ -53,6 +53,7 @@ export default function EventosPage() {
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
+  const [menuPos, setMenuPos] = useState({ right: 0, top: 0 })
   const [editing, setEditing] = useState(null) // null=cerrado, {}=nuevo, {...}=editar
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
@@ -80,7 +81,7 @@ export default function EventosPage() {
 
   const visible = events.filter((e) =>
     (filterEstado === 'todos' || e.status === filterEstado) &&
-    (!q || e.name?.toLowerCase().includes(q.toLowerCase())))
+    (!q || (e.name || '').toLowerCase().includes(q.toLowerCase())))
 
   async function onDelete(ev) {
     setMenuId(null)
@@ -115,7 +116,7 @@ export default function EventosPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroId={id} />
-      <main className="main" onClick={() => setMenuId(null)}>
+      <main className="main">
         {isAdmin && (
           <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
@@ -186,10 +187,15 @@ export default function EventosPage() {
                         <td><span className={`pill ${ESTADO_PILL[ev.status] || 'pill--warn'}`}><span className="dot" />{ESTADO_TXT[ev.status] || ev.status}</span></td>
                         <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{count}{ev.max_capacity ? `/${ev.max_capacity}` : ''}</td>
                         <td style={{ fontSize: 12 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 10 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
-                        <td style={{ textAlign: 'right', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => setMenuId(menuId === ev.id ? null : ev.id)} className="btn" style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}>⋯</button>
+                        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                          <button onClick={(e) => {
+                            if (menuId === ev.id) { setMenuId(null); return }
+                            const r = e.currentTarget.getBoundingClientRect()
+                            setMenuPos({ right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 6 })
+                            setMenuId(ev.id)
+                          }} className="btn" style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}>⋯</button>
                           {menuId === ev.id && (
-                            <div style={{ position: 'absolute', right: 8, top: '100%', zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', minWidth: 220, padding: 6, textAlign: 'left' }}>
+                            <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', right: menuPos.right, top: menuPos.top, zIndex: 60, background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', minWidth: 230, padding: 6, textAlign: 'left' }}>
                               {[
                                 ['✏️ Editar', () => { setMenuId(null); openEdit(ev, setEditing) }],
                                 ['⧉ Duplicar', () => onDuplicate(ev)],
@@ -222,6 +228,8 @@ export default function EventosPage() {
           </div>
         </div>
       </main>
+
+      {menuId && <div onClick={() => setMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />}
 
       {editing && (
         <EventModal centroId={id} opts={opts} initial={editing}
