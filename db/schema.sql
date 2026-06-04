@@ -23,6 +23,18 @@ CREATE TABLE IF NOT EXISTS usuarios (
   created_at     TIMESTAMPTZ DEFAULT now()
 );
 
+-- Tokens de invitación / restablecimiento de contraseña (un solo uso, con vencimiento).
+-- Se generan al crear un usuario (purpose='invite') o al pedir restablecer (purpose='reset').
+CREATE TABLE IF NOT EXISTS password_tokens (
+  token       TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  purpose     TEXT NOT NULL DEFAULT 'invite', -- invite | reset
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tokens_user ON password_tokens (user_id);
+
 -- Metas globales por trimestre
 CREATE TABLE IF NOT EXISTS metas (
   anio                      INTEGER NOT NULL,
