@@ -3,7 +3,6 @@ import { sql } from '../../lib/db'
 import { requireAdmin } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
-import { quarterMetrics } from '../../lib/kpi-calc'
 import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
@@ -21,12 +20,6 @@ export async function getCentrosKpi(year, quarter) {
   const rs = await sql`SELECT * FROM resumen_mes WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
   const ks = await sql`SELECT * FROM kpi_semanas WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
-  // Trimestre anterior → define el nivel GANADO que aplica a este trimestre.
-  const prevQ = quarter > 1 ? quarter - 1 : 4
-  const prevY = quarter > 1 ? year : year - 1
-  const pqm = Q_MONTHS[prevQ]
-  const prs = await sql`SELECT * FROM resumen_mes WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
-  const pks = await sql`SELECT * FROM kpi_semanas WHERE year = ${prevY} AND month BETWEEN ${pqm[0]} AND ${pqm[2]}`
 
   // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) por (año, trimestre).
   const cumpRows = await sql`
@@ -78,12 +71,10 @@ export async function getCentrosKpi(year, quarter) {
       const b = conDatos[conDatos.length - 1].nuevos
       trend = b > a ? '↑' : b < a ? '↓' : '→'
     }
-    // Nivel GANADO: se obtiene al cerrar el TRIMESTRE ANTERIOR cumpliendo la condición.
-    const pm = quarterMetrics(prs, pks, c.id, pqm)
-    const nivel = pm.desOk ? nivelPorNinos(pm.ninos) : 0
-    // En curso (motivación): lo que ganaría si el trimestre actual cerrara hoy.
+    // Nivel del centro = niños del trimestre vs umbrales (igual que el Excel; sin condición de deserción).
+    const nivel = nivelPorNinos(ninos)
     const desOkActual = months.every((m) => m.has && m.ninosInicio > 0 && (m.desercion / m.ninosInicio) * 100 < 8)
-    const nivelEnCurso = desOkActual ? nivelPorNinos(ninos) : 0
+    const nivelEnCurso = nivel
     const sig = siguienteNivel(ninos)
     // Niños por grupo (ocupación) — driver de rentabilidad.
     const grupos = last.grupos || 0
