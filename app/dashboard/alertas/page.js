@@ -13,47 +13,42 @@ const COLORS = {
 
 const nivelTxt = (n) => (n ? `Nivel ${n}` : 'Sin nivel')
 
-// Genera VARIAS alertas por centro según la condición (no una sola por estado).
+// Genera VARIAS alertas por centro: el CUMPLIMIENTO siempre está presente (en su
+// banda) y se le SUMAN las alertas de nivel, niños por grupo y tendencia.
 // prevNivel: mapa centro_id -> nivel del trimestre anterior (para detectar bajadas).
 function buildAlertas(centros, prevNivel, label) {
   const out = []
   for (const c of centros) {
-    const propias = []
-
-    // ── Críticas ──
-    const pv = prevNivel[c.id] || 0
-    if (c.nivel < pv) {
-      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
-        msg:`Bajó de ${nivelTxt(pv)} a ${nivelTxt(c.nivel)} este trimestre (${c.ninos} niños).` })
-    }
-    if (c.gpnBajo) {
-      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
-        msg:`Niños por grupo por debajo de la meta: ${c.ninosGrupo.toFixed(1)} (meta ≥ ${c.metaGpn}). La baja ocupación golpea la rentabilidad.` })
-    }
+    // ── Cumplimiento (siempre se muestra, según su banda) ──
     if (c.estado === 'Crítico') {
-      propias.push({ tipo:'critico', centro:c.nombre, fecha: label,
+      out.push({ tipo:'critico', centro:c.nombre, fecha: label,
         msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
-    }
-
-    // ── Advertencias ──
-    if (c.trend === '↓') {
-      propias.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
-        msg:`Tendencia a la baja: los nuevos ingresos cayeron respecto al mes anterior.` })
-    }
-    if (c.estado === 'Parcial') {
-      propias.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
+    } else if (c.estado === 'Parcial') {
+      out.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
         msg: c.nuevos < c.meta
           ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para la meta.`
           : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
+    } else {
+      out.push({ tipo:'info', centro:c.nombre, fecha: label,
+        msg:`Buen cumplimiento (${c.cumpl}%), ${c.nuevos} nuevos ingresos${c.nivel ? ` · ${nivelTxt(c.nivel)}` : ''}.` })
     }
 
-    // ── Positiva (solo si el centro no tiene ninguna alerta) ──
-    if (propias.length === 0) {
-      propias.push({ tipo:'info', centro:c.nombre, fecha: label,
-        msg:`Buen trimestre: ${c.cumpl}% de cumplimiento, ${c.nuevos} nuevos ingresos${c.nivel ? ` y ${nivelTxt(c.nivel)}` : ''}.` })
+    // ── Críticas adicionales: bajada de nivel y niños por grupo ──
+    const pv = prevNivel[c.id] || 0
+    if (c.nivel < pv) {
+      out.push({ tipo:'critico', centro:c.nombre, fecha: label,
+        msg:`Bajó de ${nivelTxt(pv)} a ${nivelTxt(c.nivel)} este trimestre (${c.ninos} niños).` })
+    }
+    if (c.gpnBajo) {
+      out.push({ tipo:'critico', centro:c.nombre, fecha: label,
+        msg:`Niños por grupo por debajo de la meta: ${c.ninosGrupo.toFixed(1)} (meta ≥ ${c.metaGpn}). La baja ocupación golpea la rentabilidad.` })
     }
 
-    out.push(...propias)
+    // ── Advertencia adicional: tendencia a la baja ──
+    if (c.trend === '↓') {
+      out.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
+        msg:`Tendencia a la baja: los nuevos ingresos cayeron respecto al mes anterior.` })
+    }
   }
   return out
 }
