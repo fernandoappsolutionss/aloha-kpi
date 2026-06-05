@@ -63,12 +63,13 @@ export default function CentroPage() {
   const [totals, setTotals] = useState({
     ninosActivos: 0, nuevosIngresos: 0, desercion: 0, grupos: 0,
     cpInv: 0, cpAsi: 0, cpMat: 0,
-    motivos: { tecnica: 0, perdida: 0, economico: 0, horario: 0 },
+    motivos: { tecnica: 0, perdida: 0, economico: 0, horario: 0, graduado: 0 },
     origen: { marketing: 0, centro: 0, activaciones: 0, referidos: 0, medios: 0 },
   })
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
   const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
   const [cumplReal, setCumplReal] = useState(null)
+  const [graduacion, setGraduacion] = useState(null)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
@@ -84,10 +85,11 @@ export default function CentroPage() {
       const trimestre = period.quarter
       const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct } = await getCentroResumen(id, year, trimestre)
+      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct, graduacion: grad } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
       setNivelInfo({ nivel, nivelEnCurso, sig, desOkActual })
       setCumplReal(cumplimientoPct ?? null)
+      setGraduacion(grad || null)
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
@@ -137,6 +139,7 @@ export default function CentroPage() {
           perdida: (rs || []).reduce((s, r) => s + (r.mot_perdida_clase || 0), 0),
           economico: (rs || []).reduce((s, r) => s + (r.mot_economico || 0), 0),
           horario: (rs || []).reduce((s, r) => s + (r.mot_horario || 0), 0),
+          graduado: (rs || []).reduce((s, r) => s + (r.mot_graduado || 0), 0),
         },
         origen: {
           marketing: (rs || []).reduce((s, r) => s + (r.orig_marketing || 0), 0),
@@ -160,10 +163,12 @@ export default function CentroPage() {
   const cumplCount = meses.filter(m => m.cumpl === 'Sí').length
   const cumplPctMetas = meses.length ? Math.round((cumplCount / meses.length) * 100) : 0
   const cumplPct = cumplReal != null ? cumplReal : cumplPctMetas
-  const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, 1)
+  const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, totals.motivos.graduado, 1)
   const maxOri = Math.max(totals.origen.marketing, totals.origen.centro, totals.origen.activaciones, totals.origen.referidos, totals.origen.medios, 1)
   const metaNuevosTrim = meta.nuevos * meses.length
   const desercionAlta = meses.some(m => (m.desPct || 0) > meta.desercion)
+  const graduadosQ = totals.motivos.graduado || 0
+  const desReal = Math.max(0, totals.desercion - graduadosQ)
   const promGrupo = totals.grupos > 0 ? (totals.ninosActivos / totals.grupos) : 0
   const pcv = promGrupo > 0 ? (120 / promGrupo) + 16 : 0
   const gpn = totals.ninosActivos > 0 ? ((totals.ninosActivos * 108) * (1 - pcv / 100) - 7800) / totals.ninosActivos : 0
@@ -224,7 +229,15 @@ export default function CentroPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
           <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
-          <Card l="Deserción" v={totals.desercion} s={'Meta: <' + meta.desercion + '% mensual'} warn={desercionAlta} />
+          <div className="kpi">
+            <div className="kpi__top"><span className="label">Deserción real</span></div>
+            <div className="kpi__value" style={desercionAlta ? { color: 'var(--bad)' } : undefined}>{desReal}</div>
+            <div className="kpi__sub">
+              {graduadosQ > 0
+                ? <>{totals.desercion} bajas · <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>🎓 {graduadosQ} graduado{graduadosQ !== 1 ? 's' : ''}</span></>
+                : 'Meta: <' + meta.desercion + '% mensual'}
+            </div>
+          </div>
           <Card l="Grupos activos" v={totals.grupos} s={totals.grupos > 0 ? 'GPN: $' + gpn.toFixed(2) : '—'} />
         </div>
 
@@ -270,13 +283,32 @@ export default function CentroPage() {
               { l: 'Económico', n: totals.motivos.economico },
               { l: 'Técnica', n: totals.motivos.tecnica },
               { l: 'Horario', n: totals.motivos.horario },
+              { l: 'Graduado 🎓', n: totals.motivos.graduado, good: true },
             ].map((m, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <span className="label" style={{ width: 100, fontSize: 10, textAlign: 'right' }}>{m.l}</span>
-                <Bar val={m.n} max={maxMot} color="var(--warn)" />
-                <span className="num" style={{ width: 24, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{m.n}</span>
+                <Bar val={m.n} max={maxMot} color={m.good ? 'var(--ts-green)' : 'var(--warn)'} />
+                <span className="num" style={{ width: 24, fontSize: 12, fontWeight: 600, color: m.good ? 'var(--ts-green)' : 'var(--text)' }}>{m.n}</span>
               </div>
             ))}
+
+            {graduacion && graduacion.graduados > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                <h3 style={sectionTitle}>Graduados {period.year} · logro 🎓</h3>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { l: 'Graduados', v: graduacion.graduados },
+                    { l: '% de las bajas', v: graduacion.pctBajas + '%' },
+                    { l: '% del alumnado', v: graduacion.pctAlumnado + '%' },
+                  ].map((x, i) => (
+                    <div key={i} style={{ textAlign: 'center', flex: 1, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', borderRadius: 'var(--r-sm)', padding: '10px 6px' }}>
+                      <div className="num" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ts-green)' }}>{x.v}</div>
+                      <div className="label" style={{ fontSize: 9, marginTop: 3 }}>{x.l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="card" style={{ padding: 20 }}>

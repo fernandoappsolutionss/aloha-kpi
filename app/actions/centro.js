@@ -38,7 +38,22 @@ export async function getCentroResumen(centroId, year, trimestre) {
   `
   const cumplChecklist = cumplimientoPct(cumpRows)
 
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist }
+  // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
+  // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
+  const rsAnio = await sql`SELECT month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
+  const ksAnio = await sql`SELECT des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
+  const graduadosAnio = rsAnio.reduce((a, r) => a + (r.mot_graduado || 0), 0)
+  const bajasAnio = ksAnio.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+  const ninosInicioAnio = rsAnio.find((r) => (r.ninos_inicio_mes || 0) > 0)?.ninos_inicio_mes || 0
+  const graduacion = {
+    graduados: graduadosAnio,
+    bajas: bajasAnio,
+    desercionReal: Math.max(0, bajasAnio - graduadosAnio),
+    pctBajas: bajasAnio > 0 ? Math.round((graduadosAnio / bajasAnio) * 100) : 0,
+    pctAlumnado: ninosInicioAnio > 0 ? Math.round((graduadosAnio / ninosInicioAnio) * 100) : 0,
+  }
+
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).
