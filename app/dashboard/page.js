@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
-import PeriodSelector from '../../components/PeriodSelector'
+import PanelFilter from '../../components/PanelFilter'
 import NivelBadge from '../../components/NivelBadge'
-import { getCentrosKpi, getNinosSerie } from '../actions/dashboard'
-import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../lib/period'
+import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
+import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
@@ -36,32 +36,23 @@ export default function DashboardPage() {
   const [centros, setCentros] = useState([])
   const [prev, setPrev] = useState([])
   const [nombre, setNombre] = useState('')
-  const [period, setPeriod] = useState(getCurrentPeriod())
-  const [rango, setRango] = useState('ytd')
-  const [custom, setCustom] = useState({ from: '', to: '' })
+  const [filter, setFilter] = useState({ mode: 'trimestre' })
   const [serie, setSerie] = useState([])
   const criticos = centros.filter(c => c.estado === 'Crítico').length
+  const range = resolvePanelRange(filter)
 
-  useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setPeriod(readStoredPeriod()) }, [])
+  useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setFilter(readPanelFilter()) }, [])
   useEffect(() => {
-    getCentrosKpi(period.year, period.quarter).then((data) => setCentros(data || [])).catch(() => {})
-    getCentrosKpi(period.year - 1, period.quarter).then((data) => setPrev(data || [])).catch(() => setPrev([]))
-  }, [period])
-  useEffect(() => {
-    const now = new Date(); const cy = now.getFullYear(), cm = now.getMonth() + 1
-    let d, h
-    if (rango === 'prev') { d = [cy - 1, 1]; h = [cy - 1, 12] }
-    else if (rango === 'custom' && custom.from && custom.to) {
-      const [fy, fm] = custom.from.split('-').map(Number); const [ty, tm] = custom.to.split('-').map(Number)
-      d = [fy, fm]; h = [ty, tm]
-    } else { d = [cy, 1]; h = [cy, cm] }
-    getNinosSerie(d[0], d[1], h[0], h[1])
-      .then((rows) => setSerie((rows || []).map((r) => ({ ...r, label: MES_CORTO[r.month - 1] + " '" + String(r.year).slice(2) }))))
+    const r = resolvePanelRange(filter)
+    getCentrosKpiRango(r.fromY, r.fromM, r.toY, r.toM).then((data) => setCentros(data || [])).catch(() => {})
+    getCentrosKpiRango(r.prev.fromY, r.prev.fromM, r.prev.toY, r.prev.toM).then((data) => setPrev(data || [])).catch(() => setPrev([]))
+    getNinosSerie(r.fromY, r.fromM, r.toY, r.toM)
+      .then((rows) => setSerie((rows || []).map((row) => ({ ...row, label: MES_CORTO[row.month - 1] + " '" + String(row.year).slice(2) }))))
       .catch(() => setSerie([]))
-  }, [rango, custom.from, custom.to])
+  }, [filter])
 
-  const label = periodLabel(period.year, period.quarter)
-  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
+  const label = range.label
+  function changeFilter(f) { writePanelFilter(f); setFilter(f) }
 
   const n = centros.length || 1
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
@@ -83,12 +74,12 @@ export default function DashboardPage() {
   const pTotDesReal = prev.reduce((a, c) => a + (c.desercionReal ?? c.desercion), 0)
   const pPromCumpl = prev.length ? Math.round(prev.reduce((a, c) => a + c.cumpl, 0) / prev.length) : 0
   const delta = (cur, prv) => (prv > 0 ? Math.round(((cur - prv) / prv) * 100) : null)
-  const prevLabel = `Q${period.quarter} ${period.year - 1}`
+  const prevLabel = range.prevLabel
 
   const cards = [
     { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros', yoy: { delta: delta(totNinos, pTotNinos), upGood: true } },
     { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
-    { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el trimestre', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
+    { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el período', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
     { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
     { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },
@@ -107,7 +98,7 @@ export default function DashboardPage() {
             <p className="h-sub">{centros.length} centros activos · seguimiento en tiempo real</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
-            <PeriodSelector value={period} onChange={changePeriod} />
+            <PanelFilter value={filter} onChange={changeFilter} />
             {criticos > 0 && (
               <div className="alert alert--error" style={{ alignItems: 'flex-start' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -217,28 +208,9 @@ export default function DashboardPage() {
 
         {/* Gráfico general de niños + filtros rápidos (al final del panel) */}
         <div className="panel">
-          <div className="panel__head" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <div className="panel__head">
             <h2 className="panel__title">Evolución de niños activos</h2>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              {[['ytd', 'Este año'], ['prev', 'Año anterior'], ['custom', 'Personalizado']].map(([k, l]) => {
-                const on = rango === k
-                return (
-                  <button key={k} onClick={() => setRango(k)}
-                    style={{ padding: '5px 13px', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? 'var(--ts-green-soft)' : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: on ? 'var(--ts-green)' : 'var(--text-dim)', cursor: 'pointer', fontWeight: on ? 600 : 500 }}>
-                    {l}
-                  </button>
-                )
-              })}
-              {rango === 'custom' && (
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
-                  <input type="month" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
-                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
-                  <span style={{ color: 'var(--text-dim)' }}>→</span>
-                  <input type="month" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
-                    style={{ padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }} />
-                </span>
-              )}
-            </div>
+            <span className="label">{label}</span>
           </div>
           <div style={{ padding: '18px 12px 8px' }}>
             {serie.length === 0 ? (
