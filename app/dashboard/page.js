@@ -67,6 +67,8 @@ export default function DashboardPage() {
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
   const totNuevos = centros.reduce((a, c) => a + c.nuevos, 0)
   const totDes = centros.reduce((a, c) => a + c.desercion, 0)
+  const totGrad = centros.reduce((a, c) => a + (c.graduados || 0), 0)
+  const totDesReal = centros.reduce((a, c) => a + (c.desercionReal ?? c.desercion), 0)
   const promCumpl = Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / n)
   const enMeta = centros.filter(c => c.nuevos >= c.meta).length
   const totGrupos = centros.reduce((a, c) => a + (c.grupos || 0), 0)
@@ -78,6 +80,7 @@ export default function DashboardPage() {
   const pTotNinos = prev.reduce((a, c) => a + c.ninos, 0)
   const pTotNuevos = prev.reduce((a, c) => a + c.nuevos, 0)
   const pTotDes = prev.reduce((a, c) => a + c.desercion, 0)
+  const pTotDesReal = prev.reduce((a, c) => a + (c.desercionReal ?? c.desercion), 0)
   const pPromCumpl = prev.length ? Math.round(prev.reduce((a, c) => a + c.cumpl, 0) / prev.length) : 0
   const delta = (cur, prv) => (prv > 0 ? Math.round(((cur - prv) / prv) * 100) : null)
   const prevLabel = `Q${period.quarter} ${period.year - 1}`
@@ -85,7 +88,7 @@ export default function DashboardPage() {
   const cards = [
     { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros', yoy: { delta: delta(totNinos, pTotNinos), upGood: true } },
     { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
-    { label: 'Deserción total', value: totDes, icon: ic.des, sub: 'en el trimestre', yoy: { delta: delta(totDes, pTotDes), upGood: false } },
+    { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el trimestre', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
     { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
     { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },

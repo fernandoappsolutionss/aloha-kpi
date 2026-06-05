@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS resumen_mes (
   mot_perdida_clase    INTEGER DEFAULT 0,
   mot_economico        INTEGER DEFAULT 0,
   mot_horario          INTEGER DEFAULT 0,
+  mot_graduado         INTEGER DEFAULT 0,  -- graduados (logro): se separan de la deserción real
   orig_referido        INTEGER DEFAULT 0,
   orig_marketing       INTEGER DEFAULT 0,
   orig_centro          INTEGER DEFAULT 0,

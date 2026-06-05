@@ -57,6 +57,8 @@ export async function getCentrosKpi(year, quarter) {
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
+    const graduados = crs.reduce((s, r) => s + (r.mot_graduado || 0), 0)
+    const desercionReal = Math.max(0, totDes - graduados)
     const conDatos = months.filter((m) => m.has)
     const last = conDatos.length ? conDatos[conDatos.length - 1] : months[2]
     const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
@@ -83,7 +85,7 @@ export async function getCentrosKpi(year, quarter) {
     const gpnBajo = grupos > 0 && ninosGrupo < metaGpn
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
-      nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes,
+      nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes, graduados, desercionReal,
       cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, metasCumpl, estado, trend,
       nivel, nivelEnCurso, sig, desOkActual,
       grupos, ninosGrupo, gpnBajo, metaGpn,

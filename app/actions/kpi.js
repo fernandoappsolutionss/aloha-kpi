@@ -55,6 +55,7 @@ export async function saveKpiMes(centroId, year, month, config, semanas) {
     mot_perdida_clase: intOr(config.mot_perdida_clase),
     mot_economico: intOr(config.mot_economico),
     mot_horario: intOr(config.mot_horario),
+    mot_graduado: intOr(config.mot_graduado),
     orig_referido: intOr(config.orig_referido),
     orig_marketing: intOr(config.orig_marketing),
     orig_centro: intOr(config.orig_centro),
