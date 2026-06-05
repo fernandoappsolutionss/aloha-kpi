@@ -7,28 +7,47 @@ import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
-// Métricas agregadas por centro para un (año, trimestre). Por defecto usa el
-// trimestre actual. Usado por panel, ranking, alertas y reporte. Calcula todo
-// en el servidor para mantener consistencia.
-export async function getCentrosKpi(year, quarter) {
+const Q_OF = (m) => Math.floor((m - 1) / 3) + 1
+
+// Lista de meses {year, month} entre dos extremos, inclusive.
+function monthList(fromY, fromM, toY, toM) {
+  const out = []
+  let y = fromY, m = fromM
+  while (y * 100 + m <= toY * 100 + toM) {
+    out.push({ year: y, month: m })
+    m++; if (m > 12) { m = 1; y++ }
+  }
+  return out
+}
+
+// Métricas agregadas por centro sobre un RANGO de meses [desde, hasta].
+// Es la base del panel: sirve igual para un trimestre (3 meses) que para un
+// rango mensual (ej. últimos 12 meses). Calcula todo en el servidor.
+export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   await requireAdmin()
-  if (!year || !quarter) { const p = getCurrentPeriod(); year = year || p.year; quarter = quarter || p.quarter }
-  const qm = Q_MONTHS[quarter] || [1, 2, 3]
-  const lo = qm[0], hi = qm[qm.length - 1]
+  const lo = fromY * 100 + fromM, hi = toY * 100 + toM
+  const mlist = monthList(fromY, fromM, toY, toM)
+  const nMeses = mlist.length || 1
+  const toQ = Q_OF(toM) // metas/objetivos = los del trimestre del mes final del rango
+
   const centros = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
-  const [metas] = await sql`SELECT * FROM metas WHERE anio = ${year} AND trimestre = ${quarter}`
-  const rs = await sql`SELECT * FROM resumen_mes WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
-  const ks = await sql`SELECT * FROM kpi_semanas WHERE year = ${year} AND month BETWEEN ${lo} AND ${hi}`
+  const [metas] = await sql`SELECT * FROM metas WHERE anio = ${toY} AND trimestre = ${toQ}`
+  const rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  const ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
 
-  // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) por (año, trimestre).
+  // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel). Se toman
+  // solo las celdas (trimestre, mes) cuyo mes calendario cae dentro del rango.
   const cumpRows = await sql`
-    SELECT t.centro_id AS centro_id, cu.*
+    SELECT t.centro_id AS centro_id, t.anio AS anio, t.trimestre AS trimestre, cu.*
     FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
-    WHERE t.anio = ${year} AND t.trimestre = ${quarter}
+    WHERE t.anio BETWEEN ${fromY} AND ${toY}
   `
   const cumpAgg = {}
   for (const row of cumpRows) {
+    const calMonth = (row.trimestre - 1) * 3 + row.mes
+    const v = row.anio * 100 + calMonth
+    if (v < lo || v > hi) continue
     const e = cumpAgg[row.centro_id] || { si: 0, tot: 0 }
     for (const k of CUMPLIMIENTO_KEYS) { e.tot++; if (row[k] === 'si') e.si++ }
     cumpAgg[row.centro_id] = e
@@ -42,9 +61,9 @@ export async function getCentrosKpi(year, quarter) {
     const crs = rs.filter((r) => r.centro_id === c.id)
     const cks = ks.filter((k) => k.centro_id === c.id)
     const admin = usuarios.find((u) => u.centro_id === c.id)?.nombre || '—'
-    const months = qm.map((mo) => {
-      const r = crs.find((x) => x.month === mo)
-      const ws = cks.filter((x) => x.month === mo)
+    const months = mlist.map(({ year, month }) => {
+      const r = crs.find((x) => x.year === year && x.month === month)
+      const ws = cks.filter((x) => x.year === year && x.month === month)
       const nuevos = ws.reduce((s, w) => s + (w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)
       const desercion = ws.reduce((s, w) => s + (w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
       let cob = 0
@@ -60,10 +79,10 @@ export async function getCentrosKpi(year, quarter) {
     const graduados = crs.reduce((s, r) => s + (r.mot_graduado || 0), 0)
     const desercionReal = Math.max(0, totDes - graduados)
     const conDatos = months.filter((m) => m.has)
-    const last = conDatos.length ? conDatos[conDatos.length - 1] : months[2]
+    const last = conDatos.length ? conDatos[conDatos.length - 1] : months[months.length - 1]
     const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
-    const metasCumpl = Math.round((months.filter((m) => m.ok).length / 3) * 100)
+    const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     const ag = cumpAgg[c.id]
     const cumpl = ag && ag.tot ? Math.round((ag.si / ag.tot) * 100) : 0
     const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
@@ -73,7 +92,7 @@ export async function getCentrosKpi(year, quarter) {
       const b = conDatos[conDatos.length - 1].nuevos
       trend = b > a ? '↑' : b < a ? '↓' : '→'
     }
-    // Nivel del centro = niños del trimestre vs umbrales (igual que el Excel; sin condición de deserción).
+    // Nivel del centro = niños vs umbrales (igual que el Excel; sin condición de deserción).
     const nivel = nivelPorNinos(ninos)
     const desOkActual = months.every((m) => m.has && m.ninosInicio > 0 && (m.desercion / m.ninosInicio) * 100 < 8)
     const nivelEnCurso = nivel
@@ -85,12 +104,20 @@ export async function getCentrosKpi(year, quarter) {
     const gpnBajo = grupos > 0 && ninosGrupo < metaGpn
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
-      nuevos: totNuevos, meta: metaNuevosMes * 3, desercion: totDes, graduados, desercionReal,
+      nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
       cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, metasCumpl, estado, trend,
       nivel, nivelEnCurso, sig, desOkActual,
       grupos, ninosGrupo, gpnBajo, metaGpn,
     }
   })
+}
+
+// Compatibilidad: métricas por (año, trimestre). Usado por ranking, alertas y
+// reporte. Delega en el cálculo por rango con los 3 meses del trimestre.
+export async function getCentrosKpi(year, quarter) {
+  if (!year || !quarter) { const p = getCurrentPeriod(); year = year || p.year; quarter = quarter || p.quarter }
+  const qm = Q_MONTHS[quarter] || [1, 2, 3]
+  return getCentrosKpiRango(year, qm[0], year, qm[qm.length - 1])
 }
 
 // Historial admin: agrupado por (centro, trimestre), calculado desde el
