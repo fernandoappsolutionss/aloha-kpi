@@ -148,10 +148,14 @@ CREATE TABLE IF NOT EXISTS cumplimiento (
 );
 
 -- FODA trimestral por centro (campos editables por la administradora)
+-- Las 4 cuadrantes son editables. Fortalezas/Debilidades se pre-cargan desde el
+-- cumplimiento real (checklist) y quedan editables/guardables por el centro.
 CREATE TABLE IF NOT EXISTS foda (
   centro_id          INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
   anio               INTEGER NOT NULL,
   trimestre          INTEGER NOT NULL,
+  fortalezas         TEXT,
+  debilidades        TEXT,
   oportunidades      TEXT,
   amenazas           TEXT,
   comentarios        TEXT,
@@ -159,6 +163,9 @@ CREATE TABLE IF NOT EXISTS foda (
   updated_at         TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (centro_id, anio, trimestre)
 );
+-- Migración para bases existentes: agrega las columnas editables si faltan.
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS fortalezas  TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS debilidades TEXT;
 
 -- Peticiones / comentarios del administrador (varios por trimestre, cada uno con su estado)
 CREATE TABLE IF NOT EXISTS peticiones (

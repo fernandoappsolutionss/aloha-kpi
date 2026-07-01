@@ -1,20 +1,34 @@
 'use server'
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
+import { fortalezasDebilidades } from '../../lib/checklist'
 
+// Carga el FODA guardado del trimestre + las Fortalezas/Debilidades derivadas
+// del cumplimiento real (vinculación cumplimiento ↔ FODA). La UI usa las
+// derivadas como base editable cuando aún no hay texto guardado.
 export async function loadFoda(centroId, anio, trimestre) {
   await requireCentroAccess(centroId)
   const [row] = await sql`
-    SELECT oportunidades, amenazas, comentarios, comentario_estado
-    FROM foda WHERE centro_id = ${centroId} AND anio = ${anio} AND trimestre = ${trimestre}
+    SELECT * FROM foda
+    WHERE centro_id = ${centroId} AND anio = ${anio} AND trimestre = ${trimestre}
   `
-  return row || null
+  const cumpRows = await sql`
+    SELECT cu.mes, cu.* FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
+    WHERE t.centro_id = ${centroId} AND t.anio = ${anio} AND t.trimestre = ${trimestre}
+  `
+  const vinculado = fortalezasDebilidades(cumpRows)
+  return {
+    foda: row || null,
+    vinculado, // { fortalezas: [...], debilidades: [...] } desde el cumplimiento
+  }
 }
 
 export async function saveFoda(centroId, anio, trimestre, data) {
   await requireCentroAccess(centroId)
   await upsert('foda', {
     centro_id: centroId, anio, trimestre,
+    fortalezas: data.fortalezas ?? null,
+    debilidades: data.debilidades ?? null,
     oportunidades: data.oportunidades ?? null,
     amenazas: data.amenazas ?? null,
     comentarios: data.comentarios ?? null,
