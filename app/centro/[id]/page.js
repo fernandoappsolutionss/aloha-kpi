@@ -42,6 +42,38 @@ function Kpi({ l, v }) {
   )
 }
 
+// Indicador de cumplimiento (Sí / No / Sin datos) para los KPI por rol.
+function CumplePill({ ok, evaluar }) {
+  if (!evaluar) return <span className="pill" style={{ background: 'var(--surface-3)', borderColor: 'var(--border-strong)', color: 'var(--text-dim)' }}><span className="dot" />Sin datos</span>
+  return <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Cumple' : 'No cumple'}</span>
+}
+
+// Tarjeta de KPI trimestral segmentada por rol (Administrador / Asistente).
+function RoleKpi({ rol, sub, items }) {
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <h3 style={sectionTitle} >{rol}</h3>
+        <span className="h-sub" style={{ margin: 0, fontSize: 11 }}>{sub}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{it.l}</div>
+              <div className="label" style={{ fontSize: 10, marginTop: 3 }}>{it.meta}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span className="num" style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)' }}>{it.v}</span>
+              <CumplePill ok={it.ok} evaluar={it.eval} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const sectionTitle = {
   fontFamily: 'var(--font-mono)',
   fontSize: 10.5,
@@ -169,6 +201,15 @@ export default function CentroPage() {
   const desercionAlta = meses.some(m => (m.desPct || 0) > meta.desercion)
   const graduadosQ = totals.motivos.graduado || 0
   const desReal = Math.max(0, totals.desercion - graduadosQ)
+
+  // Cumplimiento por indicador (para el KPI trimestral por rol y la cobranza)
+  const mesesConDatos = meses.filter(m => m.ninosInicio > 0 || m.nuevos > 0 || m.desercion > 0 || m.nuevosActivos > 0)
+  const nuevosOk = totals.nuevosIngresos >= metaNuevosTrim
+  const desercionOk = !desercionAlta
+  // Gestión de cobranza: se cumple si en cada mes con datos la cobranza vencida quedó dentro de la meta.
+  const cobranzaEval = mesesConDatos.length > 0
+  const cobranzaOk = cobranzaEval && mesesConDatos.every(m => (m.cobranza || 0) <= meta.cobranza)
+  const ultCobranza = mesesConDatos.length ? (mesesConDatos[mesesConDatos.length - 1].cobranza || 0) : 0
   const promGrupo = totals.grupos > 0 ? (totals.ninosActivos / totals.grupos) : 0
   const pcv = promGrupo > 0 ? (120 / promGrupo) + 16 : 0
   const gpn = totals.ninosActivos > 0 ? ((totals.ninosActivos * 108) * (1 - pcv / 100) - 7800) / totals.ninosActivos : 0
@@ -226,6 +267,26 @@ export default function CentroPage() {
           </div>
         </div>
 
+        {/* KPI Trimestral por rol — cada rol ve sus propios indicadores */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          <RoleKpi
+            rol="Administrador"
+            sub="Nuevos ingresos y deserción"
+            items={[
+              { l: 'Nuevos ingresos', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
+              { l: 'Deserción real', v: desReal, meta: 'Meta: <' + meta.desercion + '% mensual', ok: desercionOk, eval: true },
+            ]}
+          />
+          <RoleKpi
+            rol="Asistente"
+            sub="Nuevos ingresos y gestión de cobranza"
+            items={[
+              { l: 'Nuevos ingresos', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
+              { l: 'Gestión de cobranza', v: ultCobranza, meta: 'Meta: ≤ ' + meta.cobranza + ' cobranza vencida', ok: cobranzaOk, eval: cobranzaEval },
+            ]}
+          />
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
           <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
@@ -252,7 +313,10 @@ export default function CentroPage() {
                   <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
                   <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%</span></td>
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
-                  <td className="num">{m.cobranza}</td>
+                  <td className="num" style={{ color: m.cobranza <= meta.cobranza ? 'var(--ok)' : 'var(--bad)', fontWeight: 600 }}>
+                    {m.cobranza}
+                    <span style={{ fontSize: 11, fontWeight: 400 }}> {m.cobranza <= meta.cobranza ? '✓' : '✗'}</span>
+                  </td>
                   <td>
                     <span className={`pill ${m.cumpl === 'Sí' ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{m.cumpl}</span>
                   </td>

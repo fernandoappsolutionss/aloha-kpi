@@ -21,10 +21,14 @@ export default function FodaPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [foda, setFoda] = useState({
+    fortalezas: '',
+    debilidades: '',
     oportunidades: 'Tendencias educativas digitales\nAlianzas con colegios locales\nEventos comunitarios del trimestre',
     amenazas: 'Competencia directa e indirecta\nFactores económicos familiares\nVacaciones escolares / verano',
     comentarios: '',
   })
+  // Fortalezas/Debilidades derivadas del cumplimiento real (para pre-cargar/regenerar).
+  const [vinculado, setVinculado] = useState({ fortalezas: [], debilidades: [] })
   const [estado, setEstado] = useState('')
   const [status, setStatus] = useState('')
   const [peticiones, setPeticiones] = useState([])
@@ -37,15 +41,27 @@ export default function FodaPage() {
     if (params.id === 'demo') return
     loadFoda(params.id, year, quarter).then((d) => {
       if (!d) return
-      setFoda({
-        oportunidades: d.oportunidades ?? '',
-        amenazas: d.amenazas ?? '',
-        comentarios: d.comentarios ?? '',
-      })
-      if (d.comentario_estado) setEstado(d.comentario_estado)
+      const vinc = d.vinculado || { fortalezas: [], debilidades: [] }
+      setVinculado(vinc)
+      const row = d.foda
+      setFoda((prev) => ({
+        // Si hay texto guardado se usa; si no, se pre-carga desde el cumplimiento real.
+        fortalezas: (row?.fortalezas ?? '') || vinc.fortalezas.join('\n'),
+        debilidades: (row?.debilidades ?? '') || vinc.debilidades.join('\n'),
+        oportunidades: row?.oportunidades ?? prev.oportunidades,
+        amenazas: row?.amenazas ?? prev.amenazas,
+        comentarios: row?.comentarios ?? '',
+      }))
+      if (row?.comentario_estado) setEstado(row.comentario_estado)
     }).catch(() => {})
     listPeticiones(params.id, year, quarter).then((d) => setPeticiones(d || [])).catch(() => {})
   }, [params.id])
+
+  // Regenera Fortalezas/Debilidades desde el cumplimiento actual del trimestre.
+  function actualizarDesdeCumplimiento(k) {
+    const list = k === 'fortalezas' ? vinculado.fortalezas : vinculado.debilidades
+    setFoda((f) => ({ ...f, [k]: (list || []).join('\n') }))
+  }
 
   async function agregarPeticion() {
     const t = nueva.trim()
@@ -70,9 +86,6 @@ export default function FodaPage() {
     try { await deletePeticion(params.id, id) } catch { setStatus('Error al eliminar.') }
   }
 
-  const fortalezas = ['Classdojo activo y completo','Padres conectados','Grupo Study activo','Centro en buen estado','Reuniones mensuales con equipo','Meta de deserción lograda']
-  const debilidades = ['No se premió al Coach estrella','Sin encuestas de satisfacción al equipo','Meta de cobranza no cumplida','Meta de 20+ nuevos ingresos no alcanzada']
-
   async function save() {
     if (params.id === 'demo') { setStatus('Modo demo — no se guarda.'); return }
     setSaving(true); setStatus('')
@@ -87,9 +100,11 @@ export default function FodaPage() {
   }
 
   // accent = color de la barra superior y del título · tone = color del cuerpo
+  // Las 4 cuadrantes son editables. Fortalezas/Debilidades quedan vinculadas al
+  // cumplimiento (se pre-cargan desde el checklist y pueden regenerarse).
   const cuads = [
-    {t:'Fortalezas',      accent:'var(--ok)',       tone:'#6EE7B7', auto:true, items:fortalezas},
-    {t:'Debilidades',     accent:'var(--bad)',      tone:'#FCA5A5', auto:true, items:debilidades},
+    {t:'Fortalezas',      accent:'var(--ok)',       tone:'#6EE7B7', k:'fortalezas', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “Sí”.']},
+    {t:'Debilidades',     accent:'var(--bad)',      tone:'#FCA5A5', k:'debilidades', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “No”.']},
     {t:'Oportunidades',   accent:'var(--ts-green)', tone:'var(--text)', k:'oportunidades', prompts:['Tendencias educativas: ¿nuevas demandas?','Alianzas locales: colegios, empresas','Eventos y actividades comunitarias']},
     {t:'Amenazas',        accent:'var(--warn)',     tone:'#FCD34D', k:'amenazas', prompts:['Competencia directa e indirecta','Factores económicos locales','Cambios en regulaciones']},
   ]
@@ -116,27 +131,23 @@ export default function FodaPage() {
 
         <div className="alert" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', marginBottom: 20 }}>
           <span style={{ color: 'var(--ts-green)' }}>›</span>
-          Las fortalezas y debilidades se generan automáticamente desde tu checklist de cumplimiento.
+          Las fortalezas y debilidades se pre-cargan desde tu checklist de cumplimiento (incluye el cumplimiento de metas) y quedan editables. Usa “Actualizar desde cumplimiento” para regenerarlas con los datos actuales.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          {cuads.map(({t,accent,tone,auto,items,k,prompts})=>(
+          {cuads.map(({t,accent,tone,k,prompts,linked})=>(
             <div key={t} className="card" style={{ padding: 18, borderTop: `2px solid ${accent}` }}>
-              <h3 className="label" style={{ color: tone, fontSize: 12, marginBottom: 8 }}>{t}</h3>
-              {auto ? (
-                <>
-                  <p className="h-sub" style={{ marginTop: 0, marginBottom: 12, fontStyle: 'italic' }}>Generado automáticamente del cumplimiento</p>
-                  <ul style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {items.map((f,i)=><li key={i} style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{f}</li>)}
-                  </ul>
-                </>
-              ) : (
-                <>
-                  <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>Editable por la administradora</p>
-                  {prompts.map((p,i)=><p key={i} style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{p}</p>)}
-                  <textarea value={foda[k]} onChange={e=>setFoda({...foda,[k]:e.target.value})} style={taStyle}/>
-                </>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                <h3 className="label" style={{ color: tone, fontSize: 12 }}>{t}</h3>
+                {linked && (
+                  <button type="button" onClick={()=>actualizarDesdeCumplimiento(k)} className="btn" style={{ padding: '4px 10px', fontSize: 11 }}>
+                    Actualizar desde cumplimiento
+                  </button>
+                )}
+              </div>
+              <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>{linked ? 'Vinculado al cumplimiento · editable' : 'Editable por la administradora'}</p>
+              {prompts.map((p,i)=><p key={i} style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{p}</p>)}
+              <textarea value={foda[k] ?? ''} onChange={e=>setFoda({...foda,[k]:e.target.value})} style={taStyle}/>
             </div>
           ))}
         </div>
