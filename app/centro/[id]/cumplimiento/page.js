@@ -4,7 +4,8 @@ import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadCumplimiento, saveCumplimiento } from '../../../actions/cumplimiento'
 import { getCentroNombre } from '../../../actions/centros'
-import { getCurrentPeriod, quarterMonths, periodLabel } from '../../../../lib/period'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, quarterMonths, periodLabel } from '../../../../lib/period'
+import PeriodSelector from '../../../../components/PeriodSelector'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -20,7 +21,12 @@ const DEFS = {classdojo_activo:'si',ninos_completos_classdojo:'si',padres_conect
 export default function CumplimientoPage() {
   const params = useParams()
   const sp = useSearchParams()
-  const { year, quarter } = getCurrentPeriod()
+  // Período seleccionable (trimestre/año) — compartido con el resto del panel.
+  // Permite registrar/editar el cumplimiento de meses de trimestres anteriores
+  // (p. ej. Junio, que cae en Q2, aunque hoy el trimestre actual sea Q3).
+  const [period, setPeriod] = useState(getCurrentPeriod())
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
+  const { year, quarter } = period
   const label = periodLabel(year, quarter)
   const qMonths = quarterMonths(quarter)
   const [nombre, setNombre] = useState('Centro')
@@ -38,7 +44,10 @@ export default function CumplimientoPage() {
   const totalSi = allKeys.filter(k => vals[k]==='si').length
   const pct = Math.round(totalSi/allKeys.length*100)
 
-  useEffect(() => { loadData() }, [mes, centroId])
+  // Al cambiar de trimestre/año se vuelve al primer mes y se recarga.
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p); setMes(1) }
+
+  useEffect(() => { loadData() }, [mes, centroId, year, quarter])
 
   async function loadData() {
     if (!centroId) { setLoading(false); return }
@@ -78,6 +87,7 @@ export default function CumplimientoPage() {
             <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
             {status && <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad)' : 'var(--ok)', fontWeight: 500 }}>{status}</span>}
             <button onClick={save} disabled={saving||loading} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar'}
