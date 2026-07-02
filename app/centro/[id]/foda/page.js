@@ -4,7 +4,8 @@ import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
 import { loadFoda, saveFoda, listPeticiones, addPeticion, updatePeticion, deletePeticion } from '../../../actions/foda'
-import { getCurrentPeriod, periodLabel } from '../../../../lib/period'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../../lib/period'
+import PeriodSelector from '../../../../components/PeriodSelector'
 
 const ESTADOS = ['Próximo trimestre', 'Negado', 'Aprobado', 'En proceso', 'Cumplido']
 const estadoColor = (s) =>
@@ -34,8 +35,13 @@ export default function FodaPage() {
   const [peticiones, setPeticiones] = useState([])
   const [nueva, setNueva] = useState('')
   const [pBusy, setPBusy] = useState(false)
-  const { year, quarter } = getCurrentPeriod()
+  // Período seleccionable (trimestre/año) — compartido con el resto del panel.
+  // Permite editar el FODA de trimestres anteriores (p. ej. Junio en Q2).
+  const [period, setPeriod] = useState(getCurrentPeriod())
+  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
+  const { year, quarter } = period
   const label = periodLabel(year, quarter)
+  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   useEffect(() => {
     if (params.id === 'demo') return
@@ -44,18 +50,18 @@ export default function FodaPage() {
       const vinc = d.vinculado || { fortalezas: [], debilidades: [] }
       setVinculado(vinc)
       const row = d.foda
-      setFoda((prev) => ({
+      setFoda({
         // Si hay texto guardado se usa; si no, se pre-carga desde el cumplimiento real.
         fortalezas: (row?.fortalezas ?? '') || vinc.fortalezas.join('\n'),
         debilidades: (row?.debilidades ?? '') || vinc.debilidades.join('\n'),
-        oportunidades: row?.oportunidades ?? prev.oportunidades,
-        amenazas: row?.amenazas ?? prev.amenazas,
+        oportunidades: row?.oportunidades ?? '',
+        amenazas: row?.amenazas ?? '',
         comentarios: row?.comentarios ?? '',
-      }))
-      if (row?.comentario_estado) setEstado(row.comentario_estado)
+      })
+      setEstado(row?.comentario_estado || '')
     }).catch(() => {})
     listPeticiones(params.id, year, quarter).then((d) => setPeticiones(d || [])).catch(() => {})
-  }, [params.id])
+  }, [params.id, year, quarter])
 
   // Regenera Fortalezas/Debilidades desde el cumplimiento actual del trimestre.
   function actualizarDesdeCumplimiento(k) {
@@ -124,6 +130,7 @@ export default function FodaPage() {
             <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <PeriodSelector value={period} onChange={changePeriod} />
             {status && <span style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') ? 'var(--bad)' : 'var(--ok)' }}>{status}</span>}
             <button onClick={save} disabled={saving} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
           </div>
