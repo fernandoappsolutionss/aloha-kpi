@@ -6,10 +6,10 @@ import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
   eliminarEvento, duplicarEvento, listarRegistros, agregarInvitado, marcarAsistencia, marcarPago,
 } from '../../../actions/eventos'
+import { origenDeRegistro } from '../../../../lib/registro-origen'
 
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
-const FUENTE_TXT = { aloha_kpi: 'ALOHA KPI', vendedor: 'Vendedor', public: 'Público', ai_agent: 'Agente IA' }
 const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
 const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
@@ -442,13 +442,26 @@ function Registrations({ centroId, eventId, onChange }) {
         : regs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
           : (
             <table className="table" style={{ background: 'var(--surface)' }}>
-              <thead><tr>{['Nombre', 'Contacto', 'Origen', 'Pago', 'Asistencia'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {regs.map((r) => (
+                {regs.map((r) => {
+                  const origen = origenDeRegistro(r)
+                  const tel = (r.phone || '').trim()
+                  return (
                   <tr key={r.id} style={{ cursor: 'default' }}>
                     <td style={{ fontWeight: 600, color: 'var(--text)' }}>{[r.first_name, r.last_name].filter(Boolean).join(' ')}</td>
-                    <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{r.email || r.phone || '—'}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{FUENTE_TXT[r.registration_source] || r.registration_source || '—'}</td>
+                    {/* Telefono PRIMERO: es por donde se le da seguimiento al lead.
+                        Antes la celda era `email || phone`, asi que a quien tenia
+                        correo no se le veia nunca el numero. */}
+                    <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                      {tel
+                        ? <a href={`tel:${tel.replace(/[^\d+]/g, '')}`} style={{ color: 'var(--text)', fontWeight: 600 }}>{tel}</a>
+                        : <span style={{ color: 'var(--text-faint)' }}>Sin teléfono</span>}
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{r.email || '—'}</div>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 11 }} title={origen.detalle}>
+                      <span style={{ fontSize: 13, marginRight: 4 }}>{origen.icono}</span>{origen.nombre}
+                    </td>
                     <td>
                       <button onClick={() => setPagoR(r, r.payment_status !== 'paid')} disabled={busy === r.id + 'p'}
                         className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 10, cursor: 'pointer', border: 'none' }}>
@@ -464,7 +477,8 @@ function Registrations({ centroId, eventId, onChange }) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           )}
