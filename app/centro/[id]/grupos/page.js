@@ -136,7 +136,7 @@ export default function GruposPage() {
     const horarios = prefill?.horarios?.length
       ? prefill.horarios.map((h) => ({ ...h }))
       : [{ ...(prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }) }]
-    setGrupoModal({ numero: String(num), itinerario: 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios })
+    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
@@ -767,13 +767,14 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
               })}
               {/* Zonas muertas (no se venden) en gris */}
               {huecos.flatMap((h) => {
-                const [vi, vf] = ventanaVendible(dia)
+                const [, vf] = ventanaVendible(dia)
+                const limiteMuerto = dia === 6 ? aperturaDia : KINDER_INICIO
                 const muertas = []
-                if (Math.min(h.fin, vi) - h.inicio > 0) muertas.push({ inicio: h.inicio, fin: Math.min(h.fin, vi) })
+                if (Math.min(h.fin, limiteMuerto) - h.inicio > 0) muertas.push({ inicio: h.inicio, fin: Math.min(h.fin, limiteMuerto) })
                 if (h.fin - Math.max(h.inicio, vf) > 0) muertas.push({ inicio: Math.max(h.inicio, vf), fin: h.fin })
                 const razonMuerta = dia === 6
                   ? 'Después de las 5:00 pm el sábado casi no se vende (las jornadas van de 9 am a 5 pm).'
-                  : 'Hora muerta: los niños salen del colegio ~1:00 pm; se vende desde las 3:00 pm.'
+                  : 'Hora muerta: los niños salen del colegio ~1:00 pm. A las 2:00 pm abre la zona Kinder y a las 3:30 pm la parrilla de Tiny/Kids.'
                 return muertas.map((seg) => (
                   <div key={`m-${seg.inicio}`} title={razonMuerta}
                     style={{
@@ -796,7 +797,8 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                 // Si el par del día está ocupado en ESTE salón, igual se prellena la
                 // segunda sesión de 1 h en el día par (salón por asignar): el grupo
                 // siempre nace cumpliendo las 2 h semanales del programa.
-                const diaPar = sl.tipo === 'LM' ? (dia === 1 ? 3 : 1) : sl.tipo === 'MJ' ? (dia === 2 ? 4 : 2) : null
+                const diaPar = (sl.tipo === 'LM' || (sl.kinder && (dia === 1 || dia === 3))) ? (dia === 1 ? 3 : 1)
+                  : (sl.tipo === 'MJ' || (sl.kinder && (dia === 2 || dia === 4))) ? (dia === 2 ? 4 : 2) : null
                 const horarios = unidad
                   ? unidad.sesiones.map((ses) => ({ dia: ses.dia, hora_inicio: aHora(ses.inicio), hora_fin: aHora(ses.fin), salon_id: String(ses.salon_id) }))
                   : diaPar
@@ -805,18 +807,23 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                         { dia: diaPar, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: '' },
                       ]
                     : [{ dia, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: String(salon.id) }]
-                const subTexto = unidad ? sl.sub : (diaPar ? '1 h + 1 h · par en otro salón' : sl.sub)
+                const subTexto = unidad ? sl.sub : (sl.kinder ? sl.sub : diaPar ? '1 h + 1 h · par en otro salón' : sl.sub)
+                const esKinder = !!sl.kinder
                 return (
-                  <button key={`s-${sl.inicio}`} onClick={() => onAbrirGrupo({ horarios })}
-                    title={`${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
+                  <button key={`s-${sl.inicio}`} onClick={() => onAbrirGrupo({ horarios, itinerario: esKinder ? 'KINDER' : undefined })}
+                    title={esKinder
+                      ? `Zona Kinder (2:00–3:30 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`
+                      : `${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
-                      background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
-                      color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
+                      background: esKinder ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1.5px dashed ${esKinder ? 'var(--warn-line)' : 'var(--ok-line)'}`, borderRadius: 'var(--r-sm)',
+                      color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
                     }}>
                     <span className="num" style={{ whiteSpace: 'nowrap' }}>＋ {aHora12(sl.inicio)}–{aHora12(sl.fin)}</span>
-                    <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
+                    {esKinder
+                      ? <span style={{ fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>Zona Kinder</span>
+                      : <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>}
                     {!corto && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
                   </button>
                 )

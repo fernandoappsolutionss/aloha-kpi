@@ -4,7 +4,7 @@ import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, aperturaMinima, hoyISO } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
-import { validarSesion, chocanConBuffer, aMinutos } from '../../lib/inventario'
+import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
 
 const HORA_RE = /^\d{2}:\d{2}$/
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -108,6 +108,20 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
   return { horarios: out }
 }
 
+// Regla del negocio: los Kinder solo se abren entre semana de 2:00 a 3:30 pm
+// (zona Kinder). Sábados y horarios calientes quedan para Tiny y Kids.
+function validarZonaKinder(itinerario, horarios) {
+  if (itinerario !== 'KINDER') return null
+  for (const h of horarios || []) {
+    const ini = aMinutos(h.hora_inicio)
+    const fin = aMinutos(h.hora_fin)
+    if (h.dia >= 6 || ini < KINDER_INICIO || fin > KINDER_FIN) {
+      return 'Los Kinder solo se abren entre semana en la zona Kinder (2:00–3:30 pm); los sábados y los horarios calientes quedan reservados para Tiny y Kids.'
+    }
+  }
+  return null
+}
+
 // Carga única de la página de Grupos y Fusiones.
 export async function loadOperaciones(centroId) {
   await requireCentroAccess(centroId)
@@ -146,6 +160,8 @@ export async function crearGrupo(centroId, data) {
   if (fechaApertura && !FECHA_RE.test(fechaApertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const v = await validarHorarios(centroId, data?.horarios)
   if (v.error) return { error: v.error }
+  const zk = validarZonaKinder(itinerario, v.horarios)
+  if (zk) return { error: zk }
 
   const now = new Date().toISOString()
   const [g] = await sql`
@@ -196,6 +212,8 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   if (Array.isArray(data?.horarios)) {
     const v = await validarHorarios(centroId, data.horarios, grupoId)
     if (v.error) return { error: v.error }
+    const zk = validarZonaKinder(itinerario, v.horarios)
+    if (zk) return { error: zk }
     horarios = v.horarios
   }
 
