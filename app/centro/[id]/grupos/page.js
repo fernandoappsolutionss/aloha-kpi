@@ -1530,18 +1530,23 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   async function save() {
     if (!String(f.numero).trim()) { setErr('El número de grupo es requerido.'); return }
     setSaving(true); setErr('')
-    const data = {
-      numero: String(f.numero).trim(), itinerario: f.itinerario, es_online: f.es_online,
-      coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null,
-      fecha_inicio_clases: f.fecha_inicio_clases || null, inscripcion_abierta: f.inscripcion_abierta !== false,
-      notas: f.notas,
-      horarios: f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null })),
+    try {
+      const data = {
+        numero: String(f.numero).trim(), itinerario: f.itinerario, es_online: f.es_online,
+        coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null,
+        fecha_inicio_clases: f.fecha_inicio_clases || null, inscripcion_abierta: f.inscripcion_abierta !== false,
+        notas: f.notas,
+        horarios: f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null })),
+      }
+      if (!isEdit) { data.nivel = parseInt(f.nivel) || 1; data.ninos_iniciales = f.ninos_iniciales }
+      const res = isEdit ? await actualizarGrupo(centroId, initial.id, data) : await crearGrupo(centroId, data)
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(isEdit ? `Grupo ${data.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
     }
-    if (!isEdit) { data.nivel = parseInt(f.nivel) || 1; data.ninos_iniciales = f.ninos_iniciales }
-    const res = isEdit ? await actualizarGrupo(centroId, initial.id, data) : await crearGrupo(centroId, data)
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(isEdit ? `Grupo ${data.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
   }
 
   return (
@@ -1650,14 +1655,19 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
 
   async function save() {
     setSaving(true); setErr('')
-    const res = await ajustarItinerarioGrupo(centroId, g.id, {
-      nivel: parseInt(nivel) || 1,
-      fecha_inicio: inicio,
-      excepciones: exc.filter((e) => e.fecha),
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
+    try {
+      const res = await ajustarItinerarioGrupo(centroId, g.id, {
+        nivel: parseInt(nivel) || 1,
+        fecha_inicio: inicio,
+        excepciones: exc.filter((e) => e.fecha),
+      })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1737,15 +1747,20 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
-    const res = await inscribirEstudiante(centroId, {
-      nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-      origen: f.origen, fecha: f.fecha, fecha_cierre_nivel: f.fecha_cierre_nivel || null,
-      representante: f.representante, correo: f.correo, telefono: f.telefono,
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    const g = activos.find((x) => String(x.id) === String(f.grupo_id))
-    onSaved(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
+    try {
+      const res = await inscribirEstudiante(centroId, {
+        nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
+        origen: f.origen, fecha: f.fecha, fecha_cierre_nivel: f.fecha_cierre_nivel || null,
+        representante: f.representante, correo: f.correo, telefono: f.telefono,
+      })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      const g = activos.find((x) => String(x.id) === String(f.grupo_id))
+      onSaved(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1805,14 +1820,19 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
-    const res = await actualizarEstudiante(centroId, est.id, {
-      nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-      fecha_cierre_nivel: f.fecha_cierre_nivel || null, representante: f.representante, correo: f.correo,
-      telefono: f.telefono, notas: f.notas,
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(`${f.nombre.trim()} actualizado.`)
+    try {
+      const res = await actualizarEstudiante(centroId, est.id, {
+        nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
+        fecha_cierre_nivel: f.fecha_cierre_nivel || null, representante: f.representante, correo: f.correo,
+        telefono: f.telefono, notas: f.notas,
+      })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(`${f.nombre.trim()} actualizado.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1861,10 +1881,15 @@ function RetiroModal({ centroId, est, onClose, onSaved }) {
 
   async function save() {
     setSaving(true); setErr('')
-    const res = await retirarEstudiante(centroId, est.id, { motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || null })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(res)
+    try {
+      const res = await retirarEstudiante(centroId, est.id, { motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || null })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(res)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1900,11 +1925,16 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
   async function save() {
     if (!grupoId) { setErr('Selecciona el grupo donde se reincorpora.'); return }
     setSaving(true); setErr('')
-    const res = await reincorporarEstudiante(centroId, est.id, { grupoId })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    const g = activos.find((x) => String(x.id) === String(grupoId))
-    onSaved(`${est.nombre} reincorporado${g ? ` al grupo ${g.numero}` : ''}. Cuenta como reincorporado del mes.`)
+    try {
+      const res = await reincorporarEstudiante(centroId, est.id, { grupoId })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      const g = activos.find((x) => String(x.id) === String(grupoId))
+      onSaved(`${est.nombre} reincorporado${g ? ` al grupo ${g.numero}` : ''}. Cuenta como reincorporado del mes.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1943,10 +1973,15 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
-    const res = await saveCoach(centroId, { id: initial.id, nombre: f.nombre, nivel_kids: parseInt(f.nivel_kids) || 0, kinder1: f.kinder1, kinder23: f.kinder23 })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(isEdit ? `Coach ${f.nombre.trim()} actualizado.` : `Coach ${f.nombre.trim()} agregado.`)
+    try {
+      const res = await saveCoach(centroId, { id: initial.id, nombre: f.nombre, nivel_kids: parseInt(f.nivel_kids) || 0, kinder1: f.kinder1, kinder23: f.kinder23 })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(isEdit ? `Coach ${f.nombre.trim()} actualizado.` : `Coach ${f.nombre.trim()} agregado.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (
@@ -1992,10 +2027,15 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
-    const res = await saveSalon(centroId, { id: initial.id, nombre: f.nombre, es_hibrido: f.es_hibrido })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    onSaved(isEdit ? `Salón ${f.nombre.trim()} actualizado.` : `Salón ${f.nombre.trim()} agregado.`)
+    try {
+      const res = await saveSalon(centroId, { id: initial.id, nombre: f.nombre, es_hibrido: f.es_hibrido })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(isEdit ? `Salón ${f.nombre.trim()} actualizado.` : `Salón ${f.nombre.trim()} agregado.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
   }
 
   return (

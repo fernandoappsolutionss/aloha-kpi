@@ -112,13 +112,21 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
       }
     }
   }
-  // Choques contra los demás grupos activos del centro.
-  const ocupadas = await sql`
-    SELECT h.dia, h.hora_inicio, h.hora_fin, h.salon_id, g.numero
-    FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
-    WHERE g.centro_id = ${centroId} AND g.estado = 'activo' AND h.salon_id IS NOT NULL
-      AND (${grupoId} IS NULL OR g.id <> ${grupoId})
-  `
+  // Choques contra los demás grupos activos del centro. OJO: la variante con
+  // `${grupoId} IS NULL OR ...` revienta en Postgres (42P18: no puede inferir
+  // el tipo de un parámetro que solo aparece en IS NULL) — por eso se bifurca.
+  const ocupadas = grupoId
+    ? await sql`
+        SELECT h.dia, h.hora_inicio, h.hora_fin, h.salon_id, g.numero
+        FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
+        WHERE g.centro_id = ${centroId} AND g.estado = 'activo' AND h.salon_id IS NOT NULL
+          AND g.id <> ${grupoId}
+      `
+    : await sql`
+        SELECT h.dia, h.hora_inicio, h.hora_fin, h.salon_id, g.numero
+        FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
+        WHERE g.centro_id = ${centroId} AND g.estado = 'activo' AND h.salon_id IS NOT NULL
+      `
   for (const n of out) {
     if (!n.salon_id) continue
     for (const o of ocupadas) {
