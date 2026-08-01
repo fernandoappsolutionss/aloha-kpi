@@ -16,7 +16,7 @@ import {
 import { groupStatus, underMeta, promedios, sugerenciasPara, scoreBand } from '../../../../lib/fusiones'
 import {
   CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, aHora12, aMinutos, calendarioDia,
-  sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben, ventanaVendible,
+  sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben, ventanaVendible, KINDER_INICIO,
 } from '../../../../lib/inventario'
 import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
