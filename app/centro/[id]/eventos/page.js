@@ -6,7 +6,10 @@ import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
   eliminarEvento, duplicarEvento, listarRegistros, agregarInvitado, marcarAsistencia, marcarPago,
 } from '../../../actions/eventos'
+import { listarGruposActivos } from '../../../actions/grupos'
+import { inscribirEstudiante } from '../../../actions/estudiantes'
 import { origenDeRegistro } from '../../../../lib/registro-origen'
+import { ITINERARIOS, NIVEL_MAX } from '../../../../lib/operaciones'
 
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
@@ -393,6 +396,7 @@ function Registrations({ centroId, eventId, onChange }) {
   const [showInv, setShowInv] = useState(false)
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [saving, setSaving] = useState(false)
+  const [inscribir, setInscribir] = useState(null) // registro a inscribir como estudiante
 
   const load = useCallback(async () => {
     const res = await listarRegistros(centroId, eventId)
@@ -429,7 +433,12 @@ function Registrations({ centroId, eventId, onChange }) {
         <span className="label">Registrados {regs ? `(${regs.length})` : ''}</span>
         <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>
       </div>
-      {status && <div className="alert alert--error" style={{ marginBottom: 10 }}>{status.replace(/^❌\s*/, '')}</div>}
+      {status && (
+        <div className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
+          style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+          {status.replace(/^[❌✅]\s*/, '')}
+        </div>
+      )}
       {showInv && (
         <form onSubmit={addInv} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14, padding: 12, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)' }}>
           {[['first_name', 'Nombre *'], ['last_name', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']].map(([k, l]) => (
@@ -442,7 +451,7 @@ function Registrations({ centroId, eventId, onChange }) {
         : regs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
           : (
             <table className="table" style={{ background: 'var(--surface)' }}>
-              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
               <tbody>
                 {regs.map((r) => {
                   const origen = origenDeRegistro(r)
@@ -476,12 +485,94 @@ function Registrations({ centroId, eventId, onChange }) {
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? '#FCA5A5' : 'var(--text-dim)' }}>No vino</button>
                       </div>
                     </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 11 }}>Inscribir</button>
+                    </td>
                   </tr>
                   )
                 })}
               </tbody>
             </table>
           )}
+      {inscribir && (
+        <InscribirModal centroId={centroId} reg={inscribir}
+          onClose={() => setInscribir(null)}
+          onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
+      )}
+    </div>
+  )
+}
+
+// Pasa un registro de la clase de prueba al módulo de grupos: crea el
+// estudiante con origen 'clase_prueba' y el crm_registration_id del registro
+// (inscribirEstudiante rechaza el duplicado si ya fue inscrito).
+function InscribirModal({ centroId, reg, onClose, onSaved }) {
+  const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
+  const [f, setF] = useState({
+    nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: '',
+    representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
+  })
+  const [grupos, setGrupos] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+
+  useEffect(() => {
+    listarGruposActivos(centroId).then((g) => setGrupos(Array.isArray(g) ? g : [])).catch(() => setGrupos([]))
+  }, [centroId])
+
+  async function save() {
+    if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
+    setSaving(true); setErr('')
+    const res = await inscribirEstudiante(centroId, {
+      nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
+      origen: 'clase_prueba', crm_registration_id: String(reg.id),
+      representante: f.representante, telefono: f.telefono, correo: f.correo,
+    })
+    setSaving(false)
+    if (res.error) { setErr(res.error); return }
+    const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
+    onSaved(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
+  }
+
+  const niveles = Array.from({ length: NIVEL_MAX[f.itinerario] || 1 }, (_, i) => i + 1)
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 480, maxWidth: '100%', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <h3 className="panel__title">Inscribir niño</h3>
+          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
+        </div>
+        <div style={{ padding: 22 }}>
+          {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <Field full label="Nombre del niño *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+            <Field label="Itinerario">
+              <select className="input" value={f.itinerario} onChange={(e) => setF((p) => ({ ...p, itinerario: e.target.value, nivel: 1 }))}>
+                {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
+              </select>
+            </Field>
+            <Field label="Nivel">
+              <select className="input" value={f.nivel} onChange={(e) => set('nivel', parseInt(e.target.value))}>
+                {niveles.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Field full label="Grupo">
+              <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+                <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo (asignar después)'}</option>
+                {(grupos || []).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+              </select>
+            </Field>
+            <Field full label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
+            <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+            <Field label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</button>
+        </div>
+      </div>
     </div>
   )
 }

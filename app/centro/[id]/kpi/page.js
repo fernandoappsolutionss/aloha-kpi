@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
+import { contarGruposActivos } from '../../../actions/grupos'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const SEMANAS = [1, 2, 3, 4, 5]
@@ -35,6 +36,7 @@ export default function KPIPage() {
   const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
+  const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
 
   const loadData = useCallback(async () => {
     setLoading(true); setStatus('')
@@ -63,6 +65,7 @@ export default function KPIPage() {
   }, [id, year, month])
 
   useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { contarGruposActivos(id).then(n => setGruposModulo(n)).catch(() => {}) }, [id])
 
   const navMonth = (dir) => {
     let m = month + dir, y = year
@@ -216,6 +219,13 @@ export default function KPIPage() {
               <div key={key} className="field">
                 <label className="label">{lbl}</label>
                 {cfgInput(key, true)}
+                {key === 'grupos_activos' && gruposModulo !== null && (
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    El módulo de grupos cuenta {gruposModulo} activos
+                    <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={locked}
+                      className="btn" style={{ padding: '2px 8px', fontSize: 11 }}>Usar</button>
+                  </span>
+                )}
               </div>
             ))}
           </div>
