@@ -11,12 +11,16 @@ import { listarGruposActivos } from '../../../actions/grupos'
 import { inscribirEstudiante } from '../../../actions/estudiantes'
 import { origenDeRegistro } from '../../../../lib/registro-origen'
 import { ITINERARIOS, NIVEL_MAX } from '../../../../lib/operaciones'
+import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
 const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
 const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
+// Semáforo de cupos del grupo por aperturar: verde >3, ámbar 1–3, rojo 0.
+const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
+const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
 
 // datetime-local (wall-clock) + zona → ISO con offset.
 function localToISO(local, tz) {
@@ -37,7 +41,7 @@ function isoToLocal(iso, tz) {
 const EMPTY = {
   name: '', description: '', timezone: 'America/Panama', startLocal: '', endLocal: '',
   event_type: 'in_person', location: '', meeting_url: '', max_capacity: '',
-  is_free: true, price: '', currency: 'USD', status: 'published',
+  is_free: true, price: '', currency: 'USD', status: 'published', grupo_id: '',
   sales_team_id: '', pipeline_stage_id: '', attended_stage_id: '', won_stage_id: '',
   registration_questions: [],
 }
@@ -185,6 +189,13 @@ export default function EventosPage() {
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                           {ev.name}
                           {ev.location && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>📍 {ev.location}</div>}
+                          {ev.grupo ? (
+                            <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
+                              Grupo {ev.grupo.numero}{ev.grupo.horarioTexto ? ` · ${ev.grupo.horarioTexto}` : ''} · <span style={{ color: cupoColor(ev.grupo.cupos), fontWeight: 600 }}>{cupoTexto(ev.grupo.cupos)}</span>
+                            </div>
+                          ) : (
+                            <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>Sin grupo relacionado</div>
+                          )}
                         </td>
                         <td className="num" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{fmtFecha(ev.start_date)}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_type === 'online' ? 'Online' : 'Presencial'}</td>
@@ -220,7 +231,7 @@ export default function EventosPage() {
                       {openId === ev.id && (
                         <tr style={{ cursor: 'default' }}>
                           <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
-                            <Registrations centroId={id} eventId={ev.id} onChange={load} />
+                            <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load} />
                           </td>
                         </tr>
                       )}
@@ -250,7 +261,8 @@ function openEdit(ev, setEditing) {
     startLocal: isoToLocal(ev.start_date, ev.timezone), endLocal: isoToLocal(ev.end_date, ev.timezone),
     event_type: ev.event_type || 'in_person', location: ev.location || '', meeting_url: ev.meeting_url || '',
     max_capacity: ev.max_capacity || '', is_free: ev.is_free ?? true, price: ev.price || '', currency: ev.currency || 'USD',
-    status: ev.status || 'published', sales_team_id: ev.sales_team_id || '', pipeline_stage_id: ev.pipeline_stage_id || '',
+    status: ev.status || 'published', grupo_id: ev.grupo?.id ? String(ev.grupo.id) : '',
+    sales_team_id: ev.sales_team_id || '', pipeline_stage_id: ev.pipeline_stage_id || '',
     attended_stage_id: ev.attended_stage_id || '', won_stage_id: ev.won_stage_id || '',
     registration_questions: Array.isArray(ev.registration_questions) ? ev.registration_questions : [],
   })
@@ -259,16 +271,29 @@ function openEdit(ev, setEditing) {
 function EventModal({ centroId, opts, initial, onClose, onSaved }) {
   const [tab, setTab] = useState('info')
   const [f, setF] = useState(initial)
+  const [grupos, setGrupos] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const isEdit = !!f.id
+
+  useEffect(() => {
+    listarGruposActivos(centroId).then((gs) => {
+      const list = Array.isArray(gs) ? gs : []
+      setGrupos(list)
+      // Si el grupo del evento ya no está activo, el select queda en "Sin grupo"
+      // (lo que se ve es lo que se guarda: al guardar se desvincula).
+      setF((p) => (p.grupo_id && !list.some((g) => String(g.id) === String(p.grupo_id)) ? { ...p, grupo_id: '' } : p))
+    }).catch(() => setGrupos([]))
+  }, [centroId])
+  const grupoSel = (grupos || []).find((g) => String(g.id) === String(f.grupo_id)) || null
 
   async function save() {
     if (!f.name.trim() || !f.startLocal) { setErr('Nombre y fecha de inicio son requeridos.'); setTab('info'); return }
     setSaving(true); setErr('')
     const data = {
       ...f,
+      grupo_id: f.grupo_id ? Number(f.grupo_id) : null,
       start_date: localToISO(f.startLocal, f.timezone),
       end_date: f.endLocal ? localToISO(f.endLocal, f.timezone) : null,
     }
@@ -300,6 +325,17 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Field full label="Nombre de la clase de prueba *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
               <Field full label="Descripción"><textarea className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
+              <Field full label="Grupo que se va a aperturar">
+                <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+                  <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
+                  {(grupos || []).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+                </select>
+                {grupoSel && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                    {grupoSel.horarioTexto ? `${grupoSel.horarioTexto} · ` : ''}<span style={{ color: cupoColor(grupoSel.cupos), fontWeight: 600 }}>{cupoTexto(grupoSel.cupos)}</span>
+                  </div>
+                )}
+              </Field>
               <Field label="Zona horaria">
                 <select className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
                   <option value="America/Panama">Panamá (GMT-5)</option>
@@ -390,7 +426,7 @@ function Field({ label, full, children }) {
   return <div className="field" style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
 }
 
-function Registrations({ centroId, eventId, onChange }) {
+function Registrations({ centroId, eventId, grupoId, onChange }) {
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(null)
@@ -509,7 +545,7 @@ function Registrations({ centroId, eventId, onChange }) {
           onSaved={(msg) => { setNotaDe(null); setStatus('✅ ' + msg); load() }} />
       )}
       {inscribir && (
-        <InscribirModal centroId={centroId} reg={inscribir}
+        <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
       )}
@@ -600,10 +636,12 @@ function NotasModal({ centroId, eventId, reg, onClose, onSaved }) {
   )
 }
 
-function InscribirModal({ centroId, reg, onClose, onSaved }) {
+// (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
+// de prueba tiene grupo por aperturar, viene preseleccionado en el select.
+function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
-    nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: '',
+    nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
     representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
   })
   const [grupos, setGrupos] = useState(null)
@@ -612,7 +650,12 @@ function InscribirModal({ centroId, reg, onClose, onSaved }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
   useEffect(() => {
-    listarGruposActivos(centroId).then((g) => setGrupos(Array.isArray(g) ? g : [])).catch(() => setGrupos([]))
+    listarGruposActivos(centroId).then((g) => {
+      const list = Array.isArray(g) ? g : []
+      setGrupos(list)
+      // El grupo preseleccionado debe seguir activo; si no, vuelve a "Sin grupo".
+      setF((p) => (p.grupo_id && !list.some((x) => String(x.id) === String(p.grupo_id)) ? { ...p, grupo_id: '' } : p))
+    }).catch(() => setGrupos([]))
   }, [centroId])
 
   async function save() {

@@ -2,6 +2,7 @@
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, hoyISO } from '../../lib/operaciones'
+import { pushCuposAlCrm } from '../../lib/cupos-sync'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -54,6 +55,9 @@ export async function inscribirEstudiante(centroId, data) {
     INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel)
     VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel})
   `
+  // Si el grupo está vinculado a una clase de prueba, sus cupos viajan al CRM
+  // (best effort: nunca lanza ni bloquea el ok).
+  if (grupoId) await pushCuposAlCrm(centroId, grupoId)
   return { ok: true, estudianteId: e.id }
 }
 
@@ -116,6 +120,10 @@ export async function actualizarEstudiante(centroId, id, data) {
       INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, a_grupo_id)
       VALUES (${id}, ${centroId}, 'cambio_grupo', ${year}, ${month}, ${hoy}, ${est.grupo_id}, ${grupoId})
     `
+    // El cambio de grupo mueve cupos en ambos lados: si el grupo viejo o el
+    // nuevo están vinculados a una clase de prueba, el CRM se entera (best effort).
+    await pushCuposAlCrm(centroId, est.grupo_id)
+    await pushCuposAlCrm(centroId, grupoId)
   }
   return { ok: true }
 }
@@ -191,6 +199,8 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsi
     INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, motivo)
     VALUES (${id}, ${centroId}, 'retiro', ${year}, ${month}, ${fechaRetiro}, ${est.grupo_id}, ${motivo})
   `
+  // Cupos al CRM si el grupo está vinculado a una clase de prueba (best effort).
+  if (est.grupo_id) await pushCuposAlCrm(centroId, est.grupo_id)
   // Si el grupo queda sin niños, la UI ofrece cerrarlo (regla del manual).
   if (est.grupo_id) {
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${est.grupo_id} AND estado IN ('activo', 'baja_potencial')`
@@ -225,5 +235,7 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
     INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id)
     VALUES (${id}, ${centroId}, 'reincorporacion', ${year}, ${month}, ${hoy}, ${grupoId})
   `
+  // Cupos al CRM si el grupo está vinculado a una clase de prueba (best effort).
+  await pushCuposAlCrm(centroId, grupoId)
   return { ok: true }
 }

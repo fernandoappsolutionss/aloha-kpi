@@ -4,6 +4,9 @@ import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, aperturaMinima, hoyISO } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
+import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
+import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
+import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
 
 const HORA_RE = /^\d{2}:\d{2}$/
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -50,19 +53,75 @@ async function metasOperativas() {
 
 // Valida y normaliza las filas de horario del formulario. Devuelve
 // { horarios: [{ dia, hora_inicio, hora_fin, salon_id }] } o { error }.
-async function validarHorarios(centroId, horarios) {
-  const salones = await sql`SELECT id FROM salones WHERE centro_id = ${centroId}`
-  const salonIds = new Set(salones.map((s) => String(s.id)))
+// Aplica las reglas del inventario ALOHA (ventana 12:30–20:30, sesiones de
+// 1 h o 2 h) y bloquea choques de salón sin los 30 min entre clases.
+// `grupoId` excluye al propio grupo al validar choques (edición).
+async function validarHorarios(centroId, horarios, grupoId = null) {
+  const salones = await sql`SELECT id, nombre FROM salones WHERE centro_id = ${centroId}`
+  const salonPorId = new Map(salones.map((s) => [String(s.id), s.nombre]))
   const out = []
   for (const h of horarios || []) {
     const dia = intOr(h?.dia)
     if (dia < 1 || dia > 7) return { error: 'Horario inválido: el día va de 1 (lunes) a 7 (domingo).' }
     if (!HORA_RE.test(h?.hora_inicio || '') || !HORA_RE.test(h?.hora_fin || '')) return { error: 'Horario inválido: las horas van en formato HH:MM.' }
+    const invalida = validarSesion(dia, h.hora_inicio, h.hora_fin)
+    if (invalida) return { error: invalida }
     const salonId = h.salon_id || null
-    if (salonId && !salonIds.has(String(salonId))) return { error: 'El salón no pertenece a este centro.' }
+    if (salonId && !salonPorId.has(String(salonId))) return { error: 'El salón no pertenece a este centro.' }
     out.push({ dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: salonId })
   }
+  // El programa ALOHA son 2 horas semanales por grupo: 2 h un día, o 1 h en
+  // dos días distintos. (Un grupo puede quedar sin horario mientras se define.)
+  if (out.length) {
+    const totalMin = out.reduce((a, h) => a + (aMinutos(h.hora_fin) - aMinutos(h.hora_inicio)), 0)
+    if (totalMin !== 120) {
+      return { error: `El programa son 2 horas semanales por grupo (1 bloque de 2 h o 2 bloques de 1 h). Este horario suma ${totalMin / 60} h.` }
+    }
+    if (out.length === 2 && out[0].dia === out[1].dia) {
+      return { error: 'Las dos sesiones de 1 hora deben ir en días distintos.' }
+    }
+  }
+  // Choques entre las propias filas del formulario (mismo salón).
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      const a = out[i]; const b = out[j]
+      if (a.salon_id && a.dia === b.dia && String(a.salon_id) === String(b.salon_id) &&
+          chocanConBuffer(aMinutos(a.hora_inicio), aMinutos(a.hora_fin), aMinutos(b.hora_inicio), aMinutos(b.hora_fin))) {
+        return { error: `Dos sesiones del mismo grupo chocan en ${salonPorId.get(String(a.salon_id))} el mismo día (recuerda los 30 min entre clases).` }
+      }
+    }
+  }
+  // Choques contra los demás grupos activos del centro.
+  const ocupadas = await sql`
+    SELECT h.dia, h.hora_inicio, h.hora_fin, h.salon_id, g.numero
+    FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
+    WHERE g.centro_id = ${centroId} AND g.estado = 'activo' AND h.salon_id IS NOT NULL
+      AND (${grupoId} IS NULL OR g.id <> ${grupoId})
+  `
+  for (const n of out) {
+    if (!n.salon_id) continue
+    for (const o of ocupadas) {
+      if (o.dia !== n.dia || String(o.salon_id) !== String(n.salon_id)) continue
+      if (chocanConBuffer(aMinutos(n.hora_inicio), aMinutos(n.hora_fin), aMinutos(o.hora_inicio), aMinutos(o.hora_fin))) {
+        return { error: `Choca con el Grupo ${o.numero} en ${salonPorId.get(String(n.salon_id))} (${o.hora_inicio}–${o.hora_fin}); deja al menos 30 min entre clases.` }
+      }
+    }
+  }
   return { horarios: out }
+}
+
+// Regla del negocio: los Kinder solo se abren entre semana de 2:00 a 3:30 pm
+// (zona Kinder). Sábados y horarios calientes quedan para Tiny y Kids.
+function validarZonaKinder(itinerario, horarios) {
+  if (itinerario !== 'KINDER') return null
+  for (const h of horarios || []) {
+    const ini = aMinutos(h.hora_inicio)
+    const fin = aMinutos(h.hora_fin)
+    if (h.dia >= 6 || ini < KINDER_INICIO || fin > KINDER_FIN) {
+      return 'Los Kinder solo se abren entre semana en la zona Kinder (2:00–3:30 pm); los sábados y los horarios calientes quedan reservados para Tiny y Kids.'
+    }
+  }
+  return null
 }
 
 // Carga única de la página de Grupos y Fusiones.
@@ -103,6 +162,8 @@ export async function crearGrupo(centroId, data) {
   if (fechaApertura && !FECHA_RE.test(fechaApertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const v = await validarHorarios(centroId, data?.horarios)
   if (v.error) return { error: v.error }
+  const zk = validarZonaKinder(itinerario, v.horarios)
+  if (zk) return { error: zk }
 
   const now = new Date().toISOString()
   const [g] = await sql`
@@ -151,8 +212,10 @@ export async function actualizarGrupo(centroId, grupoId, data) {
 
   let horarios = null
   if (Array.isArray(data?.horarios)) {
-    const v = await validarHorarios(centroId, data.horarios)
+    const v = await validarHorarios(centroId, data.horarios, grupoId)
     if (v.error) return { error: v.error }
+    const zk = validarZonaKinder(itinerario, v.horarios)
+    if (zk) return { error: zk }
     horarios = v.horarios
   }
 
@@ -182,6 +245,9 @@ export async function cerrarGrupo(centroId, grupoId) {
   const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${grupoId} AND estado IN ('activo', 'baja_potencial')`
   if (n > 0) return { error: `El grupo tiene ${n} niños activos` }
   await sql`UPDATE grupos SET estado = 'cerrado', fecha_cierre = ${hoyISO()}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
+  // Un grupo cerrado no puede seguir vendiéndose: se desvincula de las clases
+  // de prueba y el CRM deja de mostrar sus cupos (best effort).
+  await desvincularGrupoEnEventos(centroId, grupoId)
   return { ok: true }
 }
 
@@ -207,11 +273,33 @@ export async function siguienteNumero(centroId) {
   return max + 1
 }
 
-// Action ligera para selects de otras páginas (eventos → Inscribir).
+// Action ligera para selects de otras páginas (eventos → Inscribir, grupo por
+// aperturar). Además de id/numero/itinerario devuelve horarioTexto (am/pm) y
+// cupos frente al modelo ("quedan X de 10") — campos agregados, sin romper consumidores.
 export async function listarGruposActivos(centroId) {
   await requireCentroAccess(centroId)
-  const rows = await sql`SELECT id, numero, itinerario FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
-  return rows.sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
+  const rows = await sql`
+    SELECT g.id, g.numero, g.itinerario,
+      COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
+    FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
+    WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
+    GROUP BY g.id, g.numero, g.itinerario
+  `
+  const horarios = await sql`
+    SELECT h.grupo_id, h.dia, h.hora_inicio, h.hora_fin
+    FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
+    WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
+    ORDER BY h.dia, h.hora_inicio
+  `
+  return rows
+    .map((g) => ({
+      id: g.id,
+      numero: g.numero,
+      itinerario: g.itinerario,
+      horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
+      cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
+    }))
+    .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
 }
 
 // Action ligera para el hint de grupos_activos en la página de KPI.
@@ -334,5 +422,11 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
     await sql`UPDATE grupos SET estado = 'fusionado', fusionado_en = ${tgt.id}, fecha_cierre = ${hoy}, updated_at = ${now} WHERE id = ${src.id}`
     cerrado = true
   }
+  // La fusión mueve matrícula: el CRM recibe los cupos nuevos del destino y,
+  // del origen, los cupos actualizados — o la desvinculación si quedó fusionado
+  // (best effort, nunca rompe el { ok } local).
+  await pushCuposAlCrm(centroId, tgt.id)
+  if (cerrado) await desvincularGrupoEnEventos(centroId, src.id)
+  else await pushCuposAlCrm(centroId, src.id)
   return { ok: true, cerrado }
 }
