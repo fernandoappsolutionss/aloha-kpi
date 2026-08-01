@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../../actions/cuadro'
 import { listarGruposActivos } from '../../../actions/grupos'
-import { ITINERARIOS, MOTIVOS_RETIRO_LABELS, PRODUCTOS_MATERIAL } from '../../../../lib/operaciones'
+import { retirarEstudiante, reincorporarEstudiante } from '../../../actions/estudiantes'
+import { ITINERARIOS, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, PRODUCTOS_MATERIAL, hoyISO } from '../../../../lib/operaciones'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const PRODUCTO_LABELS = { KIT: 'KIT', ABACO: 'ÁBACO', LIBRO: 'LIBRO', SUETER: 'SUÉTER', MOCHILA: 'MOCHILA', OTRO: 'OTRO' }
@@ -40,6 +41,8 @@ export default function CuadroPage() {
   const [openGrupo, setOpenGrupo] = useState(null)
   const [pedido, setPedido] = useState(EMPTY_PEDIDO)
   const [savingPedido, setSavingPedido] = useState(false)
+  // { tipo: 'retirar' | 'reincorporar', nino } — acción sobre un niño del cuadro.
+  const [accionNino, setAccionNino] = useState(null)
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
@@ -268,7 +271,10 @@ export default function CuadroPage() {
             <div className="panel" style={{ marginBottom: 20 }}>
               <div className="panel__head">
                 <h3 className="panel__title">Control de grupos</h3>
-                <span className="label">Clic en un grupo para ver sus niños</span>
+                <span className="label">Clic en un grupo para ver y gestionar sus niños</span>
+              </div>
+              <div style={{ padding: '8px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>
+                <b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
@@ -301,7 +307,7 @@ export default function CuadroPage() {
                                 <td colSpan={6} style={{ background: 'var(--surface-2)', padding: 0 }}>
                                   <div style={{ padding: '14px 18px' }}>
                                     <table className="table" style={{ background: 'var(--surface-1)' }}>
-                                      <thead><tr>{['Niño', 'Nivel', 'Estado del mes', 'Status plataforma', 'Cierre de nivel', 'Representante', 'Contacto'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                                      <thead><tr>{['Niño', 'Nivel', 'Estado del mes', 'Status plataforma', 'Cierre de nivel', 'Representante', 'Contacto', ''].map((h, hi) => <th key={hi}>{h}</th>)}</tr></thead>
                                       <tbody>
                                         {f.porNiño.map((e) => (
                                           <tr key={e.id} style={{ cursor: 'default' }}>
@@ -314,6 +320,15 @@ export default function CuadroPage() {
                                             <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                                               {e.telefono || '—'}
                                               <div style={{ color: 'var(--text-faint)' }}>{e.correo || ''}</div>
+                                            </td>
+                                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                              {e.esRetirado ? (
+                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
+                                                  onClick={() => setAccionNino({ tipo: 'reincorporar', nino: e })}>↩ Reincorporar</button>
+                                              ) : (
+                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }}
+                                                  onClick={() => setAccionNino({ tipo: 'retirar', nino: e })}>Retirar</button>
+                                              )}
                                             </td>
                                           </tr>
                                         ))}
@@ -469,7 +484,127 @@ export default function CuadroPage() {
             </div>
           </>
         )}
+
+        {accionNino?.tipo === 'retirar' && (
+          <RetirarModal centroId={id} nino={accionNino.nino}
+            onClose={() => setAccionNino(null)}
+            onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />
+        )}
+        {accionNino?.tipo === 'reincorporar' && (
+          <ReincorporarModal centroId={id} nino={accionNino.nino} grupos={gruposActivos}
+            onClose={() => setAccionNino(null)}
+            onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />
+        )}
       </main>
     </div>
   )
+}
+
+// ── Modal: retirar niño desde el cuadro ──────────────────────────────────────
+function RetirarModal({ centroId, nino, onClose, onSaved }) {
+  const [f, setF] = useState({ motivo: '', fecha: hoyISO(), ultimaAsistencia: '' })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+
+  async function save() {
+    if (!f.motivo) { setErr('Selecciona el motivo del retiro.'); return }
+    setSaving(true); setErr('')
+    const res = await retirarEstudiante(centroId, nino.id, {
+      motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || undefined,
+    })
+    setSaving(false)
+    if (res.error) { setErr(res.error); return }
+    let msg = `${nino.nombre} retirado del cuadro.`
+    if (res.grupoVacio) msg += ` El grupo ${res.grupoVacio} quedó sin niños: ciérralo en Grupos y Fusiones si ya no va a operar.`
+    onSaved(msg)
+  }
+
+  return (
+    <Modal title={`Retirar a ${nino.nombre}`} onClose={onClose}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Retirar del cuadro'}</button>
+        </>
+      )}>
+      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <Field full label="Motivo del retiro *">
+          <select className="input" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
+            <option value="">Selecciona motivo…</option>
+            {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m] || m}</option>)}
+          </select>
+        </Field>
+        <Field label="Fecha de retiro"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        <Field label="Última asistencia (opcional)"><input type="date" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
+        <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+          El niño cae en las deserciones del mes de la fecha de retiro y deja de contar en “a pagar”. Si vuelve, lo reincorporas desde esta misma tabla.
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Modal: reincorporar niño desde el cuadro ─────────────────────────────────
+function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
+  // Por defecto vuelve a su grupo anterior, si sigue activo.
+  const anterior = grupos.find((g) => String(g.id) === String(nino.grupo_id))
+  const [grupoId, setGrupoId] = useState(anterior ? String(anterior.id) : '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    if (!grupoId) { setErr('Selecciona el grupo donde se reincorpora.'); return }
+    setSaving(true); setErr('')
+    const res = await reincorporarEstudiante(centroId, nino.id, { grupoId })
+    setSaving(false)
+    if (res.error) { setErr(res.error); return }
+    const g = grupos.find((x) => String(x.id) === String(grupoId))
+    onSaved(`${nino.nombre} reincorporado${g ? ` en el grupo ${g.numero}` : ''}.`)
+  }
+
+  return (
+    <Modal title={`Reincorporar a ${nino.nombre}`} onClose={onClose}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
+        </>
+      )}>
+      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <Field full label="Grupo donde se reincorpora *">
+        <select className="input" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
+          <option value="">Selecciona grupo…</option>
+          {grupos.map((g) => (
+            <option key={g.id} value={String(g.id)}>
+              Grupo {g.numero} · {g.itinerario}{g.horarioTexto ? ` · ${g.horarioTexto}` : ''} · quedan {g.cupos} de 10 cupos
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+        Cuenta como reincorporación del mes en curso y vuelve a sumar en “a pagar”.
+      </div>
+    </Modal>
+  )
+}
+
+function Modal({ title, width = 560, onClose, children, footer }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width, maxWidth: '100%', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <h3 className="panel__title">{title}</h3>
+          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
+        </div>
+        <div style={{ padding: 22, maxHeight: '62vh', overflowY: 'auto' }}>{children}</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>{footer}</div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, full, children }) {
+  return <div className="field" style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
 }
