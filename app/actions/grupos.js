@@ -7,6 +7,25 @@ import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusio
 import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
+import { generarItinerario } from '../../lib/itinerario'
+
+// Genera y guarda el itinerario de clases del nivel (manual ALOHA Panamá):
+// necesita fecha de inicio + días de clase. Los Naranjos opera con el
+// reglamento de ALOHA Venezuela → su calendario no salta feriados panameños.
+async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel }) {
+  if (!fechaInicio || !horarios?.length) return null
+  const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
+  const conFeriados = !/naranjos/i.test(c?.nombre || '')
+  const it = generarItinerario({
+    fechaInicio,
+    dias: horarios.map((h) => h.dia),
+    nivel: nivel || 1,
+    conFeriados,
+  })
+  if (!it) return null
+  await sql`UPDATE grupos SET itinerario_clases = ${JSON.stringify(it)} WHERE id = ${grupoId}`
+  return it
+}
 
 const HORA_RE = /^\d{2}:\d{2}$/
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -180,6 +199,13 @@ export async function crearGrupo(centroId, data) {
       VALUES (${g.id}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
     `
   }
+  // El grupo nace con el itinerario de clases de su nivel (regla de Fernando):
+  // inducción, semanas del libro, mental days y cierre, saltando feriados.
+  await regenerarItinerarioClases(centroId, g.id, {
+    fechaInicio: fechaInicio || fechaApertura,
+    horarios: v.horarios,
+    nivel: intOr(data?.nivel, 1),
+  })
   // Aviso del manual: apertura mínima 8 TINY / 10 KIDS en nivel 1, 6 en niveles superiores.
   let warn
   if (data?.ninos_iniciales !== undefined && data?.ninos_iniciales !== null && data?.ninos_iniciales !== '') {
@@ -240,6 +266,17 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         VALUES (${grupoId}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
       `
     }
+  }
+  // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
+  // horarios); el nivel se conserva del itinerario ya generado.
+  const inicioCambio = String(fechaInicio || '') !== String(g.fecha_inicio_clases || '').slice(0, 10)
+  if ((horarios || inicioCambio) && fechaInicio) {
+    const hs = horarios || (await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
+    await regenerarItinerarioClases(centroId, grupoId, {
+      fechaInicio,
+      horarios: hs,
+      nivel: g.itinerario_clases?.nivel || 1,
+    })
   }
   // Si cambió el estado de inscripciones, ventas debe ver los cupos correctos.
   if ((g.inscripcion_abierta !== false) !== inscripcionAbierta) await pushCuposAlCrm(centroId, grupoId)
