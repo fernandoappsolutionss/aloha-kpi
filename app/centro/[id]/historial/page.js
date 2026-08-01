@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import { getHistorialCentro } from '../../../actions/centro'
 
@@ -60,12 +60,13 @@ export default function HistorialPage() {
 
   const loadHistorial = useCallback(async () => {
     setLoading(true)
-    const { nombre, resumen, estados } = await getHistorialCentro(id)
+    const { nombre, resumen, estados, cuadros } = await getHistorialCentro(id)
     if (nombre) setCentroNombre(nombre)
 
     // Calcular métricas derivadas
     const data = (resumen || []).map((r, i) => {
       const estado = estados?.find(e => e.year === r.year && e.month === r.month)
+      const cuadro = cuadros?.find(q => q.year === r.year && q.month === r.month) || null
       const nI = r.ninos_inicio_mes || 0
       const gA = r.grupos_activos || 1
       const nA = r.nuevos_activos_mes || 0
@@ -106,6 +107,12 @@ export default function HistorialPage() {
         cumple_prom: promG >= 8,
         meta_cob: parseFloat(((nI * 0.015)).toFixed(1)),
         meta_des: parseFloat((nI * 0.08).toFixed(1)),
+        // Foto congelada del Cuadro de Negocio (solo meses cerrados).
+        cuadro,
+        cuadro_aPagar: cuadro ? cuadro.aPagar : null,
+        cuadro_nuevos: cuadro ? cuadro.nuevos : null,
+        cuadro_retirados: cuadro ? cuadro.retirados : null,
+        cuadro_royalty: cuadro ? Number(cuadro.royalty) || 0 : null,
       }
     })
     setMeses(data)
@@ -209,6 +216,7 @@ export default function HistorialPage() {
               {vistaBtn('tendencias','Tendencias')}
               {vistaBtn('comparativa','Comparativa')}
               {vistaBtn('tabla','Tabla detalle')}
+              {vistaBtn('cuadro','Cuadro de negocio')}
             </div>
 
             {/* VISTA: TENDENCIAS */}
@@ -423,6 +431,81 @@ export default function HistorialPage() {
                 </div>
               </div>
             )}
+
+            {/* VISTA: CUADRO DE NEGOCIO (fotos congeladas de meses cerrados) */}
+            {vistaActiva === 'cuadro' && (() => {
+              const conCuadro = meses.filter(m => m.cuadro)
+              if (conCuadro.length === 0) return (
+                <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
+                  Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Semanal, su Cuadro de Negocio queda congelado y aparece aquí como historial.
+                </div>
+              )
+              return (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+                    <ChartCard title="Niños a pagar y movimientos" sub="Foto congelada al cierre de cada mes">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <ComposedChart data={conCuadro}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
+                          <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
+                          <YAxis tick={axisTick} stroke={C.faint}/>
+                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
+                          <Bar dataKey="cuadro_nuevos" name="Nuevos" fill={C.greenDeep} radius={[4,4,0,0]}/>
+                          <Bar dataKey="cuadro_retirados" name="Retirados" fill={C.bad} radius={[4,4,0,0]}/>
+                          <Line type="monotone" dataKey="cuadro_aPagar" name="Niños a pagar" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Royalty mensual" sub={'Congelado con el cuadro de cada mes'}>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={conCuadro}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
+                          <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
+                          <YAxis tick={axisTick} stroke={C.faint}/>
+                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                          <Line type="monotone" dataKey="cuadro_royalty" name="Royalty $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
+                  <div className="panel">
+                    <div className="panel__head">
+                      <h3 className="panel__title">Cuadros congelados por mes</h3>
+                      <span className="label">La misma foto que se entregó a la Junta</span>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="table">
+                        <thead>
+                          <tr>{['Mes','A pagar','Nuevos','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
+                            <th key={h} style={i > 0 ? { textAlign: 'center', whiteSpace: 'nowrap' } : undefined}>{h}</th>
+                          ))}</tr>
+                        </thead>
+                        <tbody>
+                          {conCuadro.map(m => (
+                            <tr key={m.mes} style={{ cursor: 'default' }}>
+                              <td style={{ fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)' }}>🔒 {m.mesLabel}</td>
+                              <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{m.cuadro.aPagar}</td>
+                              <td className="num" style={{ textAlign: 'center', color: C.green }}>{m.cuadro.nuevos}</td>
+                              <td className="num" style={{ textAlign: 'center', color: C.green }}>{m.cuadro.reincorporados}</td>
+                              <td className="num" style={{ textAlign: 'center', color: m.cuadro.retirados > 0 ? C.bad : 'var(--text-dim)' }}>{m.cuadro.retirados}</td>
+                              <td className="num" style={{ textAlign: 'center' }}>{m.cuadro.gruposActivos}</td>
+                              <td className="num" style={{ textAlign: 'center', color: (m.cuadro.promedio ?? 0) >= 8 ? C.green : C.bad }}>
+                                {m.cuadro.promedio == null ? '—' : Number(m.cuadro.promedio).toFixed(1)}
+                              </td>
+                              <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--ts-green)' }}>${Number(m.cuadro.royalty || 0).toFixed(2)}</td>
+                              <td className="num" style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                                {m.cuadro.cerrado_at ? String(m.cuadro.cerrado_at).slice(0, 10) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
             {chartData.length === 0 && (
               <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
