@@ -14,6 +14,21 @@ const ym = (fecha) => {
   return { year: y, month: m }
 }
 
+// Regla del negocio: un grupo con inscripcion_abierta = false está lleno/cerrado
+// y ya NO entra nadie (inscripción, reincorporación ni cambio de grupo).
+// Devuelve mensaje de error o null si el grupo acepta niños.
+async function grupoAceptaNinos(centroId, grupoId) {
+  const [g] = await sql`
+    SELECT id, numero, inscripcion_abierta FROM grupos
+    WHERE id = ${grupoId} AND centro_id = ${centroId}
+  `
+  if (!g) return 'El grupo no pertenece a este centro.'
+  if (g.inscripcion_abierta === false) {
+    return `El grupo ${g.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones si tiene cupo.`
+  }
+  return null
+}
+
 // Alta de un niño (clase de prueba, inscripción directa o traslado). Registra
 // el evento de inscripción con el year/month de la fecha de inscripción.
 export async function inscribirEstudiante(centroId, data) {
@@ -28,8 +43,8 @@ export async function inscribirEstudiante(centroId, data) {
   if (!ORIGENES.includes(origen)) return { error: 'Origen inválido.' }
   const grupoId = data?.grupo_id || null
   if (grupoId) {
-    const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
-    if (!g) return { error: 'El grupo no pertenece a este centro.' }
+    const err = await grupoAceptaNinos(centroId, grupoId)
+    if (err) return { error: err }
   }
   const crmId = data?.crm_registration_id?.trim() || null
   if (crmId) {
@@ -77,9 +92,10 @@ export async function actualizarEstudiante(centroId, id, data) {
   let grupoId = est.grupo_id
   if (data?.grupo_id !== undefined) {
     grupoId = data.grupo_id || null
-    if (grupoId) {
-      const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
-      if (!g) return { error: 'El grupo no pertenece a este centro.' }
+    // Solo si el niño CAMBIA de grupo: quedarse donde ya está siempre se puede.
+    if (grupoId && String(grupoId) !== String(est.grupo_id ?? '')) {
+      const err = await grupoAceptaNinos(centroId, grupoId)
+      if (err) return { error: err }
     }
   }
   const statusPlataforma = data?.status_plataforma !== undefined ? data.status_plataforma : est.status_plataforma
@@ -201,15 +217,26 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsi
   `
   // Cupos al CRM si el grupo está vinculado a una clase de prueba (best effort).
   if (est.grupo_id) await pushCuposAlCrm(centroId, est.grupo_id)
+
+  const out = { ok: true }
+  // Norma del cuadro: el niño que vio clases en un mes se declara retirado en
+  // ESE mes (cuenta al inicio del mes aunque ya sabemos que no sigue). Si la
+  // fecha de retiro cae en otro mes que la última asistencia, se avisa.
+  if (ultimaAsis) {
+    const a = ym(ultimaAsis)
+    if (a.year !== year || a.month !== month) {
+      out.warn = `La última asistencia fue el ${ultimaAsis} pero el retiro quedó declarado en ${String(month).padStart(2, '0')}/${year}. Norma del cuadro: si el niño vio clases en un mes, se declara retirado en ese mismo mes (usa esa fecha de retiro si ese mes sigue abierto).`
+    }
+  }
   // Si el grupo queda sin niños, la UI ofrece cerrarlo (regla del manual).
   if (est.grupo_id) {
     const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${est.grupo_id} AND estado IN ('activo', 'baja_potencial')`
     if (n === 0) {
       const [g] = await sql`SELECT numero FROM grupos WHERE id = ${est.grupo_id}`
-      if (g) return { ok: true, grupoVacio: g.numero }
+      if (g) out.grupoVacio = g.numero
     }
   }
-  return { ok: true }
+  return out
 }
 
 // Un retirado que vuelve: entra a un grupo activo y cuenta como reincorporado
@@ -222,6 +249,8 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
   if (!grupoId) return { error: 'Selecciona el grupo donde se reincorpora.' }
   const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'`
   if (!g) return { error: 'El grupo no está activo o no pertenece a este centro.' }
+  const errCerrado = await grupoAceptaNinos(centroId, grupoId)
+  if (errCerrado) return { error: errCerrado }
 
   const now = new Date().toISOString()
   const hoy = hoyISO()

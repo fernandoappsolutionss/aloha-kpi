@@ -94,9 +94,17 @@ export async function GET(request, { params }) {
     horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
   }))
 
-  let royalties = cuadroRoyalties(estudiantes, eventos, royaltyRate)
-  let control = cuadroControlGrupos(grupos, estudiantes, eventos)
-  let deserciones = cuadroDeserciones(estudiantes, eventos, grupos)
+  // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
+  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
+  const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+  const iniciado = (g) => !g.fecha_inicio_clases || String(g.fecha_inicio_clases).slice(0, 10) <= finMes
+  const gruposCuadro = grupos.filter(iniciado)
+  const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
+  const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
+
+  let royalties = cuadroRoyalties(estudiantesCuadro, eventos, royaltyRate)
+  let control = cuadroControlGrupos(gruposCuadro, estudiantesCuadro, eventos)
+  let deserciones = cuadroDeserciones(estudiantesCuadro, eventos, gruposCuadro)
 
   // Mes cerrado → el Excel sale de la foto congelada del cuadro (la misma
   // verdad histórica que muestra la página), no del estado actual.

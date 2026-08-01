@@ -535,6 +535,7 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
     setSaving(false)
     if (res.error) { setErr(res.error); return }
     let msg = `${nino.nombre} retirado del cuadro.`
+    if (res.warn) msg += ` ⚠️ ${res.warn}`
     if (res.grupoVacio) msg += ` El grupo ${res.grupoVacio} quedó sin niños: ciérralo en Grupos y Fusiones si ya no va a operar.`
     onSaved(msg)
   }
@@ -596,8 +597,8 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
         <select className="input" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
           <option value="">Selecciona grupo…</option>
           {grupos.map((g) => (
-            <option key={g.id} value={String(g.id)}>
-              Grupo {g.numero} · {g.itinerario}{g.horarioTexto ? ` · ${g.horarioTexto}` : ''} · quedan {g.cupos} de 10 cupos
+            <option key={g.id} value={String(g.id)} disabled={g.inscripcionAbierta === false}>
+              Grupo {g.numero} · {g.itinerario}{g.horarioTexto ? ` · ${g.horarioTexto}` : ''} · {g.inscripcionAbierta === false ? '🔒 cerrado a inscripciones' : `quedan ${g.cupos} de 10 cupos`}
             </option>
           ))}
         </select>

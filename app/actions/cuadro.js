@@ -2,8 +2,8 @@
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
-import { motivosParaKpi, cuadroControlGrupos, cuadroDeserciones } from '../../lib/cuadro-calc'
-import { armarGrupos, calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
+import { motivosParaKpi } from '../../lib/cuadro-calc'
+import { calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
 
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
@@ -116,15 +116,12 @@ export async function sincronizarConKpi(centroId, year, month) {
   const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
   if (mes?.estado === 'cerrado') return { error: 'Este mes está cerrado. Reábrelo en KPI Semanal para poder sincronizar.' }
 
-  const grupos = await armarGrupos(centroId)
-  const estudiantes = await sql`SELECT * FROM estudiantes WHERE centro_id = ${centroId}`
-  const eventos = await sql`
-    SELECT * FROM estudiante_eventos
-    WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
-  `
-  const control = cuadroControlGrupos(grupos, estudiantes, eventos)
+  // El mismo cálculo del cuadro (incluida la regla de fecha de inicio de
+  // clases: grupos en llenado no cuentan) alimenta el KPI.
+  const datos = await calcularCuadro(centroId, y, m)
+  const control = datos.controlGrupos
   // motivosParaKpi devuelve exactamente las 6 columnas mot_* de resumen_mes.
-  const motivos = motivosParaKpi(cuadroDeserciones(estudiantes, eventos, grupos))
+  const motivos = motivosParaKpi(datos.deserciones)
 
   const aplicado = {
     grupos_activos: control.totales.gruposActivos,
