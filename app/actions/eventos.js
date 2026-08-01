@@ -2,6 +2,8 @@
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { crmCall, crmAccountForCentro, crmConfigured, crmBaseUrl } from '../../lib/crm'
+import { armarAlohaGroup } from '../../lib/cupos-sync'
+import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 
 export async function eventosConfig() {
   return { configured: crmConfigured(), baseUrl: crmBaseUrl() }
@@ -18,14 +20,43 @@ export async function opcionesFormulario(centroId) {
 }
 
 // Eventos creados por este centro (espejo Neon → datos vivos del CRM, con stats).
+// Cada evento sale enriquecido con su grupo por aperturar (si está vinculado):
+// evento.grupo = { id, numero, horarioTexto, cupos } — una consulta agregada, sin N+1.
 export async function listarEventos(centroId) {
   await requireCentroAccess(centroId)
-  const rows = await sql`SELECT crm_event_id FROM centro_eventos WHERE centro_id = ${centroId} ORDER BY created_at DESC`
+  const rows = await sql`SELECT crm_event_id, grupo_id FROM centro_eventos WHERE centro_id = ${centroId} ORDER BY created_at DESC`
   const ids = rows.map((r) => r.crm_event_id)
   if (ids.length === 0) return { events: [] }
   const res = await crmCall('get_events_by_ids', { ids })
   if (res.error) return { error: res.error, events: [] }
-  return { events: res.events || [] }
+  const grupoPorEvento = new Map(rows.filter((r) => r.grupo_id).map((r) => [r.crm_event_id, r.grupo_id]))
+  const grupoIds = [...new Set(grupoPorEvento.values())]
+  const gruposPorId = new Map()
+  if (grupoIds.length) {
+    const gs = await sql`
+      SELECT g.id, g.numero, COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
+      FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
+      WHERE g.id = ANY(${grupoIds})
+      GROUP BY g.id, g.numero
+    `
+    const hs = await sql`
+      SELECT grupo_id, dia, hora_inicio, hora_fin FROM grupo_horarios
+      WHERE grupo_id = ANY(${grupoIds}) ORDER BY dia, hora_inicio
+    `
+    for (const g of gs) {
+      gruposPorId.set(String(g.id), {
+        id: g.id,
+        numero: g.numero,
+        horarioTexto: horarioTextoDe(hs.filter((h) => String(h.grupo_id) === String(g.id))),
+        cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
+      })
+    }
+  }
+  const events = (res.events || []).map((ev) => {
+    const gid = grupoPorEvento.get(ev.id)
+    return { ...ev, grupo: (gid && gruposPorId.get(String(gid))) || null }
+  })
+  return { events }
 }
 
 // Campos del evento que aceptamos del cliente (se pasan tal cual al CRM).
@@ -53,17 +84,29 @@ function pickEvent(data, accountId) {
   }
 }
 
+// Valida el grupo por aperturar del formulario: del centro y activo. null = sin grupo.
+async function grupoValido(centroId, grupoId) {
+  if (!grupoId) return { grupoId: null }
+  const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'`
+  if (!g) return { error: 'El grupo no está activo o no pertenece a este centro.' }
+  return { grupoId: g.id }
+}
+
 export async function crearEvento(centroId, data) {
   const s = await requireCentroAccess(centroId)
   const accountId = crmAccountForCentro(centroId)
   if (!accountId) return { error: 'Este centro no tiene cuenta de CRM asignada.' }
   if (!data?.name?.trim() || !data?.start_date) return { error: 'Nombre y fecha de inicio son requeridos.' }
-  const res = await crmCall('create_event', { event: pickEvent(data, accountId) })
+  const vg = await grupoValido(centroId, data?.grupo_id)
+  if (vg.error) return { error: vg.error }
+  const event = pickEvent(data, accountId)
+  event.aloha_group = vg.grupoId ? await armarAlohaGroup(centroId, vg.grupoId) : null
+  const res = await crmCall('create_event', { event })
   if (res.error) return { error: res.error }
   const ev = res.event
   await sql`
-    INSERT INTO centro_eventos (centro_id, crm_event_id, crm_account_id, nombre, start_date, created_by)
-    VALUES (${centroId}, ${ev.id}, ${accountId}, ${ev.name}, ${ev.start_date}, ${s.email || ''})
+    INSERT INTO centro_eventos (centro_id, crm_event_id, crm_account_id, nombre, start_date, grupo_id, created_by)
+    VALUES (${centroId}, ${ev.id}, ${accountId}, ${ev.name}, ${ev.start_date}, ${vg.grupoId}, ${s.email || ''})
     ON CONFLICT (crm_event_id) DO NOTHING
   `
   return { ok: true, event: ev }
@@ -80,9 +123,21 @@ export async function actualizarEvento(centroId, eventId, data) {
   const accountId = crmAccountForCentro(centroId)
   const ev = pickEvent(data, accountId)
   delete ev.account_id // no se cambia la cuenta en update
+  // grupo_id solo se toca si viene en data: permite cambiar o quitar (null) el
+  // grupo por aperturar; el CRM recibe el aloha_group nuevo (o null para limpiarlo).
+  let grupoId
+  if (data?.grupo_id !== undefined) {
+    const vg = await grupoValido(centroId, data.grupo_id)
+    if (vg.error) return { error: vg.error }
+    grupoId = vg.grupoId
+    ev.aloha_group = grupoId ? await armarAlohaGroup(centroId, grupoId) : null
+  }
   const res = await crmCall('update_event', { event_id: eventId, event: ev })
   if (res.error) return { error: res.error }
   await sql`UPDATE centro_eventos SET nombre = ${res.event?.name || ev.name}, start_date = ${res.event?.start_date || ev.start_date} WHERE crm_event_id = ${eventId}`
+  if (data?.grupo_id !== undefined) {
+    await sql`UPDATE centro_eventos SET grupo_id = ${grupoId} WHERE crm_event_id = ${eventId}`
+  }
   return { ok: true, event: res.event }
 }
 
@@ -99,12 +154,14 @@ export async function duplicarEvento(centroId, eventId) {
   const s = await requireCentroAccess(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
+  // El duplicado hereda el grupo por aperturar del original (el CRM ya copia su aloha_group).
+  const [origen] = await sql`SELECT grupo_id FROM centro_eventos WHERE crm_event_id = ${eventId}`
   const res = await crmCall('duplicate_event', { event_id: eventId })
   if (res.error) return { error: res.error }
   const ev = res.event
   await sql`
-    INSERT INTO centro_eventos (centro_id, crm_event_id, crm_account_id, nombre, start_date, created_by)
-    VALUES (${centroId}, ${ev.id}, ${accountId}, ${ev.name}, ${ev.start_date}, ${s.email || ''})
+    INSERT INTO centro_eventos (centro_id, crm_event_id, crm_account_id, nombre, start_date, grupo_id, created_by)
+    VALUES (${centroId}, ${ev.id}, ${accountId}, ${ev.name}, ${ev.start_date}, ${origen?.grupo_id || null}, ${s.email || ''})
     ON CONFLICT (crm_event_id) DO NOTHING
   `
   return { ok: true, event: ev }
