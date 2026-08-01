@@ -460,6 +460,28 @@ function GrupoDetalle({ g, metas, acciones }) {
         </div>
       </div>
       {g.notas && <div style={{ padding: '10px 22px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>}
+      {g.itinerario_clases?.semanas?.length > 0 && (
+        <details style={{ padding: '10px 22px', fontSize: 12, borderBottom: '1px solid var(--border)' }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}>
+            📅 Itinerario del nivel {g.itinerario_clases.nivel} · {g.itinerario_clases.semanas.length} semanas · cierre estimado {fmtDia(g.itinerario_clases.fecha_cierre_estimada)}
+            {g.itinerario_clases.inicio_siguiente_nivel ? ` · siguiente nivel inicia ${fmtDia(g.itinerario_clases.inicio_siguiente_nivel)}` : ''}
+            {g.itinerario_clases.con_feriados === false ? ' · reglamento ALOHA Venezuela (sin feriados PA)' : ''}
+          </summary>
+          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 4 }}>
+            {g.itinerario_clases.semanas.map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', background: /Cierre|Mental/.test(s.etiqueta) ? 'var(--surface-3)' : 'transparent', borderRadius: 'var(--r-sm)' }}>
+                <span style={{ color: /Cierre/.test(s.etiqueta) ? 'var(--warn)' : 'var(--text-muted)' }}>{s.etiqueta}</span>
+                <span className="num" style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{s.fechas.map((f) => fmtDia(f).slice(0, 5)).join(' · ')}</span>
+              </div>
+            ))}
+          </div>
+          {g.itinerario_clases.feriados_saltados?.length > 0 && (
+            <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 11 }}>
+              Sin clases (feriados/vacaciones del manual): {g.itinerario_clases.feriados_saltados.map((f) => fmtDia(f)).join(' · ')}
+            </div>
+          )}
+        </details>
+      )}
       {g.estudiantes.length === 0 ? (
         <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Este grupo no tiene niños activos.</div>
       ) : (
@@ -611,6 +633,21 @@ const ROW_H = 26 // px por bloque de 30 min
 const ETIQUETA_COLOR = { Caliente: 'var(--ok)', Buena: 'var(--ok)', Media: 'var(--warn)', 'Difícil': 'var(--bad)', 'Sin historial': 'var(--text-dim)' }
 const ETIQUETA_EMOJI = { Caliente: '🔥 ', Buena: '', Media: '', 'Difícil': '⚠️ ', 'Sin historial': '' }
 
+// Liberación estimada del bloque de un grupo: su itinerario da la fecha de fin
+// del nivel; si el nivel dominante es el ÚLTIMO del programa (TINY 10, KIDS 8,
+// KINDER 3), al cierre el grupo se gradúa y su bloque de horario queda libre —
+// eso permite mercadear ese horario con meses de antelación.
+function liberacionDe(grupo) {
+  const cierre = grupo.itinerario_clases?.fecha_cierre_estimada
+  if (!cierre || grupo.es_online) return null
+  const niveles = (grupo.estudiantes || []).map((e) => Number(e.nivel)).filter(Boolean)
+  if (!niveles.length) return { cierre, libera: false }
+  const conteo = {}
+  for (const n of niveles) conteo[n] = (conteo[n] || 0) + 1
+  const moda = Number(Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0])
+  return { cierre, libera: moda >= (NIVEL_MAX[grupo.itinerario] || 99) }
+}
+
 function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
@@ -670,6 +707,41 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           <div className="kpi__sub">{modelo.gruposActivos} de {modelo.capacidadGrupos} grupos del modelo · capacidad {modelo.capacidadNinos} niños — ahí crece el centro</div>
         </div>
       </div>
+
+      {/* Bloques que se van a liberar: el itinerario da la fecha de fin del
+          grupo → mercadear el horario ANTES de que quede vacío. */}
+      {(() => {
+        const porLiberarse = activos
+          .map((g) => ({ g, lib: liberacionDe(g) }))
+          .filter((x) => x.lib?.libera)
+          .sort((a, b) => String(a.lib.cierre).localeCompare(String(b.lib.cierre)))
+        if (!porLiberarse.length) return null
+        const menosDias = (f, d) => {
+          const t = new Date(`${f}T00:00:00Z`).getTime() - d * 86400000
+          return new Date(t).toISOString().slice(0, 10)
+        }
+        return (
+          <div className="panel" style={{ marginBottom: 14, borderLeft: '3px solid var(--warn)' }}>
+            <div className="panel__head">
+              <h3 className="panel__title">📣 Bloques por liberarse — mercadear con antelación</h3>
+              <span className="label">Grupos en su último nivel: al cierre, su horario queda libre</span>
+            </div>
+            <table className="table">
+              <thead><tr>{['Grupo', 'Horario', 'Se libera', 'Mercadear desde'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <tbody>
+                {porLiberarse.map(({ g, lib }) => (
+                  <tr key={g.id} style={{ cursor: 'default' }}>
+                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>Grupo {g.numero} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-dim)' }}>{g.itinerario} · {g.estudiantes.length} niños · {g.coach?.nombre || 'sin coach'}</span></td>
+                    <td style={{ fontSize: 12 }}>{horarioTexto(g.horarios)}</td>
+                    <td className="num" style={{ fontSize: 12, color: 'var(--warn)', fontWeight: 700 }}>{fmtDia(lib.cierre)}</td>
+                    <td className="num" style={{ fontSize: 12 }}>{fmtDia(menosDias(lib.cierre, 60))} <span style={{ color: 'var(--text-dim)' }}>(2 meses antes)</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
 
       {/* Recomendación: dónde abrir el próximo grupo, según la estadística del centro */}
       {recos.length > 0 && (
@@ -765,8 +837,10 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                 const st = groupStatus(grupo, 8)
                 const alerta = st.key === 'bajo'
                 const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
+                const lib = liberacionDe(grupo)
+                const tituloLib = lib?.cierre ? ` · cierra nivel ~${fmtDia(lib.cierre)}${lib.libera ? ' y SE LIBERA el bloque (último nivel)' : ''}` : ''
                 return (
-                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}`}
+                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}${tituloLib}`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                       background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
@@ -781,7 +855,10 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                       {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
                     </div>
                     {!corto && (
-                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>
+                        {aHora12(inicio)}–{aHora12(fin)}
+                        {lib?.libera && <span style={{ color: 'var(--warn)', fontWeight: 700 }}> · 📣 libre {fmtDia(lib.cierre)}</span>}
+                      </div>
                     )}
                   </div>
                 )

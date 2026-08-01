@@ -347,3 +347,9 @@ CREATE INDEX IF NOT EXISTS idx_cuadro_mensual_centro ON cuadro_mensual(centro_id
 -- qué mes el grupo (y sus niños) entra al Cuadro de Negocio.
 ALTER TABLE grupos ADD COLUMN IF NOT EXISTS inscripcion_abierta BOOLEAN DEFAULT TRUE;
 ALTER TABLE grupos ADD COLUMN IF NOT EXISTS fecha_inicio_clases DATE;
+
+-- Itinerario de clases del nivel (manual ALOHA Panamá): generado al crear el
+-- grupo desde su fecha de inicio + días de clase, saltando feriados y las
+-- vacaciones de diciembre; guarda semanas etiquetadas (inducción/libro/mental
+-- day/cierre), cierre estimado e inicio del siguiente nivel (ciclos de 2).
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS itinerario_clases JSONB;
