@@ -611,19 +611,19 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
       {/* Métricas del inventario semanal */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 14 }}>
         <div className="kpi" style={{ padding: '14px 16px' }}>
-          <div className="kpi__top"><span className="label">Inventario ocupado</span></div>
+          <div className="kpi__top"><span className="label">Inventario vendible ocupado</span></div>
           <div className="kpi__value num" style={{ fontSize: 26 }}>{inv.pctOcupacion}%</div>
-          <div className="kpi__sub">{inv.ocupadoHoras} h de {inv.capacidadHoras} h-salón/semana</div>
+          <div className="kpi__sub">{inv.ocupadoHoras} h de {inv.capacidadHoras} h vendibles ({inv.capacidadTotalHoras} h operativas)</div>
         </div>
         <div className="kpi" style={{ padding: '14px 16px' }}>
-          <div className="kpi__top"><span className="label">Horas libres/semana</span></div>
+          <div className="kpi__top"><span className="label">Horas vendibles libres</span></div>
           <div className="kpi__value num" style={{ fontSize: 26 }}>{inv.libreHoras}</div>
-          <div className="kpi__sub">Lunes a sábado · salones activos</div>
+          <div className="kpi__sub">Semana 3:30–8:30 pm · sábado 9 am–5 pm</div>
         </div>
         <div className="kpi" style={{ padding: '14px 16px' }}>
           <div className="kpi__top"><span className="label">Cupos para grupos nuevos</span></div>
           <div className="kpi__value num" style={{ fontSize: 26, color: inv.cupos2h > 0 ? 'var(--ok)' : 'var(--text)' }}>{inv.cupos2h}</div>
-          <div className="kpi__sub">bloques de 2 h ({inv.cupos1h} de 1 h) — ahí crece el centro</div>
+          <div className="kpi__sub">bloques de 2 h vendibles ({inv.cupos1h} de 1 h) — ahí crece el centro</div>
         </div>
       </div>
 
