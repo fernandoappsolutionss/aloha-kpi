@@ -190,7 +190,7 @@ export default function EventosPage() {
                           {ev.location && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>📍 {ev.location}</div>}
                           {ev.grupo ? (
                             <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
-                              Grupo {ev.grupo.numero}{ev.grupo.horarioTexto ? ` · ${ev.grupo.horarioTexto}` : ''} · <span style={{ color: cupoColor(ev.grupo.cupos), fontWeight: 600 }}>{cupoTexto(ev.grupo.cupos)}</span>
+                              Grupo {ev.grupo.numero}{ev.grupo.horarioTexto ? ` · ${ev.grupo.horarioTexto}` : ''} · <span style={{ color: cupoColor(ev.grupo.cupos), fontWeight: 600 }}>{ev.grupo.cerrado ? '🔒 grupo cerrado a inscripciones' : cupoTexto(ev.grupo.cupos)}</span>
                             </div>
                           ) : (
                             <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>Sin grupo relacionado</div>
@@ -327,7 +327,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
               <Field full label="Grupo que se va a aperturar">
                 <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
                   <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
-                  {(grupos || []).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+                  {(grupos || []).filter((g) => g.inscripcionAbierta !== false || String(g.id) === String(f.grupo_id)).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}{g.inscripcionAbierta === false ? ' · 🔒 cerrado' : ''}</option>)}
                 </select>
                 {grupoSel && (
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>

@@ -160,6 +160,9 @@ export async function crearGrupo(centroId, data) {
   }
   const fechaApertura = data?.fecha_apertura || null
   if (fechaApertura && !FECHA_RE.test(fechaApertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
+  const fechaInicio = data?.fecha_inicio_clases || null
+  if (fechaInicio && !FECHA_RE.test(fechaInicio)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
+  const inscripcionAbierta = data?.inscripcion_abierta === undefined ? true : !!data.inscripcion_abierta
   const v = await validarHorarios(centroId, data?.horarios)
   if (v.error) return { error: v.error }
   const zk = validarZonaKinder(itinerario, v.horarios)
@@ -167,8 +170,8 @@ export async function crearGrupo(centroId, data) {
 
   const now = new Date().toISOString()
   const [g] = await sql`
-    INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_apertura, notas, updated_at)
-    VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaApertura}, ${data?.notas?.trim() || null}, ${now})
+    INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_apertura, fecha_inicio_clases, inscripcion_abierta, notas, updated_at)
+    VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaApertura}, ${fechaInicio}, ${inscripcionAbierta}, ${data?.notas?.trim() || null}, ${now})
     RETURNING id
   `
   for (const h of v.horarios) {
@@ -208,6 +211,9 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   const esOnline = data?.es_online !== undefined ? !!data.es_online : g.es_online
   if (data?.fecha_apertura && !FECHA_RE.test(data.fecha_apertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const fechaApertura = data?.fecha_apertura !== undefined ? data.fecha_apertura || null : g.fecha_apertura
+  if (data?.fecha_inicio_clases && !FECHA_RE.test(data.fecha_inicio_clases)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
+  const fechaInicio = data?.fecha_inicio_clases !== undefined ? data.fecha_inicio_clases || null : g.fecha_inicio_clases
+  const inscripcionAbierta = data?.inscripcion_abierta !== undefined ? !!data.inscripcion_abierta : g.inscripcion_abierta !== false
   const notas = data?.notas !== undefined ? data.notas?.trim() || null : g.notas
 
   let horarios = null
@@ -222,7 +228,8 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   const now = new Date().toISOString()
   await sql`
     UPDATE grupos SET numero = ${numero}, itinerario = ${itinerario}, es_online = ${esOnline},
-      coach_id = ${coachId}, fecha_apertura = ${fechaApertura}, notas = ${notas}, updated_at = ${now}
+      coach_id = ${coachId}, fecha_apertura = ${fechaApertura}, fecha_inicio_clases = ${fechaInicio},
+      inscripcion_abierta = ${inscripcionAbierta}, notas = ${notas}, updated_at = ${now}
     WHERE id = ${grupoId}
   `
   if (horarios) {
@@ -234,7 +241,22 @@ export async function actualizarGrupo(centroId, grupoId, data) {
       `
     }
   }
+  // Si cambió el estado de inscripciones, ventas debe ver los cupos correctos.
+  if ((g.inscripcion_abierta !== false) !== inscripcionAbierta) await pushCuposAlCrm(centroId, grupoId)
   return { ok: true }
+}
+
+// Abre o cierra las inscripciones de un grupo (en llenado ↔ ya no entra nadie).
+// Cerrado: no acepta inscripción, reincorporación, cambio de grupo ni fusión.
+export async function toggleInscripcionGrupo(centroId, grupoId) {
+  await requireCentroAccess(centroId)
+  const [g] = await sql`SELECT id, numero, inscripcion_abierta FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+  if (!g) return { error: 'El grupo no pertenece a este centro.' }
+  const nueva = g.inscripcion_abierta === false
+  await sql`UPDATE grupos SET inscripcion_abierta = ${nueva}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
+  // Cupos al CRM: cerrado = 0 disponibles aunque tenga espacio (best effort).
+  await pushCuposAlCrm(centroId, grupoId)
+  return { ok: true, abierta: nueva }
 }
 
 // Cierre manual (manual: un grupo en 0 niños se cierra para no afectar la rentabilidad).
@@ -279,11 +301,11 @@ export async function siguienteNumero(centroId) {
 export async function listarGruposActivos(centroId) {
   await requireCentroAccess(centroId)
   const rows = await sql`
-    SELECT g.id, g.numero, g.itinerario,
+    SELECT g.id, g.numero, g.itinerario, g.inscripcion_abierta, g.fecha_inicio_clases,
       COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
     FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
     WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
-    GROUP BY g.id, g.numero, g.itinerario
+    GROUP BY g.id, g.numero, g.itinerario, g.inscripcion_abierta, g.fecha_inicio_clases
   `
   const horarios = await sql`
     SELECT h.grupo_id, h.dia, h.hora_inicio, h.hora_fin
@@ -296,6 +318,8 @@ export async function listarGruposActivos(centroId) {
       id: g.id,
       numero: g.numero,
       itinerario: g.itinerario,
+      inscripcionAbierta: g.inscripcion_abierta !== false,
+      fechaInicioClases: g.fecha_inicio_clases ? String(g.fecha_inicio_clases).slice(0, 10) : null,
       horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
       cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
     }))
@@ -394,6 +418,7 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
   const tgt = grupos.find((g) => String(g.id) === String(aGrupoId))
   if (!src || !tgt) return { error: 'El grupo no pertenece a este centro.' }
   if (tgt.estado !== 'activo') return { error: 'El grupo destino no está activo.' }
+  if (tgt.inscripcion_abierta === false) return { error: `El grupo ${tgt.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo antes de fusionar hacia él.` }
   const ids = new Set(estudianteIds.map((x) => String(x)))
   const moveKids = src.estudiantes.filter((e) => ids.has(String(e.id)))
   if (moveKids.length !== ids.size) return { error: 'Hay niños que no pertenecen al grupo origen.' }

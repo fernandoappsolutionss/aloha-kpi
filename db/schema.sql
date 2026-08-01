@@ -339,3 +339,11 @@ CREATE TABLE IF NOT EXISTS cuadro_mensual (
   UNIQUE (centro_id, year, month)
 );
 CREATE INDEX IF NOT EXISTS idx_cuadro_mensual_centro ON cuadro_mensual(centro_id, year, month);
+
+-- Ciclo de llenado del grupo (regla de Fernando, 2026-08-01):
+-- inscripcion_abierta = el grupo está EN LLENADO y se puede colocar en clases
+-- de prueba; en FALSE ya no entra nadie (ni inscripción, ni reincorporación,
+-- ni cambio de grupo, ni fusión hacia él). fecha_inicio_clases determina desde
+-- qué mes el grupo (y sus niños) entra al Cuadro de Negocio.
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS inscripcion_abierta BOOLEAN DEFAULT TRUE;
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS fecha_inicio_clases DATE;
