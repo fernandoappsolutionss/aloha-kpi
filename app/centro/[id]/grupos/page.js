@@ -15,10 +15,10 @@ import {
 } from '../../../../lib/operaciones'
 import { groupStatus, underMeta, promedios, sugerenciasPara, scoreBand } from '../../../../lib/fusiones'
 import {
-  CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, calendarioDia, sinSalonDia,
-  inventarioSemanal, coachesLibresEn, bloquesQueCaben,
+  CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, aHora12, aMinutos, calendarioDia,
+  sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben,
 } from '../../../../lib/inventario'
-import { atractivoDe, recomendacionesApertura, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
+import { atractivoDe, recomendacionesApertura, inicioVendible, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -35,7 +35,7 @@ const isoDia = (d) => {
 }
 const fmtDia = (d) => isoDia(d) || '—'
 const horarioTexto = (horarios) =>
-  (horarios || []).length ? horarios.map((h) => `${DIAS[h.dia]} ${h.hora_inicio}–${h.hora_fin}`).join(' · ') : 'Sin horario'
+  (horarios || []).length ? horarios.map((h) => `${DIAS[h.dia]} ${aHora12(aMinutos(h.hora_inicio))}–${aHora12(aMinutos(h.hora_fin))}`).join(' · ') : 'Sin horario'
 
 // Itinerarios y rangos de nivel presentes en el grupo, p. ej. "TINY 3–5 · KIDS 7".
 function nivelesTexto(g) {
@@ -595,8 +595,9 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   for (let m = aperturaDia; m <= CIERRE_MIN; m += 60) horasEje.push(m)
 
   const clickHueco = (salon, h) => {
-    const dur = h.cabe2h ? 120 : 60
-    onAbrirGrupo({ dia, hora_inicio: aHora(h.inicio), hora_fin: aHora(h.inicio + dur), salon_id: String(salon.id) })
+    const ini = inicioVendible(dia, h)
+    const dur = h.fin - ini >= 120 ? 120 : 60
+    onAbrirGrupo({ dia, hora_inicio: aHora(ini), hora_fin: aHora(ini + dur), salon_id: String(salon.id) })
   }
 
   if (!salones.filter((s) => s.activo).length) return (
@@ -644,7 +645,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
             {recos.map((r, i) => (
               <div key={`${r.dia}-${r.inicio}-${r.salon.id}`} className="card" style={{ padding: 12, borderLeft: `3px solid ${ETIQUETA_COLOR[r.etiqueta]}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {DIAS[r.dia]} {aHora(r.inicio)}–{aHora(r.fin)}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {DIAS[r.dia]} {aHora12(r.inicio)}–{aHora12(r.fin)}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta] }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{r.salon.nombre} · {r.cabe2h ? 'bloque de 2 h' : '1 h (falta el 2.º día)'}</div>
@@ -684,7 +685,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           ))}
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-          Ventana {aHora(aperturaDia)}–8:30 pm · 30 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
+          Ventana {aHora12(aperturaDia)}–8:30 pm · 30 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
         </span>
       </div>
 
@@ -701,7 +702,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           {/* Eje de horas */}
           <div style={{ position: 'relative', height: altura }}>
             {horasEje.map((m) => (
-              <div key={m} className="num" style={{ position: 'absolute', top: topDe(m) - 7, right: 6, fontSize: 10, color: 'var(--text-dim)' }}>{aHora(m)}</div>
+              <div key={m} className="num" style={{ position: 'absolute', top: topDe(m) - 7, right: 6, fontSize: 9.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{aHora12(m)}</div>
             ))}
           </div>
 
@@ -714,41 +715,45 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
               {sesiones.map(({ grupo, horario, inicio, fin }) => {
                 const st = groupStatus(grupo, 8)
                 const alerta = st.key === 'bajo'
+                const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
                 return (
-                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.estudiantes.length} niños`}
+                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                       background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
                       borderLeft: `3px solid ${alerta ? 'var(--bad)' : 'var(--ts-green)'}`,
-                      borderRadius: 'var(--r-sm)', padding: '5px 8px', overflow: 'hidden', fontSize: 11.5,
+                      borderRadius: 'var(--r-sm)', padding: corto ? '3px 8px' : '5px 8px', overflow: 'hidden', fontSize: 11.5,
                     }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>Grupo {grupo.numero}</span>
-                      <span className="num" style={{ color: alerta ? 'var(--bad)' : 'var(--ok)' }}>{grupo.estudiantes.length}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Grupo {grupo.numero}</span>
+                      <span className="num" style={{ color: alerta ? 'var(--bad)' : 'var(--ok)', flexShrink: 0 }}>{grupo.estudiantes.length}</span>
                     </div>
-                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                      {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'} · {grupo.itinerario}
+                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: corto ? 10.5 : 11.5 }}>
+                      {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
                     </div>
-                    <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{horario.hora_inicio}–{horario.hora_fin}</div>
+                    {!corto && (
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
+                    )}
                   </div>
                 )
               })}
               {huecos.map((h) => {
                 const libres = coachesLibresEn(activos, coaches, dia, h.inicio, h.fin)
-                const at = atractivoDe(grupos, retirados, dia, h.inicio)
+                const at = atractivoDe(grupos, retirados, dia, inicioVendible(dia, h))
+                const chico = h.minutos < 105 // hueco bajito: solo lo esencial para que nada se corte
                 return (
                   <button key={h.inicio} onClick={() => clickHueco(salon, h)}
-                    title={`${at.razon} Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
+                    title={`${aHora12(h.inicio)}–${aHora12(h.fin)} · ${at.razon} Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(h.inicio) + 1, height: topDe(h.fin) - topDe(h.inicio) - 2,
                       background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
-                      color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 4,
+                      color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 4, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                     }}>
-                    <span>＋ Abrir grupo</span>
-                    <span className="num" style={{ fontWeight: 500 }}>{aHora(h.inicio)}–{aHora(h.fin)}</span>
-                    <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta] }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
-                    {h.cabe2h && <span style={{ fontWeight: 500, fontSize: 10 }}>{bloquesQueCaben(h.minutos, 120)}×2h · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
+                    <span style={{ whiteSpace: 'nowrap' }}>＋ {chico ? aHora12(h.inicio) : 'Abrir grupo'}</span>
+                    {!chico && <span className="num" style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{aHora12(h.inicio)}–{aHora12(h.fin)}</span>}
+                    <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
+                    {!chico && h.cabe2h && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{bloquesQueCaben(h.minutos, 120)}×2h · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
                   </button>
                 )
               })}
@@ -761,7 +766,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
       {sinSalon.length > 0 && (
         <div className="card" style={{ padding: '10px 14px', marginTop: 12, borderLeft: '3px solid var(--warn)', fontSize: 12.5, color: 'var(--text-muted)' }}>
           <b style={{ color: 'var(--warn)' }}>Con horario pero sin salón este día:</b>{' '}
-          {sinSalon.map((x) => `Grupo ${x.grupo.numero} (${x.horario.hora_inicio}–${x.horario.hora_fin})`).join(' · ')}
+          {sinSalon.map((x) => `Grupo ${x.grupo.numero} (${aHora12(x.inicio)}–${aHora12(x.fin)})`).join(' · ')}
           {' '}— edítalos y asígnales salón para que entren al inventario.
         </div>
       )}
