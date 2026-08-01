@@ -993,11 +993,60 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
   )
 }
 
+// Por dónde va el grupo en su planificación (semana en curso del itinerario).
+function posicionPlan(g) {
+  const it = g.itinerario_clases
+  if (!it?.semanas?.length) return null
+  const idx = semanaEnCurso(it, hoyISO())
+  const sem = idx >= 0 ? it.semanas[idx] : null
+  return {
+    corto: sem?.corto || '—',
+    etiqueta: sem?.etiqueta || (idx < 0 ? 'aún no inicia' : ''),
+    nivel: it.nivel,
+    cierre: it.fecha_cierre_estimada,
+  }
+}
+
+// Resumen de niveles de los niños de un grupo: "3× T7 · 2× T8 · 1× K6".
+const nivelCorto = (e) => `${e.itinerario === 'KINDER' ? 'Kd' : e.itinerario === 'KIDS' ? 'K' : 'T'}${e.nivel}`
+function resumenNiveles(estudiantes) {
+  const cnt = {}
+  for (const e of estudiantes || []) cnt[nivelCorto(e)] = (cnt[nivelCorto(e)] || 0) + 1
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(' · ')
+}
+
 function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
   const banda = scoreBand(analisis.score, analisis.blocked)
   const key = `${from.id}-${to.id}`
   const K_ICON = { ok: '✓', mb: '△', no: '✕' }
   const K_COLOR = { ok: 'var(--ok)', mb: 'var(--warn)', no: 'var(--bad)' }
+  const planFrom = posicionPlan(from)
+  const planTo = posicionPlan(to)
+  // Aviso de planificación: fusionar niños que van por semanas distintas del
+  // plan obliga a nivelar contenido — se muestra siempre que se sepa.
+  let planAviso = null
+  if (planFrom && planTo) {
+    planAviso = planFrom.nivel === planTo.nivel && planFrom.corto === planTo.corto
+      ? { k: 'ok', t: `Van por la misma semana del plan (${planFrom.corto})` }
+      : { k: 'mb', t: `Planificación desfasada: G${from.numero} va por ${planFrom.corto} (nivel ${planFrom.nivel}), G${to.numero} por ${planTo.corto} (nivel ${planTo.nivel})` }
+  }
+  const GrupoLado = ({ g, plan, titulo }) => (
+    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+      <div className="label" style={{ marginBottom: 4 }}>{titulo}: Grupo {g.numero}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        Niveles: <b style={{ color: 'var(--text)' }}>{resumenNiveles(g.estudiantes) || 'sin niños'}</b>
+        {plan ? <> · va por <b style={{ color: 'var(--ts-green)' }}>{plan.corto}</b>{plan.cierre ? ` · cierra ~${fmtDia(plan.cierre)}` : ''}</> : ' · sin itinerario generado'}
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+        {(g.estudiantes || []).map((e) => (
+          <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel}${e.fecha_cierre_nivel ? ` · cierra ${fmtDia(e.fecha_cierre_nivel)}` : ''}`}
+            style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
   return (
     <div className="card" style={{ padding: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -1015,11 +1064,22 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+        {planAviso && (
+          <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
+            <span style={{ color: K_COLOR[planAviso.k], marginRight: 5 }}>{K_ICON[planAviso.k]}</span>{planAviso.t}
+          </span>
+        )}
         {analisis.reasons.map((r, i) => (
           <span key={i} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
             <span style={{ color: K_COLOR[r.k], marginRight: 5 }}>{K_ICON[r.k]}</span>{r.t}
           </span>
         ))}
+      </div>
+      {/* Cada niño con su nivel y por dónde va cada grupo en la planificación:
+          lo que el administrador necesita ver ANTES de fusionar. */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+        <GrupoLado g={from} plan={planFrom} titulo="Se mueve" />
+        <GrupoLado g={to} plan={planTo} titulo="Recibe" />
       </div>
     </div>
   )
