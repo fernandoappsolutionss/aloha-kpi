@@ -19,7 +19,7 @@ import {
   sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben, ventanaVendible,
 } from '../../../../lib/inventario'
 import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
-import { estadoModelo, RESUMEN_MODELO } from '../../../../lib/modelo'
+import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -731,7 +731,10 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
             ))}
           </div>
 
-          {cols.map(({ salon, sesiones, huecos }) => (
+          {cols.map(({ salon, sesiones, huecos }) => {
+            const unidadesSalon = unidadesLibres(activos, [salon])
+            const slotsLibres = slotsDelDia(dia).filter((sl) => huecos.some((h) => sl.inicio >= h.inicio && sl.fin <= h.fin))
+            return (
             <div key={salon.id} style={{
               position: 'relative', height: altura, borderRadius: 'var(--r-sm)',
               background: `repeating-linear-gradient(to bottom, var(--surface-2), var(--surface-2) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2}px)`,
@@ -762,58 +765,64 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                   </div>
                 )
               })}
+              {/* Zonas muertas (no se venden) en gris */}
               {huecos.flatMap((h) => {
-                // El hueco se parte en zona muerta (no se vende) y zona vendible.
                 const [vi, vf] = ventanaVendible(dia)
-                const segs = []
-                if (Math.min(h.fin, vi) - h.inicio > 0) segs.push({ inicio: h.inicio, fin: Math.min(h.fin, vi), muerta: true })
-                const sIni = Math.max(h.inicio, vi)
-                const sFin = Math.min(h.fin, vf)
-                if (sFin - sIni >= 30) segs.push({ inicio: sIni, fin: sFin, muerta: false })
-                if (h.fin - Math.max(h.inicio, vf) > 0) segs.push({ inicio: Math.max(h.inicio, vf), fin: h.fin, muerta: true })
-                return segs.map((seg) => {
-                  const minutos = seg.fin - seg.inicio
-                  const chico = minutos < 105
-                  if (seg.muerta) {
-                    const razonMuerta = dia === 6
-                      ? 'Después de las 5:00 pm el sábado casi no se vende (las jornadas van de 9 am a 5 pm).'
-                      : 'Hora muerta: los niños salen del colegio ~1:00 pm; se vende desde las 3:00 pm.'
-                    return (
-                      <div key={`m-${seg.inicio}`} title={razonMuerta}
-                        style={{
-                          position: 'absolute', left: 4, right: 4, top: topDe(seg.inicio) + 1, height: topDe(seg.fin) - topDe(seg.inicio) - 2,
-                          background: 'var(--surface-2)', border: '1px dashed var(--border)', borderRadius: 'var(--r-sm)',
-                          color: 'var(--text-faint)', fontSize: 10.5, fontWeight: 500, padding: 4, overflow: 'hidden',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                        }}>
-                        <span style={{ whiteSpace: 'nowrap' }}>Hora muerta</span>
-                        {!chico && <span className="num" style={{ whiteSpace: 'nowrap' }}>{aHora12(seg.inicio)}–{aHora12(seg.fin)}</span>}
-                        {!chico && <span style={{ whiteSpace: 'nowrap' }}>casi no se vende</span>}
-                      </div>
-                    )
-                  }
-                  const segHueco = { inicio: seg.inicio, fin: seg.fin, minutos, cabe1h: minutos >= 60, cabe2h: minutos >= 120 }
-                  const libres = coachesLibresEn(activos, coaches, dia, seg.inicio, seg.fin)
-                  const at = atractivoDe(grupos, retirados, dia, seg.inicio)
-                  return (
-                    <button key={`v-${seg.inicio}`} onClick={() => clickHueco(salon, segHueco)}
-                      title={`${aHora12(seg.inicio)}–${aHora12(seg.fin)} · ${at.razon} Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
-                      style={{
-                        position: 'absolute', left: 4, right: 4, top: topDe(seg.inicio) + 1, height: topDe(seg.fin) - topDe(seg.inicio) - 2,
-                        background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
-                        color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 4, overflow: 'hidden',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                      }}>
-                      <span style={{ whiteSpace: 'nowrap' }}>＋ {chico ? aHora12(seg.inicio) : 'Abrir grupo'}</span>
-                      {!chico && <span className="num" style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{aHora12(seg.inicio)}–{aHora12(seg.fin)}</span>}
-                      <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
-                      {!chico && segHueco.cabe2h && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{bloquesQueCaben(minutos, 120)}×2h · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
-                    </button>
-                  )
-                })
+                const muertas = []
+                if (Math.min(h.fin, vi) - h.inicio > 0) muertas.push({ inicio: h.inicio, fin: Math.min(h.fin, vi) })
+                if (h.fin - Math.max(h.inicio, vf) > 0) muertas.push({ inicio: Math.max(h.inicio, vf), fin: h.fin })
+                const razonMuerta = dia === 6
+                  ? 'Después de las 5:00 pm el sábado casi no se vende (las jornadas van de 9 am a 5 pm).'
+                  : 'Hora muerta: los niños salen del colegio ~1:00 pm; se vende desde las 3:00 pm.'
+                return muertas.map((seg) => (
+                  <div key={`m-${seg.inicio}`} title={razonMuerta}
+                    style={{
+                      position: 'absolute', left: 4, right: 4, top: topDe(seg.inicio) + 1, height: topDe(seg.fin) - topDe(seg.inicio) - 2,
+                      background: 'var(--surface-2)', border: '1px dashed var(--border)', borderRadius: 'var(--r-sm)',
+                      color: 'var(--text-faint)', fontSize: 10.5, fontWeight: 500, padding: 4, overflow: 'hidden',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                    }}>
+                    <span style={{ whiteSpace: 'nowrap' }}>Hora muerta</span>
+                    {seg.fin - seg.inicio >= 105 && <span style={{ whiteSpace: 'nowrap' }}>casi no se vende</span>}
+                  </div>
+                ))
+              })}
+              {/* Bloques del MODELO libres: la parrilla planificada del negocio */}
+              {slotsLibres.map((sl) => {
+                const unidad = unidadesSalon.find((u) => u.sesiones.some((ses) => ses.dia === dia && ses.inicio === sl.inicio && ses.fin === sl.fin))
+                const at = atractivoDe(grupos, retirados, dia, sl.inicio)
+                const libres = coachesLibresEn(activos, coaches, dia, sl.inicio, sl.fin)
+                const corto = sl.fin - sl.inicio <= 60
+                // Si el par del día está ocupado en ESTE salón, igual se prellena la
+                // segunda sesión de 1 h en el día par (salón por asignar): el grupo
+                // siempre nace cumpliendo las 2 h semanales del programa.
+                const diaPar = sl.tipo === 'LM' ? (dia === 1 ? 3 : 1) : sl.tipo === 'MJ' ? (dia === 2 ? 4 : 2) : null
+                const horarios = unidad
+                  ? unidad.sesiones.map((ses) => ({ dia: ses.dia, hora_inicio: aHora(ses.inicio), hora_fin: aHora(ses.fin), salon_id: String(ses.salon_id) }))
+                  : diaPar
+                    ? [
+                        { dia, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: String(salon.id) },
+                        { dia: diaPar, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: '' },
+                      ]
+                    : [{ dia, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: String(salon.id) }]
+                const subTexto = unidad ? sl.sub : (diaPar ? '1 h + 1 h · par en otro salón' : sl.sub)
+                return (
+                  <button key={`s-${sl.inicio}`} onClick={() => onAbrirGrupo({ horarios })}
+                    title={`${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
+                    style={{
+                      position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
+                      background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
+                      color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                    }}>
+                    <span className="num" style={{ whiteSpace: 'nowrap' }}>＋ {aHora12(sl.inicio)}–{aHora12(sl.fin)}</span>
+                    <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
+                    {!corto && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
+                  </button>
+                )
               })}
             </div>
-          ))}
+          ) })}
         </div>
       </div>
 
