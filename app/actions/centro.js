@@ -67,5 +67,26 @@ export async function getHistorialCentro(centroId) {
   const estados = await sql`
     SELECT year, month, estado, cerrado_at FROM mes_kpi WHERE centro_id = ${centroId}
   `
-  return { nombre: c?.nombre || '', resumen, estados }
+  // Fotos mensuales del Cuadro de Negocio (solo métricas compactas: la foto
+  // completa con niños y contactos se ve en la página del cuadro).
+  const fotos = await sql`
+    SELECT year, month, datos, cerrado_at FROM cuadro_mensual
+    WHERE centro_id = ${centroId} ORDER BY year, month
+  `
+  const cuadros = fotos.map((f) => {
+    const d = typeof f.datos === 'string' ? JSON.parse(f.datos) : f.datos
+    return {
+      year: f.year,
+      month: f.month,
+      cerrado_at: f.cerrado_at,
+      aPagar: d?.totales?.aPagar ?? 0,
+      nuevos: d?.totales?.nuevos ?? 0,
+      reincorporados: d?.totales?.reincorporados ?? 0,
+      retirados: d?.totales?.retirados ?? 0,
+      gruposActivos: d?.totales?.gruposActivos ?? 0,
+      promedio: d?.promedios?.sinK ?? null,
+      royalty: d?.royalties?.totales?.totalRoyalty ?? 0,
+    }
+  })
+  return { nombre: c?.nombre || '', resumen, estados, cuadros }
 }

@@ -34,21 +34,25 @@ export async function listarEventos(centroId) {
   const gruposPorId = new Map()
   if (grupoIds.length) {
     const gs = await sql`
-      SELECT g.id, g.numero, COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
+      SELECT g.id, g.numero, g.inscripcion_abierta,
+        COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
       FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
       WHERE g.id = ANY(${grupoIds})
-      GROUP BY g.id, g.numero
+      GROUP BY g.id, g.numero, g.inscripcion_abierta
     `
     const hs = await sql`
       SELECT grupo_id, dia, hora_inicio, hora_fin FROM grupo_horarios
       WHERE grupo_id = ANY(${grupoIds}) ORDER BY dia, hora_inicio
     `
     for (const g of gs) {
+      const cerrado = g.inscripcion_abierta === false
       gruposPorId.set(String(g.id), {
         id: g.id,
         numero: g.numero,
+        cerrado,
+        // Grupo cerrado a inscripciones = 0 cupos para ventas, aunque tenga espacio.
+        cupos: cerrado ? 0 : Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
         horarioTexto: horarioTextoDe(hs.filter((h) => String(h.grupo_id) === String(g.id))),
-        cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
       })
     }
   }

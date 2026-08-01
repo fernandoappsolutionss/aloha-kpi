@@ -1,6 +1,7 @@
 'use server'
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
+import { guardarSnapshotCuadro } from '../../lib/cuadro-snapshot'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -82,7 +83,16 @@ export async function cerrarMes(centroId, year, month) {
   await upsert('mes_kpi',
     { centro_id: centroId, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() },
     ['centro_id', 'year', 'month'])
-  return { ok: true }
+  // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial).
+  // Best effort: si falla, el mes queda cerrado igual y la foto se congela
+  // retroactivamente la próxima vez que alguien abra ese mes del cuadro.
+  let warn
+  try {
+    await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
+  } catch {
+    warn = 'El mes quedó cerrado, pero no se pudo congelar la foto del cuadro; se congelará al abrir el cuadro de ese mes.'
+  }
+  return warn ? { ok: true, warn } : { ok: true }
 }
 
 export async function reabrirMes(centroId, year, month) {

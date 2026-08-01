@@ -59,6 +59,8 @@ export default function CuadroPage() {
   useEffect(() => { loadData() }, [loadData])
 
   const cerrado = data?.mesEstado === 'cerrado'
+  // Mes cerrado = se muestra la foto congelada al cierre; nada se edita aquí.
+  const congelado = !!data?.congelado
 
   async function handleSincronizar() {
     if (cerrado) return
@@ -160,7 +162,10 @@ export default function CuadroPage() {
               </select>
             </div>
             {data && (
-              <span className={`pill ${cerrado ? 'pill--warn' : 'pill--ok'}`}><span className="dot" />{cerrado ? 'Mes KPI cerrado' : 'Mes KPI abierto'}</span>
+              <span className={`pill ${cerrado ? 'pill--warn' : 'pill--ok'}`}
+                title={congelado ? `Foto congelada al cierre${data.congeladoAt ? ' (' + fmtFecha(String(data.congeladoAt).slice(0, 10)) + ')' : ''}. Los movimientos posteriores no alteran este mes.` : undefined}>
+                <span className="dot" />{congelado ? '🔒 Mes cerrado · foto congelada' : (cerrado ? 'Mes KPI cerrado' : 'Mes KPI abierto')}
+              </span>
             )}
             <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download>⬇ Descargar Excel</a>
             <button onClick={handleSincronizar} disabled={syncing || cerrado} className="btn"
@@ -274,7 +279,11 @@ export default function CuadroPage() {
                 <span className="label">Clic en un grupo para ver y gestionar sus niños</span>
               </div>
               <div style={{ padding: '8px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>
-                <b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.
+                {congelado ? (
+                  <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(String(data.congeladoAt).slice(0, 10))})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Semanal.</>
+                ) : (
+                  <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
+                )}
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
@@ -322,7 +331,7 @@ export default function CuadroPage() {
                                               <div style={{ color: 'var(--text-faint)' }}>{e.correo || ''}</div>
                                             </td>
                                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                              {e.esRetirado ? (
+                                              {congelado ? null : e.esRetirado ? (
                                                 <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
                                                   onClick={() => setAccionNino({ tipo: 'reincorporar', nino: e })}>↩ Reincorporar</button>
                                               ) : (
@@ -417,8 +426,12 @@ export default function CuadroPage() {
                           <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{money(p.monto)}</td>
                           <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{p.observaciones || '—'}</td>
                           <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
-                            <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                            {!congelado && (
+                              <>
+                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
+                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -432,6 +445,11 @@ export default function CuadroPage() {
                   </table>
                 </div>
               )}
+              {congelado ? (
+                <div style={{ padding: '12px 18px', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
+                  🔒 Mes cerrado: los pedidos quedaron congelados con el cuadro. Reabre el mes en KPI Semanal para modificarlos.
+                </div>
+              ) : (
               <form onSubmit={handleGuardarPedido} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '14px 18px', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
                 <span className="label" style={{ width: '100%' }}>{pedido.id ? 'Editar pedido' : 'Nuevo pedido'} — {NOMBRES_MES[month - 1]} {year}</span>
                 <div className="field" style={{ flex: '0 1 140px', margin: 0 }}>
@@ -481,6 +499,7 @@ export default function CuadroPage() {
                 <button type="submit" className="btn btn--primary" disabled={savingPedido}>{savingPedido ? 'Guardando…' : (pedido.id ? 'Guardar cambios' : '+ Agregar pedido')}</button>
                 {pedido.id && <button type="button" className="btn" onClick={() => setPedido(EMPTY_PEDIDO)}>Cancelar</button>}
               </form>
+              )}
             </div>
           </>
         )}
@@ -516,6 +535,7 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
     setSaving(false)
     if (res.error) { setErr(res.error); return }
     let msg = `${nino.nombre} retirado del cuadro.`
+    if (res.warn) msg += ` ⚠️ ${res.warn}`
     if (res.grupoVacio) msg += ` El grupo ${res.grupoVacio} quedó sin niños: ciérralo en Grupos y Fusiones si ya no va a operar.`
     onSaved(msg)
   }
@@ -577,8 +597,8 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
         <select className="input" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
           <option value="">Selecciona grupo…</option>
           {grupos.map((g) => (
-            <option key={g.id} value={String(g.id)}>
-              Grupo {g.numero} · {g.itinerario}{g.horarioTexto ? ` · ${g.horarioTexto}` : ''} · quedan {g.cupos} de 10 cupos
+            <option key={g.id} value={String(g.id)} disabled={g.inscripcionAbierta === false}>
+              Grupo {g.numero} · {g.itinerario}{g.horarioTexto ? ` · ${g.horarioTexto}` : ''} · {g.inscripcionAbierta === false ? '🔒 cerrado a inscripciones' : `quedan ${g.cupos} de 10 cupos`}
             </option>
           ))}
         </select>

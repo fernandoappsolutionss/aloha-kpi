@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
-  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, siguienteNumero,
+  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, toggleInscripcionGrupo, siguienteNumero,
   saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion,
 } from '../../../actions/grupos'
 import {
@@ -225,15 +225,24 @@ export default function GruposPage() {
     const horarios = prefill?.horarios?.length
       ? prefill.horarios.map((h) => ({ ...h }))
       : [{ ...(prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }) }]
-    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios })
+    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), fecha_inicio_clases: '', inscripcion_abierta: true, notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
     setGrupoModal({
       id: g.id, numero: String(g.numero), itinerario: g.itinerario, es_online: !!g.es_online,
-      coach_id: g.coach_id || '', fecha_apertura: isoDia(g.fecha_apertura), notas: g.notas || '',
+      coach_id: g.coach_id || '', fecha_apertura: isoDia(g.fecha_apertura),
+      fecha_inicio_clases: isoDia(g.fecha_inicio_clases), inscripcion_abierta: g.inscripcion_abierta !== false,
+      notas: g.notas || '',
       horarios: (g.horarios || []).map((h) => ({ dia: h.dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || '' })),
     })
+  }
+  async function onToggleInscripcion(g) {
+    const cerrando = g.inscripcion_abierta !== false
+    if (cerrando && !confirm(`¿Cerrar las inscripciones del grupo ${g.numero}? Ya no entra nadie (ni inscripción, ni reincorporación, ni fusión) y ventas verá 0 cupos.`)) return
+    const res = await toggleInscripcionGrupo(id, g.id)
+    if (res.error) setStatus('❌ ' + res.error)
+    else { setStatus(res.abierta ? `✅ Grupo ${g.numero} abierto: en llenado.` : `🔒 Grupo ${g.numero} cerrado a inscripciones.`); refresca() }
   }
   async function onCerrarGrupo(g) {
     if (!confirm(`¿Cerrar el grupo ${g.numero}? Deja de contar en la rentabilidad del centro.`)) return
@@ -272,6 +281,7 @@ export default function GruposPage() {
   async function retiroGuardado(res, est) {
     setRetiroEst(null)
     let msg = `✅ ${est.nombre} retirado.`
+    if (res.warn) msg += ` ⚠️ ${res.warn}`
     if (res.grupoVacio && est.grupo_id && confirm(`El grupo ${res.grupoVacio} quedó sin niños. El manual indica cerrarlo para no afectar la rentabilidad. ¿Cerrarlo ahora?`)) {
       const rc = await cerrarGrupo(id, est.grupo_id)
       msg = rc.error ? '❌ ' + rc.error : `✅ ${est.nombre} retirado y grupo ${res.grupoVacio} cerrado.`
@@ -298,6 +308,7 @@ export default function GruposPage() {
     editarGrupo: abrirEditarGrupo,
     cerrar: onCerrarGrupo,
     reabrir: onReabrirGrupo,
+    toggleInscripcion: onToggleInscripcion,
     buscarFusion: onBuscarFusion,
     inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
@@ -606,10 +617,14 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
             <h3 className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
+              {activo && (g.inscripcion_abierta === false
+                ? <span className="pill pill--bad" title="Cerrado a inscripciones: ya no entra nadie. Ventas ve 0 cupos."><span className="dot" />🔒 Inscripciones cerradas</span>
+                : <span className="pill pill--ok" title="En llenado: acepta niños y se puede colocar en las clases de prueba."><span className="dot" />En llenado</span>)}
             </h3>
             <p className="h-sub" style={{ marginTop: 5 }}>
               {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
               {g.fecha_apertura ? ` · Apertura: ${fmtDia(g.fecha_apertura)}` : ''}
+              {g.fecha_inicio_clases ? ` · Inicia clases: ${fmtDia(g.fecha_inicio_clases)} (entra al cuadro ese mes)` : ''}
             </p>
           </div>
           <button className="btn" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
@@ -618,6 +633,11 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
           <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>✎ Editar grupo</button>
           {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>+ Inscribir niño aquí</button>}
+          {activo && (
+            <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.toggleInscripcion(g)}>
+              {g.inscripcion_abierta === false ? 'Abrir inscripciones' : 'Cerrar inscripciones'}
+            </button>
+          )}
           {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.buscarFusion(g)}>Buscar fusión</button>}
           {activo ? (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.cerrar(g)}>Cerrar grupo</button>
@@ -640,6 +660,28 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         </div>
         {g.notas && (
           <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>
+        )}
+        {g.itinerario_clases?.semanas?.length > 0 && (
+          <details style={{ padding: '10px 18px', fontSize: 12, borderBottom: '1px solid var(--border)' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}>
+              📅 Itinerario del nivel {g.itinerario_clases.nivel} · {g.itinerario_clases.semanas.length} semanas · cierre estimado {fmtDia(g.itinerario_clases.fecha_cierre_estimada)}
+              {g.itinerario_clases.inicio_siguiente_nivel ? ` · siguiente nivel inicia ${fmtDia(g.itinerario_clases.inicio_siguiente_nivel)}` : ''}
+              {g.itinerario_clases.con_feriados === false ? ' · reglamento ALOHA Venezuela (sin feriados PA)' : ''}
+            </summary>
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 4 }}>
+              {g.itinerario_clases.semanas.map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', background: /Cierre|Mental/.test(s.etiqueta) ? 'var(--surface-3)' : 'transparent', borderRadius: 'var(--r-sm)' }}>
+                  <span style={{ color: /Cierre/.test(s.etiqueta) ? 'var(--warn)' : 'var(--text-muted)' }}>{s.etiqueta}</span>
+                  <span className="num" style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{s.fechas.map((f) => fmtDia(f).slice(0, 5)).join(' · ')}</span>
+                </div>
+              ))}
+            </div>
+            {g.itinerario_clases.feriados_saltados?.length > 0 && (
+              <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 11 }}>
+                Sin clases (feriados/vacaciones del manual): {g.itinerario_clases.feriados_saltados.map((f) => fmtDia(f)).join(' · ')}
+              </div>
+            )}
+          </details>
         )}
         {n === 0 ? (
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
@@ -817,6 +859,21 @@ const ROW_H = 26 // px por bloque de 30 min
 const ETIQUETA_COLOR = { Caliente: 'var(--ok)', Buena: 'var(--ok)', Media: 'var(--warn)', 'Difícil': 'var(--bad)', 'Sin historial': 'var(--text-dim)' }
 const ETIQUETA_EMOJI = { Caliente: '🔥 ', Buena: '', Media: '', 'Difícil': '⚠️ ', 'Sin historial': '' }
 
+// Liberación estimada del bloque de un grupo: su itinerario da la fecha de fin
+// del nivel; si el nivel dominante es el ÚLTIMO del programa (TINY 10, KIDS 8,
+// KINDER 3), al cierre el grupo se gradúa y su bloque de horario queda libre —
+// eso permite mercadear ese horario con meses de antelación.
+function liberacionDe(grupo) {
+  const cierre = grupo.itinerario_clases?.fecha_cierre_estimada
+  if (!cierre || grupo.es_online) return null
+  const niveles = (grupo.estudiantes || []).map((e) => Number(e.nivel)).filter(Boolean)
+  if (!niveles.length) return { cierre, libera: false }
+  const conteo = {}
+  for (const n of niveles) conteo[n] = (conteo[n] || 0) + 1
+  const moda = Number(Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0])
+  return { cierre, libera: moda >= (NIVEL_MAX[grupo.itinerario] || 99) }
+}
+
 function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
@@ -876,6 +933,41 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           <div className="kpi__sub">{modelo.gruposActivos} de {modelo.capacidadGrupos} grupos del modelo · capacidad {modelo.capacidadNinos} niños — ahí crece el centro</div>
         </div>
       </div>
+
+      {/* Bloques que se van a liberar: el itinerario da la fecha de fin del
+          grupo → mercadear el horario ANTES de que quede vacío. */}
+      {(() => {
+        const porLiberarse = activos
+          .map((g) => ({ g, lib: liberacionDe(g) }))
+          .filter((x) => x.lib?.libera)
+          .sort((a, b) => String(a.lib.cierre).localeCompare(String(b.lib.cierre)))
+        if (!porLiberarse.length) return null
+        const menosDias = (f, d) => {
+          const t = new Date(`${f}T00:00:00Z`).getTime() - d * 86400000
+          return new Date(t).toISOString().slice(0, 10)
+        }
+        return (
+          <div className="panel" style={{ marginBottom: 14, borderLeft: '3px solid var(--warn)' }}>
+            <div className="panel__head">
+              <h3 className="panel__title">📣 Bloques por liberarse — mercadear con antelación</h3>
+              <span className="label">Grupos en su último nivel: al cierre, su horario queda libre</span>
+            </div>
+            <table className="table">
+              <thead><tr>{['Grupo', 'Horario', 'Se libera', 'Mercadear desde'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <tbody>
+                {porLiberarse.map(({ g, lib }) => (
+                  <tr key={g.id} style={{ cursor: 'default' }}>
+                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>Grupo {g.numero} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-dim)' }}>{g.itinerario} · {g.estudiantes.length} niños · {g.coach?.nombre || 'sin coach'}</span></td>
+                    <td style={{ fontSize: 12 }}>{horarioTexto(g.horarios)}</td>
+                    <td className="num" style={{ fontSize: 12, color: 'var(--warn)', fontWeight: 700 }}>{fmtDia(lib.cierre)}</td>
+                    <td className="num" style={{ fontSize: 12 }}>{fmtDia(menosDias(lib.cierre, 60))} <span style={{ color: 'var(--text-dim)' }}>(2 meses antes)</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
 
       {/* Recomendación: dónde abrir el próximo grupo, según la estadística del centro */}
       {recos.length > 0 && (
@@ -971,8 +1063,10 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                 const st = groupStatus(grupo, 8)
                 const alerta = st.key === 'bajo'
                 const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
+                const lib = liberacionDe(grupo)
+                const tituloLib = lib?.cierre ? ` · cierra nivel ~${fmtDia(lib.cierre)}${lib.libera ? ' y SE LIBERA el bloque (último nivel)' : ''}` : ''
                 return (
-                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}`}
+                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}${tituloLib}`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                       background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
@@ -987,7 +1081,10 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                       {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
                     </div>
                     {!corto && (
-                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>
+                        {aHora12(inicio)}–{aHora12(fin)}
+                        {lib?.libera && <span style={{ color: 'var(--warn)', fontWeight: 700 }}> · 📣 libre {fmtDia(lib.cierre)}</span>}
+                      </div>
                     )}
                   </div>
                 )
@@ -1200,7 +1297,9 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
     setSaving(true); setErr('')
     const data = {
       numero: String(f.numero).trim(), itinerario: f.itinerario, es_online: f.es_online,
-      coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null, notas: f.notas,
+      coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null,
+      fecha_inicio_clases: f.fecha_inicio_clases || null, inscripcion_abierta: f.inscripcion_abierta !== false,
+      notas: f.notas,
       horarios: f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null })),
     }
     if (!isEdit) { data.nivel = parseInt(f.nivel) || 1; data.ninos_iniciales = f.ninos_iniciales }
@@ -1233,6 +1332,18 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
           </select>
         </Field>
         <Field label="Fecha de apertura"><input type="date" className="input" value={f.fecha_apertura} onChange={(e) => set('fecha_apertura', e.target.value)} /></Field>
+        <Field label="Fecha de inicio de clases">
+          <input type="date" className="input" value={f.fecha_inicio_clases || ''} onChange={(e) => set('fecha_inicio_clases', e.target.value)} />
+        </Field>
+        <Field label="Inscripciones">
+          <select className="input" value={f.inscripcion_abierta === false ? 'cerrada' : 'abierta'} onChange={(e) => set('inscripcion_abierta', e.target.value === 'abierta')}>
+            <option value="abierta">Abiertas — en llenado</option>
+            <option value="cerrada">Cerradas — ya no entra nadie</option>
+          </select>
+        </Field>
+        <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+          El grupo <b style={{ color: 'var(--text)' }}>entra al Cuadro de Negocio en el mes de su fecha de inicio de clases</b> (sin fecha = cuenta desde ya). Mientras esté <b style={{ color: 'var(--text)' }}>en llenado</b> se puede colocar en las clases de prueba; al cerrarlo, ya no entra nadie y ventas ve 0 cupos.
+        </div>
         {!isEdit && (
           <>
             <Field label="Nivel inicial">
@@ -1323,7 +1434,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
         <Field label="Grupo">
           <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
-            {activos.map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+            {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
         <Field label="Origen">
@@ -1390,7 +1501,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
         <Field label="Grupo (mover de grupo)">
           <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
-            {activos.map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+            {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
         <Field label="Cierre de nivel"><input type="date" className="input" value={f.fecha_cierre_nivel} onChange={(e) => set('fecha_cierre_nivel', e.target.value)} /></Field>
@@ -1474,7 +1585,7 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
         <Field label="Grupo *">
           <select className="input" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
             <option value="">Selecciona un grupo…</option>
-            {activos.map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario} ({g.estudiantes.length} niños)</option>)}
+            {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario} ({g.estudiantes.length} niños){g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
       </div>

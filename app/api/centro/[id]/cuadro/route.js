@@ -6,6 +6,7 @@ import { sql } from '../../../../../lib/db'
 import { getSession, isAdminRole } from '../../../../../lib/auth'
 import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
+import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -77,14 +78,14 @@ export async function GET(request, { params }) {
     WHERE centro_id = ${id} AND year = ${year} AND month = ${month}
     ORDER BY fecha, id
   `
-  const pedidos = await sql`
+  let pedidos = await sql`
     SELECT * FROM pedidos_material
     WHERE centro_id = ${id} AND year = ${year} AND month = ${month}
     ORDER BY fecha, id
   `
   const tri = Math.ceil(month / 3)
   const [metas] = await sql`SELECT royalty_por_nino FROM metas WHERE anio = ${year} AND trimestre = ${tri}`
-  const royaltyRate = Number(metas?.royalty_por_nino) || 12
+  let royaltyRate = Number(metas?.royalty_por_nino) || 12
 
   const porCoach = new Map(coaches.map((x) => [String(x.id), x]))
   const grupos = gruposRaw.map((g) => ({
@@ -93,9 +94,31 @@ export async function GET(request, { params }) {
     horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
   }))
 
-  const royalties = cuadroRoyalties(estudiantes, eventos, royaltyRate)
-  const control = cuadroControlGrupos(grupos, estudiantes, eventos)
-  const deserciones = cuadroDeserciones(estudiantes, eventos, grupos)
+  // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
+  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
+  const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+  const iniciado = (g) => !g.fecha_inicio_clases || String(g.fecha_inicio_clases).slice(0, 10) <= finMes
+  const gruposCuadro = grupos.filter(iniciado)
+  const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
+  const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
+
+  let royalties = cuadroRoyalties(estudiantesCuadro, eventos, royaltyRate)
+  let control = cuadroControlGrupos(gruposCuadro, estudiantesCuadro, eventos)
+  let deserciones = cuadroDeserciones(estudiantesCuadro, eventos, gruposCuadro)
+
+  // Mes cerrado → el Excel sale de la foto congelada del cuadro (la misma
+  // verdad histórica que muestra la página), no del estado actual.
+  const [mesRow] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${id} AND year = ${year} AND month = ${month}`
+  if (mesRow?.estado === 'cerrado') {
+    const snap = await leerSnapshotCuadro(id, year, month)
+    if (snap?.datos) {
+      royalties = snap.datos.royalties
+      control = snap.datos.controlGrupos
+      deserciones = snap.datos.deserciones
+      pedidos = snap.datos.pedidos || []
+      royaltyRate = snap.datos.royaltyRate || royaltyRate
+    }
+  }
   const mesNombre = MESES[month - 1]
 
   const wb = new ExcelJS.Workbook()

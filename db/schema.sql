@@ -325,3 +325,31 @@ ALTER TABLE metas ADD COLUMN IF NOT EXISTS cupo_max_grupo INTEGER DEFAULT 15;
 -- Clase de prueba ↔ grupo por aperturar: cada evento del espejo puede quedar
 -- relacionado con el grupo cuyos cupos se muestran en el KPI y viajan al CRM.
 ALTER TABLE centro_eventos ADD COLUMN IF NOT EXISTS grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL;
+
+-- Historial del Cuadro de Negocio: al cerrar el mes en KPI Semanal se congela
+-- la foto completa del cuadro (jsonb). Esa foto es la verdad histórica del mes
+-- cerrado: los movimientos posteriores ya no alteran los meses entregados.
+CREATE TABLE IF NOT EXISTS cuadro_mensual (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  datos JSONB NOT NULL,
+  cerrado_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (centro_id, year, month)
+);
+CREATE INDEX IF NOT EXISTS idx_cuadro_mensual_centro ON cuadro_mensual(centro_id, year, month);
+
+-- Ciclo de llenado del grupo (regla de Fernando, 2026-08-01):
+-- inscripcion_abierta = el grupo está EN LLENADO y se puede colocar en clases
+-- de prueba; en FALSE ya no entra nadie (ni inscripción, ni reincorporación,
+-- ni cambio de grupo, ni fusión hacia él). fecha_inicio_clases determina desde
+-- qué mes el grupo (y sus niños) entra al Cuadro de Negocio.
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS inscripcion_abierta BOOLEAN DEFAULT TRUE;
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS fecha_inicio_clases DATE;
+
+-- Itinerario de clases del nivel (manual ALOHA Panamá): generado al crear el
+-- grupo desde su fecha de inicio + días de clase, saltando feriados y las
+-- vacaciones de diciembre; guarda semanas etiquetadas (inducción/libro/mental
+-- day/cierre), cierre estimado e inicio del siguiente nivel (ciclos de 2).
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS itinerario_clases JSONB;
