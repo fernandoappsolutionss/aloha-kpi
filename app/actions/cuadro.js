@@ -2,8 +2,8 @@
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
-import { promedios } from '../../lib/fusiones'
-import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones, motivosParaKpi } from '../../lib/cuadro-calc'
+import { motivosParaKpi, cuadroControlGrupos, cuadroDeserciones } from '../../lib/cuadro-calc'
+import { armarGrupos, calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
 
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
@@ -12,32 +12,11 @@ const intOr = (v, d = 0) => {
 
 const mesValido = (y, m) => y >= 2000 && y <= 2100 && m >= 1 && m <= 12
 
-// Grupos del centro con coach, horarios y estudiantes (activos + baja potencial)
-// embebidos: la forma que esperan lib/fusiones y lib/cuadro-calc.
-async function armarGrupos(centroId) {
-  const grupos = await sql`SELECT * FROM grupos WHERE centro_id = ${centroId} ORDER BY numero`
-  const coaches = await sql`SELECT * FROM coaches WHERE centro_id = ${centroId}`
-  const horarios = await sql`
-    SELECT gh.* FROM grupo_horarios gh
-    JOIN grupos g ON g.id = gh.grupo_id
-    WHERE g.centro_id = ${centroId}
-    ORDER BY gh.dia, gh.hora_inicio
-  `
-  const activos = await sql`
-    SELECT * FROM estudiantes
-    WHERE centro_id = ${centroId} AND estado IN ('activo', 'baja_potencial')
-  `
-  const porCoach = new Map(coaches.map((c) => [String(c.id), c]))
-  return grupos.map((g) => ({
-    ...g,
-    coach: g.coach_id == null ? null : porCoach.get(String(g.coach_id)) || null,
-    horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
-    estudiantes: activos.filter((e) => String(e.grupo_id) === String(g.id)),
-  }))
-}
-
 // Carga única del Cuadro de Negocio del mes: royalties, control de grupos,
 // deserciones, pedidos de material, promedios y comparación con el KPI capturado.
+// Mes ABIERTO → cálculo en vivo. Mes CERRADO → la foto congelada al cierre
+// (si el mes se cerró antes de existir el historial, se congela la mejor foto
+// disponible en ese momento y queda marcada como retroactiva).
 export async function loadCuadro(centroId, year, month) {
   await requireCentroAccess(centroId)
   const y = intOr(year)
@@ -46,55 +25,28 @@ export async function loadCuadro(centroId, year, month) {
 
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
   if (!c) return { error: 'Centro no encontrado.' }
-
-  const grupos = await armarGrupos(centroId)
-  const estudiantes = await sql`SELECT * FROM estudiantes WHERE centro_id = ${centroId}`
-  const eventos = await sql`
-    SELECT * FROM estudiante_eventos
-    WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
-    ORDER BY fecha, id
-  `
-  const pedidos = await sql`
-    SELECT * FROM pedidos_material
-    WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
-    ORDER BY fecha, id
-  `
   const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
-  const [res] = await sql`
-    SELECT nuevos_activos_mes, grupos_activos FROM resumen_mes
-    WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
-  `
-  const ks = await sql`
-    SELECT des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas
-    WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
-  `
-  const tri = Math.ceil(m / 3)
-  const [metas] = await sql`SELECT gpn_min, royalty_por_nino FROM metas WHERE anio = ${y} AND trimestre = ${tri}`
 
-  const royaltyRate = Number(metas?.royalty_por_nino) || 12
-  const gpnMin = Number(metas?.gpn_min) || 8
-  const controlGrupos = cuadroControlGrupos(grupos, estudiantes, eventos)
-  // La deserción capturada en KPI es la suma diaria de las semanas del mes.
-  const desercionKpi = ks.length
-    ? ks.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
-    : null
-
-  return {
-    nombre: c.nombre || '',
-    royalties: cuadroRoyalties(estudiantes, eventos, royaltyRate),
-    controlGrupos,
-    deserciones: cuadroDeserciones(estudiantes, eventos, grupos),
-    totales: controlGrupos.totales,
-    pedidos,
-    promedios: promedios(grupos, gpnMin),
-    kpiComparacion: {
-      nuevosKpi: res ? res.nuevos_activos_mes || 0 : null,
-      desercionKpi,
-      gruposActivosKpi: res ? res.grupos_activos || 0 : null,
-    },
-    mesEstado: mes?.estado || 'abierto',
-    royaltyRate,
+  if (mes?.estado === 'cerrado') {
+    let snap = await leerSnapshotCuadro(centroId, y, m)
+    let retroactivo = false
+    if (!snap) {
+      const datos = await guardarSnapshotCuadro(centroId, y, m)
+      snap = { datos, cerradoAt: new Date().toISOString() }
+      retroactivo = true
+    }
+    return {
+      nombre: c.nombre || '',
+      ...snap.datos,
+      mesEstado: 'cerrado',
+      congelado: true,
+      congeladoAt: snap.cerradoAt,
+      congeladoRetroactivo: retroactivo,
+    }
   }
+
+  const datos = await calcularCuadro(centroId, y, m)
+  return { nombre: c.nombre || '', ...datos, mesEstado: 'abierto' }
 }
 
 // Crea o actualiza un pedido de material del mes (id opcional = update).

@@ -325,3 +325,17 @@ ALTER TABLE metas ADD COLUMN IF NOT EXISTS cupo_max_grupo INTEGER DEFAULT 15;
 -- Clase de prueba ↔ grupo por aperturar: cada evento del espejo puede quedar
 -- relacionado con el grupo cuyos cupos se muestran en el KPI y viajan al CRM.
 ALTER TABLE centro_eventos ADD COLUMN IF NOT EXISTS grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL;
+
+-- Historial del Cuadro de Negocio: al cerrar el mes en KPI Semanal se congela
+-- la foto completa del cuadro (jsonb). Esa foto es la verdad histórica del mes
+-- cerrado: los movimientos posteriores ya no alteran los meses entregados.
+CREATE TABLE IF NOT EXISTS cuadro_mensual (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  datos JSONB NOT NULL,
+  cerrado_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (centro_id, year, month)
+);
+CREATE INDEX IF NOT EXISTS idx_cuadro_mensual_centro ON cuadro_mensual(centro_id, year, month);
