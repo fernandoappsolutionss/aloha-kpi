@@ -18,6 +18,7 @@ import {
   CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, calendarioDia, sinSalonDia,
   inventarioSemanal, coachesLibresEn, bloquesQueCaben,
 } from '../../../../lib/inventario'
+import { atractivoDe, recomendacionesApertura, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -359,7 +360,7 @@ export default function GruposPage() {
 
         {tab === 'horarios' && (
           <TabHorarios grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
-            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} />
+            retirados={data?.retirados || []} onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} />
         )}
 
         {tab === 'coaches' && (
@@ -571,12 +572,17 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
 // para aperturar un grupo con día/hora/salón prellenados.
 const ROW_H = 26 // px por bloque de 30 min
 
-function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
+const ETIQUETA_COLOR = { Caliente: 'var(--ok)', Buena: 'var(--ok)', Media: 'var(--warn)', 'Difícil': 'var(--bad)', 'Sin historial': 'var(--text-dim)' }
+const ETIQUETA_EMOJI = { Caliente: '🔥 ', Buena: '', Media: '', 'Difícil': '⚠️ ', 'Sin historial': '' }
+
+function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
     return d >= 1 && d <= 6 ? d : 1
   })
+  const [verGuia, setVerGuia] = useState(false)
   const activos = grupos.filter((g) => g.estado === 'activo')
+  const recos = recomendacionesApertura(grupos, salones, coaches, retirados, 4)
   const inv = inventarioSemanal(activos, salones)
   const cols = calendarioDia(activos, salones, dia)
   const sinSalon = sinSalonDia(activos, dia)
@@ -620,6 +626,55 @@ function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
         </div>
       </div>
 
+      {/* Recomendación: dónde abrir el próximo grupo, según la estadística del centro */}
+      {recos.length > 0 && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Dónde abrir el próximo grupo</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>
+                Rankeado con la estadística del propio centro: tamaño de los grupos por franja y retiros por horario.
+              </div>
+            </div>
+            <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setVerGuia(!verGuia)}>
+              {verGuia ? 'Ocultar guía' : 'Guía para franjas difíciles'}
+            </button>
+          </div>
+          <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 10 }}>
+            {recos.map((r, i) => (
+              <div key={`${r.dia}-${r.inicio}-${r.salon.id}`} className="card" style={{ padding: 12, borderLeft: `3px solid ${ETIQUETA_COLOR[r.etiqueta]}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {DIAS[r.dia]} {aHora(r.inicio)}–{aHora(r.fin)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta] }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{r.salon.nombre} · {r.cabe2h ? 'bloque de 2 h' : '1 h (falta el 2.º día)'}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 5, minHeight: 28 }}>{r.razon}</div>
+                <div style={{ fontSize: 11, color: r.coachesLibres.length ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
+                  {r.coachesLibres.length ? `Coaches libres: ${r.coachesLibres.map((c) => c.nombre.split(' ')[0]).join(', ')}` : 'Sin coach libre en esa franja'}
+                </div>
+                <button className="btn btn--primary" style={{ marginTop: 8, padding: '5px 12px', fontSize: 12 }}
+                  onClick={() => onAbrirGrupo({ dia: r.dia, hora_inicio: aHora(r.inicio), hora_fin: aHora(r.fin), salon_id: String(r.salon.id) })}>
+                  Aperturar aquí
+                </button>
+              </div>
+            ))}
+          </div>
+          {verGuia && (
+            <div style={{ padding: '0 16px 14px' }}>
+              <div className="card" style={{ padding: 14, borderLeft: '3px solid var(--warn)' }}>
+                <div className="label" style={{ color: 'var(--warn)', marginBottom: 8 }}>Franjas difíciles de llenar — guía del manual</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text-muted)', display: 'grid', gap: 5 }}>
+                  {GUIA_FRANJAS_DIFICILES.map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+                  Fuentes: “Establecimiento de Calendarios” y “Protocolo de Salida — herramientas de no salida” del manual. Toda promoción nueva debe aprobarla la Administración General (regla de franquicia).
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Selector de día + reglas */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -629,7 +684,7 @@ function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
           ))}
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-          Ventana {aHora(aperturaDia)}–8:30 pm · 30 min entre clases · sesiones de 1 h o 2 h · toca un bloque verde para aperturar un grupo ahí
+          Ventana {aHora(aperturaDia)}–8:30 pm · 30 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
         </span>
       </div>
 
@@ -680,9 +735,10 @@ function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
               })}
               {huecos.map((h) => {
                 const libres = coachesLibresEn(activos, coaches, dia, h.inicio, h.fin)
+                const at = atractivoDe(grupos, retirados, dia, h.inicio)
                 return (
                   <button key={h.inicio} onClick={() => clickHueco(salon, h)}
-                    title={`Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}`}
+                    title={`${at.razon} Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(h.inicio) + 1, height: topDe(h.fin) - topDe(h.inicio) - 2,
                       background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
@@ -691,6 +747,7 @@ function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
                     }}>
                     <span>＋ Abrir grupo</span>
                     <span className="num" style={{ fontWeight: 500 }}>{aHora(h.inicio)}–{aHora(h.fin)}</span>
+                    <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta] }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>
                     {h.cabe2h && <span style={{ fontWeight: 500, fontSize: 10 }}>{bloquesQueCaben(h.minutos, 120)}×2h · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
                   </button>
                 )
@@ -907,6 +964,9 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
             </div>
           ))}
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('horarios', [...f.horarios, { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }])}>+ Agregar horario</button>
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
+            El programa son <b>2 horas semanales</b>: un bloque de 2 h, o dos bloques de 1 h en días distintos. Ventana: 12:30–8:30 pm (sábado desde 9:00 am) con 30 min entre clases.
+          </div>
         </div>
         <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
       </div>

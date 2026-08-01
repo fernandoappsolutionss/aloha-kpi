@@ -68,6 +68,17 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
     if (salonId && !salonPorId.has(String(salonId))) return { error: 'El salón no pertenece a este centro.' }
     out.push({ dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: salonId })
   }
+  // El programa ALOHA son 2 horas semanales por grupo: 2 h un día, o 1 h en
+  // dos días distintos. (Un grupo puede quedar sin horario mientras se define.)
+  if (out.length) {
+    const totalMin = out.reduce((a, h) => a + (aMinutos(h.hora_fin) - aMinutos(h.hora_inicio)), 0)
+    if (totalMin !== 120) {
+      return { error: `El programa son 2 horas semanales por grupo (1 bloque de 2 h o 2 bloques de 1 h). Este horario suma ${totalMin / 60} h.` }
+    }
+    if (out.length === 2 && out[0].dia === out[1].dia) {
+      return { error: 'Las dos sesiones de 1 hora deben ir en días distintos.' }
+    }
+  }
   // Choques entre las propias filas del formulario (mismo salón).
   for (let i = 0; i < out.length; i++) {
     for (let j = i + 1; j < out.length; j++) {
