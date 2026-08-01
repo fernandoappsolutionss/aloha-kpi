@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
-  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, toggleInscripcionGrupo, siguienteNumero,
+  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, toggleInscripcionGrupo, linkCoach, siguienteNumero,
   saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion, ajustarItinerarioGrupo,
 } from '../../../actions/grupos'
 import {
@@ -306,7 +306,20 @@ export default function GruposPage() {
     }
   }
 
+  async function onLinkCoach(g) {
+    const res = await linkCoach(id, g.id)
+    if (res.error) { setStatus('❌ ' + res.error); return }
+    const url = `${window.location.origin}${res.path}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setStatus(`✅ Link del coach del grupo ${g.numero} copiado: ${url} — compártelo por WhatsApp; ahí marca asistencia y notas.`)
+    } catch {
+      setStatus(`✅ Link del coach del grupo ${g.numero}: ${url}`)
+    }
+  }
+
   const acciones = {
+    linkCoach: onLinkCoach,
     editarGrupo: abrirEditarGrupo,
     cerrar: onCerrarGrupo,
     reabrir: onReabrirGrupo,
@@ -649,6 +662,7 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
               {g.inscripcion_abierta === false ? 'Abrir inscripciones' : 'Cerrar inscripciones'}
             </button>
           )}
+          {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.linkCoach(g)}>🔗 Link del coach</button>}
           {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.buscarFusion(g)}>Buscar fusión</button>}
           {activo ? (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.cerrar(g)}>Cerrar grupo</button>
