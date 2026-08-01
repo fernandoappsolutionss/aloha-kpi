@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
@@ -48,6 +48,35 @@ const fmtDia = (d) => isoDia(d) || '—'
 const horarioTexto = (horarios) =>
   (horarios || []).length ? horarios.map((h) => `${DIAS[h.dia]} ${aHora12(aMinutos(h.hora_inicio))}–${aHora12(aMinutos(h.hora_fin))}`).join(' · ') : 'Sin horario'
 
+// Búsqueda tolerante a acentos y mayúsculas.
+const norm = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+// Un grupo coincide por número, itinerario, coach o por el nombre de alguno de
+// sus niños / representantes: buscar "Duna" debe llevarte a su grupo.
+function coincideBusqueda(g, termino) {
+  if (!termino) return true
+  const t = norm(termino)
+  return (
+    norm(`grupo ${g.numero}`).includes(t) ||
+    norm(g.itinerario).includes(t) ||
+    norm(g.coach?.nombre).includes(t) ||
+    g.estudiantes.some((e) => norm(e.nombre).includes(t) || norm(e.representante).includes(t))
+  )
+}
+
+// ¿La pantalla es angosta? Debajo del breakpoint el detalle deja de ser una
+// columna fija y pasa a abrirse como panel deslizante sobre la lista.
+function useNarrow(max = 1180) {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${max}px)`)
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [max])
+  return narrow
+}
+
 // Itinerarios y rangos de nivel presentes en el grupo, p. ej. "TINY 3–5 · KIDS 7".
 function nivelesTexto(g) {
   const partes = []
@@ -71,7 +100,12 @@ export default function GruposPage() {
   const [status, setStatus] = useState('')
   const [tab, setTab] = useState('grupos')
   const [filtro, setFiltro] = useState('todos')
+  const [busqueda, setBusqueda] = useState('')
   const [openId, setOpenId] = useState(null)
+  // Workspace maestro/detalle: la lista manda, el detalle vive al lado (sticky)
+  // y en pantallas angostas se abre como panel deslizante.
+  const narrow = useNarrow()
+  const workspaceRef = useRef(null)
   // Fusiones: se cargan al entrar al tab; se invalidan tras cada mutación.
   const [fus, setFus] = useState(null)
   const [fusLoading, setFusLoading] = useState(false)
@@ -79,7 +113,7 @@ export default function GruposPage() {
   const [busyFusion, setBusyFusion] = useState(null)
   // Modales
   const [grupoModal, setGrupoModal] = useState(null)
-  const [inscribir, setInscribir] = useState(false)
+  const [inscribir, setInscribir] = useState(null) // null | { grupoId? }
   const [editEst, setEditEst] = useState(null)
   const [retiroEst, setRetiroEst] = useState(null)
   const [reincEst, setReincEst] = useState(null)
@@ -117,15 +151,70 @@ export default function GruposPage() {
   const prom = promedios(grupos, metas.gpnMin)
   const ninosActivos = grupos.reduce((s, g) => s + g.estudiantes.length, 0) + (data?.sinGrupo?.length || 0)
 
-  const visibles = grupos.filter((g) => {
+  const pasaFiltro = (g, f) => {
     const st = groupStatus(g, metas.gpnMin)
-    if (filtro === 'todos') return g.estado === 'activo'
-    if (filtro === 'bajo') return st.key === 'bajo'
-    if (filtro === 'estables') return st.key === 'estable'
-    if (filtro === 'kinder') return g.estado === 'activo' && st.key === 'kinder'
+    if (f === 'todos') return g.estado === 'activo'
+    if (f === 'bajo') return st.key === 'bajo'
+    if (f === 'estables') return st.key === 'estable'
+    if (f === 'kinder') return g.estado === 'activo' && st.key === 'kinder'
     return g.estado !== 'activo'
-  })
-  const abierto = openId ? grupos.find((g) => String(g.id) === String(openId)) : null
+  }
+  const visibles = grupos.filter((g) => pasaFiltro(g, filtro) && coincideBusqueda(g, busqueda))
+  const abierto = openId ? visibles.find((g) => String(g.id) === String(openId)) : null
+  const visiblesKey = visibles.map((g) => g.id).join(',')
+
+  // Si el grupo abierto se sale de la vista (cambió el filtro o la búsqueda),
+  // se cierra el detalle para no mostrar algo que ya no está en la lista.
+  useEffect(() => {
+    if (openId && !visiblesKey.split(',').includes(String(openId))) setOpenId(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visiblesKey, openId])
+
+  // Deja el workspace pegado arriba: al elegir un grupo, el detalle queda
+  // completo en pantalla sin que haya que bajar la página.
+  function alinearWorkspace() {
+    const el = workspaceRef.current
+    if (!el) return
+    const top = el.getBoundingClientRect().top
+    if (top >= -4 && top <= 24) return
+    window.scrollTo({ top: window.scrollY + top - 12, behavior: 'smooth' })
+  }
+  function abrirGrupo(g, { alinear = true } = {}) {
+    setStatus('')
+    setOpenId(g.id)
+    if (alinear && !narrow) requestAnimationFrame(alinearWorkspace)
+  }
+
+  // Teclado: Esc cierra el detalle, ↑/↓ recorren la lista de grupos.
+  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || reincEst)
+  useEffect(() => {
+    function onKey(e) {
+      if (tab !== 'grupos' || hayModal) return
+      if (e.key === 'Escape') { if (openId) setOpenId(null); return }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      const t = e.target
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      const ids = visiblesKey ? visiblesKey.split(',') : []
+      if (!ids.length) return
+      e.preventDefault()
+      const i = ids.indexOf(String(openId))
+      const next = e.key === 'ArrowDown'
+        ? (i < 0 ? 0 : Math.min(i + 1, ids.length - 1))
+        : (i < 0 ? ids.length - 1 : Math.max(i - 1, 0))
+      setOpenId(ids[next])
+      requestAnimationFrame(() => document.querySelector(`[data-grupo="${ids[next]}"]`)?.scrollIntoView({ block: 'nearest' }))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tab, hayModal, openId, visiblesKey])
+
+  // Con el panel deslizante abierto, el fondo no debe hacer scroll.
+  useEffect(() => {
+    if (!narrow || !abierto || tab !== 'grupos') return
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previo }
+  }, [narrow, abierto, tab])
 
   // `prefill` opcional: desde el calendario o una recomendación del modelo.
   // Puede ser una sesión suelta { dia, hora_inicio, hora_fin, salon_id } o una
@@ -210,6 +299,7 @@ export default function GruposPage() {
     cerrar: onCerrarGrupo,
     reabrir: onReabrirGrupo,
     buscarFusion: onBuscarFusion,
+    inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
     retirar: (e) => { setStatus(''); setRetiroEst(e) },
     graduar: onGraduar,
@@ -235,7 +325,7 @@ export default function GruposPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
-      <main className="main">
+      <main className="main main--flow">
         {isAdmin && (
           <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
@@ -249,8 +339,8 @@ export default function GruposPage() {
             <p className="h-sub">{data?.nombre || ''} — grupos, niños, horarios y plan de fusiones según el manual</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn" onClick={() => { setStatus(''); setInscribir(true) }}>Inscribir niño</button>
-            <button className="btn btn--primary" onClick={abrirNuevoGrupo}>➕ Aperturar grupo</button>
+            <button className="btn" onClick={() => { setStatus(''); setInscribir({}) }}>Inscribir niño</button>
+            <button className="btn btn--primary" onClick={() => abrirNuevoGrupo()}>➕ Aperturar grupo</button>
           </div>
         </div>
 
@@ -260,7 +350,7 @@ export default function GruposPage() {
         )}
 
         {/* KPI cards (siempre visibles) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(158px,1fr))', gap: 12, marginBottom: 20 }}>
           {CARDS.map((c) => (
             <div key={c.l} className="kpi" style={{ padding: '14px 16px' }}>
               <div className="kpi__top"><span className="label">{c.l}</span></div>
@@ -279,50 +369,58 @@ export default function GruposPage() {
 
         {tab === 'grupos' && (
           <>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div className="grp-toolbar">
+              <div className="grp-search">
+                <span className="grp-search__icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                </span>
+                <input className="input" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar grupo, coach o niño…" aria-label="Buscar grupo, coach o niño" />
+                {busqueda && <button className="grp-search__clear" onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda">✕</button>}
+              </div>
               {FILTROS.map(([k, l]) => {
-                const on = filtro === k
+                const n = grupos.filter((g) => pasaFiltro(g, k)).length
                 return (
-                  <button key={k} onClick={() => setFiltro(k)}
-                    style={{ padding: '4px 12px', background: on ? 'var(--ts-green-soft)' : 'transparent', color: on ? 'var(--ts-green)' : 'var(--text-dim)', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-                    {l}
+                  <button key={k} onClick={() => setFiltro(k)} className={`grp-chip${filtro === k ? ' grp-chip--on' : ''}`}>
+                    {l}<span className="grp-chip__n">{n}</span>
                   </button>
                 )
               })}
+              <span className="label" style={{ marginLeft: 'auto' }}>
+                {visibles.length} {visibles.length === 1 ? 'grupo' : 'grupos'}{busqueda ? ' encontrados' : ''}
+              </span>
             </div>
 
-            {visibles.length === 0 ? (
-              <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
-                {grupos.length === 0 ? 'Aún no hay grupos. Apertura el primero con “➕ Aperturar grupo”.' : 'Sin grupos para este filtro.'}
+            <div className="grp-layout" ref={workspaceRef}>
+              <div className="grp-list">
+                {visibles.length === 0 ? (
+                  <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+                    {grupos.length === 0
+                      ? 'Aún no hay grupos. Apertura el primero con “➕ Aperturar grupo”.'
+                      : busqueda ? `Ningún grupo coincide con “${busqueda}”.` : 'Sin grupos para este filtro.'}
+                  </div>
+                ) : visibles.map((g) => (
+                  <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)}
+                    onAbrir={() => abrirGrupo(g)}
+                    onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
+                ))}
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
-                {visibles.map((g) => {
-                  const st = groupStatus(g, metas.gpnMin)
-                  const n = g.estudiantes.length
-                  const pct = Math.min(100, metas.gpnMin ? (n / metas.gpnMin) * 100 : 0)
-                  const activo = String(openId) === String(g.id)
-                  return (
-                    <div key={g.id} className="card" onClick={() => setOpenId(activo ? null : g.id)}
-                      style={{ padding: 16, cursor: 'pointer', borderColor: activo ? 'var(--ts-green-line)' : undefined }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Grupo {g.numero}</span>
-                        <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{g.coach?.nombre || 'Sin coach'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{horarioTexto(g.horarios)}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                        <div className="bar"><div className="bar__fill" style={{ width: `${pct}%`, background: n >= metas.gpnMin ? 'var(--ok)' : n > 0 ? 'var(--warn)' : 'var(--bad)' }} /></div>
-                        <span className="num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{n}/{metas.cupoMax}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>{nivelesTexto(g)}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
 
-            {abierto && <GrupoDetalle g={abierto} metas={metas} acciones={acciones} />}
+              {!narrow && (
+                abierto ? (
+                  <GrupoDetalle g={abierto} metas={metas} acciones={acciones} onCerrarPanel={() => setOpenId(null)} />
+                ) : (
+                  <div className="panel grp-detail grp-detail--vacio">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)' }}>Elige un grupo</div>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-dim)', maxWidth: 320, lineHeight: 1.65 }}>
+                      Su listado de niños y las acciones del grupo aparecen aquí mismo, sin bajar la página.
+                    </p>
+                    <span className="label" style={{ fontSize: 10 }}>↑ ↓ para moverte · Esc para cerrar</span>
+                  </div>
+                )
+              )}
+            </div>
 
             {data?.sinGrupo?.length > 0 && (
               <div className="panel" style={{ marginTop: 16 }}>
@@ -384,15 +482,23 @@ export default function GruposPage() {
         )}
       </main>
 
+      {/* Pantallas angostas: el detalle entra como panel deslizante sobre la lista */}
+      {tab === 'grupos' && narrow && abierto && (
+        <>
+          <div className="grp-backdrop" onClick={() => setOpenId(null)} />
+          <GrupoDetalle g={abierto} metas={metas} acciones={acciones} sheet onCerrarPanel={() => setOpenId(null)} />
+        </>
+      )}
+
       {grupoModal && (
         <GrupoModal centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} initial={grupoModal}
           onClose={() => setGrupoModal(null)}
           onSaved={(msg, warn) => { setGrupoModal(null); setStatus(warn ? `✅ ${msg} ⚠️ ${warn}` : `✅ ${msg}`); refresca() }} />
       )}
       {inscribir && (
-        <InscribirModal centroId={id} grupos={grupos}
-          onClose={() => setInscribir(false)}
-          onSaved={(msg) => { setInscribir(false); setStatus('✅ ' + msg); refresca() }} />
+        <InscribirModal centroId={id} grupos={grupos} grupoPrefill={inscribir.grupoId}
+          onClose={() => setInscribir(null)}
+          onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg); refresca() }} />
       )}
       {editEst && (
         <EstudianteModal centroId={id} est={editEst} grupos={grupos}
@@ -413,71 +519,192 @@ export default function GruposPage() {
   )
 }
 
-// ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
-function GrupoDetalle({ g, metas, acciones }) {
+// Ocupación del grupo contra el cupo máximo, con la marca de la meta (gpn_min).
+function OcupacionBar({ n, metas }) {
+  const pct = metas.cupoMax ? Math.min(100, (n / metas.cupoMax) * 100) : 0
+  const metaPct = metas.cupoMax ? Math.min(100, (metas.gpnMin / metas.cupoMax) * 100) : 0
+  const color = n >= metas.gpnMin ? 'var(--ok)' : n > 0 ? 'var(--warn)' : 'var(--bad)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} title={`${n} de ${metas.cupoMax} cupos · meta ${metas.gpnMin} niños`}>
+      <div className="bar" style={{ position: 'relative' }}>
+        <div className="bar__fill" style={{ width: `${pct}%`, background: color }} />
+        <span style={{ position: 'absolute', top: 0, bottom: 0, left: `${metaPct}%`, width: 2, background: 'var(--text-faint)' }} />
+      </div>
+      <span className="num" style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{n}/{metas.cupoMax}</span>
+    </div>
+  )
+}
+
+// ── Tarjeta de grupo en la lista maestra ────────────────────────────────────
+function GrupoCard({ g, metas, activo, onAbrir, onEditar }) {
   const st = groupStatus(g, metas.gpnMin)
   return (
-    <div className="panel" style={{ marginTop: 16 }}>
-      <div className="panel__head">
-        <div>
-          <h3 className="panel__title">Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''} <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} style={{ marginLeft: 8, verticalAlign: 'middle' }} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span></h3>
-          <p className="h-sub" style={{ marginTop: 4 }}>
-            {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
-            {g.fecha_apertura ? ` · Apertura: ${fmtDia(g.fecha_apertura)}` : ''}
-          </p>
+    <div data-grupo={g.id} role="button" tabIndex={0} aria-pressed={activo}
+      className={`grp-card${activo ? ' grp-card--on' : ''}`}
+      onClick={onAbrir}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrir() } }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.2 }}>
+            Grupo {g.numero}
+            <span className="num" style={{ fontSize: 10.5, color: 'var(--text-dim)', marginLeft: 8, letterSpacing: '0.06em' }}>
+              {g.itinerario}{g.es_online ? ' · ONLINE' : ''}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{g.coach?.nombre || 'Sin coach'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1, lineHeight: 1.45 }}>{horarioTexto(g.horarios)}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>Editar</button>
-          {g.estado === 'activo' && (
-            <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.buscarFusion(g)}>Buscar fusión</button>
-          )}
-          {g.estado === 'activo' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
+          <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
+          <button className="btn grp-card__edit" style={{ padding: '3px 9px', fontSize: 11 }}
+            title={`Editar el grupo ${g.numero}`} onClick={(e) => { e.stopPropagation(); onEditar() }}>✎ Editar</button>
+        </div>
+      </div>
+      <div style={{ marginTop: 11 }}><OcupacionBar n={g.estudiantes.length} metas={metas} /></div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 7 }}>{nivelesTexto(g)}</div>
+    </div>
+  )
+}
+
+// Acciones de un niño dentro del grupo (mismas en tabla y en panel deslizante).
+function AccionesNino({ e, acciones }) {
+  return (
+    <>
+      <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Editar</button>
+      {e.itinerario === 'TINY' && Number(e.nivel) === 10 && (
+        <button className="btn" style={{ ...BTN_XS, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
+      )}
+      {e.estado === 'activo' ? (
+        <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }} onClick={() => acciones.baja(e)}>Baja potencial</button>
+      ) : (
+        <button className="btn" style={BTN_XS} onClick={() => acciones.revertirBaja(e)}>Sigue activo</button>
+      )}
+      <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.retirar(e)}>Retirar</button>
+    </>
+  )
+}
+
+// ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
+// Vive al lado de la lista (sticky) o como panel deslizante en pantallas
+// angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
+function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
+  const st = groupStatus(g, metas.gpnMin)
+  const n = g.estudiantes.length
+  const bajas = g.estudiantes.filter((e) => e.estado === 'baja_potencial').length
+  const faltan = Math.max(0, metas.gpnMin - n)
+  const activo = g.estado === 'activo'
+  const TILES = [
+    { l: 'Niños', v: n, s: `de ${metas.cupoMax} cupos` },
+    { l: 'Meta', v: faltan === 0 ? '✓' : `−${faltan}`, s: faltan === 0 ? `cumple los ${metas.gpnMin}` : `faltan para los ${metas.gpnMin}`, c: faltan === 0 ? 'var(--ok)' : 'var(--warn)' },
+    { l: 'Bajas potenciales', v: bajas, s: bajas ? 'se irían el próximo mes' : 'ninguna', c: bajas ? 'var(--warn)' : 'var(--text)' },
+  ]
+  return (
+    <section className={`panel grp-detail${sheet ? ' grp-detail--sheet' : ''}`} aria-label={`Grupo ${g.numero}`}>
+      <header className="grp-detail__head">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+              Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
+              <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
+            </h3>
+            <p className="h-sub" style={{ marginTop: 5 }}>
+              {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
+              {g.fecha_apertura ? ` · Apertura: ${fmtDia(g.fecha_apertura)}` : ''}
+            </p>
+          </div>
+          <button className="btn" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
+            onClick={onCerrarPanel} title="Cerrar el detalle (Esc)" aria-label="Cerrar el detalle">✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>✎ Editar grupo</button>
+          {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>+ Inscribir niño aquí</button>}
+          {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.buscarFusion(g)}>Buscar fusión</button>}
+          {activo ? (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.cerrar(g)}>Cerrar grupo</button>
           ) : (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.reabrir(g)}>Reabrir</button>
           )}
         </div>
-      </div>
-      {g.notas && <div style={{ padding: '10px 22px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>}
-      {g.estudiantes.length === 0 ? (
-        <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Este grupo no tiene niños activos.</div>
-      ) : (
-        <table className="table">
-          <thead><tr>{['Niño', 'Nivel', 'Cierre de nivel', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
-          <tbody>
+      </header>
+
+      <div className="grp-detail__body">
+        <div className="grp-stats">
+          {TILES.map((t) => (
+            <div key={t.l}>
+              <span className="label">{t.l}</span>
+              <div className="num" style={{ fontSize: 21, color: t.c || 'var(--text)', lineHeight: 1.1, marginTop: 4 }}>{t.v}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{t.s}</div>
+            </div>
+          ))}
+          <div style={{ gridColumn: '1 / -1' }}><OcupacionBar n={n} metas={metas} /></div>
+        </div>
+        {g.notas && (
+          <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>
+        )}
+        {n === 0 ? (
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
+            Este grupo no tiene niños activos.
+            {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>Inscribir el primero</button>}
+          </div>
+        ) : sheet ? (
+          // En el panel deslizante la tabla no cabe: cada niño va apilado.
+          <div>
             {g.estudiantes.map((e) => (
-              <tr key={e.id} style={{ cursor: 'default' }}>
-                <td style={{ fontWeight: 600, color: 'var(--text)' }}>
-                  {e.nombre}
-                  {e.representante && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
-                </td>
-                <td><span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span></td>
-                <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_cierre_nivel)}</td>
-                <td>
+              <div key={e.id} className="grp-roster__item">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13.5 }}>{e.nombre}</div>
+                    {e.representante && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
+                  </div>
                   {e.estado === 'baja_potencial'
                     ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
                     : <span className="pill pill--ok"><span className="dot" />Activo</span>}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Editar</button>
-                    {e.itinerario === 'TINY' && Number(e.nivel) === 10 && (
-                      <button className="btn" style={{ ...BTN_XS, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
-                    )}
-                    {e.estado === 'activo' ? (
-                      <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }} onClick={() => acciones.baja(e)}>Baja potencial</button>
-                    ) : (
-                      <button className="btn" style={BTN_XS} onClick={() => acciones.revertirBaja(e)}>Sigue activo</button>
-                    )}
-                    <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.retirar(e)}>Retirar</button>
-                  </div>
-                </td>
-              </tr>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                  <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
+                  <span className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }}>cierra {fmtDia(e.fecha_cierre_nivel)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+                  <AccionesNino e={e} acciones={acciones} />
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+          </div>
+        ) : (
+          <table className="table">
+            {/* El cierre de nivel va bajo el nivel (y no en columna aparte) para
+                que las acciones de cada niño quepan en una sola línea. */}
+            <thead><tr>{['Niño', 'Nivel · cierre', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+            <tbody>
+              {g.estudiantes.map((e) => (
+                <tr key={e.id} style={{ cursor: 'default' }}>
+                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>
+                    {e.nombre}
+                    {e.representante && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
+                  </td>
+                  <td>
+                    <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
+                    <div className="num" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{fmtDia(e.fecha_cierre_nivel)}</div>
+                  </td>
+                  <td>
+                    {e.estado === 'baja_potencial'
+                      ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
+                      : <span className="pill pill--ok"><span className="dot" />Activo</span>}
+                  </td>
+                  {/* Sin wrap: las acciones de cada niño van en una sola línea
+                      y la tabla estrecha la columna del nombre, no los botones. */}
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                      <AccionesNino e={e} acciones={acciones} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -1051,8 +1278,8 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
 }
 
 // ── Modal: inscribir niño ────────────────────────────────────────────────────
-function InscribirModal({ centroId, grupos, onClose, onSaved }) {
-  const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: '', origen: 'directo', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
+function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
+  const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
@@ -1344,6 +1571,11 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
 
 // ── Base de modales y campos ─────────────────────────────────────────────────
 function Modal({ title, width = 560, onClose, children, footer }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
       <div onClick={(e) => e.stopPropagation()} className="card" style={{ width, maxWidth: '100%', padding: 0 }}>
