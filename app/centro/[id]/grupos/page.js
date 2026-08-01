@@ -1086,7 +1086,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
 }
 
 // ── Tab Horarios: calendario del inventario por salón ───────────────────────
-// El inventario ALOHA es el bloque de horario: ventana 12:30–8:30 pm, 30 min
+// El inventario ALOHA es el bloque de horario: ventana 12:30–8:30 pm, 15 min
 // entre clases, sesiones de 1 h o 2 h. Los huecos verdes se pueden clicar
 // para aperturar un grupo con día/hora/salón prellenados.
 const ROW_H = 26 // px por bloque de 30 min
@@ -1264,7 +1264,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           ))}
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-          Ventana {aHora12(aperturaDia)}–8:30 pm · 30 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
+          Ventana {aHora12(aperturaDia)}–8:30 pm · 15 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
         </span>
       </div>
 
@@ -1619,7 +1619,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
           ))}
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('horarios', [...f.horarios, { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }])}>+ Agregar horario</button>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-            El programa son <b>2 horas semanales</b>: un bloque de 2 h, o dos bloques de 1 h en días distintos. Ventana: 12:30–8:30 pm (sábado desde 9:00 am) con 30 min entre clases.
+            El programa son <b>2 horas semanales</b>: un bloque de 2 h, o dos bloques de 1 h en días distintos. Ventana: 12:30–8:30 pm (sábado desde 9:00 am) con 15 min entre clases.
           </div>
         </div>
         <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
