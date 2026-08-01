@@ -14,6 +14,10 @@ import {
   ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, DIAS, TINYMAP, aperturaMinima, hoyISO,
 } from '../../../../lib/operaciones'
 import { groupStatus, underMeta, promedios, sugerenciasPara, scoreBand } from '../../../../lib/fusiones'
+import {
+  CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, calendarioDia, sinSalonDia,
+  inventarioSemanal, coachesLibresEn, bloquesQueCaben,
+} from '../../../../lib/inventario'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -111,10 +115,12 @@ export default function GruposPage() {
   })
   const abierto = openId ? grupos.find((g) => String(g.id) === String(openId)) : null
 
-  async function abrirNuevoGrupo() {
+  // `prefill` opcional: desde un hueco del calendario llega { dia, hora_inicio, hora_fin, salon_id }.
+  async function abrirNuevoGrupo(prefill) {
     setStatus('')
     const num = await siguienteNumero(id)
-    setGrupoModal({ numero: String(num), itinerario: 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios: [{ dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }] })
+    const horario = prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }
+    setGrupoModal({ numero: String(num), itinerario: 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios: [{ ...horario }] })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
@@ -352,7 +358,8 @@ export default function GruposPage() {
         )}
 
         {tab === 'horarios' && (
-          <TabHorarios grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []} />
+          <TabHorarios grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
+            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} />
         )}
 
         {tab === 'coaches' && (
@@ -558,77 +565,154 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
   )
 }
 
-// ── Tab Horarios: inventario de franjas, coaches y salones libres ────────────
-function TabHorarios({ grupos, coaches, salones }) {
-  const minutos = (hora) => {
-    const [h, m] = String(hora || '').split(':').map(Number)
-    return (h || 0) * 60 + (m || 0)
-  }
-  const activos = grupos.filter((g) => g.estado === 'activo')
-  const coachesActivos = coaches.filter((c) => c.activo)
-  const salonesActivos = salones.filter((s) => s.activo)
-  const salonPorId = new Map(salones.map((s) => [String(s.id), s]))
-  const porFranja = new Map()
-  for (const g of activos) {
-    for (const h of g.horarios || []) {
-      const key = `${h.dia}|${h.hora_inicio}`
-      if (!porFranja.has(key)) porFranja.set(key, { key, dia: h.dia, hora_inicio: h.hora_inicio, entradas: [] })
-      porFranja.get(key).entradas.push({ g, h })
-    }
-  }
-  const franjas = [...porFranja.values()].sort((a, b) => a.dia - b.dia || minutos(a.hora_inicio) - minutos(b.hora_inicio))
-  const conLibre = franjas.filter((f) => {
-    const ocupados = new Set(f.entradas.filter((x) => x.g.coach_id).map((x) => String(x.g.coach_id)))
-    return coachesActivos.some((c) => !ocupados.has(String(c.id)))
-  }).length
+// ── Tab Horarios: calendario del inventario por salón ───────────────────────
+// El inventario ALOHA es el bloque de horario: ventana 12:30–8:30 pm, 30 min
+// entre clases, sesiones de 1 h o 2 h. Los huecos verdes se pueden clicar
+// para aperturar un grupo con día/hora/salón prellenados.
+const ROW_H = 26 // px por bloque de 30 min
 
-  if (!franjas.length) return (
+function TabHorarios({ grupos, coaches, salones, onAbrirGrupo }) {
+  const [dia, setDia] = useState(() => {
+    const d = new Date().getDay()
+    return d >= 1 && d <= 6 ? d : 1
+  })
+  const activos = grupos.filter((g) => g.estado === 'activo')
+  const inv = inventarioSemanal(activos, salones)
+  const cols = calendarioDia(activos, salones, dia)
+  const sinSalon = sinSalonDia(activos, dia)
+  const sinHorario = activos.filter((g) => !(g.horarios || []).length)
+
+  const aperturaDia = aperturaDe(dia)
+  const altura = ((CIERRE_MIN - aperturaDia) / SLOT_MIN) * ROW_H
+  const topDe = (min) => ((min - aperturaDia) / SLOT_MIN) * ROW_H
+  const horasEje = []
+  for (let m = aperturaDia; m <= CIERRE_MIN; m += 60) horasEje.push(m)
+
+  const clickHueco = (salon, h) => {
+    const dur = h.cabe2h ? 120 : 60
+    onAbrirGrupo({ dia, hora_inicio: aHora(h.inicio), hora_fin: aHora(h.inicio + dur), salon_id: String(salon.id) })
+  }
+
+  if (!salones.filter((s) => s.activo).length) return (
     <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
-      Ningún grupo activo tiene horario registrado. Edita los grupos y agrégales sus franjas.
+      Este centro no tiene salones registrados. Créalos en la pestaña “Coaches y salones” para ver el calendario del inventario.
     </div>
   )
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(160px,240px))', gap: 12, marginBottom: 16 }}>
+      {/* Métricas del inventario semanal */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 14 }}>
         <div className="kpi" style={{ padding: '14px 16px' }}>
-          <div className="kpi__top"><span className="label">Franjas ocupadas</span></div>
-          <div className="kpi__value num" style={{ fontSize: 26 }}>{franjas.length}</div>
+          <div className="kpi__top"><span className="label">Inventario ocupado</span></div>
+          <div className="kpi__value num" style={{ fontSize: 26 }}>{inv.pctOcupacion}%</div>
+          <div className="kpi__sub">{inv.ocupadoHoras} h de {inv.capacidadHoras} h-salón/semana</div>
         </div>
         <div className="kpi" style={{ padding: '14px 16px' }}>
-          <div className="kpi__top"><span className="label">Franjas con coach libre</span></div>
-          <div className="kpi__value num" style={{ fontSize: 26, color: conLibre > 0 ? 'var(--ok)' : 'var(--text)' }}>{conLibre}</div>
-          <div className="kpi__sub">Ahí se pueden abrir grupos nuevos</div>
+          <div className="kpi__top"><span className="label">Horas libres/semana</span></div>
+          <div className="kpi__value num" style={{ fontSize: 26 }}>{inv.libreHoras}</div>
+          <div className="kpi__sub">Lunes a sábado · salones activos</div>
+        </div>
+        <div className="kpi" style={{ padding: '14px 16px' }}>
+          <div className="kpi__top"><span className="label">Cupos para grupos nuevos</span></div>
+          <div className="kpi__value num" style={{ fontSize: 26, color: inv.cupos2h > 0 ? 'var(--ok)' : 'var(--text)' }}>{inv.cupos2h}</div>
+          <div className="kpi__sub">bloques de 2 h ({inv.cupos1h} de 1 h) — ahí crece el centro</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
-        {franjas.map((f) => {
-          const ocupados = new Set(f.entradas.filter((x) => x.g.coach_id).map((x) => String(x.g.coach_id)))
-          const libres = coachesActivos.filter((c) => !ocupados.has(String(c.id)))
-          const salonesOcupados = new Set(f.entradas.filter((x) => x.h.salon_id).map((x) => String(x.h.salon_id)))
-          const salonesLibres = salonesActivos.filter((s) => !salonesOcupados.has(String(s.id)))
-          return (
-            <div key={f.key} className="card" style={{ padding: 14 }}>
-              <div className="label" style={{ color: 'var(--text-muted)', marginBottom: 10 }}>{DIAS[f.dia]} · {f.hora_inicio}</div>
-              {f.entradas.map(({ g, h }) => (
-                <div key={`${g.id}-${h.id}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text)', fontWeight: 600 }}>Grupo {g.numero}</span>
-                  <span style={{ color: 'var(--text-muted)', flex: 1 }}>{g.coach?.nombre || 'Sin coach'}</span>
-                  <span style={{ color: 'var(--text-dim)' }}>{h.salon_id ? (salonPorId.get(String(h.salon_id))?.nombre || 'Salón') : g.es_online ? 'Online' : 'Sin salón'}</span>
-                  <span className="num" style={{ color: 'var(--text-muted)' }}>{g.estudiantes.length}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, background: libres.length ? 'var(--ok-bg)' : 'var(--surface-3)', border: `1px solid ${libres.length ? 'var(--ok-line)' : 'var(--border)'}`, color: libres.length ? 'var(--ok)' : 'var(--text-dim)' }}>
-                Coaches libres en esta franja: {libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
-                Salones libres: {salonesLibres.length ? salonesLibres.map((s) => s.nombre).join(', ') : 'ninguno'}
-              </div>
-            </div>
-          )
-        })}
+      {/* Selector de día + reglas */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {DIAS_OPERATIVOS.map((d) => (
+            <button key={d} className={`btn${dia === d ? ' btn--primary' : ''}`} style={{ padding: '5px 12px', fontSize: 12 }}
+              onClick={() => setDia(d)}>{DIAS[d].slice(0, 3)}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+          Ventana {aHora(aperturaDia)}–8:30 pm · 30 min entre clases · sesiones de 1 h o 2 h · toca un bloque verde para aperturar un grupo ahí
+        </span>
       </div>
+
+      {/* Calendario del día: columna por salón */}
+      <div className="card" style={{ padding: 14, overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols.length}, minmax(170px, 1fr))`, gap: 8, minWidth: 52 + cols.length * 178 }}>
+          <div />
+          {cols.map(({ salon }) => (
+            <div key={salon.id} className="label" style={{ textAlign: 'center', color: 'var(--text-muted)', paddingBottom: 4 }}>
+              {salon.nombre}{salon.es_hibrido ? ' · híbrido' : ''}
+            </div>
+          ))}
+
+          {/* Eje de horas */}
+          <div style={{ position: 'relative', height: altura }}>
+            {horasEje.map((m) => (
+              <div key={m} className="num" style={{ position: 'absolute', top: topDe(m) - 7, right: 6, fontSize: 10, color: 'var(--text-dim)' }}>{aHora(m)}</div>
+            ))}
+          </div>
+
+          {cols.map(({ salon, sesiones, huecos }) => (
+            <div key={salon.id} style={{
+              position: 'relative', height: altura, borderRadius: 'var(--r-sm)',
+              background: `repeating-linear-gradient(to bottom, var(--surface-2), var(--surface-2) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2}px)`,
+              border: '1px solid var(--border)',
+            }}>
+              {sesiones.map(({ grupo, horario, inicio, fin }) => {
+                const st = groupStatus(grupo, 8)
+                const alerta = st.key === 'bajo'
+                return (
+                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.estudiantes.length} niños`}
+                    style={{
+                      position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
+                      background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
+                      borderLeft: `3px solid ${alerta ? 'var(--bad)' : 'var(--ts-green)'}`,
+                      borderRadius: 'var(--r-sm)', padding: '5px 8px', overflow: 'hidden', fontSize: 11.5,
+                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>Grupo {grupo.numero}</span>
+                      <span className="num" style={{ color: alerta ? 'var(--bad)' : 'var(--ok)' }}>{grupo.estudiantes.length}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'} · {grupo.itinerario}
+                    </div>
+                    <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{horario.hora_inicio}–{horario.hora_fin}</div>
+                  </div>
+                )
+              })}
+              {huecos.map((h) => {
+                const libres = coachesLibresEn(activos, coaches, dia, h.inicio, h.fin)
+                return (
+                  <button key={h.inicio} onClick={() => clickHueco(salon, h)}
+                    title={`Coaches libres aquí: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}`}
+                    style={{
+                      position: 'absolute', left: 4, right: 4, top: topDe(h.inicio) + 1, height: topDe(h.fin) - topDe(h.inicio) - 2,
+                      background: 'var(--ok-bg)', border: '1.5px dashed var(--ok-line)', borderRadius: 'var(--r-sm)',
+                      color: 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 4,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                    }}>
+                    <span>＋ Abrir grupo</span>
+                    <span className="num" style={{ fontWeight: 500 }}>{aHora(h.inicio)}–{aHora(h.fin)}</span>
+                    {h.cabe2h && <span style={{ fontWeight: 500, fontSize: 10 }}>{bloquesQueCaben(h.minutos, 120)}×2h · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Grupos del día sin salón y grupos sin horario */}
+      {sinSalon.length > 0 && (
+        <div className="card" style={{ padding: '10px 14px', marginTop: 12, borderLeft: '3px solid var(--warn)', fontSize: 12.5, color: 'var(--text-muted)' }}>
+          <b style={{ color: 'var(--warn)' }}>Con horario pero sin salón este día:</b>{' '}
+          {sinSalon.map((x) => `Grupo ${x.grupo.numero} (${x.horario.hora_inicio}–${x.horario.hora_fin})`).join(' · ')}
+          {' '}— edítalos y asígnales salón para que entren al inventario.
+        </div>
+      )}
+      {sinHorario.length > 0 && (
+        <div className="card" style={{ padding: '10px 14px', marginTop: 10, fontSize: 12.5, color: 'var(--text-dim)' }}>
+          Sin horario registrado: {sinHorario.map((g) => `Grupo ${g.numero}`).join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
