@@ -288,6 +288,66 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px;
   padding: 14px 18px; border-bottom: 1px solid var(--border);
 }
+/* Segmentado del detalle: la gente del grupo vs el itinerario de su nivel. */
+.grp-seg { display: flex; gap: 6px; margin-top: 12px; }
+.grp-seg__btn {
+  flex: 1; padding: 7px 12px;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  transition: color 0.16s, border-color 0.16s, background 0.16s;
+}
+.grp-seg__btn .num { font-size: 11px; opacity: 0.75; }
+.grp-seg__btn:hover { color: var(--text); border-color: var(--text-faint); }
+.grp-seg__btn--on { background: var(--ts-green-soft); color: var(--ts-green); border-color: var(--ts-green-line); }
+
+/* Atajo "esta semana" en la vista de niños: lleva al itinerario. */
+.grp-hoy {
+  width: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; background: transparent; border: none;
+  border-bottom: 1px solid var(--border); border-left: 3px solid var(--ts-green);
+  text-align: left; font-size: 12.5px;
+}
+.grp-hoy:hover { background: var(--surface-2); }
+
+/* Itinerario del nivel */
+.itin-head { padding: 15px 18px; border-bottom: 1px solid var(--border); }
+.itin-tl { display: flex; flex-wrap: wrap; gap: 5px; padding: 14px 18px 10px; }
+.itin-blk {
+  width: 34px; height: 30px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid; border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+}
+.itin-blk--hecha { opacity: 0.45; }
+.itin-blk--hoy { box-shadow: 0 0 0 3px var(--ts-green-soft); opacity: 1; }
+.itin-leyenda { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 18px 14px; font-size: 11px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+.itin-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.itin-leyenda i { width: 11px; height: 11px; border: 1px solid; border-radius: 3px; display: inline-block; }
+
+.itin-mes {
+  position: sticky; top: 0; z-index: 1;
+  padding: 7px 18px; background: var(--surface-3);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+}
+.itin-fila { display: flex; align-items: center; gap: 9px; padding: 8px 18px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.itin-fila--hoy { background: var(--ts-green-soft); }
+.itin-fila__chip {
+  width: 32px; flex-shrink: 0; text-align: center;
+  padding: 2px 0; border: 1px solid; border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+}
+.itin-fila__fechas { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
+.itin-fecha {
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
+  padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+}
+.itin-fecha:hover { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
+/* Clase que NO se dio (feriado o suspensión): por eso corrió el plan. */
+.itin-fecha--out { color: var(--text-faint); text-decoration: line-through; cursor: help; }
+
 /* Roster apilado (panel deslizante): la tabla no cabe en pantalla angosta. */
 .grp-roster__item { padding: 13px 18px; border-bottom: 1px solid var(--border); }
 .grp-roster__item:last-child { border-bottom: none; }

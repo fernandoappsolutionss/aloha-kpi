@@ -2,17 +2,17 @@
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
-import { ITINERARIOS, aperturaMinima, hoyISO } from '../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
 import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
-import { generarItinerario } from '../../lib/itinerario'
+import { generarItinerario, normalizarExcepciones } from '../../lib/itinerario'
 
 // Genera y guarda el itinerario de clases del nivel (manual ALOHA Panamá):
 // necesita fecha de inicio + días de clase. Los Naranjos opera con el
 // reglamento de ALOHA Venezuela → su calendario no salta feriados panameños.
-async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel }) {
+async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }) {
   if (!fechaInicio || !horarios?.length) return null
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
   const conFeriados = !/naranjos/i.test(c?.nombre || '')
@@ -21,6 +21,7 @@ async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horar
     dias: horarios.map((h) => h.dia),
     nivel: nivel || 1,
     conFeriados,
+    excepciones,
   })
   if (!it) return null
   await sql`UPDATE grupos SET itinerario_clases = ${JSON.stringify(it)} WHERE id = ${grupoId}`
@@ -268,7 +269,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
     }
   }
   // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
-  // horarios); el nivel se conserva del itinerario ya generado.
+  // horarios); el nivel y las clases suspendidas del grupo se conservan.
   const inicioCambio = String(fechaInicio || '') !== String(g.fecha_inicio_clases || '').slice(0, 10)
   if ((horarios || inicioCambio) && fechaInicio) {
     const hs = horarios || (await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
@@ -276,11 +277,44 @@ export async function actualizarGrupo(centroId, grupoId, data) {
       fechaInicio,
       horarios: hs,
       nivel: g.itinerario_clases?.nivel || 1,
+      excepciones: g.itinerario_clases?.excepciones || [],
     })
   }
   // Si cambió el estado de inscripciones, ventas debe ver los cupos correctos.
   if ((g.inscripcion_abierta !== false) !== inscripcionAbierta) await pushCuposAlCrm(centroId, grupoId)
   return { ok: true }
+}
+
+// Ajusta el itinerario del nivel de UN grupo: nivel que cursa, fecha de inicio
+// del nivel y clases suspendidas (excepciones). La plantilla de semanas es la
+// base de franquicia y no se toca aquí; lo que cambia es cómo cae en el
+// calendario de este grupo. Devuelve el itinerario ya regenerado.
+export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
+  await requireCentroAccess(centroId)
+  const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+  if (!g) return { error: 'El grupo no pertenece a este centro.' }
+
+  const nivel = intOr(data?.nivel, g.itinerario_clases?.nivel || 1)
+  const topeNivel = NIVEL_MAX[g.itinerario] || 10
+  if (nivel < 1 || nivel > topeNivel) return { error: `El nivel de ${g.itinerario} va de 1 a ${topeNivel}.` }
+
+  const fechaInicio = String(data?.fecha_inicio || '').slice(0, 10)
+  if (!FECHA_RE.test(fechaInicio)) return { error: 'La fecha de inicio del nivel es requerida (AAAA-MM-DD).' }
+
+  const horarios = await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`
+  if (!horarios.length) return { error: 'El grupo no tiene horario registrado: sin días de clase no hay itinerario.' }
+
+  const excepciones = normalizarExcepciones(data?.excepciones)
+  const it = await regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones })
+  if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
+
+  // La fecha de inicio del nivel en curso ES la fecha de inicio de clases del
+  // grupo: mantenerlas alineadas evita que el siguiente guardado lo regenere.
+  await sql`
+    UPDATE grupos SET fecha_inicio_clases = ${fechaInicio}, updated_at = ${new Date().toISOString()}
+    WHERE id = ${grupoId}
+  `
+  return { ok: true, itinerario: it }
 }
 
 // Abre o cierra las inscripciones de un grupo (en llenado ↔ ya no entra nadie).
