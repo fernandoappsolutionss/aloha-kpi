@@ -45,7 +45,7 @@ function SetPasswordInner() {
       <main className="login__panel" style={{ width: '100%' }}>
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
 
             {info === null && <p className="login__cardsub">Verificando enlace…</p>}
 

@@ -200,3 +200,124 @@ CREATE INDEX IF NOT EXISTS idx_resumen_centro_year ON resumen_mes (centro_id, ye
 CREATE INDEX IF NOT EXISTS idx_kpi_centro_year      ON kpi_semanas (centro_id, year);
 CREATE INDEX IF NOT EXISTS idx_mes_kpi_centro       ON mes_kpi (centro_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_centro      ON usuarios (centro_id);
+
+-- ══ MÓDULO DE OPERACIONES (grupos, estudiantes, cuadro de negocio) ══
+
+CREATE TABLE IF NOT EXISTS salones (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL,
+  es_hibrido BOOLEAN DEFAULT FALSE,
+  activo BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_salones_centro ON salones(centro_id);
+
+CREATE TABLE IF NOT EXISTS coaches (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL,
+  nivel_kids INTEGER DEFAULT 0,
+  kinder1 BOOLEAN DEFAULT FALSE,
+  kinder23 BOOLEAN DEFAULT FALSE,
+  activo BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_coaches_centro ON coaches(centro_id);
+
+CREATE TABLE IF NOT EXISTS grupos (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  numero TEXT NOT NULL,
+  itinerario TEXT NOT NULL DEFAULT 'TINY',
+  es_online BOOLEAN DEFAULT FALSE,
+  coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
+  estado TEXT NOT NULL DEFAULT 'activo',
+  fecha_apertura DATE,
+  fecha_cierre DATE,
+  fusionado_en INTEGER REFERENCES grupos(id) ON DELETE SET NULL,
+  notas TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (centro_id, numero)
+);
+CREATE INDEX IF NOT EXISTS idx_grupos_centro ON grupos(centro_id);
+
+CREATE TABLE IF NOT EXISTS grupo_horarios (
+  id SERIAL PRIMARY KEY,
+  grupo_id INTEGER NOT NULL REFERENCES grupos(id) ON DELETE CASCADE,
+  dia INTEGER NOT NULL,
+  hora_inicio TEXT NOT NULL,
+  hora_fin TEXT NOT NULL,
+  salon_id INTEGER REFERENCES salones(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_grupo_horarios_grupo ON grupo_horarios(grupo_id);
+
+CREATE TABLE IF NOT EXISTS estudiantes (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL,
+  nombre TEXT NOT NULL,
+  itinerario TEXT NOT NULL DEFAULT 'TINY',
+  nivel INTEGER NOT NULL DEFAULT 1,
+  estado TEXT NOT NULL DEFAULT 'activo',
+  status_plataforma TEXT DEFAULT 'INCLUIR',
+  origen TEXT DEFAULT 'directo',
+  crm_registration_id TEXT,
+  fecha_inscripcion DATE,
+  fecha_cierre_nivel DATE,
+  representante TEXT,
+  correo TEXT,
+  telefono TEXT,
+  motivo_retiro TEXT,
+  fecha_retiro DATE,
+  ultima_asistencia DATE,
+  notas TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_estudiantes_centro ON estudiantes(centro_id);
+CREATE INDEX IF NOT EXISTS idx_estudiantes_grupo ON estudiantes(grupo_id);
+
+CREATE TABLE IF NOT EXISTS estudiante_eventos (
+  id SERIAL PRIMARY KEY,
+  estudiante_id INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  fecha DATE,
+  de_grupo_id INTEGER,
+  a_grupo_id INTEGER,
+  de_nivel INTEGER,
+  a_nivel INTEGER,
+  motivo TEXT,
+  notas TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_est_eventos_centro_mes ON estudiante_eventos(centro_id, year, month);
+CREATE INDEX IF NOT EXISTS idx_est_eventos_est ON estudiante_eventos(estudiante_id);
+
+CREATE TABLE IF NOT EXISTS pedidos_material (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  fecha DATE,
+  numero_oe TEXT,
+  producto TEXT NOT NULL DEFAULT 'KIT',
+  itinerario TEXT,
+  nivel INTEGER,
+  grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL,
+  cantidad INTEGER DEFAULT 0,
+  monto NUMERIC DEFAULT 0,
+  observaciones TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pedidos_centro_mes ON pedidos_material(centro_id, year, month);
+
+ALTER TABLE resumen_mes ADD COLUMN IF NOT EXISTS mot_otro INTEGER DEFAULT 0;
+ALTER TABLE metas ADD COLUMN IF NOT EXISTS royalty_por_nino NUMERIC DEFAULT 12;
+ALTER TABLE metas ADD COLUMN IF NOT EXISTS cupo_max_grupo INTEGER DEFAULT 15;

@@ -66,7 +66,7 @@ export default function LoginPage() {
         </div>
 
         <div className="login__brandfoot">
-          <Logo size={26} />
+          <Logo size={26} wordmark={false} />
           <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
             ALOHA Mental Arithmetic · Panamá · Venezuela
           </p>
@@ -77,7 +77,7 @@ export default function LoginPage() {
       <main className="login__panel">
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
             <h2 className="login__welcome">Bienvenido de nuevo</h2>
             <p className="login__cardsub">Ingresa tus credenciales para acceder al panel.</p>
           </div>

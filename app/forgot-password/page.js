@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
       <main className="login__panel" style={{ width: '100%' }}>
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
             <h2 className="login__welcome">¿Olvidaste tu contraseña?</h2>
             <p className="login__cardsub">Te enviaremos un enlace para restablecerla.</p>
           </div>
