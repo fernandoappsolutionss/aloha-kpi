@@ -18,7 +18,8 @@ import {
   CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, aHora12, aMinutos, calendarioDia,
   sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben,
 } from '../../../../lib/inventario'
-import { atractivoDe, recomendacionesApertura, inicioVendible, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
+import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
+import { estadoModelo, RESUMEN_MODELO } from '../../../../lib/modelo'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -116,12 +117,16 @@ export default function GruposPage() {
   })
   const abierto = openId ? grupos.find((g) => String(g.id) === String(openId)) : null
 
-  // `prefill` opcional: desde un hueco del calendario llega { dia, hora_inicio, hora_fin, salon_id }.
+  // `prefill` opcional: desde el calendario o una recomendación del modelo.
+  // Puede ser una sesión suelta { dia, hora_inicio, hora_fin, salon_id } o una
+  // unidad completa { horarios: [...] } (p. ej. el par Lun+Mié del modelo).
   async function abrirNuevoGrupo(prefill) {
     setStatus('')
     const num = await siguienteNumero(id)
-    const horario = prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }
-    setGrupoModal({ numero: String(num), itinerario: 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios: [{ ...horario }] })
+    const horarios = prefill?.horarios?.length
+      ? prefill.horarios.map((h) => ({ ...h }))
+      : [{ ...(prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }) }]
+    setGrupoModal({ numero: String(num), itinerario: 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
@@ -583,6 +588,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   const [verGuia, setVerGuia] = useState(false)
   const activos = grupos.filter((g) => g.estado === 'activo')
   const recos = recomendacionesApertura(grupos, salones, coaches, retirados, 4)
+  const modelo = estadoModelo(grupos, salones)
   const inv = inventarioSemanal(activos, salones)
   const cols = calendarioDia(activos, salones, dia)
   const sinSalon = sinSalonDia(activos, dia)
@@ -595,6 +601,13 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   for (let m = aperturaDia; m <= CIERRE_MIN; m += 60) horasEje.push(m)
 
   const clickHueco = (salon, h) => {
+    // Primero intenta encajar una unidad del modelo (p. ej. el par Lun+Mié
+    // completo); si no cabe ninguna, cae al bloque libre en hora vendible.
+    const unidad = unidadParaHueco(grupos, salones, dia, salon.id, h)
+    if (unidad) {
+      onAbrirGrupo({ horarios: unidad.sesiones.map((ses) => ({ dia: ses.dia, hora_inicio: aHora(ses.inicio), hora_fin: aHora(ses.fin), salon_id: String(ses.salon_id) })) })
+      return
+    }
     const ini = inicioVendible(dia, h)
     const dur = h.fin - ini >= 120 ? 120 : 60
     onAbrirGrupo({ dia, hora_inicio: aHora(ini), hora_fin: aHora(ini + dur), salon_id: String(salon.id) })
@@ -618,12 +631,12 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
         <div className="kpi" style={{ padding: '14px 16px' }}>
           <div className="kpi__top"><span className="label">Horas vendibles libres</span></div>
           <div className="kpi__value num" style={{ fontSize: 26 }}>{inv.libreHoras}</div>
-          <div className="kpi__sub">Semana 3:30–8:30 pm · sábado 9 am–5 pm</div>
+          <div className="kpi__sub">Semana 3:00–8:30 pm · sábado 9 am–5 pm</div>
         </div>
         <div className="kpi" style={{ padding: '14px 16px' }}>
-          <div className="kpi__top"><span className="label">Cupos para grupos nuevos</span></div>
-          <div className="kpi__value num" style={{ fontSize: 26, color: inv.cupos2h > 0 ? 'var(--ok)' : 'var(--text)' }}>{inv.cupos2h}</div>
-          <div className="kpi__sub">bloques de 2 h vendibles ({inv.cupos1h} de 1 h) — ahí crece el centro</div>
+          <div className="kpi__top"><span className="label">Cupos del modelo</span></div>
+          <div className="kpi__value num" style={{ fontSize: 26, color: modelo.cuposLibres > 0 ? 'var(--ok)' : 'var(--text)' }}>{modelo.cuposLibres}</div>
+          <div className="kpi__sub">{modelo.gruposActivos} de {modelo.capacidadGrupos} grupos del modelo · capacidad {modelo.capacidadNinos} niños — ahí crece el centro</div>
         </div>
       </div>
 
@@ -634,7 +647,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
             <div>
               <div className="panel__title">Dónde abrir el próximo grupo</div>
               <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>
-                Rankeado con la estadística del propio centro: tamaño de los grupos por franja y retiros por horario.
+                Siempre optimizando hacia el modelo de horarios del negocio: {RESUMEN_MODELO}. Rankeado con la estadística del propio centro.
               </div>
             </div>
             <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setVerGuia(!verGuia)}>
@@ -643,18 +656,20 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           </div>
           <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 10 }}>
             {recos.map((r, i) => (
-              <div key={`${r.dia}-${r.inicio}-${r.salon.id}`} className="card" style={{ padding: 12, borderLeft: `3px solid ${ETIQUETA_COLOR[r.etiqueta]}` }}>
+              <div key={`${r.tipo}-${r.sesiones[0].inicio}-${r.salon.id}`} className="card" style={{ padding: 12, borderLeft: `3px solid ${ETIQUETA_COLOR[r.etiqueta]}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {DIAS[r.dia]} {aHora12(r.inicio)}–{aHora12(r.fin)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta] }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {r.titulo}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{r.salon.nombre} · {r.cabe2h ? 'bloque de 2 h' : '1 h (falta el 2.º día)'}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                  {r.salon.nombre} · {r.tipo === 'LM' || r.tipo === 'MJ' ? '1 h + 1 h (par del modelo)' : 'bloque de 2 h'}
+                </div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 5, minHeight: 28 }}>{r.razon}</div>
                 <div style={{ fontSize: 11, color: r.coachesLibres.length ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
-                  {r.coachesLibres.length ? `Coaches libres: ${r.coachesLibres.map((c) => c.nombre.split(' ')[0]).join(', ')}` : 'Sin coach libre en esa franja'}
+                  {r.coachesLibres.length ? `Coaches libres: ${r.coachesLibres.map((c) => c.nombre.split(' ')[0]).join(', ')}` : 'Sin coach libre en esas franjas'}
                 </div>
                 <button className="btn btn--primary" style={{ marginTop: 8, padding: '5px 12px', fontSize: 12 }}
-                  onClick={() => onAbrirGrupo({ dia: r.dia, hora_inicio: aHora(r.inicio), hora_fin: aHora(r.fin), salon_id: String(r.salon.id) })}>
+                  onClick={() => onAbrirGrupo({ horarios: r.horariosForm })}>
                   Aperturar aquí
                 </button>
               </div>
