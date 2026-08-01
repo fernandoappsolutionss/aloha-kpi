@@ -75,7 +75,7 @@ async function metasOperativas() {
 // Valida y normaliza las filas de horario del formulario. Devuelve
 // { horarios: [{ dia, hora_inicio, hora_fin, salon_id }] } o { error }.
 // Aplica las reglas del inventario ALOHA (ventana 12:30–20:30, sesiones de
-// 1 h o 2 h) y bloquea choques de salón sin los 30 min entre clases.
+// 1 h o 2 h) y bloquea choques de salón sin el buffer entre clases.
 // `grupoId` excluye al propio grupo al validar choques (edición).
 async function validarHorarios(centroId, horarios, grupoId = null) {
   const salones = await sql`SELECT id, nombre FROM salones WHERE centro_id = ${centroId}`
@@ -108,7 +108,7 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
       const a = out[i]; const b = out[j]
       if (a.salon_id && a.dia === b.dia && String(a.salon_id) === String(b.salon_id) &&
           chocanConBuffer(aMinutos(a.hora_inicio), aMinutos(a.hora_fin), aMinutos(b.hora_inicio), aMinutos(b.hora_fin))) {
-        return { error: `Dos sesiones del mismo grupo chocan en ${salonPorId.get(String(a.salon_id))} el mismo día (recuerda los 30 min entre clases).` }
+        return { error: `Dos sesiones del mismo grupo chocan en ${salonPorId.get(String(a.salon_id))} el mismo día (recuerda los 15 min entre clases).` }
       }
     }
   }
@@ -132,7 +132,7 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
     for (const o of ocupadas) {
       if (o.dia !== n.dia || String(o.salon_id) !== String(n.salon_id)) continue
       if (chocanConBuffer(aMinutos(n.hora_inicio), aMinutos(n.hora_fin), aMinutos(o.hora_inicio), aMinutos(o.hora_fin))) {
-        return { error: `Choca con el Grupo ${o.numero} en ${salonPorId.get(String(n.salon_id))} (${o.hora_inicio}–${o.hora_fin}); deja al menos 30 min entre clases.` }
+        return { error: `Choca con el Grupo ${o.numero} en ${salonPorId.get(String(n.salon_id))} (${o.hora_inicio}–${o.hora_fin}); deja al menos 15 min entre clases.` }
       }
     }
   }
