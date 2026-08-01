@@ -353,3 +353,22 @@ ALTER TABLE grupos ADD COLUMN IF NOT EXISTS fecha_inicio_clases DATE;
 -- vacaciones de diciembre; guarda semanas etiquetadas (inducción/libro/mental
 -- day/cierre), cierre estimado e inicio del siguiente nivel (ciclos de 2).
 ALTER TABLE grupos ADD COLUMN IF NOT EXISTS itinerario_clases JSONB;
+
+-- Asistencia por clase ligada al itinerario (formato de Anclas Mall): cada
+-- grupo tiene un LINK DE COACH (token sin sesión) donde el coach marca
+-- presente/ausente/justificada por fecha del itinerario y lleva su nota por
+-- niño. Marcar presente actualiza estudiantes.ultima_asistencia (norma del
+-- retiro del cuadro).
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS coach_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_grupos_coach_token ON grupos(coach_token) WHERE coach_token IS NOT NULL;
+ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS nota_coach TEXT;
+CREATE TABLE IF NOT EXISTS asistencias (
+  id SERIAL PRIMARY KEY,
+  grupo_id INTEGER NOT NULL REFERENCES grupos(id) ON DELETE CASCADE,
+  estudiante_id INTEGER NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+  fecha DATE NOT NULL,
+  estado TEXT NOT NULL DEFAULT 'presente',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (estudiante_id, fecha)
+);
+CREATE INDEX IF NOT EXISTS idx_asistencias_grupo ON asistencias(grupo_id, fecha);

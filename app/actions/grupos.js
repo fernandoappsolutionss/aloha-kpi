@@ -1,4 +1,5 @@
 'use server'
+import { randomBytes } from 'crypto'
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
@@ -315,6 +316,20 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
     WHERE id = ${grupoId}
   `
   return { ok: true, itinerario: it }
+}
+
+// Link del coach: token estable por grupo para la lista de asistencia
+// (/coach/<token>, sin sesión). Se genera la primera vez que se pide.
+export async function linkCoach(centroId, grupoId) {
+  await requireCentroAccess(centroId)
+  const [g] = await sql`SELECT id, coach_token FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+  if (!g) return { error: 'El grupo no pertenece a este centro.' }
+  let token = g.coach_token
+  if (!token) {
+    token = randomBytes(18).toString('base64url')
+    await sql`UPDATE grupos SET coach_token = ${token}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
+  }
+  return { ok: true, path: `/coach/${token}` }
 }
 
 // Abre o cierra las inscripciones de un grupo (en llenado ↔ ya no entra nadie).
