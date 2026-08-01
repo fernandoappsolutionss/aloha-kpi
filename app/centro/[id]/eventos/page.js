@@ -5,6 +5,7 @@ import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
   eliminarEvento, duplicarEvento, listarRegistros, agregarInvitado, marcarAsistencia, marcarPago,
+  guardarNota, listarNotas,
 } from '../../../actions/eventos'
 import { listarGruposActivos } from '../../../actions/grupos'
 import { inscribirEstudiante } from '../../../actions/estudiantes'
@@ -397,6 +398,7 @@ function Registrations({ centroId, eventId, onChange }) {
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [saving, setSaving] = useState(false)
   const [inscribir, setInscribir] = useState(null) // registro a inscribir como estudiante
+  const [notaDe, setNotaDe] = useState(null)       // registro cuyo panel de notas esta abierto
 
   const load = useCallback(async () => {
     const res = await listarRegistros(centroId, eventId)
@@ -451,7 +453,7 @@ function Registrations({ centroId, eventId, onChange }) {
         : regs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
           : (
             <table className="table" style={{ background: 'var(--surface)' }}>
-              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', 'Nota', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
               <tbody>
                 {regs.map((r) => {
                   const origen = origenDeRegistro(r)
@@ -485,6 +487,13 @@ function Registrations({ centroId, eventId, onChange }) {
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? '#FCA5A5' : 'var(--text-dim)' }}>No vino</button>
                       </div>
                     </td>
+                    <td>
+                      <button onClick={() => { setStatus(''); setNotaDe(r) }} className="btn"
+                        title={r.notes?.trim() ? r.notes : 'Sin notas todavía'}
+                        style={{ padding: '4px 10px', fontSize: 11, gap: 4 }}>
+                        {r.notes?.trim() ? '📝 Ver / agregar' : '+ Nota'}
+                      </button>
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <button onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 11 }}>Inscribir</button>
                     </td>
@@ -494,6 +503,11 @@ function Registrations({ centroId, eventId, onChange }) {
               </tbody>
             </table>
           )}
+      {notaDe && (
+        <NotasModal centroId={centroId} eventId={eventId} reg={notaDe}
+          onClose={() => setNotaDe(null)}
+          onSaved={(msg) => { setNotaDe(null); setStatus('✅ ' + msg); load() }} />
+      )}
       {inscribir && (
         <InscribirModal centroId={centroId} reg={inscribir}
           onClose={() => setInscribir(null)}
@@ -506,6 +520,86 @@ function Registrations({ centroId, eventId, onChange }) {
 // Pasa un registro de la clase de prueba al módulo de grupos: crea el
 // estudiante con origen 'clase_prueba' y el crm_registration_id del registro
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito).
+/**
+ * Notas de seguimiento de un participante — el equivalente a la pestaña "Notas"
+ * del link de seguimiento, que era lo que al panel del centro le faltaba.
+ *
+ * La nota se guarda en la registración Y se agrega al historial (timeline del
+ * lead y del deal en el CRM), asi que lo que escribe el centro aqui lo ve
+ * despues el vendedor desde el CRM.
+ */
+function NotasModal({ centroId, eventId, reg, onClose, onSaved }) {
+  const [texto, setTexto] = useState('')
+  const [historial, setHistorial] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const quien = [reg.first_name, reg.last_name].filter(Boolean).join(' ') || 'Participante'
+
+  const cargar = useCallback(async () => {
+    const res = await listarNotas(centroId, eventId, reg.id)
+    if (res.error) setErr(res.error)
+    setHistorial(res.notes || [])
+  }, [centroId, eventId, reg.id])
+  useEffect(() => { cargar() }, [cargar])
+
+  async function guardar() {
+    if (!texto.trim()) { setErr('Escribe la nota antes de guardar.'); return }
+    setSaving(true); setErr('')
+    const res = await guardarNota(centroId, eventId, reg.id, texto)
+    setSaving(false)
+    if (res.error) setErr(res.error); else onSaved('Nota guardada.')
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
+      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 560, maxWidth: '100%', padding: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <h3 className="panel__title">Notas · {quien}</h3>
+          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ padding: 22, maxHeight: '62vh', overflowY: 'auto' }}>
+          {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">Agregar nueva nota</label>
+            <textarea className="input" rows={4} value={texto} onChange={(e) => setTexto(e.target.value)}
+              placeholder="Escribe una nota de seguimiento…" />
+            <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6 }}>
+              Al guardar, la nota queda en el historial y aparece en el timeline del lead y del deal en el CRM.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+            <div className="label" style={{ marginBottom: 8 }}>Historial de notas</div>
+            {historial === null ? (
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
+            ) : historial.length === 0 ? (
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>
+                Sin notas previas. La primera aparecerá aquí después de guardar.
+              </div>
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+                {historial.map((n) => (
+                  <li key={n.id} style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '10px 12px' }}>
+                    <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.description || '(nota vacía)'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>{fmtFecha(n.created_at)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={guardar} disabled={saving}>{saving ? 'Guardando…' : 'Guardar nota'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function InscribirModal({ centroId, reg, onClose, onSaved }) {
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({

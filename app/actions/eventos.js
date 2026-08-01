@@ -145,6 +145,34 @@ export async function marcarAsistencia(centroId, eventId, registrationId, attend
   return { ok: true, registration: res.registration }
 }
 
+/**
+ * Guarda una nota de seguimiento del participante.
+ *
+ * El CRM guarda la ULTIMA nota en la registración y además la agrega al
+ * historial (timeline del lead y del deal), igual que el link de seguimiento.
+ */
+export async function guardarNota(centroId, eventId, registrationId, notas) {
+  await requireCentroAccess(centroId)
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
+  const texto = String(notas ?? '').trim()
+  if (!texto) return { error: 'La nota está vacía.' }
+  const res = await crmCall('update_registration', {
+    registration_id: registrationId,
+    notes: texto,
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true, registration: res.registration }
+}
+
+/** Historial de notas de un participante (las que ya escribió cualquiera). */
+export async function listarNotas(centroId, eventId, registrationId) {
+  await requireCentroAccess(centroId)
+  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.', notes: [] }
+  const res = await crmCall('list_registration_notes', { registration_id: registrationId })
+  if (res.error) return { error: res.error, notes: [] }
+  return { notes: res.notes || [] }
+}
+
 export async function marcarPago(centroId, eventId, registrationId, paid) {
   await requireCentroAccess(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
