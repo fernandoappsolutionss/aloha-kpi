@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
   loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, toggleInscripcionGrupo, siguienteNumero,
-  saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion,
+  saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion, ajustarItinerarioGrupo,
 } from '../../../actions/grupos'
 import {
   inscribirEstudiante, actualizarEstudiante, graduarTiny, marcarBajaPotencial,
@@ -20,6 +20,7 @@ import {
 } from '../../../../lib/inventario'
 import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
+import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -117,6 +118,7 @@ export default function GruposPage() {
   const [editEst, setEditEst] = useState(null)
   const [retiroEst, setRetiroEst] = useState(null)
   const [reincEst, setReincEst] = useState(null)
+  const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
@@ -186,7 +188,7 @@ export default function GruposPage() {
   }
 
   // Teclado: Esc cierra el detalle, ↑/↓ recorren la lista de grupos.
-  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || reincEst)
+  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || reincEst || itinEdit)
   useEffect(() => {
     function onKey(e) {
       if (tab !== 'grupos' || hayModal) return
@@ -311,6 +313,7 @@ export default function GruposPage() {
     toggleInscripcion: onToggleInscripcion,
     buscarFusion: onBuscarFusion,
     inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
+    ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
     retirar: (e) => { setStatus(''); setRetiroEst(e) },
     graduar: onGraduar,
@@ -521,6 +524,11 @@ export default function GruposPage() {
           onClose={() => setRetiroEst(null)}
           onSaved={(res) => retiroGuardado(res, retiroEst)} />
       )}
+      {itinEdit && (
+        <ItinerarioModal centroId={id} g={itinEdit.grupo} nuevaExcepcion={itinEdit.fecha}
+          onClose={() => setItinEdit(null)}
+          onSaved={(msg) => { setItinEdit(null); setStatus('✅ ' + msg); refresca() }} />
+      )}
       {reincEst && (
         <ReincorporarModal centroId={id} est={reincEst} grupos={grupos}
           onClose={() => setReincEst(null)}
@@ -599,11 +607,14 @@ function AccionesNino({ e, acciones }) {
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
 function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
+  const [vista, setVista] = useState('ninos')
   const st = groupStatus(g, metas.gpnMin)
   const n = g.estudiantes.length
   const bajas = g.estudiantes.filter((e) => e.estado === 'baja_potencial').length
   const faltan = Math.max(0, metas.gpnMin - n)
   const activo = g.estado === 'activo'
+  const it = g.itinerario_clases
+  const idxHoy = it ? semanaEnCurso(it, hoyISO()) : -1
   const TILES = [
     { l: 'Niños', v: n, s: `de ${metas.cupoMax} cupos` },
     { l: 'Meta', v: faltan === 0 ? '✓' : `−${faltan}`, s: faltan === 0 ? `cumple los ${metas.gpnMin}` : `faltan para los ${metas.gpnMin}`, c: faltan === 0 ? 'var(--ok)' : 'var(--warn)' },
@@ -645,9 +656,22 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.reabrir(g)}>Reabrir</button>
           )}
         </div>
+        {/* Dos vistas del grupo: su gente y el itinerario del nivel que cursa */}
+        <div className="grp-seg" role="tablist">
+          <button role="tab" aria-selected={vista === 'ninos'} className={`grp-seg__btn${vista === 'ninos' ? ' grp-seg__btn--on' : ''}`} onClick={() => setVista('ninos')}>
+            Niños <span className="num">{n}</span>
+          </button>
+          <button role="tab" aria-selected={vista === 'itinerario'} className={`grp-seg__btn${vista === 'itinerario' ? ' grp-seg__btn--on' : ''}`} onClick={() => setVista('itinerario')}>
+            Itinerario {it ? <span className="num">nivel {it.nivel}</span> : ''}
+          </button>
+        </div>
       </header>
 
       <div className="grp-detail__body">
+        {vista === 'itinerario' ? (
+          <ItinerarioNivel g={g} it={it} idxHoy={idxHoy} onAjustar={(fecha) => acciones.ajustarItinerario(g, fecha)} />
+        ) : (
+        <>
         <div className="grp-stats">
           {TILES.map((t) => (
             <div key={t.l}>
@@ -661,27 +685,19 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         {g.notas && (
           <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>
         )}
-        {g.itinerario_clases?.semanas?.length > 0 && (
-          <details style={{ padding: '10px 18px', fontSize: 12, borderBottom: '1px solid var(--border)' }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}>
-              📅 Itinerario del nivel {g.itinerario_clases.nivel} · {g.itinerario_clases.semanas.length} semanas · cierre estimado {fmtDia(g.itinerario_clases.fecha_cierre_estimada)}
-              {g.itinerario_clases.inicio_siguiente_nivel ? ` · siguiente nivel inicia ${fmtDia(g.itinerario_clases.inicio_siguiente_nivel)}` : ''}
-              {g.itinerario_clases.con_feriados === false ? ' · reglamento ALOHA Venezuela (sin feriados PA)' : ''}
-            </summary>
-            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 4 }}>
-              {g.itinerario_clases.semanas.map((s, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 8px', background: /Cierre|Mental/.test(s.etiqueta) ? 'var(--surface-3)' : 'transparent', borderRadius: 'var(--r-sm)' }}>
-                  <span style={{ color: /Cierre/.test(s.etiqueta) ? 'var(--warn)' : 'var(--text-muted)' }}>{s.etiqueta}</span>
-                  <span className="num" style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{s.fechas.map((f) => fmtDia(f).slice(0, 5)).join(' · ')}</span>
-                </div>
-              ))}
-            </div>
-            {g.itinerario_clases.feriados_saltados?.length > 0 && (
-              <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 11 }}>
-                Sin clases (feriados/vacaciones del manual): {g.itinerario_clases.feriados_saltados.map((f) => fmtDia(f)).join(' · ')}
-              </div>
-            )}
-          </details>
+        {it?.semanas?.length > 0 && (
+          <button className="grp-hoy" onClick={() => setVista('itinerario')} title="Ver el itinerario completo del nivel">
+            <span className="label" style={{ color: 'var(--ts-green)' }}>Esta semana</span>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+              {idxHoy < 0 ? 'Nivel terminado' : it.semanas[idxHoy].etiqueta}
+            </span>
+            <span className="num" style={{ color: 'var(--text-dim)', fontSize: 11.5 }}>
+              {idxHoy < 0
+                ? `cerró ${fmtDia(it.fecha_cierre_estimada)}`
+                : `${idxHoy + 1} de ${it.semanas.length} · cierra ${fmtDia(it.fecha_cierre_estimada)}`}
+            </span>
+            <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 11 }}>Ver itinerario →</span>
+          </button>
         )}
         {n === 0 ? (
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
@@ -745,8 +761,153 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
             </tbody>
           </table>
         )}
+        </>
+        )}
       </div>
     </section>
+  )
+}
+
+// ── Itinerario del nivel: línea de tiempo visual + ajustes ───────────────────
+// La plantilla de semanas es la base de franquicia; lo que se ajusta por grupo
+// es cómo cae en SU calendario (nivel que cursa, fecha de inicio y clases
+// suspendidas). Cada suspensión corre el plan y mueve el cierre estimado.
+const TIPO_ESTILO = {
+  induccion: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
+  clase: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
+  evaluacion: { bg: 'var(--warn-bg)', line: 'var(--warn-line)', fg: 'var(--warn)' },
+  mental: { bg: 'var(--ts-green-soft)', line: 'var(--ts-green-line)', fg: 'var(--ts-green)' },
+  cierre: { bg: 'var(--bad-bg)', line: 'var(--bad-line)', fg: 'var(--bad)' },
+}
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const mesDe = (f) => {
+  const [y, m] = String(f).slice(0, 10).split('-').map(Number)
+  return `${MESES[(m || 1) - 1]} ${y}`
+}
+const diaMes = (f) => String(f).slice(8, 10) + '/' + String(f).slice(5, 7)
+
+function ItinerarioNivel({ g, it, idxHoy, onAjustar }) {
+  if (!it?.semanas?.length) {
+    return (
+      <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
+        Este grupo todavía no tiene itinerario.
+        <span style={{ fontSize: 12, maxWidth: 340, lineHeight: 1.6 }}>
+          Se arma solo con la <b style={{ color: 'var(--text)' }}>fecha de inicio de clases</b> y el horario del grupo: ponlos y aquí verás las 22 semanas del nivel.
+        </span>
+        <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => onAjustar()}>Armar itinerario</button>
+      </div>
+    )
+  }
+  const total = it.semanas.length
+  const hechas = idxHoy < 0 ? total : idxHoy
+  const pct = Math.round((hechas / total) * 100)
+  // Agrupa las semanas por mes calendario para que el plan se lea como agenda.
+  const porMes = []
+  it.semanas.forEach((s, i) => {
+    const mes = mesDe(s.fechas[0])
+    if (!porMes.length || porMes[porMes.length - 1].mes !== mes) porMes.push({ mes, filas: [] })
+    porMes[porMes.length - 1].filas.push({ s, i })
+  })
+
+  return (
+    <div>
+      <div className="itin-head">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <span className="label">Itinerario del nivel</span>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
+              {g.itinerario} · Nivel {it.nivel}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
+              {fmtDia(it.fecha_inicio)} → {fmtDia(it.fecha_cierre_estimada)} · {total} semanas
+              {it.con_feriados === false ? ' · reglamento ALOHA Venezuela' : ''}
+            </div>
+          </div>
+          <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => onAjustar()}>✎ Ajustar itinerario</button>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 5 }}>
+            <span>{idxHoy < 0 ? 'Nivel terminado' : `En curso: ${it.semanas[idxHoy].etiqueta} (${idxHoy + 1} de ${total})`}</span>
+            <span className="num">{pct}%</span>
+          </div>
+          <div className="bar"><div className="bar__fill" style={{ width: `${pct}%`, background: 'var(--ts-green)' }} /></div>
+        </div>
+      </div>
+
+      {/* Línea de tiempo: una casilla por semana, con hoy marcado */}
+      <div className="itin-tl">
+        {it.semanas.map((s, i) => {
+          const est = TIPO_ESTILO[s.tipo] || TIPO_ESTILO.clase
+          const pasada = idxHoy < 0 || i < idxHoy
+          const hoy = i === idxHoy
+          return (
+            <div key={i} className={`itin-blk${hoy ? ' itin-blk--hoy' : ''}${pasada ? ' itin-blk--hecha' : ''}`}
+              title={`${s.etiqueta} · ${s.fechas.map(fmtDia).join(' · ')}${hoy ? ' · SEMANA EN CURSO' : ''}`}
+              style={{ background: est.bg, borderColor: hoy ? 'var(--ts-green)' : est.line, color: est.fg }}>
+              {s.corto || String(i + 1)}
+            </div>
+          )
+        })}
+      </div>
+      <div className="itin-leyenda">
+        {Object.entries(TIPOS_SEMANA).map(([k, v]) => (
+          <span key={k} title={v.desc}>
+            <i style={{ background: (TIPO_ESTILO[k] || TIPO_ESTILO.clase).bg, borderColor: (TIPO_ESTILO[k] || TIPO_ESTILO.clase).line }} />{v.label}
+          </span>
+        ))}
+      </div>
+
+      {/* Agenda mes a mes */}
+      {porMes.map(({ mes, filas }) => (
+        <div key={mes}>
+          <div className="itin-mes">{mes}</div>
+          {filas.map(({ s, i }) => {
+            const est = TIPO_ESTILO[s.tipo] || TIPO_ESTILO.clase
+            const pasada = idxHoy < 0 || i < idxHoy
+            const hoy = i === idxHoy
+            return (
+              <div key={i} className={`itin-fila${hoy ? ' itin-fila--hoy' : ''}`} style={pasada ? { opacity: 0.55 } : undefined}>
+                <span className="itin-fila__chip" style={{ background: est.bg, borderColor: est.line, color: est.fg }}>{s.corto}</span>
+                <span style={{ color: hoy ? 'var(--text)' : 'var(--text-muted)', fontWeight: hoy ? 600 : 400 }}>{s.etiqueta}</span>
+                {hoy && <span className="pill pill--ok" style={{ fontSize: 10 }}><span className="dot" />Hoy</span>}
+                <span className="num itin-fila__fechas">
+                  {(s.saltadas || []).map((k) => (
+                    <span key={k.fecha} className="itin-fecha itin-fecha--out" title={`${fmtDia(k.fecha)}: ${k.motivo} — por eso corrió el plan`}>
+                      {diaMes(k.fecha)}
+                    </span>
+                  ))}
+                  {s.fechas.map((f) => (
+                    <button key={f} className="itin-fecha" title={`Suspender la clase del ${fmtDia(f)} (corre el plan)`} onClick={() => onAjustar(f)}>
+                      {diaMes(f)}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+
+      <div style={{ padding: '12px 18px', display: 'grid', gap: 8 }}>
+        {it.clases_suspendidas?.length > 0 && (
+          <div style={{ fontSize: 11.5, color: 'var(--warn)' }}>
+            ⏸ Clases suspendidas del grupo: {it.clases_suspendidas.map((c) => `${fmtDia(c.fecha)}${c.motivo ? ` (${c.motivo})` : ''}`).join(' · ')}
+          </div>
+        )}
+        {it.feriados_saltados?.length > 0 && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+            🎌 Sin clases por feriados y vacaciones del manual: {it.feriados_saltados.map(fmtDia).join(' · ')}
+          </div>
+        )}
+        {it.inicio_siguiente_nivel && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+            ➡️ El nivel {it.nivel + 1} arrancaría el <b style={{ color: 'var(--text)' }}>{fmtDia(it.inicio_siguiente_nivel)}</b>
+            {Number(it.nivel) % 2 === 0 ? ' (incluye la semana de vacaciones de fin de ciclo)' : ''}.
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1383,6 +1544,109 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
           </div>
         </div>
         <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Modal: ajustar el itinerario del nivel de un grupo ───────────────────────
+// La vista previa se calcula en el navegador con el MISMO generador del
+// servidor (lib/itinerario es cálculo puro), así se ve el cierre nuevo antes
+// de guardar. El servidor vuelve a generarlo: la UI nunca manda el plan.
+function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
+  const it = g.itinerario_clases
+  const topeNivel = NIVEL_MAX[g.itinerario] || 10
+  const [nivel, setNivel] = useState(String(it?.nivel || 1))
+  const [inicio, setInicio] = useState(isoDia(it?.fecha_inicio || g.fecha_inicio_clases) || hoyISO())
+  const [exc, setExc] = useState(() => {
+    const base = (it?.excepciones || []).map((e) => ({ ...e }))
+    if (nuevaExcepcion && !base.some((e) => e.fecha === nuevaExcepcion)) base.push({ fecha: nuevaExcepcion, motivo: '' })
+    return base.sort((a, b) => a.fecha.localeCompare(b.fecha))
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const dias = [...new Set((g.horarios || []).map((h) => Number(h.dia)))]
+  // Recalcula en vivo: así se ve a dónde se mueve el cierre antes de guardar.
+  const previo = dias.length && inicio
+    ? generarItinerario({ fechaInicio: inicio, dias, nivel: parseInt(nivel) || 1, conFeriados: it?.con_feriados !== false, excepciones: exc })
+    : null
+  const cierreAntes = it?.fecha_cierre_estimada
+  const movio = previo && cierreAntes && previo.fecha_cierre_estimada !== cierreAntes
+
+  async function save() {
+    setSaving(true); setErr('')
+    const res = await ajustarItinerarioGrupo(centroId, g.id, {
+      nivel: parseInt(nivel) || 1,
+      fecha_inicio: inicio,
+      excepciones: exc.filter((e) => e.fecha),
+    })
+    setSaving(false)
+    if (res.error) { setErr(res.error); return }
+    onSaved(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
+  }
+
+  return (
+    <Modal title={`Itinerario del grupo ${g.numero}`} width={620} onClose={onClose}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving || !dias.length}>{saving ? 'Guardando…' : 'Guardar itinerario'}</button>
+        </>
+      )}>
+      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {!dias.length && (
+        <div className="alert alert--error" style={{ marginBottom: 14 }}>
+          El grupo no tiene horario registrado. Sin días de clase no se puede armar el itinerario: edita el grupo y ponle horario.
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <Field label="Nivel que cursa">
+          <select className="input" value={nivel} onChange={(e) => setNivel(e.target.value)}>
+            {Array.from({ length: topeNivel }, (_, i) => i + 1).map((nv) => <option key={nv} value={nv}>Nivel {nv}</option>)}
+          </select>
+        </Field>
+        <Field label="Inicio del nivel">
+          <input type="date" className="input" value={inicio} onChange={(e) => setInicio(e.target.value)} />
+        </Field>
+
+        {it?.inicio_siguiente_nivel && Number(nivel) === Number(it.nivel) && it.nivel < topeNivel && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }}
+              onClick={() => { setNivel(String(it.nivel + 1)); setInicio(it.inicio_siguiente_nivel); setExc([]) }}>
+              ➡️ Pasar al nivel {it.nivel + 1} (arranca el {fmtDia(it.inicio_siguiente_nivel)})
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>
+              Cierra este nivel y arma el siguiente desde esa fecha. Las clases suspendidas del nivel anterior no se arrastran.
+            </div>
+          </div>
+        )}
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div className="label" style={{ marginBottom: 8 }}>Clases que no se dieron</div>
+          {exc.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Ninguna. Cada clase suspendida corre el plan y mueve el cierre.</div>}
+          {exc.map((e, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <input type="date" className="input" style={{ width: 160 }} value={e.fecha}
+                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, fecha: ev.target.value } : x)))} />
+              <input className="input" style={{ flex: 1 }} placeholder="Motivo (coach enfermo, feriado local…)" value={e.motivo || ''}
+                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, motivo: ev.target.value } : x)))} />
+              <button className="btn" style={{ padding: '6px 10px' }} onClick={() => setExc(exc.filter((_, j) => j !== i))}>✕</button>
+            </div>
+          ))}
+          <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setExc([...exc, { fecha: hoyISO(), motivo: '' }])}>+ Suspender una clase</button>
+        </div>
+
+        {previo && (
+          <div style={{ gridColumn: '1 / -1', background: 'var(--surface-3)', padding: '10px 14px', borderRadius: 'var(--r-sm)', fontSize: 12, lineHeight: 1.7 }}>
+            <b style={{ color: 'var(--text)' }}>Queda así:</b> {previo.semanas.length} semanas · cierra el{' '}
+            <b style={{ color: movio ? 'var(--warn)' : 'var(--text)' }}>{fmtDia(previo.fecha_cierre_estimada)}</b>
+            {movio ? ` (antes ${fmtDia(cierreAntes)})` : ''} · el nivel {previo.nivel + 1} arrancaría el {fmtDia(previo.inicio_siguiente_nivel)}.
+            {previo.feriados_saltados.length > 0 && (
+              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Salta {previo.feriados_saltados.length} día(s) por feriados/vacaciones del manual.</div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   )
