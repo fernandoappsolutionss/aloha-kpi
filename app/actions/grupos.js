@@ -5,6 +5,8 @@ import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, aperturaMinima, hoyISO } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
 import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
+import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
+import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
 
 const HORA_RE = /^\d{2}:\d{2}$/
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -243,6 +245,9 @@ export async function cerrarGrupo(centroId, grupoId) {
   const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${grupoId} AND estado IN ('activo', 'baja_potencial')`
   if (n > 0) return { error: `El grupo tiene ${n} niños activos` }
   await sql`UPDATE grupos SET estado = 'cerrado', fecha_cierre = ${hoyISO()}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
+  // Un grupo cerrado no puede seguir vendiéndose: se desvincula de las clases
+  // de prueba y el CRM deja de mostrar sus cupos (best effort).
+  await desvincularGrupoEnEventos(centroId, grupoId)
   return { ok: true }
 }
 
@@ -268,11 +273,33 @@ export async function siguienteNumero(centroId) {
   return max + 1
 }
 
-// Action ligera para selects de otras páginas (eventos → Inscribir).
+// Action ligera para selects de otras páginas (eventos → Inscribir, grupo por
+// aperturar). Además de id/numero/itinerario devuelve horarioTexto (am/pm) y
+// cupos frente al modelo ("quedan X de 10") — campos agregados, sin romper consumidores.
 export async function listarGruposActivos(centroId) {
   await requireCentroAccess(centroId)
-  const rows = await sql`SELECT id, numero, itinerario FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
-  return rows.sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
+  const rows = await sql`
+    SELECT g.id, g.numero, g.itinerario,
+      COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
+    FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
+    WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
+    GROUP BY g.id, g.numero, g.itinerario
+  `
+  const horarios = await sql`
+    SELECT h.grupo_id, h.dia, h.hora_inicio, h.hora_fin
+    FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
+    WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
+    ORDER BY h.dia, h.hora_inicio
+  `
+  return rows
+    .map((g) => ({
+      id: g.id,
+      numero: g.numero,
+      itinerario: g.itinerario,
+      horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
+      cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
+    }))
+    .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
 }
 
 // Action ligera para el hint de grupos_activos en la página de KPI.
@@ -395,5 +422,11 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
     await sql`UPDATE grupos SET estado = 'fusionado', fusionado_en = ${tgt.id}, fecha_cierre = ${hoy}, updated_at = ${now} WHERE id = ${src.id}`
     cerrado = true
   }
+  // La fusión mueve matrícula: el CRM recibe los cupos nuevos del destino y,
+  // del origen, los cupos actualizados — o la desvinculación si quedó fusionado
+  // (best effort, nunca rompe el { ok } local).
+  await pushCuposAlCrm(centroId, tgt.id)
+  if (cerrado) await desvincularGrupoEnEventos(centroId, src.id)
+  else await pushCuposAlCrm(centroId, src.id)
   return { ok: true, cerrado }
 }

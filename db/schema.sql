@@ -321,3 +321,7 @@ CREATE INDEX IF NOT EXISTS idx_pedidos_centro_mes ON pedidos_material(centro_id,
 ALTER TABLE resumen_mes ADD COLUMN IF NOT EXISTS mot_otro INTEGER DEFAULT 0;
 ALTER TABLE metas ADD COLUMN IF NOT EXISTS royalty_por_nino NUMERIC DEFAULT 12;
 ALTER TABLE metas ADD COLUMN IF NOT EXISTS cupo_max_grupo INTEGER DEFAULT 15;
+
+-- Clase de prueba ↔ grupo por aperturar: cada evento del espejo puede quedar
+-- relacionado con el grupo cuyos cupos se muestran en el KPI y viajan al CRM.
+ALTER TABLE centro_eventos ADD COLUMN IF NOT EXISTS grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL;
