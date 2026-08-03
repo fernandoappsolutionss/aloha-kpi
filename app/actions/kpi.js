@@ -2,6 +2,7 @@
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { guardarSnapshotCuadro } from '../../lib/cuadro-snapshot'
+import { fallo } from '../../lib/errores'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -30,6 +31,14 @@ export async function loadKpiMes(centroId, year, month) {
 }
 
 export async function saveKpiMes(centroId, year, month, config, semanas) {
+  try {
+    return await guardarKpiMes(centroId, year, month, config, semanas)
+  } catch (e) {
+    return fallo('saveKpiMes', e)
+  }
+}
+
+async function guardarKpiMes(centroId, year, month, config, semanas) {
   await requireCentroAccess(centroId)
   const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}`
   if (mes?.estado === 'cerrado') return { error: 'Este mes está cerrado. No se puede editar.' }
@@ -79,26 +88,35 @@ export async function saveKpiMes(centroId, year, month, config, semanas) {
 }
 
 export async function cerrarMes(centroId, year, month) {
-  await requireCentroAccess(centroId)
-  await upsert('mes_kpi',
-    { centro_id: centroId, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() },
-    ['centro_id', 'year', 'month'])
-  // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial).
-  // Best effort: si falla, el mes queda cerrado igual y la foto se congela
-  // retroactivamente la próxima vez que alguien abra ese mes del cuadro.
-  let warn
   try {
-    await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
-  } catch {
-    warn = 'El mes quedó cerrado, pero no se pudo congelar la foto del cuadro; se congelará al abrir el cuadro de ese mes.'
+    await requireCentroAccess(centroId)
+    await upsert('mes_kpi',
+      { centro_id: centroId, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() },
+      ['centro_id', 'year', 'month'])
+    // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial).
+    // Best effort: si falla, el mes queda cerrado igual y la foto se congela
+    // retroactivamente la próxima vez que alguien abra ese mes del cuadro.
+    let warn
+    try {
+      await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
+    } catch (e) {
+      console.error('[cerrarMes] no se pudo congelar la foto del cuadro:', e)
+      warn = 'El mes quedó cerrado, pero no se pudo congelar la foto del cuadro; se congelará al abrir el cuadro de ese mes.'
+    }
+    return warn ? { ok: true, warn } : { ok: true }
+  } catch (e) {
+    return fallo('cerrarMes', e)
   }
-  return warn ? { ok: true, warn } : { ok: true }
 }
 
 export async function reabrirMes(centroId, year, month) {
-  await requireCentroAccess(centroId)
-  await upsert('mes_kpi',
-    { centro_id: centroId, year, month, estado: 'abierto', cerrado_at: null },
-    ['centro_id', 'year', 'month'])
-  return { ok: true }
+  try {
+    await requireCentroAccess(centroId)
+    await upsert('mes_kpi',
+      { centro_id: centroId, year, month, estado: 'abierto', cerrado_at: null },
+      ['centro_id', 'year', 'month'])
+    return { ok: true }
+  } catch (e) {
+    return fallo('reabrirMes', e)
+  }
 }
