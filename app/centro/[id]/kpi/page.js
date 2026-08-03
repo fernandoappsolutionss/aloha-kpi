@@ -40,7 +40,16 @@ export default function KPIPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true); setStatus('')
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist } = await loadKpiMes(id, year, month)
+    let datos
+    try {
+      datos = await loadKpiMes(id, year, month)
+    } catch (e) {
+      // Sin este catch la página se quedaba en "Cargando…" para siempre.
+      setStatus('❌ No se pudo cargar el KPI: ' + (e?.message || 'desconocido'))
+      setLoading(false)
+      return
+    }
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist } = datos
     setCentroNombre(cNombre || '')
     setMesEstado(estado || 'abierto')
 
@@ -85,20 +94,32 @@ export default function KPIPage() {
     setSaving(false)
   }
 
+  // Sin try/finally, un error del servidor dejaba el botón en "Cerrando…" para
+  // siempre y sin mensaje: desde el centro se ve como "no me deja cerrar mes".
   async function handleCerrarMes() {
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
-    await handleSave()
-    const res = await cerrarMes(id, year, month)
-    if (res.ok) { setMesEstado('cerrado'); setStatus('🔒 Mes cerrado. Datos guardados como historial.') }
-    else setStatus('❌ Error al cerrar: ' + (res.error || ''))
+    try {
+      await handleSave()
+      const res = await cerrarMes(id, year, month)
+      if (res?.error) throw new Error(res.error)
+      setMesEstado('cerrado')
+      setStatus(res?.warn ? '🔒 Mes cerrado. ' + res.warn : '🔒 Mes cerrado. Datos guardados como historial.')
+    } catch (e) {
+      setStatus('❌ Error al cerrar: ' + (e?.message || 'desconocido'))
+    }
     setCerrando(false)
   }
 
   async function handleReabrirMes() {
     if (!confirm('¿Reabrir ' + NOMBRES_MES[month-1] + ' ' + year + ' para edición?')) return
-    const res = await reabrirMes(id, year, month)
-    if (res.ok) { setMesEstado('abierto'); setStatus('✅ Mes reabierto para edición.') }
+    try {
+      const res = await reabrirMes(id, year, month)
+      if (res?.error) throw new Error(res.error)
+      setMesEstado('abierto'); setStatus('✅ Mes reabierto para edición.')
+    } catch (e) {
+      setStatus('❌ Error al reabrir: ' + (e?.message || 'desconocido'))
+    }
   }
 
   const ni = parseInt(config.ninos_inicio)||0

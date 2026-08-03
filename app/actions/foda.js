@@ -2,19 +2,7 @@
 import { sql, exec, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { fortalezasDebilidades } from '../../lib/checklist'
-
-// En producción Next.js oculta el mensaje de cualquier excepción de un Server
-// Action y la reemplaza por "An error occurred in the Server Components
-// render…", que no le dice nada a quien está usando el panel. Por eso estas
-// acciones devuelven { error: 'mensaje legible' } en vez de lanzar: la UI ya
-// sabe mostrar `res.error`. El detalle técnico queda en los logs de Vercel.
-function fallo(donde, e) {
-  console.error(`[foda] ${donde}:`, e)
-  const msg = e?.message || 'error desconocido'
-  if (/No autenticado/i.test(msg)) return { error: 'Tu sesión expiró. Vuelve a entrar.' }
-  if (/No autorizado/i.test(msg)) return { error: 'No tienes acceso a este centro.' }
-  return { error: msg }
-}
+import { fallo } from '../../lib/errores'
 
 // Columnas de `foda` que escribe el guardado. La migración de este proyecto es
 // manual (`npm run db:migrate`), así que una base que se creó antes de que se
