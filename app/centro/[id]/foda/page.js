@@ -82,14 +82,23 @@ export default function FodaPage() {
   }
   async function cambiarEstadoPeticion(id, est) {
     setPeticiones(p => p.map(x => x.id === id ? { ...x, estado: est } : x))
-    try { await updatePeticion(params.id, id, { estado: est }) } catch { setStatus('Error al actualizar estado.') }
+    try {
+      const res = await updatePeticion(params.id, id, { estado: est })
+      if (res?.error) throw new Error(res.error)
+    } catch (e) { setStatus('Error al actualizar estado: ' + (e?.message || '')) }
   }
   async function guardarTextoPeticion(id, texto) {
-    try { await updatePeticion(params.id, id, { texto }) } catch { setStatus('Error al guardar el texto.') }
+    try {
+      const res = await updatePeticion(params.id, id, { texto })
+      if (res?.error) throw new Error(res.error)
+    } catch (e) { setStatus('Error al guardar el texto: ' + (e?.message || '')) }
   }
   async function eliminarPeticion(id) {
     setPeticiones(p => p.filter(x => x.id !== id))
-    try { await deletePeticion(params.id, id) } catch { setStatus('Error al eliminar.') }
+    try {
+      const res = await deletePeticion(params.id, id)
+      if (res?.error) throw new Error(res.error)
+    } catch (e) { setStatus('Error al eliminar: ' + (e?.message || '')) }
   }
 
   async function save() {

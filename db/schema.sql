@@ -163,9 +163,17 @@ CREATE TABLE IF NOT EXISTS foda (
   updated_at         TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (centro_id, anio, trimestre)
 );
--- Migración para bases existentes: agrega las columnas editables si faltan.
-ALTER TABLE foda ADD COLUMN IF NOT EXISTS fortalezas  TEXT;
-ALTER TABLE foda ADD COLUMN IF NOT EXISTS debilidades TEXT;
+-- Migración para bases existentes: `CREATE TABLE IF NOT EXISTS` no toca una
+-- tabla que ya existe, así que toda columna que escribe saveFoda se repite aquí
+-- como ALTER idempotente. Si falta una, el SELECT del cargado sigue andando y
+-- solo revienta el guardado (42703), que es confuso de diagnosticar.
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS fortalezas        TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS debilidades       TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS oportunidades     TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS amenazas          TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS comentarios       TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS comentario_estado TEXT;
+ALTER TABLE foda ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ DEFAULT now();
 
 -- Peticiones / comentarios del administrador (varios por trimestre, cada uno con su estado)
 CREATE TABLE IF NOT EXISTS peticiones (
