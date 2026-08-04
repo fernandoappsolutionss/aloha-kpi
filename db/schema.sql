@@ -413,10 +413,15 @@ CREATE INDEX IF NOT EXISTS idx_centro_reservas_centro ON centro_reservas(centro_
 
 -- Un salón por rol. UNIQUE por (reserva, salón, rol) y no por (reserva, salón):
 -- en un centro de 2 salones uno solo puede cargar dos roles.
+-- El coach va POR SALA, no por reserva: Tiny y Kids son dos clases distintas a
+-- la misma hora y cada una lleva su coach. A los papás los recibe la
+-- administración, por eso ese rol puede quedar sin coach.
 CREATE TABLE IF NOT EXISTS centro_reserva_salones (
   id SERIAL PRIMARY KEY,
   reserva_id INTEGER NOT NULL REFERENCES centro_reservas(id) ON DELETE CASCADE,
   salon_id INTEGER NOT NULL REFERENCES salones(id) ON DELETE CASCADE,
-  rol TEXT NOT NULL
+  rol TEXT NOT NULL,
+  coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL
 );
+ALTER TABLE centro_reserva_salones ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reserva_salon_rol ON centro_reserva_salones(reserva_id, salon_id, rol);

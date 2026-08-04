@@ -20,7 +20,7 @@ import {
 } from '../../../../lib/inventario'
 import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
-import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL } from '../../../../lib/reservas'
+import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_COACH } from '../../../../lib/reservas'
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
 import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
 
@@ -1340,8 +1340,9 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
                 if (grupo.es_reserva) {
                   const rol = ROL_LABEL[horario.rol] || horario.rol || ''
+                  const coachR = coaches.find((c) => String(c.id) === String(grupo.coach_id))
                   return (
-                    <div key={`${grupo.id}-${horario.id}`} title={`Clase de prueba · ${rol} · ${aHora12(inicio)}–${aHora12(fin)} · este salón no se puede usar para grupos`}
+                    <div key={`${grupo.id}-${horario.id}`} title={`Clase de prueba · ${rol} · ${coachR ? coachR.nombre : (ROL_PIDE_COACH[horario.rol] ? 'sin coach asignado' : 'la recibe la administración')} · ${aHora12(inicio)}–${aHora12(fin)} · este salón no se puede usar para grupos`}
                       style={{
                         position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                         background: 'var(--warn-bg, rgba(245,158,11,0.14))', border: '1px solid var(--warn)',
@@ -1351,7 +1352,9 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                       <div style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         🎯 Clase de prueba
                       </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: 10.5 }}>{rol}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 10.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {rol}{coachR ? ` · ${coachR.nombre.split(' ')[0]}` : (ROL_PIDE_COACH[horario.rol] ? ' · sin coach' : '')}
+                      </div>
                       <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
                     </div>
                   )
@@ -1484,13 +1487,18 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
   const [dia, setDia] = useState(String(initial.dia || 1))
   const [ini, setIni] = useState(initial.hora_inicio || '')
   const [fin, setFin] = useState(initial.hora_fin || '')
-  const [coachId, setCoachId] = useState(initial.coach_id ? String(initial.coach_id) : '')
   const [notas, setNotas] = useState(initial.notas || '')
   const [salonRol, setSalonRol] = useState(() => {
     const base = {}
     for (const s of initial.salones || []) base[s.rol] = String(s.salon_id)
     // Sin reserva previa: se reparten los salones activos en orden.
     if (!initial.salones) ROLES_RESERVA.forEach((rol, i) => { if (activos[i]) base[rol] = String(activos[i].id) })
+    return base
+  })
+  // Un coach por itinerario: Tiny y Kids son dos clases a la misma hora.
+  const [coachRol, setCoachRol] = useState(() => {
+    const base = {}
+    for (const s of initial.salones || []) if (s.coach_id) base[s.rol] = String(s.coach_id)
     return base
   })
   const [saving, setSaving] = useState(false)
@@ -1513,12 +1521,13 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
     const usados = ROLES_RESERVA.map((r) => salonRol[r]).filter(Boolean)
     if (!usados.length) { setErr('Indica al menos un salón para la clase de prueba.'); return }
     if (new Set(usados).size !== usados.length) { setErr('Un mismo salón no puede atender dos roles a la vez: papás, Tiny y Kids van en salones distintos.'); return }
+    const coachesUsados = ROLES_RESERVA.map((r) => coachRol[r]).filter(Boolean)
+    if (new Set(coachesUsados).size !== coachesUsados.length) { setErr('Un mismo coach no puede atender dos salones a la misma hora: Tiny y Kids necesitan coaches distintos.'); return }
     setSaving(true); setErr('')
     try {
       const res = await guardarReserva(centroId, {
-        id: initial.id || null, dia: parseInt(dia), hora_inicio: ini, hora_fin: fin,
-        coach_id: coachId ? parseInt(coachId) : null, notas,
-        salones: ROLES_RESERVA.filter((r) => salonRol[r]).map((r) => ({ rol: r, salon_id: salonRol[r] })),
+        id: initial.id || null, dia: parseInt(dia), hora_inicio: ini, hora_fin: fin, notas,
+        salones: ROLES_RESERVA.filter((r) => salonRol[r]).map((r) => ({ rol: r, salon_id: salonRol[r], coach_id: coachRol[r] || null })),
       })
       setSaving(false)
       if (res.error) { setErr(res.error); return }
@@ -1544,12 +1553,6 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
             {DIAS_OPERATIVOS.map((d) => <option key={d} value={d}>{DIAS[d]}</option>)}
           </select>
         </Field>
-        <Field label="Coach que la recibe">
-          <select className="input" value={coachId} onChange={(e) => setCoachId(e.target.value)}>
-            <option value="">Sin asignar</option>
-            {coaches.filter((c) => c.activo || String(c.id) === coachId).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </Field>
         <Field label="Hora de inicio"><input type="time" className="input" value={ini} onChange={(e) => setIni(e.target.value)} /></Field>
         <Field label="Hora de fin"><input type="time" className="input" value={fin} onChange={(e) => setFin(e.target.value)} /></Field>
         <div style={{ gridColumn: '1 / -1', fontSize: 12, color: dur === 90 ? 'var(--text-dim)' : 'var(--warn)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
@@ -1560,19 +1563,24 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
           {dur > 0 && dur !== 90 && <> — llevas {Math.floor(dur / 60)} h {dur % 60} min, ajústalo.</>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <div className="label" style={{ marginBottom: 8 }}>Salones (uno por rol)</div>
+          <div className="label" style={{ marginBottom: 8 }}>Salón y coach por sala</div>
           {ROLES_RESERVA.map((rol) => (
-            <div key={rol} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ width: 70, fontSize: 12.5, color: 'var(--text-muted)' }}>{ROL_LABEL[rol]}</span>
-              <select className="input" style={{ flex: 1 }} value={salonRol[rol] || ''}
+            <div key={rol} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ width: 62, fontSize: 12.5, color: 'var(--text-muted)', flexShrink: 0 }}>{ROL_LABEL[rol]}</span>
+              <select className="input" style={{ flex: 1, minWidth: 0 }} value={salonRol[rol] || ''}
                 onChange={(e) => setSalonRol((p) => ({ ...p, [rol]: e.target.value }))}>
                 <option value="">Sin salón</option>
                 {salones.filter((s) => s.activo || String(s.id) === salonRol[rol]).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
+              <select className="input" style={{ flex: 1, minWidth: 0 }} value={coachRol[rol] || ''}
+                onChange={(e) => setCoachRol((p) => ({ ...p, [rol]: e.target.value }))}>
+                <option value="">{ROL_PIDE_COACH[rol] ? 'Sin coach' : 'Administración'}</option>
+                {coaches.filter((c) => c.activo || String(c.id) === coachRol[rol]).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
             </div>
           ))}
           <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-dim)' }}>
-            Se necesitan 3 salones a la misma hora: uno para los papás, uno para Tiny y otro para Kids. Esos salones quedan bloqueados en el calendario y no se ofrecen para abrir grupos.
+            Se necesitan 3 salones a la misma hora: uno para los papás, uno para Tiny y otro para Kids. <b style={{ color: 'var(--text-muted)' }}>Tiny y Kids llevan cada uno su coach</b> (son dos clases simultáneas); a los papás los recibe la administración. Esos salones y esos coaches quedan bloqueados en el calendario. El coach se puede cambiar cuando quieras con “Editar”.
           </div>
         </div>
         <Field full label="Notas"><textarea className="input" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></Field>
