@@ -36,6 +36,8 @@ export default function KPIPage() {
   const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
+  // Cierre del mes anterior: encadena como "niños inicio" de este mes.
+  const [arrastrado, setArrastrado] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
 
   const loadData = useCallback(async () => {
@@ -49,15 +51,17 @@ export default function KPIPage() {
       setLoading(false)
       return
     }
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist } = datos
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, inicioArrastrado: arr } = datos
     setCentroNombre(cNombre || '')
     setMesEstado(estado || 'abierto')
+    setArrastrado(arr || null)
 
-    // Resumen del mes
+    // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
+    // anterior cuando existe (el servidor también lo impone al guardar).
     if (res) {
-      setConfig({ ninos_inicio: res.ninos_inicio_mes||0, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
+      setConfig({ ninos_inicio: arr ? arr.valor : (res.ninos_inicio_mes||0), grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
     } else {
-      setConfig({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+      setConfig({ ninos_inicio: arr ? arr.valor : 0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
     }
 
     // Semanas
@@ -157,11 +161,11 @@ export default function KPIPage() {
   if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text-dim)'}}>Cargando…</div>
 
   // Estilo input de "Configuración" / cards de categoría
-  const cfgInput = (key, full) => (
-    <input type="number" min="0" value={config[key]} disabled={locked}
+  const cfgInput = (key, full, bloqueado = false) => (
+    <input type="number" min="0" value={config[key]} disabled={locked || bloqueado}
       onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
       className="input num"
-      style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: locked ? 0.6 : 1, background: locked ? 'var(--surface-3)' : 'var(--bg)' }}/>
+      style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: (locked || bloqueado) ? 0.6 : 1, background: (locked || bloqueado) ? 'var(--surface-3)' : 'var(--bg)' }}/>
   )
 
   return (
@@ -239,7 +243,12 @@ export default function KPIPage() {
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta nuevos (mensual)','meta_nuevos_mensual'],['Nuevos activos mes','nuevos_activos_mes']].map(([lbl,key]) => (
               <div key={key} className="field">
                 <label className="label">{lbl}</label>
-                {cfgInput(key, true)}
+                {cfgInput(key, true, key === 'ninos_inicio' && !!arrastrado)}
+                {key === 'ninos_inicio' && arrastrado && (
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    🔗 Arrastrado del cierre de {NOMBRES_MES[arrastrado.month-1]}: los meses encadenan y este número no se digita.
+                  </span>
+                )}
                 {key === 'grupos_activos' && gruposModulo !== null && (
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     El módulo de grupos cuenta {gruposModulo} activos
