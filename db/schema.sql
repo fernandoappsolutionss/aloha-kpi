@@ -384,3 +384,39 @@ CREATE TABLE IF NOT EXISTS asistencias (
   UNIQUE (estudiante_id, fecha)
 );
 CREATE INDEX IF NOT EXISTS idx_asistencias_grupo ON asistencias(grupo_id, fecha);
+
+-- ── CLASE DE PRUEBA: reserva de sala en el calendario ──────────────────────
+-- Regla del negocio (Fernando, ago-2026): el día que el centro dedica a clase
+-- de prueba NO se arma con grupos de 1 hora — ese día los grupos son de 2 h y
+-- arrancan a las 4:30 pm, y la prueba va antes. El sábado la prueba va en el
+-- ÚLTIMO turno, después de la tercera jornada.
+-- La clase de prueba dura 1 h 30 y ocupa VARIOS salones a la vez, uno por rol:
+-- padres, Tiny y Kids.
+-- Las horas se guardan igual que en grupo_horarios: día de la semana + hora de
+-- pared en TEXT 'HH:MM'. NUNCA derivar el día de un TIMESTAMPTZ: el servidor
+-- corre en UTC y los centros operan hasta las 7:30 p. m., así que la tarde
+-- caería en el día siguiente.
+CREATE TABLE IF NOT EXISTS centro_reservas (
+  id SERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'clase_prueba',
+  dia SMALLINT NOT NULL,
+  hora_inicio TEXT NOT NULL,
+  hora_fin TEXT NOT NULL,
+  coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  notas TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_centro_reservas_centro ON centro_reservas(centro_id, activo);
+
+-- Un salón por rol. UNIQUE por (reserva, salón, rol) y no por (reserva, salón):
+-- en un centro de 2 salones uno solo puede cargar dos roles.
+CREATE TABLE IF NOT EXISTS centro_reserva_salones (
+  id SERIAL PRIMARY KEY,
+  reserva_id INTEGER NOT NULL REFERENCES centro_reservas(id) ON DELETE CASCADE,
+  salon_id INTEGER NOT NULL REFERENCES salones(id) ON DELETE CASCADE,
+  rol TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reserva_salon_rol ON centro_reserva_salones(reserva_id, salon_id, rol);
