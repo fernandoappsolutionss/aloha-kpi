@@ -20,6 +20,8 @@ import {
 } from '../../../../lib/inventario'
 import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
+import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL } from '../../../../lib/reservas'
+import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
 import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
@@ -499,8 +501,9 @@ export default function GruposPage() {
         )}
 
         {tab === 'horarios' && (
-          <TabHorarios grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
-            retirados={data?.retirados || []} onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} />
+          <TabHorarios centroId={id} grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
+            retirados={data?.retirados || []} reservas={data?.reservas || []}
+            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} onChanged={refresca} setStatus={setStatus} />
         )}
 
         {tab === 'coaches' && (
@@ -1109,13 +1112,19 @@ function liberacionDe(grupo) {
   return { cierre, libera: moda >= (NIVEL_MAX[grupo.itinerario] || 99) }
 }
 
-function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
+function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, onAbrirGrupo, onChanged, setStatus }) {
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
     return d >= 1 && d <= 6 ? d : 1
   })
   const [verGuia, setVerGuia] = useState(false)
-  const activos = grupos.filter((g) => g.estado === 'activo')
+  const [reservaModal, setReservaModal] = useState(null)
+  const [borrando, setBorrando] = useState(false)
+  // La clase de prueba entra al calendario como pseudo-grupo: así ocupa salón,
+  // respeta el buffer y desaparece de los huecos sin tocar el motor.
+  const pseudoReservas = reservasComoGrupos(reservas || [])
+  const conPrueba = diasConPrueba(reservas || [])
+  const activos = [...grupos.filter((g) => g.estado === 'activo'), ...pseudoReservas]
   const recos = recomendacionesApertura(grupos, salones, coaches, retirados, 4)
   const modelo = estadoModelo(grupos, salones)
   const inv = inventarioSemanal(activos, salones)
@@ -1128,6 +1137,19 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
   const topDe = (min) => ((min - aperturaDia) / SLOT_MIN) * ROW_H
   const horasEje = []
   for (let m = aperturaDia; m <= CIERRE_MIN; m += 60) horasEje.push(m)
+
+  // La clase de prueba del día seleccionado (una por día, es la sala que el
+  // administrador aparta para recibir a los papás).
+  const reservaDia = (reservas || []).find((r) => Number(r.dia) === dia) || null
+
+  async function quitarReserva() {
+    if (!reservaDia) return
+    setBorrando(true)
+    const res = await eliminarReserva(centroId, reservaDia.id)
+    setBorrando(false)
+    if (res.error) setStatus('❌ ' + res.error)
+    else { setStatus(`✅ Clase de prueba del ${DIAS[dia].toLowerCase()} eliminada — ese día vuelve a la parrilla normal.`); onChanged() }
+  }
 
   const clickHueco = (salon, h) => {
     // Primero intenta encajar una unidad del modelo (p. ej. el par Lun+Mié
@@ -1263,10 +1285,28 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
               onClick={() => setDia(d)}>{DIAS[d].slice(0, 3)}</button>
           ))}
         </div>
+        {reservaDia ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span className="pill pill--warn" style={{ whiteSpace: 'nowrap' }}>🎯 Clase de prueba {aHora12(aMinutos(reservaDia.hora_inicio))}–{aHora12(aMinutos(reservaDia.hora_fin))}</span>
+            <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReservaModal(reservaDia) }}>Editar</button>
+            <button className="btn" style={BTN_XS} disabled={borrando} onClick={quitarReserva}>{borrando ? 'Quitando…' : 'Quitar'}</button>
+          </div>
+        ) : (
+          <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => { setStatus(''); setReservaModal({ dia }) }}>
+            🎯 Clase de prueba este día
+          </button>
+        )}
         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           Ventana {aHora12(aperturaDia)}–8:30 pm · 15 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
         </span>
       </div>
+
+      {/* Regla del negocio: el día de clase de prueba no lleva grupos de 1 h */}
+      {reservaDia && dia !== 6 && (
+        <div className="card" style={{ padding: '9px 14px', marginBottom: 12, borderLeft: '3px solid var(--warn)', fontSize: 12.5, color: 'var(--text-muted)' }}>
+          <b style={{ color: 'var(--warn)' }}>Día de clase de prueba:</b> este día no se arma con grupos de 1 h — los bloques son de <b>2 h desde las 4:30 pm</b>, y la prueba va antes. Tampoco abre la zona Kinder.
+        </div>
+      )}
 
       {/* Calendario del día: columna por salón */}
       <div className="card" style={{ padding: 14, overflowX: 'auto' }}>
@@ -1287,7 +1327,7 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
 
           {cols.map(({ salon, sesiones, huecos }) => {
             const unidadesSalon = unidadesLibres(activos, [salon])
-            const slotsLibres = slotsDelDia(dia).filter((sl) => huecos.some((h) => sl.inicio >= h.inicio && sl.fin <= h.fin))
+            const slotsLibres = slotsDelDia(dia, conPrueba.has(dia)).filter((sl) => huecos.some((h) => sl.inicio >= h.inicio && sl.fin <= h.fin))
             return (
             <div key={salon.id} style={{
               position: 'relative', height: altura, borderRadius: 'var(--r-sm)',
@@ -1298,6 +1338,24 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
                 const st = groupStatus(grupo, 8)
                 const alerta = st.key === 'bajo'
                 const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
+                if (grupo.es_reserva) {
+                  const rol = ROL_LABEL[horario.rol] || horario.rol || ''
+                  return (
+                    <div key={`${grupo.id}-${horario.id}`} title={`Clase de prueba · ${rol} · ${aHora12(inicio)}–${aHora12(fin)} · este salón no se puede usar para grupos`}
+                      style={{
+                        position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
+                        background: 'var(--warn-bg, rgba(245,158,11,0.14))', border: '1px solid var(--warn)',
+                        borderLeft: '3px solid var(--warn)', borderRadius: 'var(--r-sm)',
+                        padding: '5px 8px', overflow: 'hidden', fontSize: 11.5,
+                      }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        🎯 Clase de prueba
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 10.5 }}>{rol}</div>
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
+                    </div>
+                  )
+                }
                 const lib = liberacionDe(grupo)
                 const tituloLib = lib?.cierre ? ` · cierra nivel ~${fmtDia(lib.cierre)}${lib.libera ? ' y SE LIBERA el bloque (último nivel)' : ''}` : ''
                 return (
@@ -1405,7 +1463,121 @@ function TabHorarios({ grupos, coaches, salones, retirados, onAbrirGrupo }) {
           Sin horario registrado: {sinHorario.map((g) => `Grupo ${g.numero}`).join(' · ')}
         </div>
       )}
+
+      {reservaModal && (
+        <ReservaModal centroId={centroId} coaches={coaches} salones={salones} initial={reservaModal}
+          onClose={() => setReservaModal(null)}
+          onSaved={(msg) => { setReservaModal(null); setStatus('✅ ' + msg); onChanged() }} />
+      )}
     </div>
+  )
+}
+
+// ── Modal: apartar la sala de la clase de prueba ─────────────────────────────
+// Regla de Fernando: la prueba dura 1 h 30 y ocupa 3 salones a la vez (padres,
+// Tiny y Kids). Entre semana va ANTES de los bloques de 2 h de las 4:30 pm; el
+// sábado va al final, después de la tercera jornada. El sistema propone la
+// franja; el administrador decide el día y los salones.
+function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
+  const isEdit = !!initial.id
+  const activos = salones.filter((s) => s.activo)
+  const [dia, setDia] = useState(String(initial.dia || 1))
+  const [ini, setIni] = useState(initial.hora_inicio || '')
+  const [fin, setFin] = useState(initial.hora_fin || '')
+  const [coachId, setCoachId] = useState(initial.coach_id ? String(initial.coach_id) : '')
+  const [notas, setNotas] = useState(initial.notas || '')
+  const [salonRol, setSalonRol] = useState(() => {
+    const base = {}
+    for (const s of initial.salones || []) base[s.rol] = String(s.salon_id)
+    // Sin reserva previa: se reparten los salones activos en orden.
+    if (!initial.salones) ROLES_RESERVA.forEach((rol, i) => { if (activos[i]) base[rol] = String(activos[i].id) })
+    return base
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  // La franja la calcula el servidor con la regla del negocio (así la UI no
+  // duplica la fórmula y el sábado sale del final de la última jornada).
+  useEffect(() => {
+    if (isEdit) return
+    let vivo = true
+    sugerenciaReserva(centroId, parseInt(dia)).then((s) => {
+      if (vivo && s && !s.error) { setIni(s.hora_inicio); setFin(s.hora_fin) }
+    }).catch(() => {})
+    return () => { vivo = false }
+  }, [centroId, dia, isEdit])
+
+  const dur = ini && fin ? aMinutos(fin) - aMinutos(ini) : 0
+
+  async function save() {
+    const usados = ROLES_RESERVA.map((r) => salonRol[r]).filter(Boolean)
+    if (!usados.length) { setErr('Indica al menos un salón para la clase de prueba.'); return }
+    if (new Set(usados).size !== usados.length) { setErr('Un mismo salón no puede atender dos roles a la vez: papás, Tiny y Kids van en salones distintos.'); return }
+    setSaving(true); setErr('')
+    try {
+      const res = await guardarReserva(centroId, {
+        id: initial.id || null, dia: parseInt(dia), hora_inicio: ini, hora_fin: fin,
+        coach_id: coachId ? parseInt(coachId) : null, notas,
+        salones: ROLES_RESERVA.filter((r) => salonRol[r]).map((r) => ({ rol: r, salon_id: salonRol[r] })),
+      })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(`Clase de prueba del ${DIAS[parseInt(dia)].toLowerCase()} ${ini}–${fin} apartada en ${usados.length} salón${usados.length === 1 ? '' : 'es'}.`)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
+  }
+
+  return (
+    <Modal title={isEdit ? 'Editar clase de prueba' : 'Apartar clase de prueba'} width={560} onClose={onClose}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Apartar')}</button>
+        </>
+      )}>
+      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <Field label="Día de la clase de prueba">
+          <select className="input" value={dia} onChange={(e) => setDia(e.target.value)}>
+            {DIAS_OPERATIVOS.map((d) => <option key={d} value={d}>{DIAS[d]}</option>)}
+          </select>
+        </Field>
+        <Field label="Coach que la recibe">
+          <select className="input" value={coachId} onChange={(e) => setCoachId(e.target.value)}>
+            <option value="">Sin asignar</option>
+            {coaches.filter((c) => c.activo || String(c.id) === coachId).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </Field>
+        <Field label="Hora de inicio"><input type="time" className="input" value={ini} onChange={(e) => setIni(e.target.value)} /></Field>
+        <Field label="Hora de fin"><input type="time" className="input" value={fin} onChange={(e) => setFin(e.target.value)} /></Field>
+        <div style={{ gridColumn: '1 / -1', fontSize: 12, color: dur === 90 ? 'var(--text-dim)' : 'var(--warn)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+          {parseInt(dia) === 6
+            ? 'Sábado: la prueba va en el último turno, después de la tercera jornada.'
+            : 'Entre semana: la prueba va antes de las 4:30 pm, y ese día los grupos son bloques de 2 h (no de 1 h).'}
+          {' '}Dura <b style={{ color: dur === 90 ? 'var(--text)' : 'var(--warn)' }}>1 h 30</b>
+          {dur > 0 && dur !== 90 && <> — llevas {Math.floor(dur / 60)} h {dur % 60} min, ajústalo.</>}
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div className="label" style={{ marginBottom: 8 }}>Salones (uno por rol)</div>
+          {ROLES_RESERVA.map((rol) => (
+            <div key={rol} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ width: 70, fontSize: 12.5, color: 'var(--text-muted)' }}>{ROL_LABEL[rol]}</span>
+              <select className="input" style={{ flex: 1 }} value={salonRol[rol] || ''}
+                onChange={(e) => setSalonRol((p) => ({ ...p, [rol]: e.target.value }))}>
+                <option value="">Sin salón</option>
+                {salones.filter((s) => s.activo || String(s.id) === salonRol[rol]).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              </select>
+            </div>
+          ))}
+          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-dim)' }}>
+            Se necesitan 3 salones a la misma hora: uno para los papás, uno para Tiny y otro para Kids. Esos salones quedan bloqueados en el calendario y no se ofrecen para abrir grupos.
+          </div>
+        </div>
+        <Field full label="Notas"><textarea className="input" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></Field>
+      </div>
+    </Modal>
   )
 }
 

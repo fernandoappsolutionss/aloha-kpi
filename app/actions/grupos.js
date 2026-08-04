@@ -138,6 +138,23 @@ async function validarHorarios(centroId, horarios, grupoId = null) {
       }
     }
   }
+  // Choques contra la CLASE DE PRUEBA: ese salón está tomado por padres, Tiny
+  // o Kids. Se valida en el servidor porque al modal de grupo se puede llegar
+  // sin pasar por el calendario.
+  const reservadas = await sql`
+    SELECT r.dia, r.hora_inicio, r.hora_fin, rs.salon_id, rs.rol
+    FROM centro_reservas r JOIN centro_reserva_salones rs ON rs.reserva_id = r.id
+    WHERE r.centro_id = ${centroId} AND r.activo = TRUE
+  `
+  for (const n of out) {
+    if (!n.salon_id) continue
+    for (const o of reservadas) {
+      if (o.dia !== n.dia || String(o.salon_id) !== String(n.salon_id)) continue
+      if (chocanConBuffer(aMinutos(n.hora_inicio), aMinutos(n.hora_fin), aMinutos(o.hora_inicio), aMinutos(o.hora_fin))) {
+        return { error: `Choca con la clase de prueba (${o.hora_inicio}–${o.hora_fin}) en ${salonPorId.get(String(n.salon_id))}: ese salón atiende a ${o.rol}. Deja al menos 15 min entre clases.` }
+      }
+    }
+  }
   return { horarios: out }
 }
 
@@ -173,7 +190,18 @@ export async function loadOperaciones(centroId) {
     ORDER BY nombre
   `
   const metas = await metasOperativas()
-  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas }
+  // Clase de prueba: la sala reservada. Viaja aparte de `grupos` para que la
+  // tabla de grupos, las fusiones y el Cuadro de Negocio no la vean; el
+  // calendario la mezcla como pseudo-grupo al pintar (lib/reservas).
+  const rs = await sql`
+    SELECT id, tipo, dia, hora_inicio, hora_fin, coach_id, activo, notas
+    FROM centro_reservas WHERE centro_id = ${centroId} AND activo = TRUE ORDER BY dia, hora_inicio
+  `
+  const rsSal = rs.length
+    ? await sql`SELECT reserva_id, salon_id, rol FROM centro_reserva_salones WHERE reserva_id = ANY(${rs.map((r) => r.id)})`
+    : []
+  const reservas = rs.map((r) => ({ ...r, salones: rsSal.filter((x) => x.reserva_id === r.id) }))
+  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas, reservas }
 }
 
 export async function crearGrupo(centroId, data) {
