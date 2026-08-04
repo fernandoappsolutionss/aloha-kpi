@@ -11,10 +11,10 @@ const intOr = (v, d = 0) => {
   return Number.isFinite(n) ? n : d
 }
 
-// Desde AGOSTO 2026 los motivos de deserción del KPI no se digitan: salen de
-// los retiros registrados en el módulo (botón Retirar del Cuadro de Negocio o
-// de Grupos), que ya piden el motivo del manual. Los meses anteriores se
-// capturaron a mano y no se tocan.
+// Desde AGOSTO 2026 lo que el módulo ya sabe no se digita en el KPI: los
+// motivos salen de los retiros registrados, y los grupos activos y los nuevos
+// del mes, del propio Cuadro de Negocio. Antes de esa fecha todo se capturó a
+// mano y no se toca.
 const AUTO_MOTIVOS_DESDE = 202608
 
 async function motivosDelModulo(centroId, year, month) {
@@ -22,12 +22,24 @@ async function motivosDelModulo(centroId, year, month) {
   try {
     const datos = await calcularCuadro(centroId, intOr(year), intOr(month))
     const des = datos?.deserciones || []
-    return { ...motivosParaKpi(des), total: des.length }
+    const t = datos?.totales || {}
+    return {
+      ...motivosParaKpi(des),
+      total: des.length,
+      grupos: t.gruposActivos || 0,
+      nuevos: t.nuevos || 0,
+    }
   } catch (e) {
     // Si el cuadro falla, el KPI sigue editable a mano: nunca bloquear la captura.
-    console.error('[kpi] no se pudieron leer los motivos del módulo:', e)
+    console.error('[kpi] no se pudieron leer los datos del módulo:', e)
     return null
   }
+}
+
+// Grupos activos que ve el módulo de operaciones ahora mismo.
+async function gruposDelModulo(centroId) {
+  const [g] = await sql`SELECT COUNT(*)::int AS n FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
+  return g?.n || 0
 }
 
 // Cierre del mes anterior: es el "niños inicio" OBLIGATORIO del mes actual.
@@ -91,7 +103,15 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
   // llegue del formulario no puede contradecir los retiros registrados.
   const auto = await motivosDelModulo(centroId, intOr(year), intOr(month))
   const mot = (k) => (auto ? auto[k] : intOr(config[k]))
-  const nuevosActivos = intOr(config.nuevos_activos_mes)
+  // Grupos activos: el módulo manda. Un formulario recién abierto llega en 0 y
+  // así nacía la fila del mes — dejando el panel sin promedio de niños por
+  // grupo. Nunca se escribe 0 si el centro tiene grupos abiertos.
+  const gruposForm = intOr(config.grupos_activos)
+  let gruposActivos = auto && auto.grupos > 0 ? auto.grupos : gruposForm
+  if (gruposActivos <= 0) gruposActivos = await gruposDelModulo(centroId)
+  // Nuevos del mes: desde agosto salen del cuadro, no del formulario (así un
+  // "Guardar" con la pantalla vieja no borra lo que sincronizó el cuadro).
+  const nuevosActivos = auto ? auto.nuevos : intOr(config.nuevos_activos_mes)
   const ninosFinal = Math.max(0, ninosInicio + nuevosActivos - totalDes)
   const now = new Date().toISOString()
 
@@ -99,7 +119,7 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
     centro_id: centroId, year, month,
     ninos_inicio_mes: ninosInicio,
     ninos_final_mes: ninosFinal,
-    grupos_activos: intOr(config.grupos_activos),
+    grupos_activos: gruposActivos,
     meta_nuevos_mensual: intOr(config.meta_nuevos_mensual, 20),
     nuevos_activos_mes: nuevosActivos,
     cp_invitados: intOr(config.cp_invitados),
