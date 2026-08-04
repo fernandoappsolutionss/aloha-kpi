@@ -25,8 +25,18 @@ export async function getCentroResumen(centroId, year, trimestre) {
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
 
+  // Cierre del mes anterior al trimestre: semilla del encadenamiento (el mes
+  // que abre el trimestre arranca con lo que cerró el mes previo).
+  const py = lo === 1 ? year - 1 : year
+  const pm = lo === 1 ? 12 : lo - 1
+  const [prevMes] = await sql`
+    SELECT ninos_final_mes FROM resumen_mes
+    WHERE centro_id = ${centroId} AND year = ${py} AND month = ${pm}
+  `
+  const cierrePrevio = prevMes?.ninos_final_mes || 0
+
   // Nivel del centro = niños del trimestre vs umbrales (igual que el Excel; sin condición de deserción).
-  const cur = quarterMetrics(rs, ks, centroId, months)
+  const cur = quarterMetrics(rs, ks, centroId, months, cierrePrevio)
   const nivel = nivelPorNinos(cur.ninos)
   const nivelEnCurso = nivel
   const sig = siguienteNivel(cur.ninos)
@@ -53,7 +63,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     pctAlumnado: ninosInicioAnio > 0 ? Math.round((graduadosAnio / ninosInicioAnio) * 100) : 0,
   }
 
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion }
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, meses: cur.months, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).

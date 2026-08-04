@@ -117,7 +117,7 @@ export default function CentroPage() {
       const trimestre = period.quarter
       const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const { nombre: cNombre, metas: m, rs, ks, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct, graduacion: grad } = await getCentroResumen(id, year, trimestre)
+      const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct, graduacion: grad } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
       setNivelInfo({ nivel, nivelEnCurso, sig, desOkActual })
       setCumplReal(cumplimientoPct ?? null)
@@ -140,9 +140,12 @@ export default function CentroPage() {
           const lastSem = [...ws].sort((a, b) => b.semana - a.semana)[0]
           cobMes = lastSem.cob_d5 || lastSem.cob_d4 || lastSem.cob_d3 || lastSem.cob_d2 || lastSem.cob_d1 || 0
         }
-        const ninosInicio = r?.ninos_inicio_mes || 0
+        // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
+        // heredado del cierre anterior y cierre real del mes cuando existe.
+        const calc = (mesesCalc || []).find(x => x.mo === mo)
+        const ninosInicio = calc ? calc.ninosInicio : (r?.ninos_inicio_mes || 0)
         const nuevosActivosMes = r?.nuevos_activos_mes || 0
-        const ninosFin = Math.max(0, ninosInicio + nuevosActivosMes - desercion)
+        const ninosFin = calc ? calc.ninosFinal : Math.max(0, ninosInicio + nuevosActivosMes - desercion)
         const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
         const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
         return {
