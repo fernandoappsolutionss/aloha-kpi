@@ -106,8 +106,9 @@ export async function deletePedido(centroId, id) {
 }
 
 // Vuelca al KPI mensual (resumen_mes) SOLO los campos que salen del cuadro:
-// grupos activos, nuevos del mes y motivos de deserción. No toca kpi_semanas
-// ni los campos de clase de prueba, y respeta el candado del mes cerrado.
+// niños al inicio y al cierre del mes, grupos activos, nuevos del mes y
+// motivos de deserción. No toca kpi_semanas ni los campos de clase de
+// prueba, y respeta el candado del mes cerrado.
 export async function sincronizarConKpi(centroId, year, month) {
   await requireCentroAccess(centroId)
   const y = intOr(year)
@@ -123,9 +124,14 @@ export async function sincronizarConKpi(centroId, year, month) {
   // motivosParaKpi devuelve exactamente las 6 columnas mot_* de resumen_mes.
   const motivos = motivosParaKpi(datos.deserciones)
 
+  const t = control.totales
   const aplicado = {
-    grupos_activos: control.totales.gruposActivos,
-    nuevos_activos_mes: control.totales.nuevos,
+    // Inicio del mes = los que venían del mes anterior (continúan + los que
+    // se retiraron durante el mes); cierre = los que pagan (a pagar).
+    ninos_inicio_mes: t.continuan + t.retirados,
+    ninos_final_mes: t.aPagar,
+    grupos_activos: t.gruposActivos,
+    nuevos_activos_mes: t.nuevos,
     mot_tecnica: motivos.mot_tecnica,
     mot_perdida_clase: motivos.mot_perdida_clase,
     mot_economico: motivos.mot_economico,
