@@ -72,7 +72,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       const ninosIni = r?.ninos_inicio_mes || 0
       const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
       const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
-      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, nuevosActivos: r?.nuevos_activos_mes||0, grupos: r?.grupos_activos||0 }
+      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, ninosFinal: r?.ninos_final_mes || 0, nuevosActivos: r?.nuevos_activos_mes||0, grupos: r?.grupos_activos||0 }
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
@@ -80,7 +80,10 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const desercionReal = Math.max(0, totDes - graduados)
     const conDatos = months.filter((m) => m.has)
     const last = conDatos.length ? conDatos[conDatos.length - 1] : months[months.length - 1]
-    const ninos = Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
+    // El cierre del mes (ninos_final_mes, lo escribe "Sincronizar con KPI"
+    // desde el Cuadro de Negocio) manda; si aún no está, se estima con
+    // inicio + nuevos − deserción capturada en las semanas.
+    const ninos = last.ninosFinal > 0 ? last.ninosFinal : Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     const ag = cumpAgg[c.id]
