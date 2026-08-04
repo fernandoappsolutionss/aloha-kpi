@@ -10,6 +10,20 @@ const intOr = (v, d = 0) => {
   return Number.isFinite(n) ? n : d
 }
 
+// Cierre del mes anterior: es el "niños inicio" OBLIGATORIO del mes actual.
+// Regla de Fernando: si la administradora cerró con 170, el siguiente mes
+// arranca con 170 — los números deben encadenar mes a mes, sin dedazos.
+async function cierreMesAnterior(centroId, year, month) {
+  const py = month === 1 ? year - 1 : year
+  const pm = month === 1 ? 12 : month - 1
+  const [prev] = await sql`
+    SELECT ninos_final_mes FROM resumen_mes
+    WHERE centro_id = ${centroId} AND year = ${py} AND month = ${pm}
+  `
+  const valor = prev?.ninos_final_mes || 0
+  return valor > 0 ? { valor, year: py, month: pm } : null
+}
+
 export async function loadKpiMes(centroId, year, month) {
   await requireCentroAccess(centroId)
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
@@ -27,6 +41,7 @@ export async function loadKpiMes(centroId, year, month) {
     resumen: res || null,
     semanas,
     historial,
+    inicioArrastrado: await cierreMesAnterior(centroId, intOr(year), intOr(month)),
   }
 }
 
@@ -46,7 +61,11 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
   let totalDes = 0
   for (const w of semanas || []) for (const v of (w.des || [])) totalDes += intOr(v)
 
-  const ninosInicio = intOr(config.ninos_inicio)
+  // El inicio del mes se ARRASTRA del cierre del mes anterior cuando existe
+  // (regla del encadenamiento); lo que digite el cliente solo vale para el
+  // primer mes del centro, cuando aún no hay cadena.
+  const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month))
+  const ninosInicio = arrastrado ? arrastrado.valor : intOr(config.ninos_inicio)
   const nuevosActivos = intOr(config.nuevos_activos_mes)
   const ninosFinal = Math.max(0, ninosInicio + nuevosActivos - totalDes)
   const now = new Date().toISOString()
@@ -93,12 +112,24 @@ export async function cerrarMes(centroId, year, month) {
     await upsert('mes_kpi',
       { centro_id: centroId, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() },
       ['centro_id', 'year', 'month'])
-    // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial).
+    // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial)
+    // y los niños de inicio/cierre quedan GRABADOS en el KPI del mes desde
+    // esa foto: el mes siguiente arranca con este cierre (encadenamiento).
     // Best effort: si falla, el mes queda cerrado igual y la foto se congela
     // retroactivamente la próxima vez que alguien abra ese mes del cuadro.
     let warn
     try {
-      await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
+      const datos = await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
+      const t = datos?.totales
+      if (t) {
+        await upsert('resumen_mes', {
+          centro_id: centroId, year: intOr(year), month: intOr(month),
+          ninos_inicio_mes: t.continuan + t.retirados,
+          ninos_final_mes: t.aPagar,
+          grupos_activos: t.gruposActivos,
+          updated_at: new Date().toISOString(),
+        }, ['centro_id', 'year', 'month'])
+      }
     } catch (e) {
       console.error('[cerrarMes] no se pudo congelar la foto del cuadro:', e)
       warn = 'El mes quedó cerrado, pero no se pudo congelar la foto del cuadro; se congelará al abrir el cuadro de ese mes.'
