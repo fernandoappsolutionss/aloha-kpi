@@ -11,14 +11,14 @@ const HORA_RE = /^\d{2}:\d{2}$/
 export async function listarReservas(centroId) {
   await requireCentroAccess(centroId)
   const rs = await sql`
-    SELECT id, tipo, dia, hora_inicio, hora_fin, coach_id, activo, notas
+    SELECT id, tipo, dia, hora_inicio, hora_fin, activo, notas
     FROM centro_reservas WHERE centro_id = ${centroId} AND activo = TRUE
     ORDER BY dia, hora_inicio
   `
   if (!rs.length) return []
   const ids = rs.map((r) => r.id)
   const ss = await sql`
-    SELECT reserva_id, salon_id, rol FROM centro_reserva_salones
+    SELECT reserva_id, salon_id, rol, coach_id FROM centro_reserva_salones
     WHERE reserva_id = ANY(${ids})
   `
   return rs.map((r) => ({ ...r, salones: ss.filter((s) => s.reserva_id === r.id) }))
@@ -49,7 +49,9 @@ export async function guardarReserva(centroId, data) {
     if (ini < aperturaDe(dia) || fin > CIERRE_MIN) {
       return { error: 'La clase de prueba queda fuera del horario de operación del centro.' }
     }
-    // Un salón por rol: padres, Tiny y Kids.
+    // Un salón por rol: padres, Tiny y Kids. Tiny y Kids llevan su propio
+    // coach (son dos clases a la misma hora); a los papás los recibe la
+    // administración, por eso ese rol puede ir sin coach.
     const salones = []
     for (const s of data?.salones || []) {
       const rol = String(s?.rol || '').toLowerCase()
@@ -58,9 +60,20 @@ export async function guardarReserva(centroId, data) {
       if (!Number.isFinite(salonId)) return { error: `Falta el salón de ${rol}.` }
       const [ok] = await sql`SELECT id FROM salones WHERE id = ${salonId} AND centro_id = ${centroId}`
       if (!ok) return { error: 'Un salón no pertenece a este centro.' }
-      salones.push({ salon_id: salonId, rol })
+      let coachId = parseInt(s?.coach_id)
+      if (!Number.isFinite(coachId)) coachId = null
+      if (coachId) {
+        const [okC] = await sql`SELECT id FROM coaches WHERE id = ${coachId} AND centro_id = ${centroId}`
+        if (!okC) return { error: 'Un coach no pertenece a este centro.' }
+      }
+      salones.push({ salon_id: salonId, rol, coach_id: coachId })
     }
     if (!salones.length) return { error: 'Indica al menos un salón para la clase de prueba.' }
+    // El mismo coach no puede dar Tiny y Kids a la vez.
+    const conCoach = salones.filter((s) => s.coach_id).map((s) => s.coach_id)
+    if (new Set(conCoach).size !== conCoach.length) {
+      return { error: 'Un mismo coach no puede atender dos salones a la misma hora: Tiny y Kids necesitan coaches distintos.' }
+    }
 
     // Choque con grupos ya abiertos en esos salones (mismo criterio de buffer
     // que usa el módulo: lo valida el propio calendario al pintar, aquí se
@@ -70,22 +83,22 @@ export async function guardarReserva(centroId, data) {
     if (id) {
       const r = await sql`
         UPDATE centro_reservas SET dia = ${dia}, hora_inicio = ${data.hora_inicio}, hora_fin = ${data.hora_fin},
-          coach_id = ${data?.coach_id || null}, notas = ${data?.notas?.trim() || null}, updated_at = ${now}
+          notas = ${data?.notas?.trim() || null}, updated_at = ${now}
         WHERE id = ${id} AND centro_id = ${centroId} RETURNING id`
       if (!r.length) return { error: 'La reserva no pertenece a este centro.' }
       await sql`DELETE FROM centro_reserva_salones WHERE reserva_id = ${id}`
     } else {
       const [nueva] = await sql`
-        INSERT INTO centro_reservas (centro_id, tipo, dia, hora_inicio, hora_fin, coach_id, notas, updated_at)
+        INSERT INTO centro_reservas (centro_id, tipo, dia, hora_inicio, hora_fin, notas, updated_at)
         VALUES (${centroId}, 'clase_prueba', ${dia}, ${data.hora_inicio}, ${data.hora_fin},
-                ${data?.coach_id || null}, ${data?.notas?.trim() || null}, ${now})
+                ${data?.notas?.trim() || null}, ${now})
         RETURNING id`
       id = nueva.id
     }
     for (const s of salones) {
-      await sql`INSERT INTO centro_reserva_salones (reserva_id, salon_id, rol)
-                VALUES (${id}, ${s.salon_id}, ${s.rol})
-                ON CONFLICT (reserva_id, salon_id, rol) DO NOTHING`
+      await sql`INSERT INTO centro_reserva_salones (reserva_id, salon_id, rol, coach_id)
+                VALUES (${id}, ${s.salon_id}, ${s.rol}, ${s.coach_id})
+                ON CONFLICT (reserva_id, salon_id, rol) DO UPDATE SET coach_id = EXCLUDED.coach_id`
     }
     return { ok: true, id }
   } catch (e) {

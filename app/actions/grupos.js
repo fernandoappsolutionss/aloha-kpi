@@ -194,11 +194,11 @@ export async function loadOperaciones(centroId) {
   // tabla de grupos, las fusiones y el Cuadro de Negocio no la vean; el
   // calendario la mezcla como pseudo-grupo al pintar (lib/reservas).
   const rs = await sql`
-    SELECT id, tipo, dia, hora_inicio, hora_fin, coach_id, activo, notas
+    SELECT id, tipo, dia, hora_inicio, hora_fin, activo, notas
     FROM centro_reservas WHERE centro_id = ${centroId} AND activo = TRUE ORDER BY dia, hora_inicio
   `
   const rsSal = rs.length
-    ? await sql`SELECT reserva_id, salon_id, rol FROM centro_reserva_salones WHERE reserva_id = ANY(${rs.map((r) => r.id)})`
+    ? await sql`SELECT reserva_id, salon_id, rol, coach_id FROM centro_reserva_salones WHERE reserva_id = ANY(${rs.map((r) => r.id)})`
     : []
   const reservas = rs.map((r) => ({ ...r, salones: rsSal.filter((x) => x.reserva_id === r.id) }))
   return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas, reservas }
