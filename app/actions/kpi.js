@@ -1,13 +1,45 @@
 'use server'
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
-import { guardarSnapshotCuadro } from '../../lib/cuadro-snapshot'
+import { guardarSnapshotCuadro, calcularCuadro } from '../../lib/cuadro-snapshot'
+import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { fallo } from '../../lib/errores'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
   return Number.isFinite(n) ? n : d
+}
+
+// Desde AGOSTO 2026 lo que el módulo ya sabe no se digita en el KPI: los
+// motivos salen de los retiros registrados, y los grupos activos y los nuevos
+// del mes, del propio Cuadro de Negocio. Antes de esa fecha todo se capturó a
+// mano y no se toca.
+const AUTO_MOTIVOS_DESDE = 202608
+
+async function motivosDelModulo(centroId, year, month) {
+  if (year * 100 + month < AUTO_MOTIVOS_DESDE) return null
+  try {
+    const datos = await calcularCuadro(centroId, intOr(year), intOr(month))
+    const des = datos?.deserciones || []
+    const t = datos?.totales || {}
+    return {
+      ...motivosParaKpi(des),
+      total: des.length,
+      grupos: t.gruposActivos || 0,
+      nuevos: t.nuevos || 0,
+    }
+  } catch (e) {
+    // Si el cuadro falla, el KPI sigue editable a mano: nunca bloquear la captura.
+    console.error('[kpi] no se pudieron leer los datos del módulo:', e)
+    return null
+  }
+}
+
+// Grupos activos que ve el módulo de operaciones ahora mismo.
+async function gruposDelModulo(centroId) {
+  const [g] = await sql`SELECT COUNT(*)::int AS n FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
+  return g?.n || 0
 }
 
 // Cierre del mes anterior: es el "niños inicio" OBLIGATORIO del mes actual.
@@ -42,6 +74,7 @@ export async function loadKpiMes(centroId, year, month) {
     semanas,
     historial,
     inicioArrastrado: await cierreMesAnterior(centroId, intOr(year), intOr(month)),
+    motivosAuto: await motivosDelModulo(centroId, intOr(year), intOr(month)),
   }
 }
 
@@ -66,7 +99,19 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
   // primer mes del centro, cuando aún no hay cadena.
   const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month))
   const ninosInicio = arrastrado ? arrastrado.valor : intOr(config.ninos_inicio)
-  const nuevosActivos = intOr(config.nuevos_activos_mes)
+  // Los motivos de deserción los manda el módulo desde agosto 2026: lo que
+  // llegue del formulario no puede contradecir los retiros registrados.
+  const auto = await motivosDelModulo(centroId, intOr(year), intOr(month))
+  const mot = (k) => (auto ? auto[k] : intOr(config[k]))
+  // Grupos activos: el módulo manda. Un formulario recién abierto llega en 0 y
+  // así nacía la fila del mes — dejando el panel sin promedio de niños por
+  // grupo. Nunca se escribe 0 si el centro tiene grupos abiertos.
+  const gruposForm = intOr(config.grupos_activos)
+  let gruposActivos = auto && auto.grupos > 0 ? auto.grupos : gruposForm
+  if (gruposActivos <= 0) gruposActivos = await gruposDelModulo(centroId)
+  // Nuevos del mes: desde agosto salen del cuadro, no del formulario (así un
+  // "Guardar" con la pantalla vieja no borra lo que sincronizó el cuadro).
+  const nuevosActivos = auto ? auto.nuevos : intOr(config.nuevos_activos_mes)
   const ninosFinal = Math.max(0, ninosInicio + nuevosActivos - totalDes)
   const now = new Date().toISOString()
 
@@ -74,17 +119,18 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
     centro_id: centroId, year, month,
     ninos_inicio_mes: ninosInicio,
     ninos_final_mes: ninosFinal,
-    grupos_activos: intOr(config.grupos_activos),
+    grupos_activos: gruposActivos,
     meta_nuevos_mensual: intOr(config.meta_nuevos_mensual, 20),
     nuevos_activos_mes: nuevosActivos,
     cp_invitados: intOr(config.cp_invitados),
     cp_asistieron: intOr(config.cp_asistieron),
     cp_matriculados: intOr(config.cp_matriculados),
-    mot_tecnica: intOr(config.mot_tecnica),
-    mot_perdida_clase: intOr(config.mot_perdida_clase),
-    mot_economico: intOr(config.mot_economico),
-    mot_horario: intOr(config.mot_horario),
-    mot_graduado: intOr(config.mot_graduado),
+    mot_tecnica: mot('mot_tecnica'),
+    mot_perdida_clase: mot('mot_perdida_clase'),
+    mot_economico: mot('mot_economico'),
+    mot_horario: mot('mot_horario'),
+    mot_graduado: mot('mot_graduado'),
+    mot_otro: mot('mot_otro'),
     orig_referido: intOr(config.orig_referido),
     orig_marketing: intOr(config.orig_marketing),
     orig_centro: intOr(config.orig_centro),

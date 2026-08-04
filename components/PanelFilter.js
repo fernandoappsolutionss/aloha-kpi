@@ -41,9 +41,15 @@ export default function PanelFilter({ value, onChange }) {
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {[['12m', 'Últimos 12 meses'], ['ytd', 'Este año'], ['prev', 'Año pasado'], ['custom', 'Personalizado']].map(([k, l]) => (
-            <button key={k} style={pill(preset === k)} onClick={() => onChange({ ...f, mode: 'mensual', preset: k })}>{l}</button>
+          {[['12m', 'Últimos 12 meses'], ['36m', 'Últimos 3 años'], ['anio', 'Año completo'], ['ytd', 'Este año'], ['custom', 'Personalizado']].map(([k, l]) => (
+            <button key={k} style={pill(preset === k)} onClick={() => onChange({ ...f, mode: 'mensual', preset: k, year: f.year || cy })}>{l}</button>
           ))}
+          {preset === 'anio' && (
+            <select className="select" value={f.year || cy} aria-label="Año"
+              onChange={e => onChange({ ...f, mode: 'mensual', preset: 'anio', year: Number(e.target.value) })}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
           {preset === 'custom' && (
             <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
               <input type="month" value={f.from || ''} style={inp}

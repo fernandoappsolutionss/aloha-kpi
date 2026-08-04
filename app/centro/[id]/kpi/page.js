@@ -33,11 +33,13 @@ export default function KPIPage() {
   const [cerrando, setCerrando] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
-  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
   // Cierre del mes anterior: encadena como "niños inicio" de este mes.
   const [arrastrado, setArrastrado] = useState(null)
+  // Motivos de deserción que vienen del módulo (retiros registrados).
+  const [motivosAuto, setMotivosAuto] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
 
   const loadData = useCallback(async () => {
@@ -51,18 +53,21 @@ export default function KPIPage() {
       setLoading(false)
       return
     }
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, inicioArrastrado: arr } = datos
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, inicioArrastrado: arr, motivosAuto: mAuto } = datos
     setCentroNombre(cNombre || '')
     setMesEstado(estado || 'abierto')
     setArrastrado(arr || null)
+    setMotivosAuto(mAuto || null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
     // anterior cuando existe (el servidor también lo impone al guardar).
     if (res) {
-      setConfig({ ninos_inicio: arr ? arr.valor : (res.ninos_inicio_mes||0), grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
+      setConfig({ ninos_inicio: arr ? arr.valor : (res.ninos_inicio_mes||0), grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
     } else {
-      setConfig({ ninos_inicio: arr ? arr.valor : 0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+      setConfig({ ninos_inicio: arr ? arr.valor : 0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
     }
+
+    if (mAuto) setConfig(c => ({ ...c, mot_tecnica: mAuto.mot_tecnica, mot_perdida_clase: mAuto.mot_perdida_clase, mot_economico: mAuto.mot_economico, mot_horario: mAuto.mot_horario, mot_graduado: mAuto.mot_graduado, mot_otro: mAuto.mot_otro }))
 
     // Semanas
     const sems = SEMANAS.map(s => {
@@ -318,18 +323,23 @@ export default function KPIPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
             {title:'Clase de Prueba', accent:'var(--ts-green)', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
-            {title:'Motivo Deserción', accent:'var(--bad)', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado']]},
+            {title:'Motivo Deserción', accent:'var(--bad)', auto: !!motivosAuto, fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
             {title:'Origen Nuevos Ingresos', accent:'var(--ok)', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios']]},
-          ].map(({title,accent,fields}) => (
+          ].map(({title,accent,fields,auto}) => (
             <div key={title} className="panel">
               <div className="panel__head" style={{ padding: '12px 16px', borderTop: `2px solid ${accent}` }}>
                 <span className="label">{title}</span>
               </div>
               <div style={{ padding: 14 }}>
+                {auto && (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+                    🔗 Se llena solo con los {motivosAuto.total} retiro{motivosAuto.total === 1 ? '' : 's'} registrado{motivosAuto.total === 1 ? '' : 's'} este mes en Cuadro de Negocio o Grupos. Para cambiarlo, corrige el motivo al retirar al niño.
+                  </div>
+                )}
                 {fields.map(([lbl,key]) => (
                   <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
-                    {cfgInput(key, false)}
+                    {cfgInput(key, false, !!auto)}
                   </div>
                 ))}
               </div>
