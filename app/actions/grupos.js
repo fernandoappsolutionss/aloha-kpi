@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
-import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO } from '../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO, fechaIso10 } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
 import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
@@ -281,7 +281,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   }
   // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
   // horarios); el nivel y las clases suspendidas del grupo se conservan.
-  const inicioCambio = String(fechaInicio || '') !== String(g.fecha_inicio_clases || '').slice(0, 10)
+  const inicioCambio = String(fechaInicio || '') !== (fechaIso10(g.fecha_inicio_clases) || '')
   if ((horarios || inicioCambio) && fechaInicio) {
     const hs = horarios || (await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
     await regenerarItinerarioClases(centroId, grupoId, {
@@ -415,7 +415,7 @@ export async function listarGruposActivos(centroId) {
       numero: g.numero,
       itinerario: g.itinerario,
       inscripcionAbierta: g.inscripcion_abierta !== false,
-      fechaInicioClases: g.fecha_inicio_clases ? String(g.fecha_inicio_clases).slice(0, 10) : null,
+      fechaInicioClases: fechaIso10(g.fecha_inicio_clases),
       horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
       cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
     }))

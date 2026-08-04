@@ -4,7 +4,7 @@
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
 import { getSession, isAdminRole } from '../../../../../lib/auth'
-import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
+import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
 import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
 
@@ -97,7 +97,7 @@ export async function GET(request, { params }) {
   // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
   // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
   const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-  const iniciado = (g) => !g.fecha_inicio_clases || String(g.fecha_inicio_clases).slice(0, 10) <= finMes
+  const iniciado = (g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= finMes
   const gruposCuadro = grupos.filter(iniciado)
   const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
   const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
