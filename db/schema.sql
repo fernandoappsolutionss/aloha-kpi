@@ -9,8 +9,12 @@ CREATE TABLE IF NOT EXISTS centros (
   id          SERIAL PRIMARY KEY,
   nombre      TEXT NOT NULL,
   region      TEXT,
+  pais        TEXT NOT NULL DEFAULT 'PA',
   created_at  TIMESTAMPTZ DEFAULT now()
 );
+-- País del centro ('PA' Panamá / 'VE' Venezuela): define qué fechas patrias
+-- salta su calendario de itinerarios.
+ALTER TABLE centros ADD COLUMN IF NOT EXISTS pais TEXT NOT NULL DEFAULT 'PA';
 
 -- Usuarios (autenticación propia: email + password_hash)
 CREATE TABLE IF NOT EXISTS usuarios (

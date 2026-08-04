@@ -4,9 +4,12 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
+// El país del centro define las FECHAS PATRIAS que salta su calendario de
+// itinerarios (Panamá o Venezuela).
+const PAISES = { PA: 'Panamá', VE: 'Venezuela' }
 const REGIONES = {
-  'Panamá': ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste'],
-  'Venezuela': ['Distrito Capital','Amazonas','Anzoátegui','Apure','Aragua','Barinas','Bolívar','Carabobo','Cojedes','Delta Amacuro','Falcón','Guárico','La Guaira','Lara','Mérida','Miranda','Monagas','Nueva Esparta','Portuguesa','Sucre','Táchira','Trujillo','Yaracuy','Zulia'],
+  PA: ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste'],
+  VE: ['Distrito Capital','Amazonas','Anzoátegui','Apure','Aragua','Barinas','Bolívar','Carabobo','Cojedes','Delta Amacuro','Falcón','Guárico','La Guaira','Lara','Mérida','Miranda','Monagas','Nueva Esparta','Portuguesa','Sucre','Táchira','Trujillo','Yaracuy','Zulia'],
 }
 
 export default function CentrosPage() {
@@ -15,7 +18,7 @@ export default function CentrosPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [status, setStatus] = useState('')
-  const [form, setForm] = useState({ nombre: '', region: 'Ciudad de Panamá' })
+  const [form, setForm] = useState({ nombre: '', region: 'Ciudad de Panamá', pais: 'PA' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(null)
 
@@ -36,15 +39,15 @@ export default function CentrosPage() {
     setSaving(true); setStatus('')
     try {
       if (editing) {
-        const res = await updateCentro(editing, { nombre: form.nombre, region: form.region })
+        const res = await updateCentro(editing, { nombre: form.nombre, region: form.region, pais: form.pais })
         if (res.error) throw new Error(res.error)
         setStatus('✅ Centro actualizado.')
       } else {
-        const res = await createCentro({ nombre: form.nombre, region: form.region })
+        const res = await createCentro({ nombre: form.nombre, region: form.region, pais: form.pais })
         if (res.error) throw new Error(res.error)
         setStatus('✅ Centro creado.')
       }
-      setShowForm(false); setEditing(null); setForm({ nombre: '', region: 'Ciudad de Panamá' })
+      setShowForm(false); setEditing(null); setForm({ nombre: '', region: 'Ciudad de Panamá', pais: 'PA' })
       loadCentros()
     } catch (e) { setStatus('❌ Error: ' + e.message) }
     setSaving(false)
@@ -70,7 +73,7 @@ export default function CentrosPage() {
   }
 
   function editCentro(c) {
-    setEditing(c.id); setForm({ nombre: c.nombre, region: c.region || 'Ciudad de Panamá' }); setShowForm(true)
+    setEditing(c.id); setForm({ nombre: c.nombre, region: c.region || 'Ciudad de Panamá', pais: c.pais === 'VE' ? 'VE' : 'PA' }); setShowForm(true)
   }
 
   const isError = status.includes('❌')
@@ -88,7 +91,7 @@ export default function CentrosPage() {
             <h1 className="h-title">Gestión de centros</h1>
             <p className="h-sub">{centros.length} centros registrados</p>
           </div>
-          <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá'}); setShowForm(!showForm) }}
+          <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá',pais:'PA'}); setShowForm(!showForm) }}
             className={`btn${showForm ? '' : ' btn--primary'}`}>
             {showForm ? '✕ Cancelar' : '+ Nuevo centro'}
           </button>
@@ -105,20 +108,27 @@ export default function CentrosPage() {
           <div className="card" style={{ padding: 24, marginBottom: 20 }}>
             <h3 className="panel__title" style={{ marginBottom: 20 }}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h3>
             <form onSubmit={saveCentro}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 18 }}>
                 <div className="field">
                   <label className="label">Nombre del centro *</label>
                   <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
                     placeholder="Ej: BRISAS DEL GOLF" className="input"/>
                 </div>
                 <div className="field">
-                  <label className="label">País / Región</label>
+                  <label className="label">País *</label>
+                  <select value={form.pais}
+                    onChange={e=>{ const p = e.target.value; setForm({...form, pais: p, region: REGIONES[p][0]}) }}
+                    className="input">
+                    {Object.entries(PAISES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                    Define las fechas patrias que salta el calendario de clases.
+                  </div>
+                </div>
+                <div className="field">
+                  <label className="label">Región</label>
                   <select value={form.region} onChange={e=>setForm({...form,region:e.target.value})} className="input">
-                    {Object.entries(REGIONES).map(([pais, regs]) => (
-                      <optgroup key={pais} label={pais}>
-                        {regs.map(r => <option key={r} value={r}>{r}</option>)}
-                      </optgroup>
-                    ))}
+                    {(REGIONES[form.pais] || []).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
@@ -136,18 +146,19 @@ export default function CentrosPage() {
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
-                <tr>{['Centro','Región','Usuarios','Acciones'].map(h=>
+                <tr>{['Centro','País','Región','Usuarios','Acciones'].map(h=>
                   <th key={h}>{h}</th>
                 )}</tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr style={{ cursor: 'default' }}><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando...</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando...</td></tr>
                 ) : centros.map((c) => {
                   const userCount = c.user_count || 0
                   return (
                     <tr key={c.id} style={{ cursor: 'default' }}>
                       <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
+                      <td style={{ color: 'var(--text-dim)' }}>{PAISES[c.pais] || 'Panamá'}</td>
                       <td style={{ color: 'var(--text-dim)' }}>{c.region || '—'}</td>
                       <td>
                         <span className="pill pill--ok"><span className="dot" />{userCount} usuario{userCount!==1?'s':''}</span>
@@ -170,7 +181,7 @@ export default function CentrosPage() {
                   )
                 })}
                 {!loading && centros.length === 0 && (
-                  <tr style={{ cursor: 'default' }}><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No hay centros. Crea el primero.</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No hay centros. Crea el primero.</td></tr>
                 )}
               </tbody>
             </table>
