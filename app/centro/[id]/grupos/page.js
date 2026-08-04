@@ -834,7 +834,7 @@ function ItinerarioNivel({ g, it, idxHoy, onAjustar }) {
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
               {fmtDia(it.fecha_inicio)} → {fmtDia(it.fecha_cierre_estimada)} · {total} semanas
-              {it.con_feriados === false ? ' · reglamento ALOHA Venezuela' : ''}
+              {it.pais === 'VE' || it.con_feriados === false ? ' · fechas patrias de Venezuela' : ''}
             </div>
           </div>
           <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => onAjustar()}>✎ Ajustar itinerario</button>
@@ -1648,7 +1648,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
   const dias = [...new Set((g.horarios || []).map((h) => Number(h.dia)))]
   // Recalcula en vivo: así se ve a dónde se mueve el cierre antes de guardar.
   const previo = dias.length && inicio
-    ? generarItinerario({ fechaInicio: inicio, dias, nivel: parseInt(nivel) || 1, conFeriados: it?.con_feriados !== false, excepciones: exc })
+    ? generarItinerario({ fechaInicio: inicio, dias, nivel: parseInt(nivel) || 1, pais: it?.pais || (it?.con_feriados === false ? 'VE' : 'PA'), excepciones: exc })
     : null
   const cierreAntes = it?.fecha_cierre_estimada
   const movio = previo && cierreAntes && previo.fecha_cierre_estimada !== cierreAntes

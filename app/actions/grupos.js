@@ -15,13 +15,15 @@ import { generarItinerario, normalizarExcepciones } from '../../lib/itinerario'
 // reglamento de ALOHA Venezuela → su calendario no salta feriados panameños.
 async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }) {
   if (!fechaInicio || !horarios?.length) return null
-  const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
-  const conFeriados = !/naranjos/i.test(c?.nombre || '')
+  const [c] = await sql`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+  // El país del centro define sus fechas patrias; el nombre es solo respaldo
+  // para centros creados antes de la columna pais.
+  const pais = c?.pais === 'VE' || (!c?.pais && /naranjos/i.test(c?.nombre || '')) ? 'VE' : 'PA'
   const it = generarItinerario({
     fechaInicio,
     dias: horarios.map((h) => h.dia),
     nivel: nivel || 1,
-    conFeriados,
+    pais,
     excepciones,
   })
   if (!it) return null
