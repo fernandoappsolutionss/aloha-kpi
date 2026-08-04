@@ -35,6 +35,12 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   const rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
+  // Semilla del ENCADENAMIENTO: cierre del mes anterior al rango. Un mes
+  // recién abierto (sin cierre) hereda los niños del eslabón anterior en vez
+  // de mostrar 0 en el panel.
+  const py = fromM === 1 ? fromY - 1 : fromY
+  const pm = fromM === 1 ? 12 : fromM - 1
+  const prevRows = await sql`SELECT centro_id, ninos_final_mes, grupos_activos FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
 
   // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel). Se toman
   // solo las celdas (trimestre, mes) cuyo mes calendario cae dentro del rango.
@@ -61,6 +67,9 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const crs = rs.filter((r) => r.centro_id === c.id)
     const cks = ks.filter((k) => k.centro_id === c.id)
     const admin = usuarios.find((u) => u.centro_id === c.id)?.nombre || '—'
+    const prev = prevRows.find((r) => r.centro_id === c.id)
+    let cadena = prev?.ninos_final_mes || 0
+    let cadenaGrupos = prev?.grupos_activos || 0
     const months = mlist.map(({ year, month }) => {
       const r = crs.find((x) => x.year === year && x.month === month)
       const ws = cks.filter((x) => x.year === year && x.month === month)
@@ -69,10 +78,14 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       let cob = 0
       if (ws.length) { const last = [...ws].sort((a, b) => b.semana - a.semana)[0]; cob = last.cob_d5||last.cob_d4||last.cob_d3||last.cob_d2||last.cob_d1||0 }
       const has = ws.length > 0 || !!r
-      const ninosIni = r?.ninos_inicio_mes || 0
+      // Encadenado: sin inicio guardado, el mes hereda el cierre del anterior.
+      const ninosIni = (r?.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : cadena
+      const nuevosActivos = r?.nuevos_activos_mes || 0
+      const ninosFinal = (r?.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ninosIni + nuevosActivos - desercion)
+      if (has) { cadena = ninosFinal; if ((r?.grupos_activos || 0) > 0) cadenaGrupos = r.grupos_activos }
       const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
       const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
-      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, ninosFinal: r?.ninos_final_mes || 0, nuevosActivos: r?.nuevos_activos_mes||0, grupos: r?.grupos_activos||0 }
+      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, ninosFinal, nuevosActivos, grupos: (r?.grupos_activos || 0) > 0 ? r.grupos_activos : cadenaGrupos }
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
@@ -80,10 +93,9 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const desercionReal = Math.max(0, totDes - graduados)
     const conDatos = months.filter((m) => m.has)
     const last = conDatos.length ? conDatos[conDatos.length - 1] : months[months.length - 1]
-    // El cierre del mes (ninos_final_mes, lo escribe "Sincronizar con KPI"
-    // desde el Cuadro de Negocio) manda; si aún no está, se estima con
-    // inicio + nuevos − deserción capturada en las semanas.
-    const ninos = last.ninosFinal > 0 ? last.ninosFinal : Math.max(0, last.ninosInicio + last.nuevosActivos - last.desercion)
+    // ninosFinal ya viene encadenado: cierre real del mes si existe, o el
+    // eslabón anterior + nuevos − deserción para meses aún en curso.
+    const ninos = last.ninosFinal
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     const ag = cumpAgg[c.id]
@@ -163,15 +175,39 @@ export async function getHistorialAdmin(anio, centroSel, trimSel) {
   return out
 }
 
-// Serie mensual de niños (suma de todos los centros) para un rango [desde, hasta].
+// Serie mensual de niños (suma de todos los centros) para un rango [desde,
+// hasta], ENCADENADA: un mes en curso sin cierre hereda el eslabón anterior
+// del centro (+ nuevos − deserción) en vez de hundir la curva a 0.
 export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
   await requireAdmin()
   const lo = desdeY * 100 + desdeM
   const hi = hastaY * 100 + hastaM
-  return await sql`
-    SELECT year, month, SUM(ninos_final_mes)::int ninos, SUM(nuevos_activos_mes)::int nuevos
-    FROM resumen_mes
-    WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}
-    GROUP BY year, month ORDER BY year, month
-  `
+  const py = desdeM === 1 ? desdeY - 1 : desdeY
+  const pm = desdeM === 1 ? 12 : desdeM - 1
+  const rows = await sql`
+    SELECT centro_id, year, month, ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
+    FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  const prev = await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
+  const desMes = await sql`
+    SELECT centro_id, year, month,
+           SUM(des_d1 + des_d2 + des_d3 + des_d4 + des_d5)::int AS des
+    FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}
+    GROUP BY centro_id, year, month`
+  const cadena = new Map(prev.map((r) => [r.centro_id, r.ninos_final_mes || 0]))
+  const out = []
+  for (const { year, month } of monthList(desdeY, desdeM, hastaY, hastaM)) {
+    const mrs = rows.filter((r) => r.year === year && r.month === month)
+    if (!mrs.length) continue
+    let ninos = 0, nuevos = 0
+    for (const r of mrs) {
+      const des = desMes.find((d) => d.centro_id === r.centro_id && d.year === year && d.month === month)?.des || 0
+      const ini = (r.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : (cadena.get(r.centro_id) || 0)
+      const fin = (r.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ini + (r.nuevos_activos_mes || 0) - des)
+      cadena.set(r.centro_id, fin)
+      ninos += fin
+      nuevos += r.nuevos_activos_mes || 0
+    }
+    out.push({ year, month, ninos, nuevos })
+  }
+  return out
 }
