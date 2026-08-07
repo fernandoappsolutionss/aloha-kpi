@@ -24,8 +24,9 @@ const sql = neon(process.env.DATABASE_URL)
 // así que separar por `;` es seguro. Se quitan los comentarios de línea.
 const raw = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8')
 const statements = raw
+  .replace(/--.*$/gm, '')
   .split(';')
-  .map((s) => s.replace(/--.*$/gm, '').trim())
+  .map((s) => s.trim())
   .filter((s) => s.length > 0)
 
 console.log(`→ Aplicando ${statements.length} sentencias de db/schema.sql…`)

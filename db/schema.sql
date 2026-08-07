@@ -425,3 +425,62 @@ CREATE TABLE IF NOT EXISTS centro_reserva_salones (
 );
 ALTER TABLE centro_reserva_salones ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reserva_salon_rol ON centro_reserva_salones(reserva_id, salon_id, rol);
+
+-- Ruta al Proximo Nivel: cada calculo queda congelado con la version del
+-- motor para poder explicar la recomendacion y medir su error despues.
+CREATE TABLE IF NOT EXISTS growth_snapshots (
+  id BIGSERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  snapshot_date DATE NOT NULL,
+  engine_version TEXT NOT NULL,
+  confidence TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (centro_id, snapshot_date, engine_version)
+);
+CREATE INDEX IF NOT EXISTS idx_growth_snapshots_centro
+  ON growth_snapshots(centro_id, snapshot_date DESC);
+
+CREATE TABLE IF NOT EXISTS growth_recommendations (
+  id BIGSERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  snapshot_id BIGINT NOT NULL REFERENCES growth_snapshots(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  generated_for DATE NOT NULL,
+  title TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  action TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  baseline NUMERIC,
+  target NUMERIC,
+  unit TEXT,
+  estimated_impact NUMERIC DEFAULT 0,
+  effort NUMERIC DEFAULT 1,
+  priority NUMERIC DEFAULT 0,
+  responsible TEXT,
+  due_date DATE,
+  expires_at DATE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (centro_id, kind, generated_for)
+);
+CREATE INDEX IF NOT EXISTS idx_growth_recommendations_active
+  ON growth_recommendations(centro_id, status, generated_for DESC);
+
+CREATE TABLE IF NOT EXISTS growth_notification_receipts (
+  id BIGSERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  snapshot_id BIGINT NOT NULL REFERENCES growth_snapshots(id) ON DELETE CASCADE,
+  week_start DATE NOT NULL,
+  shown_at TIMESTAMPTZ DEFAULT now(),
+  acknowledged_at TIMESTAMPTZ,
+  snoozed_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (usuario_id, week_start)
+);
+CREATE INDEX IF NOT EXISTS idx_growth_receipts_usuario
+  ON growth_notification_receipts(usuario_id, week_start DESC);
