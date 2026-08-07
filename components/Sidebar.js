@@ -58,6 +58,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   ]
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}` },
+    { label: 'Ruta de Nivel', icon: 'target', href: `/centro/${centroId}/ruta-nivel` },
     { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi` },
     { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos` },
     { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro` },
@@ -89,7 +90,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       <nav className="sb__nav">
         <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => (
-          <button key={item.href} onClick={() => router.push(item.href)}
+          <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
             className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
             <Icon name={item.icon} /><span>{item.label}</span>
           </button>
@@ -105,7 +106,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
             {centrosOpen && centros.map(c => {
               const active = path.startsWith(`/centro/${c.id}`)
               return (
-                <button key={c.id} onClick={() => router.push(`/centro/${c.id}`)}
+                <button key={c.id} onClick={() => router.push(`/centro/${c.id}`)} title={c.nombre}
                   className={`sb__item sb__sub${active ? ' sb__item--active' : ''}`}>
                   <span style={{ width: 5, height: 5, borderRadius: 3, background: active ? 'var(--ts-green)' : 'var(--text-faint)', flexShrink: 0 }} />
                   <span>{c.nombre.length > 18 ? c.nombre.split(' ').slice(0, 2).join(' ') : c.nombre}</span>
@@ -119,7 +120,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
           <>
             <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
             {adminConfig.map(item => (
-              <button key={item.href} onClick={() => router.push(item.href)}
+              <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
                 className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
                 <Icon name={item.icon} /><span>{item.label}</span>
               </button>
