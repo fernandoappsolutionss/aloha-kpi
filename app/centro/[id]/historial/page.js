@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import { getHistorialCentro } from '../../../actions/centro'
+import { valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
 
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -120,19 +121,23 @@ export default function HistorialPage() {
     const data = rows.map((r) => {
       const key = monthKey(r)
       const estado = estados?.find(e => e.year === r.year && e.month === r.month)
+      const estadoMes = estado?.estado || 'abierto'
       const cuadro = cuadros?.find(q => q.year === r.year && q.month === r.month) || null
+      const usaCuadroVivo = estadoMes !== 'cerrado' && cuadro?.vivo === true
       const semana = semanasPorMes.get(`${r.year}-${r.month}`) || null
       const rawInicio = Number(r.ninos_inicio_mes) || 0
       const nI = keyAnterior === key - 1 && cierreAnterior > 0 ? cierreAnterior : rawInicio
-      const gA = r.grupos_activos || 1
+      const gA = valorHistorialMes({ estado: estadoMes, guardado: r.grupos_activos, cuadro, campo: 'gruposActivos' }) || 1
       const nuevosSemanal = Number(semana?.nuevos_ingresos_venta) || 0
       const nuevosCuadro = Number(cuadro?.nuevos) || 0
-      const nA = r.nuevos_activos_mes == null ? nuevosCuadro : Number(r.nuevos_activos_mes)
+      const nA = valorHistorialMes({ estado: estadoMes, guardado: r.nuevos_activos_mes, cuadro, campo: 'nuevos' })
       const totalDes = Number(semana?.total_desercion) || 0
       const reincorporados = Number(cuadro?.reincorporados) || 0
       const rawFinal = Number(r.ninos_final_mes) || 0
       const cuadroFinal = Number(cuadro?.aPagar) || 0
-      const ninosFinal = rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA + reincorporados - totalDes))
+      const ninosFinal = usaCuadroVivo
+        ? valorHistorialMes({ estado: estadoMes, guardado: r.ninos_final_mes, cuadro, campo: 'aPagar' })
+        : (rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA + reincorporados - totalDes)))
       const promG = gA > 0 ? ninosFinal / gA : 0
       const pcv = calcPcv(promG)
       const gpn = calcGpn(ninosFinal, pcv)
@@ -142,7 +147,7 @@ export default function HistorialPage() {
         mes: MES[r.month-1] + ' ' + r.year,
         mesLabel: MES_FULL[r.month-1] + ' ' + r.year,
         year: r.year, month: r.month,
-        estado: estado?.estado || 'abierto',
+        estado: estadoMes,
         cerrado_at: estado?.cerrado_at,
         ninos_inicio: nI,
         ninos_final: ninosFinal,
@@ -168,7 +173,7 @@ export default function HistorialPage() {
         cumple_prom: promG >= 8,
         meta_cob: parseFloat(((nI * 0.015)).toFixed(1)),
         meta_des: parseFloat((nI * 0.08).toFixed(1)),
-        // Foto congelada del Cuadro de Negocio (solo meses cerrados).
+        // Foto congelada o cálculo vivo; la vista de Cuadro solo lista las fotos cerradas.
         cuadro,
         cuadro_aPagar: cuadro ? cuadro.aPagar : null,
         cuadro_nuevos: cuadro ? cuadro.nuevos : null,
@@ -590,7 +595,7 @@ export default function HistorialPage() {
 
             {/* VISTA: CUADRO DE NEGOCIO (fotos congeladas de meses cerrados) */}
             {vistaActiva === 'cuadro' && (() => {
-              const conCuadro = visibleMeses.filter(m => m.cuadro)
+              const conCuadro = visibleMeses.filter(m => m.cuadro && !m.cuadro.vivo)
               if (conCuadro.length === 0) return (
                 <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
                   Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Semanal, su Cuadro de Negocio queda congelado y aparece aquí como historial.

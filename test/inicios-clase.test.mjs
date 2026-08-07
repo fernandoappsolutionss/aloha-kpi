@@ -7,6 +7,7 @@ import {
   iniciosClaseMes,
   proyeccionSiguienteMes,
   usaIniciosClaseOperativos,
+  valorHistorialMes,
 } from '../lib/inicios-clase.mjs'
 
 const grupo = (overrides = {}) => ({
@@ -124,4 +125,22 @@ test('la fecha operativa reemplaza el legado desde agosto de 2026', () => {
   assert.equal(usaIniciosClaseOperativos(2026, 7), false)
   assert.equal(usaIniciosClaseOperativos(2026, 8), true)
   assert.equal(usaIniciosClaseOperativos(2027, 1), true)
+})
+
+test('el historial de un mes abierto usa el calculo vivo del cuadro', () => {
+  assert.equal(valorHistorialMes({
+    estado: 'abierto',
+    guardado: 0,
+    cuadro: { vivo: true, nuevos: 1 },
+    campo: 'nuevos',
+  }), 1)
+})
+
+test('el historial de un mes cerrado conserva el valor guardado', () => {
+  assert.equal(valorHistorialMes({
+    estado: 'cerrado',
+    guardado: 14,
+    cuadro: { vivo: true, nuevos: 99 },
+    campo: 'nuevos',
+  }), 14)
 })
