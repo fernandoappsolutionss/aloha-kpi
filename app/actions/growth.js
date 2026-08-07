@@ -1,7 +1,8 @@
 'use server'
 
-import { requireCentroAccess } from '../../lib/auth'
+import { requireAdmin, requireCentroAccess } from '../../lib/auth'
 import { sql } from '../../lib/db'
+import { evaluateGrowthForecasts } from '../../lib/growth/backtest.mjs'
 import {
   briefingEligibility,
   growthWeekStart,
@@ -147,4 +148,101 @@ export async function updateGrowthRecommendation(centroId, recommendationId, com
   `
   if (!updated) throw new Error('La recomendacion ya no esta activa')
   return updated
+}
+
+const adminGrowthRow = (growth, backtest) => {
+  const projection = growth.projection
+  const topAction = growth.recommendations.find((item) => item.status === 'pending')
+    || growth.recommendations.find((item) => item.status === 'postponed')
+    || null
+  const nextMonth = projection.scenarios.base.series[0] || null
+  const nextThreshold = projection.nextLevel?.threshold ?? null
+
+  return {
+    id: growth.center.id,
+    name: growth.center.nombre,
+    currentChildren: projection.currentChildren,
+    currentLevel: projection.currentLevel,
+    nextLevel: projection.nextLevel,
+    confidence: growth.metrics.confidence,
+    baseMonthlyNet: projection.scenarios.base.monthlyNet,
+    actionMonthlyNet: projection.scenarios.action.monthlyNet,
+    baseQuarter: projection.scenarios.base.recognitionQuarter,
+    actionQuarter: projection.scenarios.action.recognitionQuarter,
+    nextMonth,
+    capacityMax: projection.capacityMax,
+    capacityHeadroom: projection.capacityMax == null
+      ? null
+      : projection.capacityMax - projection.currentChildren,
+    capacityBlocksLevel: nextThreshold != null
+      && projection.capacityMax != null
+      && projection.capacityMax < nextThreshold,
+    acquisitionShare: growth.metrics.controls.acquisitionShare,
+    attritionShare: growth.metrics.controls.attritionShare,
+    attendanceRate: growth.metrics.rates.attendance,
+    enrollmentRate: growth.metrics.rates.enrollment,
+    topAction,
+    backtest,
+  }
+}
+
+export async function getGrowthAdminOverview() {
+  await requireAdmin()
+  const centers = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
+  const calculated = []
+
+  for (let index = 0; index < centers.length; index += 3) {
+    const batch = centers.slice(index, index + 3)
+    const settled = await Promise.allSettled(batch.map((center) => calculateCentroGrowth(center.id)))
+    settled.forEach((result, offset) => {
+      calculated.push(result.status === 'fulfilled'
+        ? { center: batch[offset], growth: result.value }
+        : { center: batch[offset], error: true })
+    })
+  }
+
+  const [snapshots, closedActuals] = await Promise.all([
+    sql`
+      SELECT centro_id, snapshot_date, payload
+      FROM growth_snapshots
+      WHERE snapshot_date >= CURRENT_DATE - INTERVAL '24 months'
+      ORDER BY snapshot_date
+    `,
+    sql`
+      SELECT rm.centro_id,
+             CONCAT(rm.year, '-', LPAD(rm.month::text, 2, '0')) AS period,
+             rm.ninos_final_mes AS actual
+      FROM resumen_mes rm
+      JOIN mes_kpi mk
+        ON mk.centro_id = rm.centro_id
+       AND mk.year = rm.year
+       AND mk.month = rm.month
+      WHERE mk.estado = 'cerrado'
+    `,
+  ])
+
+  const model = evaluateGrowthForecasts({ snapshots, actuals: closedActuals })
+  const rows = calculated.map(({ center, growth, error }) => {
+    if (error || !growth) return { id: center.id, name: center.nombre, error: true }
+    const centerBacktest = evaluateGrowthForecasts({
+      snapshots: snapshots.filter((item) => String(item.centro_id) === String(center.id)),
+      actuals: closedActuals.filter((item) => String(item.centro_id) === String(center.id)),
+    })
+    return adminGrowthRow(growth, centerBacktest)
+  })
+  const readyRows = rows.filter((row) => !row.error)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    model,
+    summary: {
+      centers: rows.length,
+      calculated: readyRows.length,
+      lowConfidence: readyRows.filter((row) => row.confidence.level === 'low').length,
+      positiveBase: readyRows.filter((row) => row.baseMonthlyNet > 0).length,
+      capacityBlocked: readyRows.filter((row) => row.capacityBlocksLevel).length,
+      projectedMonthlyNet: readyRows.reduce((sum, row) => sum + row.baseMonthlyNet, 0),
+    },
+    rows,
+  }
 }

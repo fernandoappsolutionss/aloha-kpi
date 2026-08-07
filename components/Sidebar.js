@@ -46,6 +46,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
+    { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
     { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
     { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
