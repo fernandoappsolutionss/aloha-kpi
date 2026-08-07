@@ -19,6 +19,7 @@ const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', m
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
 const ACTION_MENU_WIDTH = 238
 const ACTION_MENU_HEIGHT = 248
+const compactActionMenuHeight = (ev) => ev?.status === 'published' ? ACTION_MENU_HEIGHT : 178
 // Semáforo de cupos del grupo por aperturar: verde >3, ámbar 1–3, rojo 0.
 const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
 const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
@@ -113,10 +114,11 @@ export default function EventosPage() {
     if (menuId === ev.id) { setMenuId(null); return }
     const r = e.currentTarget.getBoundingClientRect()
     const gap = 8
+    const menuHeight = compactActionMenuHeight(ev)
     const left = Math.max(gap, Math.min(window.innerWidth - ACTION_MENU_WIDTH - gap, r.right - ACTION_MENU_WIDTH))
     const below = r.bottom + gap
-    const top = below + ACTION_MENU_HEIGHT > window.innerHeight - gap
-      ? Math.max(gap, r.top - ACTION_MENU_HEIGHT - gap)
+    const top = below + menuHeight > window.innerHeight - gap
+      ? Math.max(gap, r.top - menuHeight - gap)
       : below
     setMenuPos({ left, top })
     setMenuId(ev.id)
@@ -243,11 +245,11 @@ export default function EventosPage() {
           {[
             ['✏️ Editar', () => { setMenuId(null); openEdit(menuEvent, setEditing) }],
             ['⧉ Duplicar', () => onDuplicate(menuEvent)],
-            ['🔗 Copiar link de registro', () => copy(regUrl(menuEvent), 'Link de registro copiado.')],
+            menuEvent.status === 'published' && ['🔗 Copiar link de registro', () => copy(regUrl(menuEvent), 'Link de registro copiado.')],
             ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
-            ['👁 Ver página pública', () => { setMenuId(null); window.open(regUrl(menuEvent), '_blank') }],
+            menuEvent.status === 'published' && ['👁 Ver página pública', () => { setMenuId(null); window.open(regUrl(menuEvent), '_blank') }],
             ['🗑 Eliminar', () => onDelete(menuEvent), true],
-          ].map(([txt, fn, danger], k) => (
+          ].filter(Boolean).map(([txt, fn, danger], k) => (
             <button key={k} onClick={fn}
               style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>
               {txt}
