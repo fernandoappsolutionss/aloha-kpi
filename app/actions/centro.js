@@ -4,6 +4,8 @@ import { requireCentroAccess } from '../../lib/auth'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
+import { fechaIso10, hoyISO } from '../../lib/operaciones'
+import { iniciosClaseMes, proyeccionSiguienteMes } from '../../lib/inicios-clase.mjs'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -63,7 +65,52 @@ export async function getCentroResumen(centroId, year, trimestre) {
     pctAlumnado: ninosInicioAnio > 0 ? Math.round((graduadosAnio / ninosInicioAnio) * 100) : 0,
   }
 
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, meses: cur.months, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion }
+  const hoy = hoyISO()
+  const [yearActual, monthActual] = hoy.split('-').map(Number)
+  const nextYear = monthActual === 12 ? yearActual + 1 : yearActual
+  const nextMonth = monthActual === 12 ? 1 : monthActual + 1
+  const finMesActual = `${yearActual}-${String(monthActual).padStart(2, '0')}-${String(new Date(yearActual, monthActual, 0).getDate()).padStart(2, '0')}`
+  const gruposProyeccion = await sql`
+    SELECT id, estado, fecha_inicio_clases FROM grupos WHERE centro_id = ${centroId}
+  `
+  const estudiantesProyeccion = await sql`
+    SELECT id, grupo_id, estado, fecha_inscripcion FROM estudiantes WHERE centro_id = ${centroId}
+  `
+  const eventosProyeccion = await sql`
+    SELECT id, estudiante_id, tipo, fecha, a_grupo_id
+    FROM estudiante_eventos
+    WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'retiro')
+    ORDER BY fecha, id
+  `
+  const gruposPorId = new Map(gruposProyeccion.map((grupo) => [String(grupo.id), grupo]))
+  const poblacionOperativa = estudiantesProyeccion.filter((estudiante) => {
+    if (estudiante.estado !== 'activo' && estudiante.estado !== 'baja_potencial') return false
+    const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
+    const fechaGrupo = fechaIso10(grupo?.fecha_inicio_clases)
+    const fechaInscripcion = fechaIso10(estudiante.fecha_inscripcion)
+    return (!fechaGrupo || fechaGrupo <= finMesActual) && (!fechaInscripcion || fechaInscripcion <= finMesActual)
+  })
+  const cierreActual = poblacionOperativa.length
+  const bajasPotenciales = poblacionOperativa.filter((estudiante) => estudiante.estado === 'baja_potencial').length
+  const iniciosProgramados = iniciosClaseMes(
+    estudiantesProyeccion,
+    gruposProyeccion,
+    eventosProyeccion,
+    nextYear,
+    nextMonth,
+  ).filter((inicio) =>
+    inicio.estado === 'activo' && inicio.grupoEstado !== 'cerrado' && inicio.grupoEstado !== 'fusionado'
+  ).length
+  const proyeccion = {
+    year: nextYear,
+    month: nextMonth,
+    cierreActual,
+    bajasPotenciales,
+    iniciosProgramados,
+    total: proyeccionSiguienteMes({ cierreActual, bajasPotenciales, iniciosProgramados }),
+  }
+
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, meses: cur.months, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion, proyeccion }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).
@@ -104,7 +151,7 @@ export async function getHistorialCentro(centroId) {
       month: f.month,
       cerrado_at: f.cerrado_at,
       aPagar: d?.totales?.aPagar ?? 0,
-      nuevos: d?.totales?.nuevos ?? 0,
+      nuevos: d?.iniciosClase?.length ?? d?.totales?.nuevos ?? 0,
       reincorporados: d?.totales?.reincorporados ?? 0,
       retirados: d?.totales?.retirados ?? 0,
       gruposActivos: d?.totales?.gruposActivos ?? 0,

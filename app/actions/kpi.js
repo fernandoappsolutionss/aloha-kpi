@@ -3,6 +3,7 @@ import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { guardarSnapshotCuadro, calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
+import { balanceMensual, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
 
 const SEMANAS = [1, 2, 3, 4, 5]
@@ -15,7 +16,7 @@ const intOr = (v, d = 0) => {
 // motivos salen de los retiros registrados, y los grupos activos y los nuevos
 // del mes, del propio Cuadro de Negocio. Antes de esa fecha todo se capturó a
 // mano y no se toca.
-const AUTO_MOTIVOS_DESDE = 202608
+const AUTO_MOTIVOS_DESDE = INICIOS_CLASE_DESDE
 
 async function motivosDelModulo(centroId, year, month) {
   if (year * 100 + month < AUTO_MOTIVOS_DESDE) return null
@@ -27,7 +28,10 @@ async function motivosDelModulo(centroId, year, month) {
       ...motivosParaKpi(des),
       total: des.length,
       grupos: t.gruposActivos || 0,
-      nuevos: t.nuevos || 0,
+      nuevos: datos?.iniciosClase?.length ?? t.nuevos ?? 0,
+      reincorporados: t.reincorporados || 0,
+      inicio: t.mesAnterior || 0,
+      final: t.aPagar || 0,
     }
   } catch (e) {
     // Si el cuadro falla, el KPI sigue editable a mano: nunca bloquear la captura.
@@ -109,10 +113,12 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
   const gruposForm = intOr(config.grupos_activos)
   let gruposActivos = auto && auto.grupos > 0 ? auto.grupos : gruposForm
   if (gruposActivos <= 0) gruposActivos = await gruposDelModulo(centroId)
-  // Nuevos del mes: desde agosto salen del cuadro, no del formulario (así un
+  // Nuevos activos: desde agosto salen de los inicios de clase del cuadro (así un
   // "Guardar" con la pantalla vieja no borra lo que sincronizó el cuadro).
   const nuevosActivos = auto ? auto.nuevos : intOr(config.nuevos_activos_mes)
-  const ninosFinal = Math.max(0, ninosInicio + nuevosActivos - totalDes)
+  const retirados = auto ? auto.total : totalDes
+  const reincorporados = auto ? auto.reincorporados : 0
+  const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
   const now = new Date().toISOString()
 
   await upsert('resumen_mes', {
@@ -170,9 +176,10 @@ export async function cerrarMes(centroId, year, month) {
       if (t) {
         await upsert('resumen_mes', {
           centro_id: centroId, year: intOr(year), month: intOr(month),
-          ninos_inicio_mes: t.continuan + t.retirados,
+          ninos_inicio_mes: t.mesAnterior,
           ninos_final_mes: t.aPagar,
           grupos_activos: t.gruposActivos,
+          nuevos_activos_mes: datos?.iniciosClase?.length ?? t.nuevos ?? 0,
           updated_at: new Date().toISOString(),
         }, ['centro_id', 'year', 'month'])
       }

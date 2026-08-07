@@ -93,7 +93,7 @@ export default function CentroPage() {
   const [nombre, setNombre] = useState('')
   const [meses, setMeses] = useState([])
   const [totals, setTotals] = useState({
-    ninosActivos: 0, nuevosIngresos: 0, desercion: 0, grupos: 0,
+    ninosActivos: 0, nuevosIngresos: 0, nuevosActivos: 0, desercion: 0, grupos: 0,
     cpInv: 0, cpAsi: 0, cpMat: 0,
     motivos: { tecnica: 0, perdida: 0, economico: 0, horario: 0, graduado: 0 },
     origen: { marketing: 0, centro: 0, activaciones: 0, referidos: 0, medios: 0 },
@@ -102,6 +102,7 @@ export default function CentroPage() {
   const [nivelInfo, setNivelInfo] = useState({ nivel: 0, nivelEnCurso: 0, sig: null, desOkActual: false })
   const [cumplReal, setCumplReal] = useState(null)
   const [graduacion, setGraduacion] = useState(null)
+  const [proyeccion, setProyeccion] = useState(null)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
@@ -117,11 +118,12 @@ export default function CentroPage() {
       const trimestre = period.quarter
       const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct, graduacion: grad } = await getCentroResumen(id, year, trimestre)
+      const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, nivel, nivelEnCurso, sig, desOkActual, cumplimientoPct, graduacion: grad, proyeccion: proy } = await getCentroResumen(id, year, trimestre)
       if (cNombre) setNombre(cNombre)
       setNivelInfo({ nivel, nivelEnCurso, sig, desOkActual })
       setCumplReal(cumplimientoPct ?? null)
       setGraduacion(grad || null)
+      setProyeccion(proy || null)
 
       const metaFetched = {
         nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
@@ -164,6 +166,7 @@ export default function CentroPage() {
       setTotals({
         ninosActivos: lastMonth.ninos,
         nuevosIngresos: mensual.reduce((s, mm) => s + mm.nuevos, 0),
+        nuevosActivos: mensual.reduce((s, mm) => s + mm.nuevosActivos, 0),
         desercion: mensual.reduce((s, mm) => s + mm.desercion, 0),
         grupos: ultResumen?.grupos_activos || 0,
         cpInv: (rs || []).reduce((s, r) => s + (r.cp_invitados || 0), 0),
@@ -270,29 +273,44 @@ export default function CentroPage() {
           </div>
         </div>
 
+        {proyeccion && (
+          <div style={{ marginBottom: 20, padding: '16px 20px', background: 'var(--surface-2)', borderTop: '1px solid var(--border-strong)', borderBottom: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+            <div>
+              <div className="label">Proyección {NOMBRES_MES[proyeccion.month - 1]} {proyeccion.year}</div>
+              <div className="num" style={{ fontSize: 34, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{proyeccion.total} niños</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 16, flex: '1 1 480px', maxWidth: 680 }}>
+              <Kpi l="Cierre actual" v={proyeccion.cierreActual} />
+              <Kpi l="Bajas anunciadas" v={`− ${proyeccion.bajasPotenciales}`} />
+              <Kpi l="Inicios de clase" v={`+ ${proyeccion.iniciosProgramados}`} />
+            </div>
+          </div>
+        )}
+
         {/* KPI Trimestral por rol — cada rol ve sus propios indicadores */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
           <RoleKpi
             rol="Administrador"
-            sub="Nuevos ingresos y deserción"
+            sub="Ventas y deserción"
             items={[
-              { l: 'Nuevos ingresos', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
+              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
               { l: 'Deserción real', v: desReal, meta: 'Meta: <' + meta.desercion + '% mensual', ok: desercionOk, eval: true },
             ]}
           />
           <RoleKpi
             rol="Asistente"
-            sub="Nuevos ingresos y gestión de cobranza"
+            sub="Ventas y gestión de cobranza"
             items={[
-              { l: 'Nuevos ingresos', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
+              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
               { l: 'Gestión de cobranza', v: ultCobranza, meta: 'Meta: ≤ ' + meta.cobranza + ' cobranza vencida', ok: cobranzaOk, eval: cobranzaEval },
             ]}
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 20 }}>
           <Card l="Niños activos" v={totals.ninosActivos} s={totals.grupos > 0 ? 'Prom/grupo: ' + promGrupo.toFixed(1) : '—'} />
-          <Card l="Nuevos ingresos" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
+          <Card l="Nuevos ingresos venta" v={totals.nuevosIngresos} s={'Meta: ' + metaNuevosTrim + ' · ' + (metaNuevosTrim ? Math.round(totals.nuevosIngresos / metaNuevosTrim * 100) : 0) + '%'} warn={totals.nuevosIngresos < metaNuevosTrim} />
+          <Card l="Nuevos activos" v={totals.nuevosActivos} s="Inicios de clase del trimestre" />
           <div className="kpi">
             <div className="kpi__top"><span className="label">Deserción real</span></div>
             <div className="kpi__value" style={desercionAlta ? { color: 'var(--bad)' } : undefined}>{desReal}</div>
@@ -309,11 +327,12 @@ export default function CentroPage() {
           <div className="card" style={{ padding: 20 }}>
             <h3 style={sectionTitle}>Resultados por mes</h3>
             <table className="table">
-              <thead><tr>{['Mes', 'Nuevos', 'Deserción', 'Niños', 'Cobranza', 'Meta'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Mes', 'Ventas', 'Nuevos activos', 'Deserción', 'Niños', 'Cobranza', 'Meta'].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>{meses.map((m, i) => (
                 <tr key={i} style={{ cursor: 'default' }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{m.mes}</td>
                   <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
+                  <td className="num" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{m.nuevosActivos}</td>
                   <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%</span></td>
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
                   <td className="num" style={{ color: m.cobranza <= meta.cobranza ? 'var(--ok)' : 'var(--bad)', fontWeight: 600 }}>
@@ -405,7 +424,7 @@ export default function CentroPage() {
               <Kpi l="Meses cumplidos" v={cumplCount + '/' + meses.length} />
               <Kpi l="Niños inicio trim." v={meses[0]?.ninosInicio || 0} />
               <Kpi l="Niños final trim." v={totals.ninosActivos} />
-              <Kpi l="Nuevos ingresos" v={totals.nuevosIngresos} />
+              <Kpi l="Nuevos ingresos venta" v={totals.nuevosIngresos} />
             </div>
           </div>
         </div>

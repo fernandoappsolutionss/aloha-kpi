@@ -1,5 +1,6 @@
 // GET /api/centro/[id]/cuadro?year=&month= — descarga el Cuadro de Negocio del
-// mes en Excel (hojas ROYALTIES / CANTIDAD DE NIÑOS / NIÑOS RETIRADOS),
+// mes en Excel (ROYALTIES / CANTIDAD DE NIÑOS / NIÑOS RETIRADOS /
+// INICIOS DE CLASE),
 // replicando el formato del cuadro real que se entrega a la Junta.
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
@@ -7,6 +8,7 @@ import { getSession, isAdminRole } from '../../../../../lib/auth'
 import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
 import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
+import { iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -73,11 +75,13 @@ export async function GET(request, { params }) {
     ORDER BY gh.dia, gh.hora_inicio
   `
   const estudiantes = await sql`SELECT * FROM estudiantes WHERE centro_id = ${id}`
-  const eventos = await sql`
+  const todosEventos = await sql`
     SELECT * FROM estudiante_eventos
-    WHERE centro_id = ${id} AND year = ${year} AND month = ${month}
+    WHERE centro_id = ${id}
+      AND ((year = ${year} AND month = ${month}) OR tipo IN ('inscripcion', 'retiro'))
     ORDER BY fecha, id
   `
+  const eventos = todosEventos.filter((evento) => Number(evento.year) === year && Number(evento.month) === month)
   let pedidos = await sql`
     SELECT * FROM pedidos_material
     WHERE centro_id = ${id} AND year = ${year} AND month = ${month}
@@ -102,9 +106,24 @@ export async function GET(request, { params }) {
   const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
   const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
 
-  let royalties = cuadroRoyalties(estudiantesCuadro, eventos, royaltyRate)
-  let control = cuadroControlGrupos(gruposCuadro, estudiantesCuadro, eventos)
+  const usaIniciosOperativos = usaIniciosClaseOperativos(year, month)
+  let iniciosClase = usaIniciosOperativos ? iniciosClaseMes(estudiantes, grupos, todosEventos, year, month) : null
+  const nuevosActivosIds = usaIniciosOperativos
+    ? new Set(iniciosClase.map((inicio) => String(inicio.estudianteId)))
+    : null
+  let royalties = cuadroRoyalties(estudiantesCuadro, eventos, royaltyRate, nuevosActivosIds)
+  let control = cuadroControlGrupos(gruposCuadro, estudiantesCuadro, eventos, nuevosActivosIds)
   let deserciones = cuadroDeserciones(estudiantesCuadro, eventos, gruposCuadro)
+  if (usaIniciosOperativos) {
+    const totales = {
+      ...control.totales,
+      nuevos: iniciosClase.length,
+      reincorporados: eventos.filter((evento) => evento.tipo === 'reincorporacion').length,
+      retirados: deserciones.length,
+    }
+    totales.mesAnterior = totales.aPagar - totales.nuevos - totales.reincorporados + totales.retirados
+    control = { ...control, totales }
+  }
 
   // Mes cerrado → el Excel sale de la foto congelada del cuadro (la misma
   // verdad histórica que muestra la página), no del estado actual.
@@ -115,6 +134,7 @@ export async function GET(request, { params }) {
       royalties = snap.datos.royalties
       control = snap.datos.controlGrupos
       deserciones = snap.datos.deserciones
+      iniciosClase = Array.isArray(snap.datos.iniciosClase) ? snap.datos.iniciosClase : iniciosClase
       pedidos = snap.datos.pedidos || []
       royaltyRate = snap.datos.royaltyRate || royaltyRate
     }
@@ -230,6 +250,32 @@ export async function GET(request, { params }) {
     ])
   }
   fila(h3, ['TOTAL', '', '', '', deserciones.length, '', '', '', '', '', '', '', ''], { bold: true, fill: FILL_TOTAL })
+
+  // ── Hoja 4: INICIOS DE CLASE ──────────────────────────────────────────────
+  const h4 = wb.addWorksheet('INICIOS DE CLASE')
+  h4.columns = [
+    { width: 18 }, { width: 12 }, { width: 12 }, { width: 8 }, { width: 30 },
+    { width: 18 }, { width: 18 }, { width: 18 }, { width: 26 }, { width: 28 }, { width: 14 },
+  ]
+  fila(h4, [`LISTA DE INICIOS DE CLASE — ${mesNombre} ${year}`], { bold: true })
+  fila(h4, [])
+  fila(h4, [
+    'COACH', 'GRUPO', 'ITINERARIO', 'NIVEL', 'NIÑO', 'FECHA DE INSCRIPCIÓN',
+    'INICIO DEL GRUPO', 'INICIO EFECTIVO', 'REPRESENTANTE', 'CORREO', 'TELÉFONO',
+  ], { bold: true, fill: FILL_HEADER })
+  for (const inicio of iniciosClase || []) {
+    fila(h4, [
+      inicio.coachNombre || '', inicio.grupoNumero ? `GRUPO ${inicio.grupoNumero}` : '',
+      inicio.itinerario || '', inicio.nivel ?? '', inicio.nombre || '', inicio.fechaInscripcion || '',
+      inicio.fechaInicioGrupo || '', inicio.fechaInicio || '', inicio.representante || '',
+      inicio.correo || '', inicio.telefono || '',
+    ])
+  }
+  if (Array.isArray(iniciosClase)) {
+    fila(h4, ['TOTAL', '', '', '', iniciosClase.length, '', '', '', '', '', ''], { bold: true, fill: FILL_TOTAL })
+  } else {
+    fila(h4, ['DECLARACIÓN DISPONIBLE DESDE AGOSTO 2026'], { bold: true, fill: FILL_TOTAL })
+  }
 
   const buffer = await wb.xlsx.writeBuffer()
   const filename = `CUADRO_DE_NEGOCIO_${limpio(c.nombre)}_${mesNombre}_${year}.xlsx`

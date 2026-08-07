@@ -67,7 +67,17 @@ export default function KPIPage() {
       setConfig({ ninos_inicio: arr ? arr.valor : 0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
     }
 
-    if (mAuto) setConfig(c => ({ ...c, mot_tecnica: mAuto.mot_tecnica, mot_perdida_clase: mAuto.mot_perdida_clase, mot_economico: mAuto.mot_economico, mot_horario: mAuto.mot_horario, mot_graduado: mAuto.mot_graduado, mot_otro: mAuto.mot_otro }))
+    if (mAuto) setConfig(c => ({
+      ...c,
+      nuevos_activos_mes: mAuto.nuevos,
+      grupos_activos: mAuto.grupos || c.grupos_activos,
+      mot_tecnica: mAuto.mot_tecnica,
+      mot_perdida_clase: mAuto.mot_perdida_clase,
+      mot_economico: mAuto.mot_economico,
+      mot_horario: mAuto.mot_horario,
+      mot_graduado: mAuto.mot_graduado,
+      mot_otro: mAuto.mot_otro,
+    }))
 
     // Semanas
     const sems = SEMANAS.map(s => {
@@ -137,7 +147,9 @@ export default function KPIPage() {
   const metaN = parseInt(config.meta_nuevos_mensual)||20
   const totalDes = semanas.reduce((a,s) => a + s.des.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
-  const ninosFinal = Math.max(0, ni + nA - totalDes)
+  const retiradosOperativos = motivosAuto ? motivosAuto.total : totalDes
+  const reincorporados = motivosAuto?.reincorporados || 0
+  const ninosFinal = Math.max(0, ni + nA + reincorporados - retiradosOperativos)
   const promG = gA > 0 ? ninosFinal / gA : 0
   const pcv = promG > 0 ? (120/promG) + 16 : 0
   const gpn = ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
@@ -244,8 +256,8 @@ export default function KPIPage() {
         {/* Config del mes */}
         <div className="card" style={{ padding: 18, marginBottom: 16 }}>
           <h3 className="label" style={{ marginBottom: 14 }}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
-            {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual'],['Nuevos ingresos venta','nuevos_activos_mes']].map(([lbl,key]) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14 }}>
+            {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual']].map(([lbl,key]) => (
               <div key={key} className="field">
                 <label className="label">{lbl}</label>
                 {cfgInput(key, true, key === 'ninos_inicio' && !!arrastrado)}
@@ -263,14 +275,24 @@ export default function KPIPage() {
                 )}
               </div>
             ))}
+            <div className="field">
+              <label className="label">Nuevos ingresos venta</label>
+              <input type="number" value={totalIng} disabled className="input num" style={{ width: '100%', padding: '10px 12px', opacity: 0.75, background: 'var(--surface-3)' }} />
+            </div>
+            <div className="field">
+              <label className="label">Nuevos activos del mes</label>
+              {cfgInput('nuevos_activos_mes', true, !!motivosAuto)}
+              {motivosAuto && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{nA} inicio{nA === 1 ? '' : 's'} de clase declarado{nA === 1 ? '' : 's'} en Cuadro de Negocio</span>}
+            </div>
           </div>
         </div>
 
         {/* Indicadores calculados */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 16 }}>
           {[
-            {l:'Total Deserción', v:totalDes, c:'var(--bad)'},
-            {l:'Total Nuevos', v:totalIng, c:'var(--ok)'},
+            {l:'Retiros del mes', v:retiradosOperativos, c:'var(--bad)'},
+            {l:'Nuevos ingresos venta', v:totalIng, c:'var(--ok)'},
+            {l:'Nuevos activos del mes', v:nA, c:'var(--ok)'},
             {l:'Niños Final Mes', v:ninosFinal, c:'var(--text)'},
             {l:'Prom. Niños/Grupo', v:promG.toFixed(2), c:promG>=8?'var(--ok)':'var(--bad)', m:'≥ 8', ok:promG>=8},
             {l:'%CV', v:pcv.toFixed(1)+'%', c:'var(--text)'},
@@ -349,7 +371,7 @@ export default function KPIPage() {
 
         {/* Nota fórmulas */}
         <div className="card" style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ts-green)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Deserción = suma | Nuevos = suma | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
+          <strong style={{ color: 'var(--ts-green)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Retiros = suma | Ventas = suma | Niños final = inicio + nuevos activos + reincorporados − retirados | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
         </div>
       </main>
     </div>

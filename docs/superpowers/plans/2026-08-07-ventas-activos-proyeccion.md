@@ -150,7 +150,7 @@ const retirados = auto ? auto.retiros : totalDes
 const ninosFinal = balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados })
 ```
 
-`sincronizarConKpi` and `cerrarMes` must write `ninos_inicio_mes: t.mesAnterior`, `ninos_final_mes: t.aPagar`, and `nuevos_activos_mes: datos.iniciosClase.length`.
+`sincronizarConKpi` and `cerrarMes` must write `ninos_inicio_mes: t.mesAnterior`, `ninos_final_mes: t.aPagar`, and, from August 2026 onward, `nuevos_activos_mes: datos.iniciosClase.length`. Earlier months retain their historical classification.
 
 - [ ] **Step 5: Run tests and build**
 
@@ -193,7 +193,7 @@ fila(h4, ['COACH', 'GRUPO', 'ITINERARIO', 'NIVEL', 'CANTIDAD', 'NIÑO',
   { bold: true, fill: FILL_HEADER })
 ```
 
-For an open month, use the live `iniciosClase` list. For a closed month, use the snapshot list; if an old snapshot lacks it, keep the live reconstruction made before loading the snapshot.
+For a month from August 2026 onward, use the live `iniciosClase` list or its frozen snapshot. Keep earlier snapshots in their historical format because imported enrollment dates cannot reconstruct reliable class starts.
 
 - [ ] **Step 3: Update labels and comparison copy**
 

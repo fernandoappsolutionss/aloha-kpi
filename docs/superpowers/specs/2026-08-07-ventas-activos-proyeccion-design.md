@@ -35,7 +35,7 @@ nuevos activos = cantidad de inicios operativos del mes
 ninos final = ninos inicio + nuevos activos + reincorporados - retirados
 ```
 
-Los meses cerrados conservaran sus valores y listas en la foto mensual. Los meses historicos cerrados antes de este cambio reconstruiran los inicios con las fechas disponibles, sin modificar sus datos guardados.
+Los meses cerrados conservaran sus valores y listas en la foto mensual. La declaracion por fecha operativa comienza en agosto de 2026. Los meses anteriores mantienen sus valores y fotos historicas porque las fechas del cargue inicial no permiten reconstruir inicios confiables.
 
 ## Proyeccion del proximo mes
 
@@ -75,6 +75,7 @@ La lista de inicios tendra el mismo valor declarativo que la lista de retiros en
 - Si un grupo carece de fecha de inicio, la fecha de inscripcion servira como fecha operativa.
 - Los grupos sin fecha de inicio no entraran en la proyeccion como grupos futuros.
 - Los meses cerrados seguiran siendo inmutables.
+- Antes de agosto de 2026 se conserva la clasificacion historica; no se reinterpretan fechas importadas como inicios de clase.
 
 ## Pruebas
 

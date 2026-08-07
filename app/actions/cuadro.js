@@ -4,6 +4,7 @@ import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
+import { usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
 
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
@@ -35,9 +36,19 @@ export async function loadCuadro(centroId, year, month) {
       snap = { datos, cerradoAt: new Date().toISOString() }
       retroactivo = true
     }
+    let datos = snap.datos
+    if (usaIniciosClaseOperativos(y, m) && !Array.isArray(datos.iniciosClase)) {
+      try {
+        const reconstruido = await calcularCuadro(centroId, y, m)
+        datos = { ...datos, iniciosClase: reconstruido.iniciosClase || [] }
+      } catch (e) {
+        console.error('[loadCuadro] no se pudieron reconstruir los inicios de clase:', e)
+        datos = { ...datos, iniciosClase: [] }
+      }
+    }
     return {
       nombre: c.nombre || '',
-      ...snap.datos,
+      ...datos,
       mesEstado: 'cerrado',
       congelado: true,
       congeladoAt: snap.cerradoAt,
@@ -106,7 +117,7 @@ export async function deletePedido(centroId, id) {
 }
 
 // Vuelca al KPI mensual (resumen_mes) SOLO los campos que salen del cuadro:
-// niños al inicio y al cierre del mes, grupos activos, nuevos del mes y
+// niños al inicio y al cierre del mes, grupos activos, nuevos activos y
 // motivos de deserción. No toca kpi_semanas ni los campos de clase de
 // prueba, y respeta el candado del mes cerrado.
 export async function sincronizarConKpi(centroId, year, month) {
@@ -126,12 +137,10 @@ export async function sincronizarConKpi(centroId, year, month) {
 
   const t = control.totales
   const aplicado = {
-    // Inicio del mes = los que venían del mes anterior (continúan + los que
-    // se retiraron durante el mes); cierre = los que pagan (a pagar).
-    ninos_inicio_mes: t.continuan + t.retirados,
+    ninos_inicio_mes: t.mesAnterior,
     ninos_final_mes: t.aPagar,
     grupos_activos: t.gruposActivos,
-    nuevos_activos_mes: t.nuevos,
+    nuevos_activos_mes: datos.iniciosClase?.length ?? t.nuevos,
     mot_tecnica: motivos.mot_tecnica,
     mot_perdida_clase: motivos.mot_perdida_clase,
     mot_economico: motivos.mot_economico,

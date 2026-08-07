@@ -127,11 +127,12 @@ export default function HistorialPage() {
       const gA = r.grupos_activos || 1
       const nuevosSemanal = Number(semana?.nuevos_ingresos_venta) || 0
       const nuevosCuadro = Number(cuadro?.nuevos) || 0
-      const nA = Number(r.nuevos_activos_mes) || nuevosSemanal || nuevosCuadro
+      const nA = r.nuevos_activos_mes == null ? nuevosCuadro : Number(r.nuevos_activos_mes)
       const totalDes = Number(semana?.total_desercion) || 0
+      const reincorporados = Number(cuadro?.reincorporados) || 0
       const rawFinal = Number(r.ninos_final_mes) || 0
       const cuadroFinal = Number(cuadro?.aPagar) || 0
-      const ninosFinal = rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA - totalDes))
+      const ninosFinal = rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA + reincorporados - totalDes))
       const promG = gA > 0 ? ninosFinal / gA : 0
       const pcv = calcPcv(promG)
       const gpn = calcGpn(ninosFinal, pcv)
@@ -147,7 +148,7 @@ export default function HistorialPage() {
         ninos_final: ninosFinal,
         grupos_activos: gA,
         nuevos_activos: nA,
-        nuevos_ingresos_venta: nA,
+        nuevos_ingresos_venta: nuevosSemanal,
         meta_nuevos: r.meta_nuevos_mensual || 20,
         cp_invitados: r.cp_invitados || 0,
         cp_asistieron: r.cp_asistieron || 0,
@@ -351,12 +352,13 @@ export default function HistorialPage() {
                     <span className="dot" />{last.estado==='cerrado' ? 'Cerrado' : 'Abierto'}
                   </span>
                 </h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 14 }}>
                   <StatCard label="Niños Final Mes" val={last.ninos_final} prev={prev?.ninos_final} color="var(--text)"/>
                   <StatCard label="Prom. Niños/Grupo" val={last.prom_grupo} prev={prev?.prom_grupo} color={last.cumple_prom?C.green:C.bad} meta={8} metaOp="≥"/>
                   <StatCard label="%CV" val={last.pcv} prev={prev?.pcv} unit="%" color="var(--text)" invertTrend/>
                   <StatCard label="GPN" val={last.gpn} prev={prev?.gpn} unit="" color={last.gpn>=0?C.green:C.bad}/>
                   <StatCard label="Nuevos Ingresos Venta" val={last.nuevos_ingresos_venta} prev={prev?.nuevos_ingresos_venta} color={C.green} meta={last.meta_nuevos} metaOp="≥"/>
+                  <StatCard label="Nuevos Activos del Mes" val={last.nuevos_activos} prev={prev?.nuevos_activos} color={C.mut}/>
                   <StatCard label="Grupos Activos" val={last.grupos_activos} prev={prev?.grupos_activos} color="var(--text)"/>
                 </div>
               </div>
@@ -389,8 +391,8 @@ export default function HistorialPage() {
                   </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Gráfica 2: Nuevos ingresos venta vs Meta */}
-                <ChartCard title="Nuevos Ingresos vs Meta">
+                {/* Gráfica 2: ventas, nuevos activos y meta comercial */}
+                <ChartCard title="Ventas, Activos y Meta" sub="La meta comercial aplica solo a ventas">
                   <ResponsiveContainer width="100%" height={220}>
                     <ComposedChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
@@ -399,6 +401,7 @@ export default function HistorialPage() {
                       <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Legend content={(props) => <LegendWithPercent {...props} percentages={goalPct} />}/>
                       <Bar dataKey="nuevos_ingresos_venta" name="Nuevos ingresos venta" fill={C.green} radius={[4,4,0,0]}/>
+                      <Line type="monotone" dataKey="nuevos_activos" name="Nuevos activos" stroke={C.mut} strokeWidth={2.5} dot={{r:4,fill:'var(--surface-1)',stroke:C.mut,strokeWidth:2}}/>
                       <Line type="stepAfter" dataKey="meta_nuevos" name="Meta venta" stroke={C.warn} strokeWidth={2.5} strokeDasharray="6 5" dot={{r:3,fill:C.warn}}/>
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -514,7 +517,7 @@ export default function HistorialPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Ingresos Venta','Meta Venta','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
+                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Ingresos Venta','Nuevos Activos','Meta Venta','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
                           <th key={h} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -537,6 +540,7 @@ export default function HistorialPage() {
                             </td>
                             <td className="num" style={{ textAlign: 'center' }}>{m.grupos_activos}</td>
                             <td className="num" style={{ textAlign: 'center', color: m.nuevos_ingresos_venta>=m.meta_nuevos?C.green:C.bad, fontWeight: 600 }}>{m.nuevos_ingresos_venta}</td>
+                            <td className="num" style={{ textAlign: 'center', color: C.mut, fontWeight: 600 }}>{m.nuevos_activos}</td>
                             <td className="num" style={{ textAlign: 'center', color: 'var(--text-dim)' }}>{m.meta_nuevos}</td>
                             <td className="num" style={{ textAlign: 'center', color: m.cumple_prom?C.green:C.bad, fontWeight: 600 }}>
                               {m.prom_grupo}
@@ -564,6 +568,7 @@ export default function HistorialPage() {
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.ninos_final,0)/visibleMeses.length)}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.grupos_activos,0)/visibleMeses.length)}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.nuevos_ingresos_venta,0)/visibleMeses.length)}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: C.mut }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.nuevos_activos,0)/visibleMeses.length)}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text-dim)' }}>{visibleMeses[0]?.meta_nuevos}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: visibleMeses.reduce((a,m)=>a+m.prom_grupo,0)/visibleMeses.length>=8?C.green:C.bad }}>
                             {(visibleMeses.reduce((a,m)=>a+m.prom_grupo,0)/visibleMeses.length).toFixed(2)}
@@ -602,7 +607,7 @@ export default function HistorialPage() {
                           <YAxis tick={axisTick} stroke={C.faint}/>
                           <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                           <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
-                          <Bar dataKey="cuadro_nuevos" name="Nuevos" fill={C.greenDeep} radius={[4,4,0,0]}/>
+                          <Bar dataKey="cuadro_nuevos" name="Nuevos activos" fill={C.greenDeep} radius={[4,4,0,0]}/>
                           <Bar dataKey="cuadro_retirados" name="Retirados" fill={C.bad} radius={[4,4,0,0]}/>
                           <Line type="monotone" dataKey="cuadro_aPagar" name="Niños a pagar" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
                         </ComposedChart>
@@ -628,7 +633,7 @@ export default function HistorialPage() {
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
-                          <tr>{['Mes','A pagar','Nuevos','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
+                          <tr>{['Mes','A pagar','Nuevos activos','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
                             <th key={h} style={i > 0 ? { textAlign: 'center', whiteSpace: 'nowrap' } : undefined}>{h}</th>
                           ))}</tr>
                         </thead>
