@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
@@ -8,22 +8,49 @@ import { getHistorialCentro } from '../../../actions/centro'
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-/* Paleta dark — verde Tessa como serie/acento principal, grises para secundarias */
+/* Paleta conectada al tema: en light las barras grises ya no se pierden. */
 const C = {
-  green:  '#10B981',                  // serie principal / positivo
-  greenDeep: '#059669',
-  mut:    '#A6A6A6',                  // serie secundaria
-  dim:    '#6E6E6E',                  // ejes / labels / serie terciaria
-  faint:  '#4A4A4A',
-  bad:    '#EF4444',
-  warn:   '#F5B23B',
-  text:   '#FAFAF7',
-  track:  'rgba(255,255,255,0.10)',   // barras "meta"/fondo
+  green:  'var(--ts-green)',
+  greenDeep: 'var(--ts-green-deep)',
+  mut:    'var(--chart-muted)',
+  dim:    'var(--text-dim)',
+  faint:  'var(--chart-axis)',
+  bad:    'var(--bad)',
+  warn:   'var(--warn)',
+  text:   'var(--text)',
+  track:  'var(--chart-track)',
+  cursor: 'var(--chart-cursor)',
 }
-const GRID = 'rgba(255,255,255,0.08)'
+const GRID = 'var(--chart-grid)'
 
 const calcPcv = (prom) => prom > 0 ? (120/prom) + 16 : 0
 const calcGpn = (ninosFinal, pcv) => ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
+const monthKey = (m) => (m.year * 12) + m.month
+const monthKeyToInput = (key) => {
+  const year = Math.floor((key - 1) / 12)
+  const month = ((key - 1) % 12) + 1
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+const parseMonthInput = (value) => {
+  if (!value) return null
+  const [year, month] = value.split('-').map(Number)
+  return Number.isFinite(year) && Number.isFinite(month) ? (year * 12) + month : null
+}
+const sumKey = (data, key) => data.reduce((acc, row) => acc + (Number(row[key]) || 0), 0)
+const pctLabel = (value) => {
+  if (!Number.isFinite(value)) return '0%'
+  const digits = Math.abs(value) > 0 && Math.abs(value) < 10 ? 1 : 0
+  return `${value.toFixed(digits)}%`
+}
+const sharePercentages = (data, keys) => {
+  const totals = keys.reduce((acc, key) => ({ ...acc, [key]: sumKey(data, key) }), {})
+  const total = Object.values(totals).reduce((acc, value) => acc + value, 0)
+  return keys.reduce((acc, key) => ({ ...acc, [key]: total > 0 ? (totals[key] / total) * 100 : 0 }), {})
+}
+const funnelPercentages = (data, keys, baseKey) => {
+  const base = sumKey(data, baseKey)
+  return keys.reduce((acc, key) => ({ ...acc, [key]: base > 0 ? (sumKey(data, key) / base) * 100 : 0 }), {})
+}
 
 const Trend = ({ val, prev }) => {
   if (prev === undefined || prev === null) return null
@@ -37,7 +64,7 @@ const Trend = ({ val, prev }) => {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{background:'#181818',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,padding:'10px 14px',boxShadow:'0 8px 28px rgba(0,0,0,0.5)',fontSize:12}}>
+    <div style={{background:'var(--chart-tooltip-bg)',border:'1px solid var(--chart-tooltip-border)',borderRadius:8,padding:'10px 14px',boxShadow:'var(--chart-tooltip-shadow)',fontSize:12}}>
       <p style={{fontWeight:700,color:C.text,marginBottom:6,fontFamily:'var(--font-mono)'}}>{label}</p>
       {payload.map(p => (
         <p key={p.name} style={{color:p.color,margin:'2px 0'}}>{p.name}: <strong>{typeof p.value === 'number' ? p.value.toFixed(1) : p.value}</strong></p>
@@ -49,6 +76,27 @@ const CustomTooltip = ({ active, payload, label }) => {
 const axisTick = { fontSize: 11, fill: C.dim, fontFamily: 'var(--font-mono)' }
 const legendStyle = { fontSize: 11, color: C.mut }
 
+const LegendWithPercent = ({ payload, percentages }) => {
+  if (!payload?.length) return null
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 6, color: 'var(--text-dim)', fontSize: 11 }}>
+      {payload.map((item) => {
+        const key = item.dataKey || item.payload?.dataKey || item.value
+        const color = item.color || item.payload?.fill || item.payload?.stroke || 'var(--text-dim)'
+        return (
+          <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+            <span style={{ width: 7, height: 7, borderRadius: 999, background: color, flexShrink: 0 }} />
+            <span>{item.value}</span>
+            {percentages?.[key] !== undefined && (
+              <span className="num" style={{ color: 'var(--text-muted)' }}>({pctLabel(percentages[key])})</span>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function HistorialPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -56,6 +104,7 @@ export default function HistorialPage() {
   const [loading, setLoading] = useState(true)
   const [meses, setMeses] = useState([])
   const [vistaActiva, setVistaActiva] = useState('tendencias') // 'tendencias' | 'tabla' | 'detalle'
+  const [periodo, setPeriodo] = useState({ tipo: '12m', from: '', to: '' })
   const [mesDetalle, setMesDetalle] = useState(null)
 
   const loadHistorial = useCallback(async () => {
@@ -88,6 +137,7 @@ export default function HistorialPage() {
         ninos_final: ninosFinal,
         grupos_activos: gA,
         nuevos_activos: nA,
+        nuevos_ingresos_venta: nA,
         meta_nuevos: r.meta_nuevos_mensual || 20,
         cp_invitados: r.cp_invitados || 0,
         cp_asistieron: r.cp_asistieron || 0,
@@ -121,11 +171,43 @@ export default function HistorialPage() {
 
   useEffect(() => { loadHistorial() }, [loadHistorial])
 
+  const firstMonth = meses[0] || null
+  const latestMonth = meses[meses.length - 1] || null
+  const latestInput = latestMonth ? monthKeyToInput(monthKey(latestMonth)) : ''
+  const defaultCustomFrom = latestMonth ? monthKeyToInput(monthKey(latestMonth) - 11) : ''
+  const visibleMeses = useMemo(() => {
+    if (!meses.length) return []
+    if (periodo.tipo === '3m' || periodo.tipo === '12m') {
+      const latest = monthKey(meses[meses.length - 1])
+      const start = latest - (periodo.tipo === '3m' ? 2 : 11)
+      return meses.filter((m) => monthKey(m) >= start && monthKey(m) <= latest)
+    }
+
+    let from = parseMonthInput(periodo.from) ?? (firstMonth ? monthKey(firstMonth) : null)
+    let to = parseMonthInput(periodo.to) ?? (latestMonth ? monthKey(latestMonth) : null)
+    if (from === null || to === null) return meses
+    if (from > to) [from, to] = [to, from]
+    return meses.filter((m) => {
+      const key = monthKey(m)
+      return key >= from && key <= to
+    })
+  }, [meses, periodo, firstMonth, latestMonth])
+
   if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text-dim)',fontFamily:'var(--font-mono)'}}>Cargando historial…</div>
 
-  const chartData = meses.filter(m => m.ninos_final > 0 || m.ninos_inicio > 0)
-  const last = meses[meses.length - 1]
-  const prev = meses[meses.length - 2]
+  const chartData = visibleMeses.filter(m => m.ninos_final > 0 || m.ninos_inicio > 0)
+  const last = visibleMeses[visibleMeses.length - 1]
+  const prev = visibleMeses[visibleMeses.length - 2]
+  const originPct = sharePercentages(chartData, ['orig_referido', 'orig_marketing', 'orig_centro', 'orig_activaciones'])
+  const desertionPct = sharePercentages(chartData, ['mot_perdida_clase', 'mot_economico', 'mot_tecnica', 'mot_horario'])
+  const funnelPct = funnelPercentages(chartData, ['cp_invitados', 'cp_asistieron', 'cp_matriculados'], 'cp_invitados')
+  const goalPct = {
+    nuevos_ingresos_venta: sumKey(chartData, 'meta_nuevos') > 0 ? (sumKey(chartData, 'nuevos_ingresos_venta') / sumKey(chartData, 'meta_nuevos')) * 100 : 0,
+    meta_nuevos: 100,
+  }
+  const visibleRangeLabel = visibleMeses.length
+    ? `${visibleMeses[0].mesLabel} - ${visibleMeses[visibleMeses.length - 1].mesLabel}`
+    : 'Sin meses en este rango'
 
   const StatCard = ({ label, val, prev, unit='', color='var(--text)', meta, metaOp, invertTrend }) => {
     const prevVal = prev
@@ -150,6 +232,24 @@ export default function HistorialPage() {
     const on = vistaActiva === v
     return (
       <button onClick={()=>setVistaActiva(v)} className={`btn${on ? ' btn--primary' : ''}`} style={{ padding: '9px 18px' }}>
+        {label}
+      </button>
+    )
+  }
+
+  const filtroBtn = (tipo, label) => {
+    const on = periodo.tipo === tipo
+    return (
+      <button
+        type="button"
+        onClick={() => setPeriodo((p) => ({
+          tipo,
+          from: tipo === 'custom' ? (p.from || defaultCustomFrom) : p.from,
+          to: tipo === 'custom' ? (p.to || latestInput) : p.to,
+        }))}
+        className={`btn${on ? ' btn--primary' : ''}`}
+        style={{ padding: '7px 12px', fontSize: 12 }}
+      >
         {label}
       </button>
     )
@@ -191,11 +291,49 @@ export default function HistorialPage() {
           </div>
         ) : (
           <>
+            {/* Filtro de rango */}
+            <div className="card" style={{ padding: '12px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div className="label">Rango visible</div>
+                <p className="h-sub" style={{ marginTop: 3 }}>{visibleRangeLabel} · {visibleMeses.length} de {meses.length} mes(es)</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {filtroBtn('3m', 'Últimos 3 meses')}
+                {filtroBtn('12m', 'Últimos 12 meses')}
+                {filtroBtn('custom', 'Personalizado')}
+                {periodo.tipo === 'custom' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <input
+                      type="month"
+                      value={periodo.from || defaultCustomFrom}
+                      onChange={(e) => setPeriodo((p) => ({ ...p, tipo: 'custom', from: e.target.value }))}
+                      className="input num"
+                      style={{ width: 138, padding: '7px 10px', fontSize: 12 }}
+                    />
+                    <span style={{ color: 'var(--text-dim)' }}>→</span>
+                    <input
+                      type="month"
+                      value={periodo.to || latestInput}
+                      onChange={(e) => setPeriodo((p) => ({ ...p, tipo: 'custom', to: e.target.value }))}
+                      className="input num"
+                      style={{ width: 138, padding: '7px 10px', fontSize: 12 }}
+                    />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {visibleMeses.length === 0 ? (
+              <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn)' }}>
+                No hay meses registrados en el rango seleccionado.
+              </div>
+            ) : (
+              <>
             {/* KPIs resumen del último mes */}
             {last && (
               <div style={{ marginBottom: 26 }}>
                 <h2 className="label" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  Último mes registrado: {last.mesLabel}
+                  Último mes visible: {last.mesLabel}
                   <span className={`pill ${last.estado==='cerrado' ? 'pill--warn' : 'pill--ok'}`}>
                     <span className="dot" />{last.estado==='cerrado' ? 'Cerrado' : 'Abierto'}
                   </span>
@@ -205,7 +343,7 @@ export default function HistorialPage() {
                   <StatCard label="Prom. Niños/Grupo" val={last.prom_grupo} prev={prev?.prom_grupo} color={last.cumple_prom?C.green:C.bad} meta={8} metaOp="≥"/>
                   <StatCard label="%CV" val={last.pcv} prev={prev?.pcv} unit="%" color="var(--text)" invertTrend/>
                   <StatCard label="GPN" val={last.gpn} prev={prev?.gpn} unit="" color={last.gpn>=0?C.green:C.bad}/>
-                  <StatCard label="Nuevos Activos" val={last.nuevos_activos} prev={prev?.nuevos_activos} color={C.green} meta={last.meta_nuevos} metaOp="≥"/>
+                  <StatCard label="Nuevos Ingresos Venta" val={last.nuevos_ingresos_venta} prev={prev?.nuevos_ingresos_venta} color={C.green} meta={last.meta_nuevos} metaOp="≥"/>
                   <StatCard label="Grupos Activos" val={last.grupos_activos} prev={prev?.grupos_activos} color="var(--text)"/>
                 </div>
               </div>
@@ -230,7 +368,7 @@ export default function HistorialPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
                       <Line type="monotone" dataKey="ninos_inicio" name="Inicio mes" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
                       <Line type="monotone" dataKey="ninos_final" name="Final mes" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
@@ -238,18 +376,18 @@ export default function HistorialPage() {
                   </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Gráfica 2: Nuevos vs Meta */}
+                {/* Gráfica 2: Nuevos ingresos venta vs Meta */}
                 <ChartCard title="Nuevos Ingresos vs Meta">
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={chartData}>
+                    <ComposedChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
-                      <Bar dataKey="nuevos_activos" name="Nuevos activos" fill={C.green} radius={[4,4,0,0]}/>
-                      <Bar dataKey="meta_nuevos" name="Meta mensual" fill={C.track} radius={[4,4,0,0]}/>
-                    </BarChart>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
+                      <Legend content={(props) => <LegendWithPercent {...props} percentages={goalPct} />}/>
+                      <Bar dataKey="nuevos_ingresos_venta" name="Nuevos ingresos venta" fill={C.green} radius={[4,4,0,0]}/>
+                      <Line type="stepAfter" dataKey="meta_nuevos" name="Meta venta" stroke={C.warn} strokeWidth={2.5} strokeDasharray="6 5" dot={{r:3,fill:C.warn}}/>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </ChartCard>
 
@@ -260,7 +398,7 @@ export default function HistorialPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint} domain={[0,'auto']}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <ReferenceLine y={8} stroke={C.warn} strokeDasharray="5 5" label={{value:'Meta 8',fill:C.warn,fontSize:10,position:'right'}}/>
                       <Line type="monotone" dataKey="prom_grupo" name="Prom. niños/grupo" stroke={C.green} strokeWidth={2.5} dot={{r:4,fill:C.green}}/>
                     </LineChart>
@@ -275,7 +413,7 @@ export default function HistorialPage() {
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis yAxisId="left" tick={axisTick} stroke={C.faint} label={{value:'%CV',angle:-90,position:'insideLeft',fontSize:10,fill:C.dim}}/>
                       <YAxis yAxisId="right" orientation="right" tick={axisTick} stroke={C.faint} label={{value:'GPN $',angle:90,position:'insideRight',fontSize:10,fill:C.dim}}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
                       <Line yAxisId="left" type="monotone" dataKey="pcv" name="%CV" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
                       <Line yAxisId="right" type="monotone" dataKey="gpn" name="GPN $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
@@ -296,9 +434,9 @@ export default function HistorialPage() {
                     <BarChart data={chartData} stackOffset="expand">
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
+                      <YAxis tick={axisTick} stroke={C.faint} tickFormatter={(value) => `${Math.round(value * 100)}%`}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
+                      <Legend content={(props) => <LegendWithPercent {...props} percentages={originPct} />}/>
                       <Bar dataKey="orig_referido" name="Referido" fill={C.green} stackId="a" radius={[0,0,0,0]}/>
                       <Bar dataKey="orig_marketing" name="Marketing" fill={C.greenDeep} stackId="a"/>
                       <Bar dataKey="orig_centro" name="Centro" fill={C.mut} stackId="a"/>
@@ -314,8 +452,8 @@ export default function HistorialPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
+                      <Legend content={(props) => <LegendWithPercent {...props} percentages={desertionPct} />}/>
                       <Bar dataKey="mot_perdida_clase" name="Pérd. clase" fill={C.bad} stackId="b"/>
                       <Bar dataKey="mot_economico" name="Económico" fill={C.warn} stackId="b"/>
                       <Bar dataKey="mot_tecnica" name="Técnica" fill={C.mut} stackId="b"/>
@@ -331,8 +469,8 @@ export default function HistorialPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
+                      <Legend content={(props) => <LegendWithPercent {...props} percentages={funnelPct} />}/>
                       <Bar dataKey="cp_invitados" name="Invitados" fill={C.track} radius={[4,4,0,0]}/>
                       <Bar dataKey="cp_asistieron" name="Asistieron" fill={C.mut} radius={[4,4,0,0]}/>
                       <Bar dataKey="cp_matriculados" name="Matriculados" fill={C.green} radius={[4,4,0,0]}/>
@@ -347,7 +485,7 @@ export default function HistorialPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Bar dataKey="grupos_activos" name="Grupos activos" fill={C.green} radius={[4,4,0,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
@@ -363,14 +501,14 @@ export default function HistorialPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Nuevos','Meta N','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
+                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Ingresos Venta','Meta Venta','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
                           <th key={h} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {meses.map((m, i) => {
-                        const pr = i > 0 ? meses[i-1] : null
+                      {visibleMeses.map((m, i) => {
+                        const pr = i > 0 ? visibleMeses[i-1] : null
                         return (
                           <tr key={m.mes} style={{ cursor: 'default' }}>
                             <td style={{ fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)' }}>{m.mesLabel}</td>
@@ -385,7 +523,7 @@ export default function HistorialPage() {
                               {pr && <Trend val={m.ninos_final} prev={pr.ninos_final}/>}
                             </td>
                             <td className="num" style={{ textAlign: 'center' }}>{m.grupos_activos}</td>
-                            <td className="num" style={{ textAlign: 'center', color: m.nuevos_activos>=m.meta_nuevos?C.green:C.bad, fontWeight: 600 }}>{m.nuevos_activos}</td>
+                            <td className="num" style={{ textAlign: 'center', color: m.nuevos_ingresos_venta>=m.meta_nuevos?C.green:C.bad, fontWeight: 600 }}>{m.nuevos_ingresos_venta}</td>
                             <td className="num" style={{ textAlign: 'center', color: 'var(--text-dim)' }}>{m.meta_nuevos}</td>
                             <td className="num" style={{ textAlign: 'center', color: m.cumple_prom?C.green:C.bad, fontWeight: 600 }}>
                               {m.prom_grupo}
@@ -405,23 +543,23 @@ export default function HistorialPage() {
                         )
                       })}
                     </tbody>
-                    {meses.length > 1 && (
+                    {visibleMeses.length > 1 && (
                       <tfoot style={{ background: 'var(--surface-3)', borderTop: '1px solid var(--border-strong)' }}>
                         <tr>
                           <td colSpan={2} className="label" style={{ padding: '12px 16px', color: 'var(--ts-green)' }}>PROMEDIO GENERAL</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(meses.reduce((a,m)=>a+m.ninos_inicio,0)/meses.length)}</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(meses.reduce((a,m)=>a+m.ninos_final,0)/meses.length)}</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(meses.reduce((a,m)=>a+m.grupos_activos,0)/meses.length)}</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(meses.reduce((a,m)=>a+m.nuevos_activos,0)/meses.length)}</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text-dim)' }}>{meses[0]?.meta_nuevos}</td>
-                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: meses.reduce((a,m)=>a+m.prom_grupo,0)/meses.length>=8?C.green:C.bad }}>
-                            {(meses.reduce((a,m)=>a+m.prom_grupo,0)/meses.length).toFixed(2)}
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.ninos_inicio,0)/visibleMeses.length)}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.ninos_final,0)/visibleMeses.length)}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.grupos_activos,0)/visibleMeses.length)}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.nuevos_ingresos_venta,0)/visibleMeses.length)}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text-dim)' }}>{visibleMeses[0]?.meta_nuevos}</td>
+                          <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: visibleMeses.reduce((a,m)=>a+m.prom_grupo,0)/visibleMeses.length>=8?C.green:C.bad }}>
+                            {(visibleMeses.reduce((a,m)=>a+m.prom_grupo,0)/visibleMeses.length).toFixed(2)}
                           </td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text-muted)' }}>
-                            {(meses.reduce((a,m)=>a+m.pcv,0)/meses.length).toFixed(1)}%
+                            {(visibleMeses.reduce((a,m)=>a+m.pcv,0)/visibleMeses.length).toFixed(1)}%
                           </td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: C.green }}>
-                            ${(meses.reduce((a,m)=>a+m.gpn,0)/meses.length).toFixed(2)}
+                            ${(visibleMeses.reduce((a,m)=>a+m.gpn,0)/visibleMeses.length).toFixed(2)}
                           </td>
                           <td colSpan={2}></td>
                         </tr>
@@ -434,7 +572,7 @@ export default function HistorialPage() {
 
             {/* VISTA: CUADRO DE NEGOCIO (fotos congeladas de meses cerrados) */}
             {vistaActiva === 'cuadro' && (() => {
-              const conCuadro = meses.filter(m => m.cuadro)
+              const conCuadro = visibleMeses.filter(m => m.cuadro)
               if (conCuadro.length === 0) return (
                 <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
                   Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Semanal, su Cuadro de Negocio queda congelado y aparece aquí como historial.
@@ -449,7 +587,7 @@ export default function HistorialPage() {
                           <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                           <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                           <YAxis tick={axisTick} stroke={C.faint}/>
-                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                           <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
                           <Bar dataKey="cuadro_nuevos" name="Nuevos" fill={C.greenDeep} radius={[4,4,0,0]}/>
                           <Bar dataKey="cuadro_retirados" name="Retirados" fill={C.bad} radius={[4,4,0,0]}/>
@@ -463,7 +601,7 @@ export default function HistorialPage() {
                           <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                           <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                           <YAxis tick={axisTick} stroke={C.faint}/>
-                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
+                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                           <Line type="monotone" dataKey="cuadro_royalty" name="Royalty $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
                         </LineChart>
                       </ResponsiveContainer>
@@ -511,6 +649,9 @@ export default function HistorialPage() {
               <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
                 Los meses tienen datos de configuración pero aún no hay suficiente información para graficar. Ingresa los datos en el KPI Semanal y guarda.
               </div>
+            )}
+
+              </>
             )}
 
           </>

@@ -38,6 +38,16 @@ html, body { height: 100%; }
   --warn: #F5B23B;  --warn-bg: rgba(245, 178, 59, 0.13);  --warn-line: rgba(245,178,59,0.35);
   --bad:  #EF4444;  --bad-bg:  rgba(239, 68, 68, 0.13);   --bad-line:  rgba(239,68,68,0.35);
 
+  /* ---- Chart ink ---- */
+  --chart-muted: #A6A6A6;
+  --chart-axis: rgba(255, 255, 255, 0.28);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-track: rgba(255, 255, 255, 0.14);
+  --chart-cursor: rgba(255, 255, 255, 0.05);
+  --chart-tooltip-bg: #181818;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.10);
+  --chart-tooltip-shadow: 0 8px 28px rgba(0, 0, 0, 0.50);
+
   /* ---- Type families (variables injected by next/font in layout.js) ---- */
   --font-serif: var(--font-fraunces), Georgia, 'Times New Roman', serif;
   --font-sans:  var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -489,6 +499,15 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   --ok:   #059669; --ok-bg:   rgba(16, 185, 129, 0.12); --ok-line:   rgba(5, 150, 105, 0.32);
   --warn: #B45309; --warn-bg: rgba(245, 158, 11, 0.16); --warn-line: rgba(180, 83, 9, 0.32);
   --bad:  #DC2626; --bad-bg:  rgba(239, 68, 68, 0.10);  --bad-line:  rgba(220, 38, 38, 0.30);
+
+  --chart-muted: #707067;
+  --chart-axis: rgba(10, 10, 10, 0.32);
+  --chart-grid: rgba(10, 10, 10, 0.10);
+  --chart-track: rgba(10, 10, 10, 0.22);
+  --chart-cursor: rgba(10, 10, 10, 0.05);
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-border: rgba(10, 10, 10, 0.12);
+  --chart-tooltip-shadow: 0 10px 26px rgba(10, 10, 10, 0.16);
 
   --logo-ring: #2A2A2A;
   --logo-dash: #B2B2AC;
