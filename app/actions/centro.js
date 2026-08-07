@@ -77,6 +77,20 @@ export async function getHistorialCentro(centroId) {
   const estados = await sql`
     SELECT year, month, estado, cerrado_at FROM mes_kpi WHERE centro_id = ${centroId}
   `
+  const semanas = await sql`
+    SELECT
+      year,
+      month,
+      COALESCE(SUM(
+        COALESCE(ing_d1, 0) + COALESCE(ing_d2, 0) + COALESCE(ing_d3, 0) + COALESCE(ing_d4, 0) + COALESCE(ing_d5, 0)
+      ), 0)::int AS nuevos_ingresos_venta,
+      COALESCE(SUM(
+        COALESCE(des_d1, 0) + COALESCE(des_d2, 0) + COALESCE(des_d3, 0) + COALESCE(des_d4, 0) + COALESCE(des_d5, 0)
+      ), 0)::int AS total_desercion
+    FROM kpi_semanas
+    WHERE centro_id = ${centroId}
+    GROUP BY year, month
+  `
   // Fotos mensuales del Cuadro de Negocio (solo métricas compactas: la foto
   // completa con niños y contactos se ve en la página del cuadro).
   const fotos = await sql`
@@ -98,5 +112,5 @@ export async function getHistorialCentro(centroId) {
       royalty: d?.royalties?.totales?.totalRoyalty ?? 0,
     }
   })
-  return { nombre: c?.nombre || '', resumen, estados, cuadros }
+  return { nombre: c?.nombre || '', resumen, estados, semanas, cuadros }
 }

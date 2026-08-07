@@ -109,25 +109,35 @@ export default function HistorialPage() {
 
   const loadHistorial = useCallback(async () => {
     setLoading(true)
-    const { nombre, resumen, estados, cuadros } = await getHistorialCentro(id)
+    const { nombre, resumen, estados, semanas, cuadros } = await getHistorialCentro(id)
     if (nombre) setCentroNombre(nombre)
 
-    // Calcular métricas derivadas
-    const data = (resumen || []).map((r, i) => {
+    // Calcular métricas derivadas con el mismo encadenamiento que usa KPI mensual.
+    const semanasPorMes = new Map((semanas || []).map((s) => [`${s.year}-${s.month}`, s]))
+    const rows = [...(resumen || [])].sort((a, b) => monthKey(a) - monthKey(b))
+    let cierreAnterior = null
+    let keyAnterior = null
+    const data = rows.map((r) => {
+      const key = monthKey(r)
       const estado = estados?.find(e => e.year === r.year && e.month === r.month)
       const cuadro = cuadros?.find(q => q.year === r.year && q.month === r.month) || null
-      const nI = r.ninos_inicio_mes || 0
+      const semana = semanasPorMes.get(`${r.year}-${r.month}`) || null
+      const rawInicio = Number(r.ninos_inicio_mes) || 0
+      const nI = keyAnterior === key - 1 && cierreAnterior > 0 ? cierreAnterior : rawInicio
       const gA = r.grupos_activos || 1
-      const nA = r.nuevos_activos_mes || 0
-      const totalDes = r.ninos_inicio_mes ? 0 : 0 // will compute from kpi_semanas
-      const ninosFinal = r.ninos_final_mes || 0
+      const nuevosSemanal = Number(semana?.nuevos_ingresos_venta) || 0
+      const nuevosCuadro = Number(cuadro?.nuevos) || 0
+      const nA = Number(r.nuevos_activos_mes) || nuevosSemanal || nuevosCuadro
+      const totalDes = Number(semana?.total_desercion) || 0
+      const rawFinal = Number(r.ninos_final_mes) || 0
+      const cuadroFinal = Number(cuadro?.aPagar) || 0
+      const ninosFinal = rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA - totalDes))
       const promG = gA > 0 ? ninosFinal / gA : 0
       const pcv = calcPcv(promG)
       const gpn = calcGpn(ninosFinal, pcv)
-      const prev = i > 0 ? resumen[i-1] : null
-      const prevNF = prev ? (prev.ninos_final_mes || 0) : null
+      const prevNF = keyAnterior === key - 1 ? cierreAnterior : null
 
-      return {
+      const row = {
         mes: MES[r.month-1] + ' ' + r.year,
         mesLabel: MES_FULL[r.month-1] + ' ' + r.year,
         year: r.year, month: r.month,
@@ -164,6 +174,9 @@ export default function HistorialPage() {
         cuadro_retirados: cuadro ? cuadro.retirados : null,
         cuadro_royalty: cuadro ? Number(cuadro.royalty) || 0 : null,
       }
+      cierreAnterior = ninosFinal
+      keyAnterior = key
+      return row
     })
     setMeses(data)
     setLoading(false)
