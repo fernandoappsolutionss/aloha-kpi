@@ -7,6 +7,7 @@ import { getCentroGrowth } from '../../actions/growth'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import PeriodSelector from '../../../components/PeriodSelector'
 import GrowthSummaryBand from '../../../components/growth/GrowthSummaryBand'
+import GrowthBriefing from '../../../components/growth/GrowthBriefing'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -231,6 +232,7 @@ export default function CentroPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
+      <GrowthBriefing centroId={id} />
       <main className="main">
         {isAdmin && (
           <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
