@@ -17,6 +17,8 @@ const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Fina
 const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
 const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
+const ACTION_MENU_WIDTH = 238
+const ACTION_MENU_HEIGHT = 248
 // Semáforo de cupos del grupo por aperturar: verde >3, ámbar 1–3, rojo 0.
 const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
 const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
@@ -60,7 +62,7 @@ export default function EventosPage() {
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
-  const [menuPos, setMenuPos] = useState({ right: 0, top: 0 })
+  const [menuPos, setMenuPos] = useState({ left: 0, top: 0 })
   const [editing, setEditing] = useState(null) // null=cerrado, {}=nuevo, {...}=editar
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
@@ -106,6 +108,19 @@ export default function EventosPage() {
     setMenuId(null)
     navigator.clipboard?.writeText(text).then(() => setStatus('✅ ' + msg)).catch(() => setStatus('Link: ' + text))
   }
+  function toggleActionMenu(e, ev) {
+    e.stopPropagation()
+    if (menuId === ev.id) { setMenuId(null); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    const gap = 8
+    const left = Math.max(gap, Math.min(window.innerWidth - ACTION_MENU_WIDTH - gap, r.right - ACTION_MENU_WIDTH))
+    const below = r.bottom + gap
+    const top = below + ACTION_MENU_HEIGHT > window.innerHeight - gap
+      ? Math.max(gap, r.top - ACTION_MENU_HEIGHT - gap)
+      : below
+    setMenuPos({ left, top })
+    setMenuId(ev.id)
+  }
   const regUrl = (e) => `${config.baseUrl}/events/${e.share_token}`
   const segUrl = (e) => `${config.baseUrl}/events/tracking/${e.tracking_token}`
 
@@ -119,6 +134,7 @@ export default function EventosPage() {
     { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ts-green)' },
     { l: 'En compras', v: `$${agg.revenue.toLocaleString()}`, c: 'var(--text)' },
   ]
+  const menuEvent = menuId ? events.find((ev) => ev.id === menuId) : null
 
   return (
     <div className="shell">
@@ -202,29 +218,7 @@ export default function EventosPage() {
                         <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{count}{ev.max_capacity ? `/${ev.max_capacity}` : ''}</td>
                         <td style={{ fontSize: 12 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 10 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
                         <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <button onClick={(e) => {
-                            if (menuId === ev.id) { setMenuId(null); return }
-                            const r = e.currentTarget.getBoundingClientRect()
-                            setMenuPos({ right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 6 })
-                            setMenuId(ev.id)
-                          }} className="btn" style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}>⋯</button>
-                          {menuId === ev.id && (
-                            <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', right: menuPos.right, top: menuPos.top, zIndex: 60, background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', minWidth: 230, padding: 6, textAlign: 'left' }}>
-                              {[
-                                ['✏️ Editar', () => { setMenuId(null); openEdit(ev, setEditing) }],
-                                ['⧉ Duplicar', () => onDuplicate(ev)],
-                                ['🔗 Copiar link de registro', () => copy(regUrl(ev), 'Link de registro copiado.')],
-                                ['📈 Copiar link de seguimiento', () => copy(segUrl(ev), 'Link de seguimiento copiado.')],
-                                ['👁 Ver página pública', () => { setMenuId(null); window.open(regUrl(ev), '_blank') }],
-                                ['🗑 Eliminar', () => onDelete(ev), true],
-                              ].map(([txt, fn, danger], k) => (
-                                <button key={k} onClick={fn}
-                                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? '#FCA5A5' : 'var(--text-muted)', borderRadius: 6 }}>
-                                  {txt}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          <button onClick={(e) => toggleActionMenu(e, ev)} className="btn" style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}>⋯</button>
                         </td>
                       </tr>
                       {openId === ev.id && (
@@ -244,6 +238,23 @@ export default function EventosPage() {
       </main>
 
       {menuId && <div onClick={() => setMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />}
+      {menuEvent && (
+        <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: menuPos.left, top: menuPos.top, zIndex: 60, background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 18px 42px rgba(0,0,0,0.28)', width: ACTION_MENU_WIDTH, padding: 6, textAlign: 'left' }}>
+          {[
+            ['✏️ Editar', () => { setMenuId(null); openEdit(menuEvent, setEditing) }],
+            ['⧉ Duplicar', () => onDuplicate(menuEvent)],
+            ['🔗 Copiar link de registro', () => copy(regUrl(menuEvent), 'Link de registro copiado.')],
+            ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
+            ['👁 Ver página pública', () => { setMenuId(null); window.open(regUrl(menuEvent), '_blank') }],
+            ['🗑 Eliminar', () => onDelete(menuEvent), true],
+          ].map(([txt, fn, danger], k) => (
+            <button key={k} onClick={fn}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>
+              {txt}
+            </button>
+          ))}
+        </div>
+      )}
 
       {editing && (
         <EventModal centroId={id} opts={opts} initial={editing}
