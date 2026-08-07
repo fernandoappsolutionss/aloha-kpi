@@ -13,7 +13,7 @@ import {
   YAxis,
 } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
-import { getCentroGrowth } from '../../../actions/growth'
+import { getCentroGrowth, updateGrowthRecommendation } from '../../../actions/growth'
 import {
   confidenceMeta,
   formatGrowthPeriod,
@@ -37,6 +37,12 @@ const KIND_LABELS = {
   technique: 'Técnica',
   schedule: 'Horario',
   activations: 'Activaciones',
+}
+
+const STATUS_LABELS = {
+  completed: 'Completada',
+  dismissed: 'Descartada',
+  postponed: 'Pospuesta 7 días',
 }
 
 const pct = (value) => `${Math.round((Number(value) || 0) * 100)}%`
@@ -98,6 +104,8 @@ export default function GrowthRoutePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeScenario, setActiveScenario] = useState('base')
+  const [updatingRecommendation, setUpdatingRecommendation] = useState(null)
+  const [recommendationError, setRecommendationError] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -142,6 +150,25 @@ export default function GrowthRoutePage() {
   const capacityPct = projection.capacityMax
     ? Math.min(100, (projection.currentChildren / projection.capacityMax) * 100)
     : 0
+
+  const changeRecommendation = async (recommendationId, command) => {
+    setUpdatingRecommendation(recommendationId)
+    setRecommendationError('')
+    try {
+      const updated = await updateGrowthRecommendation(id, recommendationId, command)
+      setData((current) => ({
+        ...current,
+        recommendations: current.recommendations.map((item) => (
+          String(item.id) === String(recommendationId) ? { ...item, ...updated } : item
+        )),
+      }))
+    } catch (cause) {
+      console.error('[GrowthRoutePage recommendation]', cause)
+      setRecommendationError('No se pudo actualizar la recomendación.')
+    } finally {
+      setUpdatingRecommendation(null)
+    }
+  }
 
   return (
     <div className="shell">
@@ -268,13 +295,21 @@ export default function GrowthRoutePage() {
               <h2 id="actions-title">Tres acciones para mover el resultado</h2>
             </div>
           </div>
+          {recommendationError && <div className="alert alert--error">{recommendationError}</div>}
           {recommendations.length > 0 ? (
             <div className="growth-actions">
               {recommendations.map((item, index) => (
-              <article className="growth-action" key={item.kind}>
+              <article className={`growth-action growth-action--${item.status || 'pending'}`} key={item.id || item.kind}>
                 <div className="growth-action__top">
                   <span className="growth-action__rank num">0{index + 1}</span>
-                  <span className="pill">{KIND_LABELS[item.kind] || item.kind}</span>
+                  <div className="growth-action__badges">
+                    <span className="pill">{KIND_LABELS[item.kind] || item.kind}</span>
+                    {STATUS_LABELS[item.status] && (
+                      <span className={`pill ${item.status === 'completed' ? 'pill--ok' : item.status === 'dismissed' ? 'pill--bad' : 'pill--warn'}`}>
+                        <span className="dot" />{STATUS_LABELS[item.status]}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <h3>{item.title}</h3>
                 <p>{item.reason}</p>
@@ -289,6 +324,36 @@ export default function GrowthRoutePage() {
                   </strong>
                 </div>
                 <p className="growth-action__task">{item.action}</p>
+                {item.status !== 'completed' && item.status !== 'dismissed' && (
+                  <div className="growth-action__commands" aria-label={`Seguimiento de ${item.title}`}>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={updatingRecommendation != null}
+                      onClick={() => changeRecommendation(item.id, 'complete')}
+                    >
+                      {String(updatingRecommendation) === String(item.id) ? 'Guardando...' : 'Completar'}
+                    </button>
+                    {item.status !== 'postponed' && (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={updatingRecommendation != null}
+                        onClick={() => changeRecommendation(item.id, 'postpone')}
+                      >
+                        Posponer 7 días
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn growth-action__dismiss"
+                      disabled={updatingRecommendation != null}
+                      onClick={() => changeRecommendation(item.id, 'dismiss')}
+                    >
+                      Descartar
+                    </button>
+                  </div>
+                )}
               </article>
               ))}
             </div>
