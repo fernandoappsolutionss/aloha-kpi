@@ -245,7 +245,7 @@ export default function KPIPage() {
         <div className="card" style={{ padding: 18, marginBottom: 16 }}>
           <h3 className="label" style={{ marginBottom: 14 }}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
-            {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta nuevos (mensual)','meta_nuevos_mensual'],['Nuevos activos mes','nuevos_activos_mes']].map(([lbl,key]) => (
+            {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual'],['Nuevos ingresos venta','nuevos_activos_mes']].map(([lbl,key]) => (
               <div key={key} className="field">
                 <label className="label">{lbl}</label>
                 {cfgInput(key, true, key === 'ninos_inicio' && !!arrastrado)}
