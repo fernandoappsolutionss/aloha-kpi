@@ -6,6 +6,7 @@ import {
   fechaInicioOperativa,
   iniciosClaseMes,
   proyeccionSiguienteMes,
+  resumenConCuadroVivo,
   usaIniciosClaseOperativos,
   valorHistorialMes,
 } from '../lib/inicios-clase.mjs'
@@ -143,4 +144,32 @@ test('el historial de un mes cerrado conserva el valor guardado', () => {
     cuadro: { vivo: true, nuevos: 99 },
     campo: 'nuevos',
   }), 14)
+})
+
+test('el resumen trimestral incorpora el cuadro vivo del mes abierto', () => {
+  const filas = resumenConCuadroVivo([
+    { centro_id: 2, year: 2026, month: 8, ninos_final_mes: 134, nuevos_activos_mes: 0, grupos_activos: 19 },
+  ], {
+    year: 2026,
+    month: 8,
+    estado: 'abierto',
+    cuadro: { totales: { mesAnterior: 135, aPagar: 136, gruposActivos: 19 }, iniciosClase: [{}] },
+  })
+
+  assert.equal(filas[0].ninos_final_mes, 136)
+  assert.equal(filas[0].nuevos_activos_mes, 1)
+})
+
+test('el resumen trimestral no reinterpreta un mes cerrado', () => {
+  const original = [
+    { centro_id: 2, year: 2026, month: 7, ninos_final_mes: 135, nuevos_activos_mes: 0, grupos_activos: 19 },
+  ]
+  const filas = resumenConCuadroVivo(original, {
+    year: 2026,
+    month: 7,
+    estado: 'cerrado',
+    cuadro: { totales: { mesAnterior: 1, aPagar: 999, gruposActivos: 99 }, iniciosClase: [{}, {}] },
+  })
+
+  assert.deepEqual(filas, original)
 })
