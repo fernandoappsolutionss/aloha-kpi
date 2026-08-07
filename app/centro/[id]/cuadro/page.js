@@ -64,11 +64,11 @@ export default function CuadroPage() {
 
   async function handleSincronizar() {
     if (cerrado) return
-    if (!confirm(`¿Sincronizar el KPI de ${NOMBRES_MES[month - 1]} ${year} con el cuadro? Se sobreescriben grupos activos, nuevos del mes y motivos de deserción en el resumen mensual.`)) return
+    if (!confirm(`¿Sincronizar el KPI de ${NOMBRES_MES[month - 1]} ${year} con el cuadro? Se sobreescriben grupos activos, nuevos activos y motivos de deserción en el resumen mensual.`)) return
     setSyncing(true); setStatus('')
     const res = await sincronizarConKpi(id, year, month)
     if (res.error) setStatus('❌ ' + res.error)
-    else setStatus(`✅ KPI sincronizado: ${res.aplicado.grupos_activos} grupos activos, ${res.aplicado.nuevos_activos_mes} nuevos y motivos de deserción actualizados.`)
+    else setStatus(`✅ KPI sincronizado: ${res.aplicado.grupos_activos} grupos activos, ${res.aplicado.nuevos_activos_mes} nuevos activos y motivos de deserción actualizados.`)
     setSyncing(false)
   }
 
@@ -118,20 +118,23 @@ export default function CuadroPage() {
   const isError = status.includes('❌')
   const statusText = status.replace(/^[❌✅]\s*/, '')
   const t = data?.totales
+  const iniciosDisponibles = Array.isArray(data?.iniciosClase)
+  const nuevosActivos = iniciosDisponibles ? data.iniciosClase.length : (t?.nuevos || 0)
+  const nuevosLabel = iniciosDisponibles ? 'Nuevos activos' : 'Nuevos históricos'
   const graduados = data ? data.deserciones.filter((d) => d.motivo === 'GRADUADO').length : 0
   const sumMesAnterior = data ? data.controlGrupos.filas.reduce((a, f) => a + f.contadores.mesAnterior, 0) : 0
   const totalCantidad = data ? data.pedidos.reduce((a, p) => a + (parseInt(p.cantidad) || 0), 0) : 0
   const totalMonto = data ? data.pedidos.reduce((a, p) => a + (Number(p.monto) || 0), 0) : 0
   const CARDS = data ? [
     { l: 'Niños a pagar', v: t.aPagar, c: 'var(--text)' },
-    { l: 'Nuevos del mes', v: t.nuevos, c: 'var(--ok)' },
+    { l: nuevosLabel, v: nuevosActivos, c: 'var(--ok)' },
     { l: 'Reincorporados', v: t.reincorporados, c: 'var(--ok)' },
     { l: 'Retirados del mes', v: t.retirados, c: t.retirados > 0 ? 'var(--bad)' : 'var(--text)', s: graduados > 0 ? `de ellos ${graduados} graduado${graduados === 1 ? '' : 's'} 🎓` : undefined },
     { l: 'Grupos activos', v: t.gruposActivos, c: 'var(--text)', s: `prom. ${data.promedios.sinK.toFixed(1)} niños/grupo sin Kinder` },
     { l: 'Royalty total', v: money(data.royalties.totales.totalRoyalty), c: 'var(--ts-green)' },
   ] : []
   const compCols = data ? [
-    { l: 'Nuevos', cuadro: t.nuevos, kpi: data.kpiComparacion.nuevosKpi },
+    { l: nuevosLabel, cuadro: nuevosActivos, kpi: data.kpiComparacion.nuevosKpi },
     { l: 'Retirados', cuadro: t.retirados, kpi: data.kpiComparacion.desercionKpi },
     { l: 'Grupos activos', cuadro: t.gruposActivos, kpi: data.kpiComparacion.gruposActivosKpi },
   ] : []
@@ -170,7 +173,7 @@ export default function CuadroPage() {
             <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download>⬇ Descargar Excel</a>
             <button onClick={handleSincronizar} disabled={syncing || cerrado} className="btn"
               style={cerrado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              title={cerrado ? 'Este mes está cerrado en KPI Semanal. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos del mes y motivos de deserción al KPI mensual'}>
+              title={cerrado ? 'Este mes está cerrado en KPI Semanal. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
               {syncing ? 'Sincronizando…' : 'Sincronizar con KPI'}
             </button>
           </div>
@@ -184,7 +187,7 @@ export default function CuadroPage() {
         {data && (
           <>
             {/* KPI cards del mes */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
               {CARDS.map((c) => (
                 <div key={c.l} className="kpi" style={{ padding: '14px 16px' }}>
                   <div className="kpi__top"><span className="label">{c.l}</span></div>
@@ -243,7 +246,7 @@ export default function CuadroPage() {
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr>{['Nivel', 'Nuevos', 'Continúan', 'Total niños', 'Royalty'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
+                  <thead><tr>{['Nivel', nuevosLabel, 'Continúan', 'Total niños', 'Royalty'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
                     {data.royalties.filas.length === 0 ? (
                       <tr style={{ cursor: 'default' }}><td colSpan={5} style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)' }}>Sin niños activos este mes.</td></tr>
@@ -287,7 +290,7 @@ export default function CuadroPage() {
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr>{['Grupo', 'Mes anterior', 'Nuevos', 'Reincorporados', 'Retirados', 'Total del mes'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
+                  <thead><tr>{['Grupo', 'Mes anterior', nuevosLabel, 'Reincorporados', 'Retirados', 'Total del mes'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
                     {data.controlGrupos.filas.length === 0 ? (
                       <tr style={{ cursor: 'default' }}><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)' }}>Sin grupos con movimientos este mes. Apertura grupos e inscribe niños en “Grupos y Fusiones”.</td></tr>
@@ -363,6 +366,42 @@ export default function CuadroPage() {
                 </table>
               </div>
             </div>
+
+            {/* Declaración de inicios operativos del mes */}
+            {iniciosDisponibles && <div className="panel" style={{ marginBottom: 20 }}>
+              <div className="panel__head">
+                <h3 className="panel__title">Inicios de clase del mes</h3>
+                <span className="label">{data.iniciosClase?.length || 0} nuevo{data.iniciosClase?.length === 1 ? '' : 's'} activo{data.iniciosClase?.length === 1 ? '' : 's'} en {NOMBRES_MES[month - 1]}</span>
+              </div>
+              {!data.iniciosClase?.length ? (
+                <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin inicios de clase en {NOMBRES_MES[month - 1]} {year}.</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Fecha de inscripción', 'Inicio del grupo', 'Inicio efectivo', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {data.iniciosClase.map((inicio) => (
+                        <tr key={inicio.estudianteId} style={{ cursor: 'default' }}>
+                          <td style={{ fontWeight: 600, color: 'var(--text)' }}>{inicio.nombre}</td>
+                          <td className="num" style={{ fontSize: 12 }}>
+                            {inicio.grupoNumero ? `Grupo ${inicio.grupoNumero}` : 'Sin grupo'}
+                            {inicio.coachNombre && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{inicio.coachNombre}</div>}
+                          </td>
+                          <td className="num" style={{ fontSize: 12 }}>{inicio.itinerario || '—'} {inicio.nivel ?? '—'}</td>
+                          <td className="num" style={{ fontSize: 12 }}>{fmtFecha(inicio.fechaInscripcion)}</td>
+                          <td className="num" style={{ fontSize: 12 }}>{fmtFecha(inicio.fechaInicioGrupo)}</td>
+                          <td className="num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ok)' }}>{fmtFecha(inicio.fechaInicio)}</td>
+                          <td style={{ fontSize: 12 }}>
+                            {inicio.representante || '—'}
+                            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{[inicio.telefono, inicio.correo].filter(Boolean).join(' · ')}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>}
 
             {/* Deserciones del mes (hoja Niños Retirados) */}
             <div className="panel" style={{ marginBottom: 20 }}>
