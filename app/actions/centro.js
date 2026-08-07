@@ -5,7 +5,7 @@ import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
-import { iniciosClaseMes, proyeccionSiguienteMes } from '../../lib/inicios-clase.mjs'
+import { iniciosClaseMes, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
@@ -18,7 +18,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
 
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
   const [metas] = await sql`SELECT * FROM metas WHERE anio = ${year} AND trimestre = ${trimestre}`
-  const rs = await sql`
+  let rs = await sql`
     SELECT * FROM resumen_mes
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
     ORDER BY month
@@ -27,6 +27,28 @@ export async function getCentroResumen(centroId, year, trimestre) {
     SELECT * FROM kpi_semanas
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
+
+  const hoy = hoyISO()
+  const [yearActual, monthActual] = hoy.split('-').map(Number)
+  if (Number(year) === yearActual && months.includes(monthActual)) {
+    const [estadoActual] = await sql`
+      SELECT estado FROM mes_kpi
+      WHERE centro_id = ${centroId} AND year = ${yearActual} AND month = ${monthActual}
+    `
+    if (estadoActual?.estado !== 'cerrado') {
+      try {
+        const cuadroActual = await calcularCuadro(centroId, yearActual, monthActual)
+        rs = resumenConCuadroVivo(rs, {
+          year: yearActual,
+          month: monthActual,
+          estado: estadoActual?.estado || 'abierto',
+          cuadro: cuadroActual,
+        })
+      } catch (e) {
+        console.error('[getCentroResumen] no se pudo calcular el mes abierto:', e)
+      }
+    }
+  }
 
   // Cierre del mes anterior al trimestre: semilla del encadenamiento (el mes
   // que abre el trimestre arranca con lo que cerró el mes previo).
@@ -66,8 +88,6 @@ export async function getCentroResumen(centroId, year, trimestre) {
     pctAlumnado: ninosInicioAnio > 0 ? Math.round((graduadosAnio / ninosInicioAnio) * 100) : 0,
   }
 
-  const hoy = hoyISO()
-  const [yearActual, monthActual] = hoy.split('-').map(Number)
   const nextYear = monthActual === 12 ? yearActual + 1 : yearActual
   const nextMonth = monthActual === 12 ? 1 : monthActual + 1
   const finMesActual = `${yearActual}-${String(monthActual).padStart(2, '0')}-${String(new Date(yearActual, monthActual, 0).getDate()).padStart(2, '0')}`
