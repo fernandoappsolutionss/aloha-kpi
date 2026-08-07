@@ -6,6 +6,7 @@ import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
 import { iniciosClaseMes, proyeccionSiguienteMes } from '../../lib/inicios-clase.mjs'
+import { calcularCuadro } from '../../lib/cuadro-snapshot'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -159,5 +160,38 @@ export async function getHistorialCentro(centroId) {
       royalty: d?.royalties?.totales?.totalRoyalty ?? 0,
     }
   })
+
+  // La foto congelada manda en meses cerrados. Para el último mes abierto,
+  // Historial consume el mismo cálculo vivo que KPI y Cuadro de Negocio.
+  const ultimoResumen = resumen[resumen.length - 1]
+  const estadoUltimo = ultimoResumen && estados.find((estado) =>
+    Number(estado.year) === Number(ultimoResumen.year) &&
+    Number(estado.month) === Number(ultimoResumen.month)
+  )
+  if (ultimoResumen && estadoUltimo?.estado !== 'cerrado') {
+    try {
+      const d = await calcularCuadro(centroId, Number(ultimoResumen.year), Number(ultimoResumen.month))
+      const cuadroVivo = {
+        year: Number(ultimoResumen.year),
+        month: Number(ultimoResumen.month),
+        cerrado_at: null,
+        vivo: true,
+        aPagar: d?.totales?.aPagar ?? 0,
+        nuevos: d?.iniciosClase?.length ?? d?.totales?.nuevos ?? 0,
+        reincorporados: d?.totales?.reincorporados ?? 0,
+        retirados: d?.totales?.retirados ?? 0,
+        gruposActivos: d?.totales?.gruposActivos ?? 0,
+        promedio: d?.promedios?.sinK ?? null,
+        royalty: d?.royalties?.totales?.totalRoyalty ?? 0,
+      }
+      const indice = cuadros.findIndex((cuadro) =>
+        Number(cuadro.year) === cuadroVivo.year && Number(cuadro.month) === cuadroVivo.month
+      )
+      if (indice >= 0) cuadros[indice] = cuadroVivo
+      else cuadros.push(cuadroVivo)
+    } catch (e) {
+      console.error('[getHistorialCentro] no se pudo calcular el mes abierto:', e)
+    }
+  }
   return { nombre: c?.nombre || '', resumen, estados, semanas, cuadros }
 }
