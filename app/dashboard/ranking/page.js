@@ -5,6 +5,7 @@ import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import NivelBadge from '../../../components/NivelBadge'
+import { CENTER_LEVELS } from '../../../lib/growth/constants.mjs'
 
 const MEDAL = { 1:'🥇', 2:'🥈', 3:'🥉' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -119,17 +120,16 @@ export default function RankingPage() {
         <div className="card" style={{ marginTop: 16, padding: '16px 20px' }}>
           <div className="label" style={{ marginBottom: 12 }}>Niveles de centro · ALOHA 2026</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
-            {[[1, '> 170'], [2, '> 200'], [3, '> 240'], [4, '> 325'], [5, '> 410']].map(([n, r]) => (
-              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <NivelBadge nivel={n} size="sm" />
-                <span className="num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r} niños</span>
+            {CENTER_LEVELS.map(({ level, threshold }) => (
+              <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <NivelBadge nivel={level} size="sm" />
+                <span className="num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>≥ {threshold} niños</span>
               </div>
             ))}
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.5, maxWidth: 760 }}>
-            El nivel se <strong style={{ color: 'var(--text-muted)' }}>gana al cerrar un trimestre</strong> cumpliendo la condición
-            (niños + deserción <strong style={{ color: 'var(--text-muted)' }}>menor al 8% los 3 meses</strong>) y aplica al
-            <strong style={{ color: 'var(--text-muted)' }}> trimestre siguiente</strong>. Sube de nivel aumentando tus niños activos y manteniendo baja la deserción.
+            El nivel se reconoce al <strong style={{ color: 'var(--text-muted)' }}>cerrar el trimestre</strong> según los niños activos
+            y aplica al <strong style={{ color: 'var(--text-muted)' }}>trimestre siguiente</strong>. Reducir la deserción ayuda a sostener el umbral alcanzado.
           </p>
         </div>
       </main>
