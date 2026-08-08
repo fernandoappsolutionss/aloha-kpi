@@ -32,7 +32,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es" className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
+    <html lang="es" suppressHydrationWarning className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
       <body>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('ts_theme');document.documentElement.dataset.theme=(t==='light')?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();` }} />
         {children}

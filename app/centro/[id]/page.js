@@ -143,7 +143,7 @@ export default function CentroPage() {
         const r = (rs || []).find(x => x.month === mo)
         const ws = (ks || []).filter(x => x.month === mo)
         const nuevos = ws.reduce((s, w) => s + (w.ing_d1 || 0) + (w.ing_d2 || 0) + (w.ing_d3 || 0) + (w.ing_d4 || 0) + (w.ing_d5 || 0), 0)
-        const desercion = ws.reduce((s, w) => s + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+        const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
         let cobMes = 0
         if (ws.length) {
           const lastSem = [...ws].sort((a, b) => b.semana - a.semana)[0]
@@ -152,6 +152,7 @@ export default function CentroPage() {
         // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
         // heredado del cierre anterior y cierre real del mes cuando existe.
         const calc = (mesesCalc || []).find(x => x.mo === mo)
+        const desercion = r?.retiros_operativos_mes ?? desercionSemanal
         const ninosInicio = calc ? calc.ninosInicio : (r?.ninos_inicio_mes || 0)
         const nuevosActivosMes = r?.nuevos_activos_mes || 0
         const ninosFin = calc ? calc.ninosFinal : Math.max(0, ninosInicio + nuevosActivosMes - desercion)

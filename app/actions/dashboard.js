@@ -4,6 +4,9 @@ import { requireAdmin } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
+import { hoyISO } from '../../lib/operaciones'
+import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
+import { motivosParaKpi } from '../../lib/cuadro-calc'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -20,6 +23,97 @@ function monthList(fromY, fromM, toY, toM) {
   return out
 }
 
+async function aplicarMesesAbiertosVivos(rows, prevRows, lo, hi, centroIds = []) {
+  try {
+    const estados = await sql`
+      SELECT centro_id, year, month, estado FROM mes_kpi
+      WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}
+    `
+    let actualizadas = rows.map((row) => ({
+      ...row,
+      estado_mes: estados.find((estado) =>
+        Number(estado.centro_id) === Number(row.centro_id) &&
+        Number(estado.year) === Number(row.year) &&
+        Number(estado.month) === Number(row.month)
+      )?.estado || 'abierto',
+    }))
+    const ids = new Set(centroIds.map(Number))
+    for (const row of [...rows, ...prevRows]) ids.add(Number(row.centro_id))
+    const [yearActual, monthActual] = hoyISO().split('-').map(Number)
+    const candidatos = periodosAbiertosOperativos({
+      resumenes: rows,
+      estados,
+      centroIds: [...ids],
+      desde: lo,
+      hasta: hi,
+      periodoActual: yearActual * 100 + monthActual,
+    })
+    if (!candidatos.length) return actualizadas
+
+    const [estudiantes, grupos, eventos] = await Promise.all([
+      sql`SELECT id, centro_id, grupo_id, nombre, estado, fecha_inscripcion FROM estudiantes`,
+      sql`SELECT id, centro_id, numero, estado, fecha_inicio_clases FROM grupos`,
+      sql`
+        SELECT id, centro_id, estudiante_id, tipo, motivo, fecha, year, month, a_grupo_id
+        FROM estudiante_eventos
+        WHERE ((year * 100 + month) BETWEEN ${lo} AND ${hi}) OR tipo IN ('inscripcion', 'retiro')
+        ORDER BY fecha, id
+      `,
+    ])
+    const agruparPorCentro = (items) => {
+      const agrupados = new Map()
+      for (const item of items) {
+        const centroId = Number(item.centro_id)
+        const grupo = agrupados.get(centroId) || []
+        grupo.push(item)
+        agrupados.set(centroId, grupo)
+      }
+      return agrupados
+    }
+    const estudiantesPorCentro = agruparPorCentro(estudiantes)
+    const gruposPorCentro = agruparPorCentro(grupos)
+    const eventosPorCentro = agruparPorCentro(eventos)
+    for (const candidato of candidatos) {
+      const { centroId, year, month, estado } = candidato
+      const movimientos = movimientosVivosMes({
+        estudiantes: estudiantesPorCentro.get(centroId) || [],
+        grupos: gruposPorCentro.get(centroId) || [],
+        eventos: eventosPorCentro.get(centroId) || [],
+        year,
+        month,
+      })
+      const previousYear = month === 1 ? year - 1 : year
+      const previousMonth = month === 1 ? 12 : month - 1
+      const fila = actualizadas.find((item) =>
+        Number(item.centro_id) === centroId && Number(item.year) === year && Number(item.month) === month
+      )
+      const anterior = actualizadas.find((item) =>
+        Number(item.centro_id) === centroId &&
+        Number(item.year) === previousYear &&
+        Number(item.month) === previousMonth
+      ) || prevRows.find((item) =>
+        Number(item.centro_id) === centroId &&
+        Number(item.year ?? previousYear) === previousYear &&
+        Number(item.month ?? previousMonth) === previousMonth
+      )
+
+      actualizadas = resumenConCuadroVivo(actualizadas, {
+        centroId,
+        year,
+        month,
+        estado,
+        cuadro: movimientos,
+        inicioArrastrado: anterior?.ninos_final_mes ?? fila?.ninos_inicio_mes,
+        motivos: motivosParaKpi(movimientos.deserciones),
+      })
+    }
+    return actualizadas
+  } catch (error) {
+    console.error('[dashboard] no se pudo aplicar el balance vivo de los meses abiertos:', error)
+    return rows
+  }
+}
+
 // Métricas agregadas por centro sobre un RANGO de meses [desde, hasta].
 // Es la base del panel: sirve igual para un trimestre (3 meses) que para un
 // rango mensual (ej. últimos 12 meses). Calcula todo en el servidor.
@@ -32,7 +126,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
 
   const centros = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
   const [metas] = await sql`SELECT * FROM metas WHERE anio = ${toY} AND trimestre = ${toQ}`
-  const rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  let rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
   // Semilla del ENCADENAMIENTO: cierre del mes anterior al rango. Un mes
@@ -41,6 +135,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   const py = fromM === 1 ? fromY - 1 : fromY
   const pm = fromM === 1 ? 12 : fromM - 1
   const prevRows = await sql`SELECT centro_id, ninos_final_mes, grupos_activos FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
+  rs = await aplicarMesesAbiertosVivos(rs, prevRows, lo, hi, centros.map((centro) => centro.id))
 
   // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel). Se toman
   // solo las celdas (trimestre, mes) cuyo mes calendario cae dentro del rango.
@@ -74,14 +169,20 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       const r = crs.find((x) => x.year === year && x.month === month)
       const ws = cks.filter((x) => x.year === year && x.month === month)
       const nuevos = ws.reduce((s, w) => s + (w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)
-      const desercion = ws.reduce((s, w) => s + (w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
+      const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
+      const desercion = r?.retiros_operativos_mes ?? desercionSemanal
       let cob = 0
       if (ws.length) { const last = [...ws].sort((a, b) => b.semana - a.semana)[0]; cob = last.cob_d5||last.cob_d4||last.cob_d3||last.cob_d2||last.cob_d1||0 }
       const has = ws.length > 0 || !!r
+      const balanceDeclarado = !!r && (r.balance_vivo === true || r.estado_mes === 'cerrado')
       // Encadenado: sin inicio guardado, el mes hereda el cierre del anterior.
-      const ninosIni = (r?.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : cadena
+      const ninosIni = balanceDeclarado && r.ninos_inicio_mes != null
+        ? Number(r.ninos_inicio_mes)
+        : (r?.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : cadena
       const nuevosActivos = r?.nuevos_activos_mes || 0
-      const ninosFinal = (r?.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ninosIni + nuevosActivos - desercion)
+      const ninosFinal = balanceDeclarado && r.ninos_final_mes != null
+        ? Number(r.ninos_final_mes)
+        : (r?.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ninosIni + nuevosActivos - desercion)
       if (has) { cadena = ninosFinal; if ((r?.grupos_activos || 0) > 0) cadenaGrupos = r.grupos_activos }
       const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
       const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
@@ -145,23 +246,34 @@ export async function getHistorialAdmin(anio, centroSel, trimSel) {
     : await sql`SELECT id, nombre FROM centros ORDER BY nombre`
 
   const trimestres = (trimSel && trimSel !== 'todos') ? [parseInt(trimSel)] : [1, 2, 3, 4]
+  const centroIds = new Set(centros.map((centro) => Number(centro.id)))
+  const lo = Number(anio) * 100 + 1
+  const hi = Number(anio) * 100 + 12
+  let resumen = (await sql`SELECT * FROM resumen_mes WHERE year = ${anio}`)
+    .filter((row) => centroIds.has(Number(row.centro_id)))
+  const semanas = (await sql`SELECT * FROM kpi_semanas WHERE year = ${anio}`)
+    .filter((row) => centroIds.has(Number(row.centro_id)))
+  const prevRows = (await sql`SELECT centro_id, ninos_final_mes, grupos_activos FROM resumen_mes WHERE year = ${Number(anio) - 1} AND month = 12`)
+    .filter((row) => centroIds.has(Number(row.centro_id)))
+  resumen = await aplicarMesesAbiertosVivos(resumen, prevRows, lo, hi, [...centroIds])
 
   const out = []
   for (const c of centros) {
-    const rs = await sql`SELECT * FROM resumen_mes WHERE centro_id = ${c.id} AND year = ${anio}`
-    const ks = await sql`SELECT * FROM kpi_semanas WHERE centro_id = ${c.id} AND year = ${anio}`
+    const rs = resumen.filter((row) => Number(row.centro_id) === Number(c.id))
+    const ks = semanas.filter((row) => Number(row.centro_id) === Number(c.id))
     for (const t of trimestres) {
       const months = Q_MONTHS[t]
       const meses = months.map((mo) => {
         const r = rs.find((x) => x.month === mo)
         const ws = ks.filter((x) => x.month === mo)
         const nuevos = ws.reduce((a, w) => a + (w.ing_d1 || 0) + (w.ing_d2 || 0) + (w.ing_d3 || 0) + (w.ing_d4 || 0) + (w.ing_d5 || 0), 0)
-        const des = ws.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+        const desercionSemanal = ws.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+        const des = r?.retiros_operativos_mes ?? desercionSemanal
         return {
           month: mo,
           nuevos, des,
-          ninos: r?.ninos_final_mes || 0,
-          grupos: r?.grupos_activos || 0,
+          ninos: r?.ninos_final_mes ?? 0,
+          grupos: r?.grupos_activos ?? 0,
           cp_inv: r?.cp_invitados || 0,
           cp_mat: r?.cp_matriculados || 0,
           tieneData: ws.length > 0 || !!r,
@@ -184,10 +296,12 @@ export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
   const hi = hastaY * 100 + hastaM
   const py = desdeM === 1 ? desdeY - 1 : desdeY
   const pm = desdeM === 1 ? 12 : desdeM - 1
-  const rows = await sql`
+  const centros = await sql`SELECT id FROM centros`
+  let rows = await sql`
     SELECT centro_id, year, month, ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
     FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const prev = await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
+  rows = await aplicarMesesAbiertosVivos(rows, prev, lo, hi, centros.map((centro) => centro.id))
   const desMes = await sql`
     SELECT centro_id, year, month,
            SUM(des_d1 + des_d2 + des_d3 + des_d4 + des_d5)::int AS des
@@ -200,9 +314,14 @@ export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
     if (!mrs.length) continue
     let ninos = 0, nuevos = 0
     for (const r of mrs) {
-      const des = desMes.find((d) => d.centro_id === r.centro_id && d.year === year && d.month === month)?.des || 0
-      const ini = (r.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : (cadena.get(r.centro_id) || 0)
-      const fin = (r.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ini + (r.nuevos_activos_mes || 0) - des)
+      const des = r.retiros_operativos_mes ?? (desMes.find((d) => d.centro_id === r.centro_id && d.year === year && d.month === month)?.des || 0)
+      const balanceDeclarado = r.balance_vivo === true || r.estado_mes === 'cerrado'
+      const ini = balanceDeclarado && r.ninos_inicio_mes != null
+        ? Number(r.ninos_inicio_mes)
+        : (r.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : (cadena.get(r.centro_id) || 0)
+      const fin = balanceDeclarado && r.ninos_final_mes != null
+        ? Number(r.ninos_final_mes)
+        : (r.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ini + (r.nuevos_activos_mes || 0) - des)
       cadena.set(r.centro_id, fin)
       ninos += fin
       nuevos += r.nuevos_activos_mes || 0

@@ -4,10 +4,15 @@ import assert from 'node:assert/strict'
 import {
   ajusteHistoricoKpi,
   balanceMensual,
+  cuadroConBalanceDeclarado,
+  estadoMesPermiteCambios,
   fechaInicioOperativa,
   finalVisibleKpi,
   iniciosClaseMes,
   inicioVisibleKpi,
+  movimientosVivosMes,
+  periodosAfectadosCambioInicioGrupo,
+  periodosAbiertosOperativos,
   proyeccionSiguienteMes,
   resumenConCuadroVivo,
   usaIniciosClaseOperativos,
@@ -56,6 +61,39 @@ test('una inscripcion posterior al inicio del grupo cuenta al inscribirse', () =
   assert.equal(fechaInicioOperativa(e, grupo(), ev), '2026-08-21')
 })
 
+test('mover el inicio del grupo protege tambien el mes efectivo de cada nino', () => {
+  const periodos = periodosAfectadosCambioInicioGrupo({
+    grupo: grupo({ fecha_inicio_clases: '2026-08-15' }),
+    fechaNueva: '2026-10-01',
+    estudiantes: [estudiante({ fecha_inscripcion: '2026-09-10' })],
+    eventos: [inscripcion({ fecha: '2026-09-10' })],
+    fechaReferencia: '2026-08-08',
+  })
+
+  assert.deepEqual(periodos, [
+    { year: 2026, month: 8 },
+    { year: 2026, month: 9 },
+    { year: 2026, month: 10 },
+  ])
+})
+
+test('un grupo sin fecha inicial protege desde su apertura al asignarle una', () => {
+  const periodos = periodosAfectadosCambioInicioGrupo({
+    grupo: grupo({ fecha_inicio_clases: null, fecha_apertura: '2026-06-20' }),
+    fechaNueva: '2026-09-01',
+    estudiantes: [estudiante({ fecha_inscripcion: '2026-07-05' })],
+    eventos: [inscripcion({ fecha: '2026-07-05' })],
+    fechaReferencia: '2026-08-08',
+  })
+
+  assert.deepEqual(periodos, [
+    { year: 2026, month: 6 },
+    { year: 2026, month: 7 },
+    { year: 2026, month: 8 },
+    { year: 2026, month: 9 },
+  ])
+})
+
 test('sin fecha de inicio de grupo se usa la fecha de inscripcion', () => {
   assert.equal(fechaInicioOperativa(estudiante(), grupo({ fecha_inicio_clases: null }), inscripcion()), '2026-06-03')
 })
@@ -79,6 +117,24 @@ test('un retiro anterior al inicio cancela el nuevo activo', () => {
   ]
 
   assert.deepEqual(iniciosClaseMes([estudiante()], [grupo()], eventos, 2026, 8), [])
+})
+
+test('una cancelacion antes del inicio de clases no descuenta un nino activo', () => {
+  const eventos = [
+    inscripcion(),
+    { id: 101, estudiante_id: 1, tipo: 'retiro', fecha: '2026-08-01', year: 2026, month: 8 },
+  ]
+  const movimientos = movimientosVivosMes({
+    estudiantes: [estudiante({ estado: 'retirado' })],
+    grupos: [grupo()],
+    eventos,
+    year: 2026,
+    month: 8,
+  })
+
+  assert.equal(movimientos.iniciosClase.length, 0)
+  assert.equal(movimientos.deserciones.length, 0)
+  assert.equal(movimientos.totales.retirados, 0)
 })
 
 test('un retiro despues del inicio conserva el inicio y ambos se declaran', () => {
@@ -119,6 +175,23 @@ test('una reincorporacion no crea un nuevo activo', () => {
 
 test('calcula el balance operativo mensual', () => {
   assert.equal(balanceMensual({ inicio: 150, nuevosActivos: 12, reincorporados: 2, retirados: 5 }), 159)
+})
+
+test('el snapshot cerrado conserva el mismo balance que el resumen mensual', () => {
+  const datos = cuadroConBalanceDeclarado({
+    datos: {
+      totales: { mesAnterior: 126, nuevos: 1, reincorporados: 0, retirados: 9, aPagar: 118 },
+      controlGrupos: { totales: { mesAnterior: 126, nuevos: 1, reincorporados: 0, retirados: 9, aPagar: 118 } },
+    },
+    inicio: 135,
+    nuevosActivos: 1,
+    reincorporados: 0,
+    retirados: 8,
+  })
+
+  assert.equal(datos.totales.mesAnterior, 135)
+  assert.equal(datos.totales.aPagar, 128)
+  assert.equal(datos.controlGrupos.totales.aPagar, 128)
 })
 
 test('un mes cerrado conserva su inicio historico aunque cambie el cierre anterior', () => {
@@ -172,18 +245,98 @@ test('el historial de un mes cerrado conserva el valor guardado', () => {
   }), 14)
 })
 
-test('el resumen trimestral incorpora el cuadro vivo del mes abierto', () => {
+test('el resumen trimestral usa el balance KPI aunque el roster vivo tenga otra cantidad', () => {
   const filas = resumenConCuadroVivo([
-    { centro_id: 2, year: 2026, month: 8, ninos_final_mes: 134, nuevos_activos_mes: 0, grupos_activos: 19 },
+    { centro_id: 2, year: 2026, month: 7, ninos_inicio_mes: 148, ninos_final_mes: 135, nuevos_activos_mes: 0, grupos_activos: 19 },
+    { centro_id: 2, year: 2026, month: 8, ninos_inicio_mes: 135, ninos_final_mes: 128, nuevos_activos_mes: 1, grupos_activos: 19 },
   ], {
     year: 2026,
     month: 8,
     estado: 'abierto',
-    cuadro: { totales: { mesAnterior: 135, aPagar: 136, gruposActivos: 19 }, iniciosClase: [{}] },
+    inicioArrastrado: 135,
+    cuadro: {
+      totales: { mesAnterior: 126, aPagar: 127, gruposActivos: 17, reincorporados: 0 },
+      iniciosClase: [{}],
+      deserciones: Array.from({ length: 8 }, () => ({})),
+    },
+    motivos: { mot_economico: 4, mot_graduado: 1, mot_otro: 3 },
   })
 
-  assert.equal(filas[0].ninos_final_mes, 136)
-  assert.equal(filas[0].nuevos_activos_mes, 1)
+  assert.equal(filas[1].ninos_inicio_mes, 135)
+  assert.equal(filas[1].ninos_final_mes, 128)
+  assert.equal(filas[1].nuevos_activos_mes, 1)
+  assert.equal(filas[1].retiros_operativos_mes, 8)
+  assert.equal(filas[1].mot_graduado, 1)
+})
+
+test('el panel agregado aplica los inicios y retiros vivos del mes abierto', () => {
+  const movimientos = movimientosVivosMes({
+    estudiantes: [estudiante({ id: 877, fecha_inscripcion: '2026-08-07' })],
+    grupos: [grupo({ fecha_inicio_clases: '2026-01-10', estado: 'activo' })],
+    eventos: [inscripcion({ id: 956, estudiante_id: 877, fecha: '2026-08-07' })],
+    year: 2026,
+    month: 8,
+  })
+  const filas = resumenConCuadroVivo([
+    { centro_id: 6, year: 2026, month: 8, ninos_inicio_mes: 61, ninos_final_mes: 61 },
+    { centro_id: 1, year: 2026, month: 8, ninos_inicio_mes: 200, ninos_final_mes: 200 },
+  ], {
+    centroId: 6,
+    year: 2026,
+    month: 8,
+    estado: 'abierto',
+    inicioArrastrado: 61,
+    cuadro: movimientos,
+  })
+
+  assert.equal(movimientos.iniciosClase.length, 1)
+  assert.equal(movimientos.deserciones.length, 0)
+  assert.equal(movimientos.totales.gruposActivos, 1)
+  assert.equal(filas[0].ninos_final_mes, 62)
+  assert.equal(filas[1].ninos_final_mes, 200)
+})
+
+test('el mes abierto se crea desde los movimientos aunque aun no tenga fila KPI', () => {
+  const filas = resumenConCuadroVivo([], {
+    centroId: 2,
+    year: 2026,
+    month: 8,
+    estado: 'abierto',
+    inicioArrastrado: 135,
+    cuadro: {
+      totales: { gruposActivos: 17, reincorporados: 0 },
+      iniciosClase: [{}],
+      deserciones: Array.from({ length: 8 }, () => ({})),
+    },
+  })
+
+  assert.equal(filas.length, 1)
+  assert.equal(filas[0].centro_id, 2)
+  assert.equal(filas[0].ninos_inicio_mes, 135)
+  assert.equal(filas[0].ninos_final_mes, 128)
+})
+
+test('un resumen sin estado sigue abierto aunque ya no sea el mes actual', () => {
+  const periodos = periodosAbiertosOperativos({
+    resumenes: [{ centro_id: 2, year: 2026, month: 8 }],
+    estados: [],
+    centroIds: [2],
+    desde: 202608,
+    hasta: 202609,
+    periodoActual: 202609,
+  })
+
+  assert.deepEqual(periodos, [
+    { centroId: 2, year: 2026, month: 8, estado: 'abierto' },
+    { centroId: 2, year: 2026, month: 9, estado: 'abierto' },
+  ])
+})
+
+test('un mes en proceso de cierre rechaza nuevas escrituras', () => {
+  assert.equal(estadoMesPermiteCambios(null), true)
+  assert.equal(estadoMesPermiteCambios('abierto'), true)
+  assert.equal(estadoMesPermiteCambios('cerrando'), false)
+  assert.equal(estadoMesPermiteCambios('cerrado'), false)
 })
 
 test('el resumen trimestral no reinterpreta un mes cerrado', () => {

@@ -1,11 +1,12 @@
 'use server'
-import { sql, upsert } from '../../lib/db'
+import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
-import { guardarSnapshotCuadro, calcularCuadro } from '../../lib/cuadro-snapshot'
+import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { balanceMensual, INICIOS_CLASE_DESDE, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
+import { balanceMensual, cuadroConBalanceDeclarado, INICIOS_CLASE_DESDE, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
 import { cierreMesAnterior } from '../../lib/cadena'
+import { bloquearMesesEditables } from '../../lib/mes-kpi'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -19,10 +20,10 @@ const intOr = (v, d = 0) => {
 // mano y no se toca.
 const AUTO_MOTIVOS_DESDE = INICIOS_CLASE_DESDE
 
-async function motivosDelModulo(centroId, year, month) {
+async function motivosDelModulo(centroId, year, month, query = sql) {
   if (year * 100 + month < AUTO_MOTIVOS_DESDE) return null
   try {
-    const datos = await calcularCuadro(centroId, intOr(year), intOr(month))
+    const datos = await calcularCuadro(centroId, intOr(year), intOr(month), query)
     const des = datos?.deserciones || []
     const t = datos?.totales || {}
     return {
@@ -42,8 +43,8 @@ async function motivosDelModulo(centroId, year, month) {
 }
 
 // Grupos activos que ve el módulo de operaciones ahora mismo.
-async function gruposDelModulo(centroId) {
-  const [g] = await sql`SELECT COUNT(*)::int AS n FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
+async function gruposDelModulo(centroId, query = sql) {
+  const [g] = await query`SELECT COUNT(*)::int AS n FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
   return g?.n || 0
 }
 
@@ -84,111 +85,133 @@ export async function saveKpiMes(centroId, year, month, config, semanas) {
 
 async function guardarKpiMes(centroId, year, month, config, semanas) {
   await requireCentroAccess(centroId)
-  const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}`
-  if (mes?.estado === 'cerrado') return { error: 'Este mes está cerrado. No se puede editar.' }
-
   let totalDes = 0
   for (const w of semanas || []) for (const v of (w.des || [])) totalDes += intOr(v)
 
-  // El inicio del mes se ARRASTRA del cierre del mes anterior cuando existe
-  // (regla del encadenamiento); lo que digite el cliente solo vale para el
-  // primer mes del centro, cuando aún no hay cadena.
-  const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month))
-  const ninosInicio = arrastrado ? arrastrado.valor : intOr(config.ninos_inicio)
-  // Los motivos de deserción los manda el módulo desde agosto 2026: lo que
-  // llegue del formulario no puede contradecir los retiros registrados.
-  const auto = await motivosDelModulo(centroId, intOr(year), intOr(month))
-  const mot = (k) => (auto ? auto[k] : intOr(config[k]))
-  // Grupos activos: el módulo manda. Un formulario recién abierto llega en 0 y
-  // así nacía la fila del mes — dejando el panel sin promedio de niños por
-  // grupo. Nunca se escribe 0 si el centro tiene grupos abiertos.
-  const gruposForm = intOr(config.grupos_activos)
-  let gruposActivos = auto && auto.grupos > 0 ? auto.grupos : gruposForm
-  if (gruposActivos <= 0) gruposActivos = await gruposDelModulo(centroId)
-  // Nuevos activos: desde agosto salen de los inicios de clase del cuadro (así un
-  // "Guardar" con la pantalla vieja no borra lo que sincronizó el cuadro).
-  const nuevosActivos = auto ? auto.nuevos : intOr(config.nuevos_activos_mes)
-  const retirados = auto ? auto.total : totalDes
-  const reincorporados = auto ? auto.reincorporados : 0
-  const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
-  const now = new Date().toISOString()
+  return await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+    if (errorMes) return { error: errorMes }
 
-  await upsert('resumen_mes', {
-    centro_id: centroId, year, month,
-    ninos_inicio_mes: ninosInicio,
-    ninos_final_mes: ninosFinal,
-    grupos_activos: gruposActivos,
-    meta_nuevos_mensual: intOr(config.meta_nuevos_mensual, 20),
-    nuevos_activos_mes: nuevosActivos,
-    cp_invitados: intOr(config.cp_invitados),
-    cp_asistieron: intOr(config.cp_asistieron),
-    cp_matriculados: intOr(config.cp_matriculados),
-    mot_tecnica: mot('mot_tecnica'),
-    mot_perdida_clase: mot('mot_perdida_clase'),
-    mot_economico: mot('mot_economico'),
-    mot_horario: mot('mot_horario'),
-    mot_graduado: mot('mot_graduado'),
-    mot_otro: mot('mot_otro'),
-    orig_referido: intOr(config.orig_referido),
-    orig_marketing: intOr(config.orig_marketing),
-    orig_centro: intOr(config.orig_centro),
-    orig_activaciones: intOr(config.orig_activaciones),
-    orig_medios: intOr(config.orig_medios),
-    updated_at: now,
-  }, ['centro_id', 'year', 'month'])
+    // El inicio se arrastra del cierre anterior. La lectura y el guardado
+    // permanecen bajo el mismo bloqueo que usan los movimientos operativos.
+    const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month), query)
+    const ninosInicio = arrastrado ? arrastrado.valor : intOr(config.ninos_inicio)
+    const auto = await motivosDelModulo(centroId, intOr(year), intOr(month), query)
+    const mot = (k) => (auto ? auto[k] : intOr(config[k]))
+    const gruposForm = intOr(config.grupos_activos)
+    let gruposActivos = auto && auto.grupos > 0 ? auto.grupos : gruposForm
+    if (gruposActivos <= 0) gruposActivos = await gruposDelModulo(centroId, query)
+    const nuevosActivos = auto ? auto.nuevos : intOr(config.nuevos_activos_mes)
+    const retirados = auto ? auto.total : totalDes
+    const reincorporados = auto ? auto.reincorporados : 0
+    const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
+    const now = new Date().toISOString()
 
-  for (let i = 0; i < SEMANAS.length; i++) {
-    const w = semanas?.[i] || { cob: [], des: [], ing: [] }
-    await upsert('kpi_semanas', {
-      centro_id: centroId, year, month, semana: i + 1,
-      cob_d1: intOr(w.cob?.[0]), cob_d2: intOr(w.cob?.[1]), cob_d3: intOr(w.cob?.[2]), cob_d4: intOr(w.cob?.[3]), cob_d5: intOr(w.cob?.[4]),
-      des_d1: intOr(w.des?.[0]), des_d2: intOr(w.des?.[1]), des_d3: intOr(w.des?.[2]), des_d4: intOr(w.des?.[3]), des_d5: intOr(w.des?.[4]),
-      ing_d1: intOr(w.ing?.[0]), ing_d2: intOr(w.ing?.[1]), ing_d3: intOr(w.ing?.[2]), ing_d4: intOr(w.ing?.[3]), ing_d5: intOr(w.ing?.[4]),
+    await upsertWith(query, 'resumen_mes', {
+      centro_id: centroId, year, month,
+      ninos_inicio_mes: ninosInicio,
+      ninos_final_mes: ninosFinal,
+      grupos_activos: gruposActivos,
+      meta_nuevos_mensual: intOr(config.meta_nuevos_mensual, 20),
+      nuevos_activos_mes: nuevosActivos,
+      cp_invitados: intOr(config.cp_invitados),
+      cp_asistieron: intOr(config.cp_asistieron),
+      cp_matriculados: intOr(config.cp_matriculados),
+      mot_tecnica: mot('mot_tecnica'),
+      mot_perdida_clase: mot('mot_perdida_clase'),
+      mot_economico: mot('mot_economico'),
+      mot_horario: mot('mot_horario'),
+      mot_graduado: mot('mot_graduado'),
+      mot_otro: mot('mot_otro'),
+      orig_referido: intOr(config.orig_referido),
+      orig_marketing: intOr(config.orig_marketing),
+      orig_centro: intOr(config.orig_centro),
+      orig_activaciones: intOr(config.orig_activaciones),
+      orig_medios: intOr(config.orig_medios),
       updated_at: now,
-    }, ['centro_id', 'year', 'month', 'semana'])
-  }
-  return { ok: true }
+    }, ['centro_id', 'year', 'month'])
+
+    for (let i = 0; i < SEMANAS.length; i++) {
+      const w = semanas?.[i] || { cob: [], des: [], ing: [] }
+      await upsertWith(query, 'kpi_semanas', {
+        centro_id: centroId, year, month, semana: i + 1,
+        cob_d1: intOr(w.cob?.[0]), cob_d2: intOr(w.cob?.[1]), cob_d3: intOr(w.cob?.[2]), cob_d4: intOr(w.cob?.[3]), cob_d5: intOr(w.cob?.[4]),
+        des_d1: intOr(w.des?.[0]), des_d2: intOr(w.des?.[1]), des_d3: intOr(w.des?.[2]), des_d4: intOr(w.des?.[3]), des_d5: intOr(w.des?.[4]),
+        ing_d1: intOr(w.ing?.[0]), ing_d2: intOr(w.ing?.[1]), ing_d3: intOr(w.ing?.[2]), ing_d4: intOr(w.ing?.[3]), ing_d5: intOr(w.ing?.[4]),
+        updated_at: now,
+      }, ['centro_id', 'year', 'month', 'semana'])
+    }
+    return { ok: true }
+  })
 }
 
 export async function cerrarMes(centroId, year, month) {
+  const y = intOr(year)
+  const m = intOr(month)
   try {
     await requireCentroAccess(centroId)
-    await upsert('mes_kpi',
-      { centro_id: centroId, year, month, estado: 'cerrado', cerrado_at: new Date().toISOString() },
-      ['centro_id', 'year', 'month'])
-    // Al cerrar el mes se congela la foto del Cuadro de Negocio (historial)
-    // y los niños de inicio/cierre quedan GRABADOS en el KPI del mes desde
-    // esa foto: el mes siguiente arranca con este cierre (encadenamiento).
-    // Best effort: si falla, el mes queda cerrado igual y la foto se congela
-    // retroactivamente la próxima vez que alguien abra ese mes del cuadro.
-    let warn
-    try {
-      const datos = await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
+    return await withTransaction(async (query) => {
+      await query`
+        INSERT INTO mes_kpi (centro_id, year, month, estado, cerrado_at)
+        VALUES (${centroId}, ${y}, ${m}, 'abierto', NULL)
+        ON CONFLICT (centro_id, year, month) DO NOTHING
+      `
+      const [mes] = await query`
+        SELECT estado FROM mes_kpi
+        WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
+        FOR UPDATE
+      `
+      if (mes?.estado === 'cerrado') return { ok: true, alreadyClosed: true }
+      if (mes?.estado !== 'abierto') {
+        return { error: 'El mes no está disponible para cerrar. Recarga la pantalla e inténtalo de nuevo.' }
+      }
+
+      // El bloqueo de mes se mantiene mientras se leen los movimientos, se
+      // congela el cuadro, se encadena el saldo y se marca el cierre.
+      const datos = await calcularCuadro(centroId, y, m, query)
       const t = datos?.totales
-      // Antes de agosto de 2026 el KPI se capturaba manualmente y una foto
-      // tardia del Cuadro no puede reconstruir quienes estaban activos al
-      // cierre. Se conserva el resumen que guardarKpiMes acaba de grabar.
-      if (t && usaIniciosClaseOperativos(year, month)) {
-        // El inicio SIEMPRE se arrastra del cierre del mes anterior — misma
-        // regla que guardarKpiMes. Derivarlo de la propia foto (t.mesAnterior)
-        // le da al mes un inicio PROPIO y rompe la cadena: cerrar un mes por
-        // error le reescribía el inicio con los datos de hoy. Ese cálculo solo
-        // sirve de arranque cuando el centro no tiene mes anterior.
-        const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month))
-        await upsert('resumen_mes', {
-          centro_id: centroId, year: intOr(year), month: intOr(month),
-          ninos_inicio_mes: arrastrado ? arrastrado.valor : t.mesAnterior,
-          ninos_final_mes: t.aPagar,
+      const operativo = Boolean(t && usaIniciosClaseOperativos(y, m))
+      const arrastrado = operativo ? await cierreMesAnterior(centroId, y, m, query) : null
+      const nuevosActivos = datos?.iniciosClase?.length ?? t?.nuevos ?? 0
+      const reincorporados = t?.reincorporados || 0
+      const retirados = Array.isArray(datos?.deserciones) ? datos.deserciones.length : (t?.retirados || 0)
+      const ninosInicio = arrastrado ? arrastrado.valor : (t?.mesAnterior || 0)
+      const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
+      const datosCierre = operativo
+        ? cuadroConBalanceDeclarado({ datos, inicio: ninosInicio, nuevosActivos, reincorporados, retirados })
+        : datos
+      const cerradoAt = new Date().toISOString()
+
+      await upsertWith(query, 'cuadro_mensual', {
+        centro_id: centroId,
+        year: y,
+        month: m,
+        datos: JSON.stringify(datosCierre),
+        cerrado_at: cerradoAt,
+      }, ['centro_id', 'year', 'month'])
+
+      // Los meses históricos anteriores a la automatización conservan la
+      // captura manual. Desde agosto, el cierre operativo es la fuente única.
+      if (operativo) {
+        await upsertWith(query, 'resumen_mes', {
+          centro_id: centroId,
+          year: y,
+          month: m,
+          ninos_inicio_mes: ninosInicio,
+          ninos_final_mes: ninosFinal,
           grupos_activos: t.gruposActivos,
-          nuevos_activos_mes: datos?.iniciosClase?.length ?? t.nuevos ?? 0,
-          updated_at: new Date().toISOString(),
+          nuevos_activos_mes: nuevosActivos,
+          updated_at: cerradoAt,
         }, ['centro_id', 'year', 'month'])
       }
-    } catch (e) {
-      console.error('[cerrarMes] no se pudo congelar la foto del cuadro:', e)
-      warn = 'El mes quedó cerrado, pero no se pudo congelar la foto del cuadro; se congelará al abrir el cuadro de ese mes.'
-    }
-    return warn ? { ok: true, warn } : { ok: true }
+
+      await query`
+        UPDATE mes_kpi
+        SET estado = 'cerrado', cerrado_at = ${cerradoAt}
+        WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
+      `
+      return { ok: true }
+    })
   } catch (e) {
     return fallo('cerrarMes', e)
   }
@@ -197,10 +220,23 @@ export async function cerrarMes(centroId, year, month) {
 export async function reabrirMes(centroId, year, month) {
   try {
     await requireCentroAccess(centroId)
-    await upsert('mes_kpi',
-      { centro_id: centroId, year, month, estado: 'abierto', cerrado_at: null },
-      ['centro_id', 'year', 'month'])
-    return { ok: true }
+    return await withTransaction(async (query) => {
+      await query`
+        INSERT INTO mes_kpi (centro_id, year, month, estado, cerrado_at)
+        VALUES (${centroId}, ${year}, ${month}, 'abierto', NULL)
+        ON CONFLICT (centro_id, year, month) DO NOTHING
+      `
+      await query`
+        SELECT estado FROM mes_kpi
+        WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}
+        FOR UPDATE
+      `
+      await query`
+        UPDATE mes_kpi SET estado = 'abierto', cerrado_at = NULL
+        WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}
+      `
+      return { ok: true }
+    })
   } catch (e) {
     return fallo('reabrirMes', e)
   }

@@ -1,11 +1,12 @@
 'use server'
-import { sql, upsert } from '../../lib/db'
+import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
-import { usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
+import { balanceMensual, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
 import { cierreMesAnterior } from '../../lib/cadena'
+import { bloquearMesesEditables } from '../../lib/mes-kpi'
 
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
@@ -126,43 +127,47 @@ export async function sincronizarConKpi(centroId, year, month) {
   const y = intOr(year)
   const m = intOr(month)
   if (!mesValido(y, m)) return { error: 'Mes inválido.' }
-  const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
-  if (mes?.estado === 'cerrado') return { error: 'Este mes está cerrado. Reábrelo en KPI Semanal para poder sincronizar.' }
   if (!usaIniciosClaseOperativos(y, m)) {
     return { error: 'Los meses anteriores a agosto de 2026 conservan su captura histórica. Corrígelos desde KPI Semanal.' }
   }
 
-  // El mismo cálculo del cuadro (incluida la regla de fecha de inicio de
-  // clases: grupos en llenado no cuentan) alimenta el KPI.
-  const datos = await calcularCuadro(centroId, y, m)
-  const control = datos.controlGrupos
-  // motivosParaKpi devuelve exactamente las 6 columnas mot_* de resumen_mes.
-  const motivos = motivosParaKpi(datos.deserciones)
+  return await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year: y, month: m }])
+    if (errorMes) return { error: errorMes }
 
-  const t = control.totales
-  // El inicio del mes NO se calcula: se ARRASTRA del cierre del mes anterior
-  // (regla del encadenamiento). Derivarlo del propio mes como
-  // `totalMes − nuevos + retirados` (t.mesAnterior) le da a cada mes un inicio
-  // independiente, y ahí es donde la cadena se parte sin que nadie lo note.
-  // Ese cálculo solo sirve de arranque cuando el centro aún no tiene mes
-  // anterior del cual encadenar.
-  const arrastrado = await cierreMesAnterior(centroId, y, m)
-  const aplicado = {
-    ninos_inicio_mes: arrastrado ? arrastrado.valor : t.mesAnterior,
-    ninos_final_mes: t.aPagar,
-    grupos_activos: t.gruposActivos,
-    nuevos_activos_mes: datos.iniciosClase?.length ?? t.nuevos,
-    mot_tecnica: motivos.mot_tecnica,
-    mot_perdida_clase: motivos.mot_perdida_clase,
-    mot_economico: motivos.mot_economico,
-    mot_horario: motivos.mot_horario,
-    mot_graduado: motivos.mot_graduado,
-    mot_otro: motivos.mot_otro,
-  }
-  await upsert('resumen_mes', {
-    centro_id: centroId, year: y, month: m,
-    ...aplicado,
-    updated_at: new Date().toISOString(),
-  }, ['centro_id', 'year', 'month'])
-  return { ok: true, aplicado }
+    // El cálculo y el guardado ocurren bajo el mismo bloqueo mensual para que
+    // ningún movimiento deje el resumen desactualizado a mitad del proceso.
+    const datos = await calcularCuadro(centroId, y, m, query)
+    const t = datos.controlGrupos.totales
+    const motivos = motivosParaKpi(datos.deserciones)
+    const arrastrado = await cierreMesAnterior(centroId, y, m, query)
+    const ninosInicio = arrastrado ? arrastrado.valor : t.mesAnterior
+    const nuevosActivos = datos.iniciosClase?.length ?? t.nuevos ?? 0
+    const retirados = Array.isArray(datos.deserciones) ? datos.deserciones.length : (t.retirados || 0)
+    const aplicado = {
+      ninos_inicio_mes: ninosInicio,
+      ninos_final_mes: Math.max(0, balanceMensual({
+        inicio: ninosInicio,
+        nuevosActivos,
+        reincorporados: t.reincorporados || 0,
+        retirados,
+      })),
+      grupos_activos: t.gruposActivos,
+      nuevos_activos_mes: nuevosActivos,
+      mot_tecnica: motivos.mot_tecnica,
+      mot_perdida_clase: motivos.mot_perdida_clase,
+      mot_economico: motivos.mot_economico,
+      mot_horario: motivos.mot_horario,
+      mot_graduado: motivos.mot_graduado,
+      mot_otro: motivos.mot_otro,
+    }
+    await upsertWith(query, 'resumen_mes', {
+      centro_id: centroId,
+      year: y,
+      month: m,
+      ...aplicado,
+      updated_at: new Date().toISOString(),
+    }, ['centro_id', 'year', 'month'])
+    return { ok: true, aplicado }
+  })
 }
