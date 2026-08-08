@@ -5,10 +5,9 @@
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
 import { getSession, isAdminRole } from '../../../../../lib/auth'
-import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
-import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
-import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
-import { INICIOS_CLASE_DESDE_FECHA, iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
+import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
+import { cargarDatosCuadroExportacion, grupoPedidoCongelado } from '../../../../../lib/cuadro-export.mjs'
+import { calcularCuadro, leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -73,81 +72,20 @@ export async function GET(request, { params }) {
     return Response.json({ error: 'Este mes cerrado no tiene una foto histórica.' }, { status: 409 })
   }
 
-  const gruposRaw = await sql`SELECT * FROM grupos WHERE centro_id = ${id} ORDER BY numero`
-  const coaches = await sql`SELECT * FROM coaches WHERE centro_id = ${id}`
-  const horarios = await sql`
-    SELECT gh.* FROM grupo_horarios gh
-    JOIN grupos g ON g.id = gh.grupo_id
-    WHERE g.centro_id = ${id}
-    ORDER BY gh.dia, gh.hora_inicio
-  `
-  const estudiantes = await sql`SELECT * FROM estudiantes WHERE centro_id = ${id}`
-  const todosEventos = await sql`
-    SELECT * FROM estudiante_eventos
-    WHERE centro_id = ${id}
-      AND ((year = ${year} AND month = ${month}) OR tipo IN ('inscripcion', 'retiro', 'cambio_grupo'))
-    ORDER BY fecha, id
-  `
-  const eventos = todosEventos.filter((evento) => Number(evento.year) === year && Number(evento.month) === month)
-  let pedidos = await sql`
-    SELECT * FROM pedidos_material
-    WHERE centro_id = ${id} AND year = ${year} AND month = ${month}
-    ORDER BY fecha, id
-  `
-  const tri = Math.ceil(month / 3)
-  const [metas] = await sql`SELECT royalty_por_nino FROM metas WHERE anio = ${year} AND trimestre = ${tri}`
-  let royaltyRate = Number(metas?.royalty_por_nino) || 12
-
-  const porCoach = new Map(coaches.map((x) => [String(x.id), x]))
-  const grupos = gruposRaw.map((g) => ({
-    ...g,
-    coach: g.coach_id == null ? null : porCoach.get(String(g.coach_id)) || null,
-    horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
-  }))
-
-  // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
-  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
-  const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-  const iniciado = (g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= finMes
-  const gruposCuadro = grupos.filter(iniciado)
-  const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
-  const usaIniciosOperativos = usaIniciosClaseOperativos(year, month)
-  const estudiantesCuadro = estudiantes.filter((e) => {
-    if (usaIniciosOperativos && !e.grupo_id) {
-      const fecha = fechaIso10(e.fecha_inscripcion)
-      return Boolean(fecha && fecha < INICIOS_CLASE_DESDE_FECHA)
-    }
-    return !e.grupo_id || !noIniciados.has(String(e.grupo_id))
+  // El camino cerrado termina en el snapshot. `calcularCuadro` solo se invoca
+  // para meses abiertos, por lo que el Excel histórico no depende de grupos,
+  // niños, movimientos, pedidos ni metas que hayan cambiado después del cierre.
+  const datos = await cargarDatosCuadroExportacion({
+    estado: mesRow?.estado || 'abierto',
+    snapshot: snapshotCerrado,
+    calcular: () => calcularCuadro(id, year, month),
   })
-
-  let iniciosClase = usaIniciosOperativos ? iniciosClaseMes(estudiantes, grupos, todosEventos, year, month) : null
-  const nuevosActivosIds = usaIniciosOperativos
-    ? new Set(iniciosClase.map((inicio) => String(inicio.estudianteId)))
-    : null
-  let royalties = cuadroRoyalties(estudiantesCuadro, eventos, royaltyRate, nuevosActivosIds)
-  let control = cuadroControlGrupos(gruposCuadro, estudiantesCuadro, eventos, nuevosActivosIds)
-  let deserciones = cuadroDeserciones(estudiantesCuadro, eventos, gruposCuadro)
-  if (usaIniciosOperativos) {
-    const totales = {
-      ...control.totales,
-      nuevos: iniciosClase.length,
-      reincorporados: eventos.filter((evento) => evento.tipo === 'reincorporacion').length,
-      retirados: deserciones.length,
-    }
-    totales.mesAnterior = totales.aPagar - totales.nuevos - totales.reincorporados + totales.retirados
-    control = { ...control, totales }
-  }
-
-  // Mes cerrado → el Excel sale de la foto congelada del cuadro (la misma
-  // verdad histórica que muestra la página), no del estado actual.
-  if (snapshotCerrado?.datos) {
-    royalties = snapshotCerrado.datos.royalties
-    control = snapshotCerrado.datos.controlGrupos
-    deserciones = snapshotCerrado.datos.deserciones
-    iniciosClase = Array.isArray(snapshotCerrado.datos.iniciosClase) ? snapshotCerrado.datos.iniciosClase : []
-    pedidos = snapshotCerrado.datos.pedidos || []
-    royaltyRate = snapshotCerrado.datos.royaltyRate || royaltyRate
-  }
+  const royalties = datos.royalties
+  const control = datos.controlGrupos
+  const deserciones = datos.deserciones || []
+  const iniciosClase = Array.isArray(datos.iniciosClase) ? datos.iniciosClase : []
+  const pedidos = datos.pedidos || []
+  const royaltyRate = Number(datos.royaltyRate) || 12
   const mesNombre = MESES[month - 1]
 
   const wb = new ExcelJS.Workbook()
@@ -179,7 +117,7 @@ export async function GET(request, { params }) {
   fila(h1, ['FECHA', 'N° O/E', 'PRODUCTO', 'GRUPO', 'NIVEL', 'CANTIDAD', 'MONTO', 'OBSERVACIONES'], { bold: true, fill: FILL_HEADER })
   let totalPedidos = 0
   for (const p of pedidos) {
-    const g = grupos.find((x) => String(x.id) === String(p.grupo_id))
+    const g = grupoPedidoCongelado(p, control)
     const monto = Number(p.monto) || 0
     totalPedidos += monto
     const r = fila(h1, [p.fecha || '', p.numero_oe || '', p.producto || '', g ? `GRUPO ${g.numero}` : '', p.nivel ?? '', p.cantidad || 0, monto, p.observaciones || ''])

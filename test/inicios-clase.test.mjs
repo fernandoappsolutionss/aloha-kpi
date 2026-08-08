@@ -7,6 +7,7 @@ import {
   cierreKpiDeclarado,
   cuadroConBalanceDeclarado,
   estadoMesPermiteCambios,
+  estudiantesConInicioAlCierre,
   fechaInicioOperativa,
   finalVisibleKpi,
   iniciosClaseMes,
@@ -122,6 +123,31 @@ test('una inscripcion posterior al inicio del grupo cuenta al inscribirse', () =
   const ev = inscripcion({ fecha: '2026-08-21' })
 
   assert.equal(fechaInicioOperativa(e, grupo(), ev), '2026-08-21')
+})
+
+test('una asignacion efectiva posterior no cuenta al niño en un mes anterior abierto', () => {
+  const e = estudiante({ fecha_inscripcion: '2026-08-06' })
+  const eventos = [
+    inscripcion({ fecha: '2026-08-06', a_grupo_id: null }),
+    { id: 101, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-03', a_grupo_id: 10 },
+  ]
+
+  assert.deepEqual(
+    estudiantesConInicioAlCierre([e], [grupo({ fecha_inicio_clases: '2026-07-01' })], eventos, 2026, 8),
+    [],
+  )
+  assert.deepEqual(
+    estudiantesConInicioAlCierre([e], [grupo({ fecha_inicio_clases: '2026-07-01' })], eventos, 2026, 9),
+    [e],
+  )
+})
+
+test('una venta nueva sin grupo no entra en la poblacion activa del mes', () => {
+  const e = estudiante({ grupo_id: null, fecha_inscripcion: '2026-08-06' })
+  assert.deepEqual(
+    estudiantesConInicioAlCierre([e], [grupo()], [inscripcion({ fecha: '2026-08-06', a_grupo_id: null })], 2026, 8),
+    [],
+  )
 })
 
 test('mover el inicio del grupo protege tambien el mes efectivo de cada nino', () => {

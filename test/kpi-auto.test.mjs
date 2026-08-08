@@ -15,6 +15,7 @@ import {
   filtrarClasesVigentesCrm,
   formaKpiGuardada,
   mezclarSemanasAutomaticas,
+  validarEventosCrm,
 } from '../lib/kpi-auto-server.js'
 
 const matriz = () => Array.from({ length: 5 }, () => [0, 0, 0, 0, 0])
@@ -74,7 +75,13 @@ test('consulta todos los eventos CRM en lotes de hasta 500 sin perder registros'
   const calls = []
   const crm = async (action, body) => {
     calls.push({ action, ids: body.event_ids })
-    return { registrations: body.event_ids.map((event_id) => ({ id: `reg-${event_id}`, event_id })) }
+    return { registrations: body.event_ids.map((event_id) => ({
+      id: `reg-${event_id}`,
+      event_id,
+      attendance_status: null,
+      registered_at: '2026-08-01T12:00:00.000Z',
+      checked_in_at: null,
+    })) }
   }
 
   const result = await cargarRegistrosPorLotes(ids, crm)
@@ -89,7 +96,15 @@ test('un lote CRM fallido invalida la fuente completa', async () => {
   let call = 0
   const result = await cargarRegistrosPorLotes(
     Array.from({ length: 501 }, (_, index) => `event-${index}`),
-    async () => (++call === 2 ? { error: 'CRM no disponible' } : { registrations: [{ id: 'reg-1' }] }),
+    async (_action, body) => (++call === 2
+      ? { error: 'CRM no disponible' }
+      : { registrations: [{
+          id: 'reg-1',
+          event_id: body.event_ids[0],
+          attendance_status: null,
+          registered_at: '2026-08-01T12:00:00.000Z',
+          checked_in_at: null,
+        }] }),
   )
 
   assert.deepEqual(result, { complete: false, error: 'CRM no disponible' })
@@ -103,6 +118,39 @@ test('una respuesta CRM exitosa pero malformada invalida la fuente completa', as
   }
 })
 
+test('rechaza registros CRM incompletos o ajenos al lote solicitado', async () => {
+  const invalidos = [
+    { event_id: 'event-1', registered_at: '2026-08-01T12:00:00.000Z' },
+    { id: 'reg-1', registered_at: '2026-08-01T12:00:00.000Z' },
+    { id: 'reg-1', event_id: 'event-ajeno', registered_at: '2026-08-01T12:00:00.000Z' },
+    { id: 'reg-1', event_id: 'event-1', registered_at: 'fecha-invalida' },
+  ]
+
+  for (const registration of invalidos) {
+    const result = await cargarRegistrosPorLotes(
+      ['event-1'],
+      async () => ({ registrations: [registration] }),
+    )
+    assert.equal(result.complete, false)
+    assert.match(result.error, /respuesta inválida/i)
+  }
+})
+
+test('acepta asistencia pendiente nula cuando el resto del registro CRM es válido', async () => {
+  const result = await cargarRegistrosPorLotes(['event-1'], async () => ({
+    registrations: [{
+      id: 'reg-1',
+      event_id: 'event-1',
+      attendance_status: null,
+      registered_at: '2026-08-01T12:00:00.000Z',
+      checked_in_at: null,
+    }],
+  }))
+
+  assert.equal(result.complete, true)
+  assert.equal(result.registrations.length, 1)
+})
+
 test('los espejos de clases eliminadas del CRM no bloquean los registros vigentes', () => {
   const clases = [
     { id: 'vigente-1', start_date: '2026-08-06T23:00:00.000Z' },
@@ -114,6 +162,13 @@ test('los espejos de clases eliminadas del CRM no bloquean los registros vigente
     filtrarClasesVigentesCrm(clases, [{ id: 'vigente-2' }, { id: 'vigente-1' }]),
     [clases[0], clases[2]],
   )
+})
+
+test('una lista de clases CRM con filas incompletas falla cerrada', () => {
+  assert.equal(validarEventosCrm([{}], 'cuenta-1').complete, false)
+  assert.equal(validarEventosCrm([{ id: 'ev-1' }], 'cuenta-1').complete, false)
+  assert.equal(validarEventosCrm([{ id: 'ev-1', account_id: 'otra-cuenta' }], 'cuenta-1').complete, false)
+  assert.equal(validarEventosCrm([{ id: 'ev-1', account_id: 'cuenta-1' }], 'cuenta-1').complete, true)
 })
 
 test('valida el origen comercial separado del origen tecnico', () => {
@@ -195,6 +250,23 @@ test('usa la fecha de la clase como respaldo para una asistencia sin checked_in_
 
   assert.equal(source.cp_invitados, 0)
   assert.equal(source.cp_asistieron, 1)
+})
+
+test('no suma invitados que no pertenecen a una clase solicitada', () => {
+  const source = fuenteKpiAutomatica({
+    year: 2026,
+    month: 8,
+    clases: [{ id: 'ev-1', start_date: '2026-08-13T23:00:00.000Z' }],
+    registros: [{
+      id: 'reg-ajeno',
+      event_id: 'ev-ajeno',
+      attendance_status: null,
+      registered_at: '2026-08-02T12:00:00.000Z',
+    }],
+    movimientos: [],
+  })
+
+  assert.equal(source.cp_invitados, 0)
 })
 
 test('distribuye retiros por semana y agrupa sus motivos', () => {
@@ -281,6 +353,26 @@ test('un origen clasificado despues de conciliar sigue limitado al total real de
   const reconciled = aplicarAjustes(fuenteVacia({ ing, orig_referido: 1 }), adjustments)
 
   assert.equal(reconciled.orig_referido, 1)
+  assert.equal(reconciled.orig_por_clasificar, 0)
+})
+
+test('una reclasificacion anterior no borra el origen de una venta automatica nueva', () => {
+  const unaVenta = matriz()
+  unaVenta[0][0] = 1
+  const dosVentas = matriz()
+  dosVentas[0][0] = 2
+  const adjustments = crearAjustes(
+    fuenteVacia({ ing: unaVenta, orig_referido: 1 }),
+    fuenteVacia({ ing: unaVenta, orig_por_clasificar: 1 }),
+  )
+
+  const reconciled = aplicarAjustes(
+    fuenteVacia({ ing: dosVentas, orig_referido: 1, orig_marketing: 1 }),
+    adjustments,
+  )
+
+  assert.equal(reconciled.orig_referido, 1)
+  assert.equal(reconciled.orig_marketing, 1)
   assert.equal(reconciled.orig_por_clasificar, 0)
 })
 
