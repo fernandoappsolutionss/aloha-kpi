@@ -5,8 +5,10 @@ import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
-import { iniciosClaseMes, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
+import { iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
+import { motivosParaKpi } from '../../lib/cuadro-calc'
+import { cierreMesAnterior } from '../../lib/cadena'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -30,25 +32,49 @@ export async function getCentroResumen(centroId, year, trimestre) {
 
   const hoy = hoyISO()
   const [yearActual, monthActual] = hoy.split('-').map(Number)
-  if (Number(year) === yearActual && months.includes(monthActual)) {
-    const [estadoActual] = await sql`
-      SELECT estado FROM mes_kpi
-      WHERE centro_id = ${centroId} AND year = ${yearActual} AND month = ${monthActual}
-    `
-    if (estadoActual?.estado !== 'cerrado') {
-      try {
-        const cuadroActual = await calcularCuadro(centroId, yearActual, monthActual)
-        rs = resumenConCuadroVivo(rs, {
-          year: yearActual,
-          month: monthActual,
-          estado: estadoActual?.estado || 'abierto',
-          cuadro: cuadroActual,
-        })
-      } catch (e) {
-        console.error('[getCentroResumen] no se pudo calcular el mes abierto:', e)
-      }
+  const estadosRango = await sql`
+    SELECT year, month, estado FROM mes_kpi
+    WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
+  `
+  const abiertos = periodosAbiertosOperativos({
+    resumenes: rs,
+    estados: estadosRango,
+    centroIds: [centroId],
+    desde: Number(year) * 100 + lo,
+    hasta: Number(year) * 100 + hi,
+    periodoActual: yearActual * 100 + monthActual,
+  })
+
+  for (const abierto of abiertos) {
+    try {
+      const [cuadroAbierto, cierreAnterior] = await Promise.all([
+        calcularCuadro(centroId, abierto.year, abierto.month),
+        cierreMesAnterior(centroId, abierto.year, abierto.month),
+      ])
+      const previousYear = abierto.month === 1 ? abierto.year - 1 : abierto.year
+      const previousMonth = abierto.month === 1 ? 12 : abierto.month - 1
+      const cierreVivoAnterior = rs.find((fila) =>
+        Number(fila.year) === previousYear && Number(fila.month) === previousMonth
+      )?.ninos_final_mes
+      rs = resumenConCuadroVivo(rs, {
+        centroId,
+        year: abierto.year,
+        month: abierto.month,
+        estado: abierto.estado,
+        cuadro: cuadroAbierto,
+        inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
+        motivos: motivosParaKpi(cuadroAbierto?.deserciones || []),
+      })
+    } catch (e) {
+      console.error(`[getCentroResumen] no se pudo calcular ${abierto.year}-${abierto.month}:`, e)
     }
   }
+  rs = rs.map((fila) => ({
+    ...fila,
+    estado_mes: estadosRango.find((estado) =>
+      Number(estado.year) === Number(fila.year) && Number(estado.month) === Number(fila.month)
+    )?.estado || 'abierto',
+  }))
 
   // Cierre del mes anterior al trimestre: semilla del encadenamiento (el mes
   // que abre el trimestre arranca con lo que cerró el mes previo).
@@ -111,7 +137,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     const fechaInscripcion = fechaIso10(estudiante.fecha_inscripcion)
     return (!fechaGrupo || fechaGrupo <= finMesActual) && (!fechaInscripcion || fechaInscripcion <= finMesActual)
   })
-  const cierreActual = poblacionOperativa.length
+  const cierreActual = cur.ninos
   const bajasPotenciales = poblacionOperativa.filter((estudiante) => estudiante.estado === 'baja_potencial').length
   const iniciosProgramados = iniciosClaseMes(
     estudiantesProyeccion,
@@ -138,7 +164,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
 export async function getHistorialCentro(centroId) {
   await requireCentroAccess(centroId)
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${centroId}`
-  const resumen = await sql`
+  let resumen = await sql`
     SELECT * FROM resumen_mes WHERE centro_id = ${centroId}
     ORDER BY year ASC, month ASC
   `
@@ -181,19 +207,39 @@ export async function getHistorialCentro(centroId) {
     }
   })
 
-  // La foto congelada manda en meses cerrados. Para el último mes abierto,
-  // Historial consume el mismo cálculo vivo que KPI y Cuadro de Negocio.
-  const ultimoResumen = resumen[resumen.length - 1]
-  const estadoUltimo = ultimoResumen && estados.find((estado) =>
-    Number(estado.year) === Number(ultimoResumen.year) &&
-    Number(estado.month) === Number(ultimoResumen.month)
-  )
-  if (ultimoResumen && estadoUltimo?.estado !== 'cerrado') {
+  // La foto congelada manda en meses cerrados. Cada mes reabierto consume el
+  // mismo cálculo vivo que KPI y Cuadro de Negocio, aunque no sea el último.
+  const [yearActual, monthActual] = hoyISO().split('-').map(Number)
+  const abiertos = periodosAbiertosOperativos({
+    resumenes: resumen,
+    estados,
+    centroIds: [centroId],
+    periodoActual: yearActual * 100 + monthActual,
+  })
+
+  for (const abierto of abiertos) {
     try {
-      const d = await calcularCuadro(centroId, Number(ultimoResumen.year), Number(ultimoResumen.month))
+      const [d, cierreAnterior] = await Promise.all([
+        calcularCuadro(centroId, abierto.year, abierto.month),
+        cierreMesAnterior(centroId, abierto.year, abierto.month),
+      ])
+      const previousYear = abierto.month === 1 ? abierto.year - 1 : abierto.year
+      const previousMonth = abierto.month === 1 ? 12 : abierto.month - 1
+      const cierreVivoAnterior = resumen.find((fila) =>
+        Number(fila.year) === previousYear && Number(fila.month) === previousMonth
+      )?.ninos_final_mes
+      resumen = resumenConCuadroVivo(resumen, {
+        centroId,
+        year: abierto.year,
+        month: abierto.month,
+        estado: abierto.estado,
+        cuadro: d,
+        inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
+        motivos: motivosParaKpi(d?.deserciones || []),
+      })
       const cuadroVivo = {
-        year: Number(ultimoResumen.year),
-        month: Number(ultimoResumen.month),
+        year: abierto.year,
+        month: abierto.month,
         cerrado_at: null,
         vivo: true,
         aPagar: d?.totales?.aPagar ?? 0,
@@ -210,7 +256,7 @@ export async function getHistorialCentro(centroId) {
       if (indice >= 0) cuadros[indice] = cuadroVivo
       else cuadros.push(cuadroVivo)
     } catch (e) {
-      console.error('[getHistorialCentro] no se pudo calcular el mes abierto:', e)
+      console.error(`[getHistorialCentro] no se pudo calcular ${abierto.year}-${abierto.month}:`, e)
     }
   }
   return { nombre: c?.nombre || '', resumen, estados, semanas, cuadros }

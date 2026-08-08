@@ -1,6 +1,6 @@
 'use server'
 import { randomBytes } from 'crypto'
-import { sql } from '../../lib/db'
+import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO, fechaIso10 } from '../../lib/operaciones'
@@ -9,13 +9,15 @@ import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } f
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
 import { generarItinerario, normalizarExcepciones } from '../../lib/itinerario'
+import { bloquearMesesEditables } from '../../lib/mes-kpi'
+import { periodosAfectadosCambioInicioGrupo } from '../../lib/inicios-clase.mjs'
 
 // Genera y guarda el itinerario de clases del nivel (manual ALOHA Panamá):
 // necesita fecha de inicio + días de clase. Los Naranjos opera con el
 // reglamento de ALOHA Venezuela → su calendario no salta feriados panameños.
-async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }) {
+async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }, query = sql) {
   if (!fechaInicio || !horarios?.length) return null
-  const [c] = await sql`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+  const [c] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
   // El país del centro define sus fechas patrias; el nombre es solo respaldo
   // para centros creados antes de la columna pais.
   const pais = c?.pais === 'VE' || (!c?.pais && /naranjos/i.test(c?.nombre || '')) ? 'VE' : 'PA'
@@ -27,7 +29,10 @@ async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horar
     excepciones,
   })
   if (!it) return null
-  await sql`UPDATE grupos SET itinerario_clases = ${JSON.stringify(it)} WHERE id = ${grupoId}`
+  await query`
+    UPDATE grupos SET itinerario_clases = ${JSON.stringify(it)}, updated_at = ${new Date().toISOString()}
+    WHERE id = ${grupoId}
+  `
   return it
 }
 
@@ -221,6 +226,7 @@ export async function crearGrupo(centroId, data) {
   if (fechaApertura && !FECHA_RE.test(fechaApertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const fechaInicio = data?.fecha_inicio_clases || null
   if (fechaInicio && !FECHA_RE.test(fechaInicio)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
+  const periodoInicio = ym(fechaInicio || hoyISO())
   const inscripcionAbierta = data?.inscripcion_abierta === undefined ? true : !!data.inscripcion_abierta
   const v = await validarHorarios(centroId, data?.horarios)
   if (v.error) return { error: v.error }
@@ -228,24 +234,34 @@ export async function crearGrupo(centroId, data) {
   if (zk) return { error: zk }
 
   const now = new Date().toISOString()
-  const [g] = await sql`
-    INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_apertura, fecha_inicio_clases, inscripcion_abierta, notas, updated_at)
-    VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaApertura}, ${fechaInicio}, ${inscripcionAbierta}, ${data?.notas?.trim() || null}, ${now})
-    RETURNING id
-  `
-  for (const h of v.horarios) {
-    await sql`
-      INSERT INTO grupo_horarios (grupo_id, dia, hora_inicio, hora_fin, salon_id)
-      VALUES (${g.id}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
+  const resultado = await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [periodoInicio])
+    if (errorMes) return { error: errorMes }
+    const [duplicado] = await query`
+      SELECT id FROM grupos WHERE centro_id = ${centroId} AND numero = ${numero}
     `
-  }
-  // El grupo nace con el itinerario de clases de su nivel (regla de Fernando):
-  // inducción, semanas del libro, mental days y cierre, saltando feriados.
-  await regenerarItinerarioClases(centroId, g.id, {
-    fechaInicio: fechaInicio || fechaApertura,
-    horarios: v.horarios,
-    nivel: intOr(data?.nivel, 1),
+    if (duplicado) return { error: `Ya existe el grupo ${numero}` }
+    const [g] = await query`
+      INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_apertura, fecha_inicio_clases, inscripcion_abierta, notas, updated_at)
+      VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaApertura}, ${fechaInicio}, ${inscripcionAbierta}, ${data?.notas?.trim() || null}, ${now})
+      RETURNING id
+    `
+    for (const h of v.horarios) {
+      await query`
+        INSERT INTO grupo_horarios (grupo_id, dia, hora_inicio, hora_fin, salon_id)
+        VALUES (${g.id}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
+      `
+    }
+    // El grupo nace con el itinerario de clases de su nivel (regla de Fernando):
+    // inducción, semanas del libro, mental days y cierre, saltando feriados.
+    await regenerarItinerarioClases(centroId, g.id, {
+      fechaInicio: fechaInicio || fechaApertura,
+      horarios: v.horarios,
+      nivel: intOr(data?.nivel, 1),
+    }, query)
+    return { ok: true, grupoId: g.id }
   })
+  if (resultado.error) return resultado
   // Aviso del manual: apertura mínima 8 TINY / 10 KIDS en nivel 1, 6 en niveles superiores.
   let warn
   if (data?.ninos_iniciales !== undefined && data?.ninos_iniciales !== null && data?.ninos_iniciales !== '') {
@@ -253,7 +269,7 @@ export async function crearGrupo(centroId, data) {
     const n = intOr(data.ninos_iniciales)
     if (n < minimo) warn = `Apertura con ${n} niños, por debajo del mínimo del manual (${minimo}). El grupo queda bajo responsabilidad del centro en niveles superiores.`
   }
-  return warn ? { ok: true, grupoId: g.id, warn } : { ok: true, grupoId: g.id }
+  return warn ? { ...resultado, warn } : resultado
 }
 
 export async function actualizarGrupo(centroId, grupoId, data) {
@@ -278,7 +294,10 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   if (data?.fecha_apertura && !FECHA_RE.test(data.fecha_apertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const fechaApertura = data?.fecha_apertura !== undefined ? data.fecha_apertura || null : g.fecha_apertura
   if (data?.fecha_inicio_clases && !FECHA_RE.test(data.fecha_inicio_clases)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
-  const fechaInicio = data?.fecha_inicio_clases !== undefined ? data.fecha_inicio_clases || null : g.fecha_inicio_clases
+  const fechaInicio = data?.fecha_inicio_clases !== undefined
+    ? data.fecha_inicio_clases || null
+    : fechaIso10(g.fecha_inicio_clases)
+  const inicioCambio = fechaIso10(fechaInicio) !== fechaIso10(g.fecha_inicio_clases)
   const inscripcionAbierta = data?.inscripcion_abierta !== undefined ? !!data.inscripcion_abierta : g.inscripcion_abierta !== false
   const notas = data?.notas !== undefined ? data.notas?.trim() || null : g.notas
 
@@ -292,36 +311,69 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   }
 
   const now = new Date().toISOString()
-  await sql`
-    UPDATE grupos SET numero = ${numero}, itinerario = ${itinerario}, es_online = ${esOnline},
-      coach_id = ${coachId}, fecha_apertura = ${fechaApertura}, fecha_inicio_clases = ${fechaInicio},
-      inscripcion_abierta = ${inscripcionAbierta}, notas = ${notas}, updated_at = ${now}
-    WHERE id = ${grupoId}
-  `
-  if (horarios) {
-    await sql`DELETE FROM grupo_horarios WHERE grupo_id = ${grupoId}`
-    for (const h of horarios) {
-      await sql`
-        INSERT INTO grupo_horarios (grupo_id, dia, hora_inicio, hora_fin, salon_id)
-        VALUES (${grupoId}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
-      `
+  const resultado = await withTransaction(async (query) => {
+    const [grupoBloqueado] = await query`
+      SELECT * FROM grupos
+      WHERE id = ${grupoId} AND centro_id = ${centroId}
+      FOR UPDATE
+    `
+    if (!grupoBloqueado) return { error: 'El grupo no pertenece a este centro.' }
+    if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
+      return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
     }
-  }
-  // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
-  // horarios); el nivel y las clases suspendidas del grupo se conservan.
-  const inicioCambio = String(fechaInicio || '') !== (fechaIso10(g.fecha_inicio_clases) || '')
-  if ((horarios || inicioCambio) && fechaInicio) {
-    const hs = horarios || (await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
-    await regenerarItinerarioClases(centroId, grupoId, {
-      fechaInicio,
-      horarios: hs,
-      nivel: g.itinerario_clases?.nivel || 1,
-      excepciones: g.itinerario_clases?.excepciones || [],
-    })
-  }
+    if (inicioCambio) {
+      const estudiantes = await query`
+        SELECT id, grupo_id, fecha_inscripcion FROM estudiantes
+        WHERE centro_id = ${centroId}
+      `
+      const eventos = await query`
+        SELECT id, estudiante_id, tipo, fecha, a_grupo_id
+        FROM estudiante_eventos
+        WHERE centro_id = ${centroId} AND tipo = 'inscripcion'
+        ORDER BY fecha, id
+      `
+      const periodos = periodosAfectadosCambioInicioGrupo({
+        grupo: grupoBloqueado,
+        fechaNueva: fechaInicio,
+        estudiantes,
+        eventos,
+        fechaReferencia: hoyISO(),
+      })
+      const errorMes = await bloquearMesesEditables(query, centroId, periodos)
+      if (errorMes) return { error: errorMes }
+    }
+    await query`
+      UPDATE grupos SET numero = ${numero}, itinerario = ${itinerario}, es_online = ${esOnline},
+        coach_id = ${coachId}, fecha_apertura = ${fechaApertura}, fecha_inicio_clases = ${fechaInicio},
+        inscripcion_abierta = ${inscripcionAbierta}, notas = ${notas}, updated_at = ${now}
+      WHERE id = ${grupoId}
+    `
+    if (horarios) {
+      await query`DELETE FROM grupo_horarios WHERE grupo_id = ${grupoId}`
+      for (const h of horarios) {
+        await query`
+          INSERT INTO grupo_horarios (grupo_id, dia, hora_inicio, hora_fin, salon_id)
+          VALUES (${grupoId}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
+        `
+      }
+    }
+    // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
+    // horarios); el nivel y las clases suspendidas del grupo se conservan.
+    if ((horarios || inicioCambio) && fechaInicio) {
+      const hs = horarios || (await query`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
+      await regenerarItinerarioClases(centroId, grupoId, {
+        fechaInicio,
+        horarios: hs,
+        nivel: g.itinerario_clases?.nivel || 1,
+        excepciones: g.itinerario_clases?.excepciones || [],
+      }, query)
+    }
+    return { ok: true }
+  })
+  if (resultado.error) return resultado
   // Si cambió el estado de inscripciones, ventas debe ver los cupos correctos.
   if ((g.inscripcion_abierta !== false) !== inscripcionAbierta) await pushCuposAlCrm(centroId, grupoId)
-  return { ok: true }
+  return resultado
 }
 
 // Ajusta el itinerario del nivel de UN grupo: nivel que cursa, fecha de inicio
@@ -339,21 +391,33 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
 
   const fechaInicio = String(data?.fecha_inicio || '').slice(0, 10)
   if (!FECHA_RE.test(fechaInicio)) return { error: 'La fecha de inicio del nivel es requerida (AAAA-MM-DD).' }
-
-  const horarios = await sql`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`
-  if (!horarios.length) return { error: 'El grupo no tiene horario registrado: sin días de clase no hay itinerario.' }
-
   const excepciones = normalizarExcepciones(data?.excepciones)
-  const it = await regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones })
-  if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
 
-  // La fecha de inicio del nivel en curso ES la fecha de inicio de clases del
-  // grupo: mantenerlas alineadas evita que el siguiente guardado lo regenere.
-  await sql`
-    UPDATE grupos SET fecha_inicio_clases = ${fechaInicio}, updated_at = ${new Date().toISOString()}
-    WHERE id = ${grupoId}
-  `
-  return { ok: true, itinerario: it }
+  return await withTransaction(async (query) => {
+    const [grupoBloqueado] = await query`
+      SELECT fecha_inicio_clases FROM grupos
+      WHERE id = ${grupoId} AND centro_id = ${centroId}
+      FOR UPDATE
+    `
+    if (!grupoBloqueado) return { error: 'El grupo no pertenece a este centro.' }
+    if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
+      return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
+    }
+    const horarios = await query`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`
+    if (!horarios.length) return { error: 'El grupo no tiene horario registrado: sin días de clase no hay itinerario.' }
+
+    const it = await regenerarItinerarioClases(
+      centroId,
+      grupoId,
+      { fechaInicio, horarios, nivel, excepciones },
+      query,
+    )
+    if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
+
+    // La fecha del nivel vive dentro del itinerario. La fecha inicial del grupo
+    // no cambia: esa es la que determina cuándo cada niño se vuelve activo.
+    return { ok: true, itinerario: it }
+  })
 }
 
 // Link del coach: token estable por grupo para la lista de asistencia
