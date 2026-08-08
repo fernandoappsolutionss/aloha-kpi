@@ -5,6 +5,7 @@ import { guardarSnapshotCuadro, calcularCuadro } from '../../lib/cuadro-snapshot
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { balanceMensual, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
+import { cierreMesAnterior } from '../../lib/cadena'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -44,20 +45,6 @@ async function motivosDelModulo(centroId, year, month) {
 async function gruposDelModulo(centroId) {
   const [g] = await sql`SELECT COUNT(*)::int AS n FROM grupos WHERE centro_id = ${centroId} AND estado = 'activo'`
   return g?.n || 0
-}
-
-// Cierre del mes anterior: es el "niños inicio" OBLIGATORIO del mes actual.
-// Regla de Fernando: si la administradora cerró con 170, el siguiente mes
-// arranca con 170 — los números deben encadenar mes a mes, sin dedazos.
-async function cierreMesAnterior(centroId, year, month) {
-  const py = month === 1 ? year - 1 : year
-  const pm = month === 1 ? 12 : month - 1
-  const [prev] = await sql`
-    SELECT ninos_final_mes FROM resumen_mes
-    WHERE centro_id = ${centroId} AND year = ${py} AND month = ${pm}
-  `
-  const valor = prev?.ninos_final_mes || 0
-  return valor > 0 ? { valor, year: py, month: pm } : null
 }
 
 export async function loadKpiMes(centroId, year, month) {
@@ -174,9 +161,15 @@ export async function cerrarMes(centroId, year, month) {
       const datos = await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
       const t = datos?.totales
       if (t) {
+        // El inicio SIEMPRE se arrastra del cierre del mes anterior — misma
+        // regla que guardarKpiMes. Derivarlo de la propia foto (t.mesAnterior)
+        // le da al mes un inicio PROPIO y rompe la cadena: cerrar un mes por
+        // error le reescribía el inicio con los datos de hoy. Ese cálculo solo
+        // sirve de arranque cuando el centro no tiene mes anterior.
+        const arrastrado = await cierreMesAnterior(centroId, intOr(year), intOr(month))
         await upsert('resumen_mes', {
           centro_id: centroId, year: intOr(year), month: intOr(month),
-          ninos_inicio_mes: t.mesAnterior,
+          ninos_inicio_mes: arrastrado ? arrastrado.valor : t.mesAnterior,
           ninos_final_mes: t.aPagar,
           grupos_activos: t.gruposActivos,
           nuevos_activos_mes: datos?.iniciosClase?.length ?? t.nuevos ?? 0,
