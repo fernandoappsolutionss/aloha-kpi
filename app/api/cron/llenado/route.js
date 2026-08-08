@@ -1,7 +1,14 @@
 // GET /api/cron/llenado — cron diario del llenado (vercel.json: 0 10 * * * UTC
-// ≈ 5am Panamá). Dos fases con presupuesto de tiempo compartido:
+// ≈ 5am Panamá). Tres fases con presupuesto de tiempo compartido:
 //   1) detectarTransicionesVentana por CENTRO, con try/catch por centro — el
 //      fallo de uno NO aborta a los demás (corrección Sol, tests gate 2).
+//   1b) retiros PROGRAMADOS vencidos (R5, g1-24): una transacción por niño con
+//      FOR UPDATE SKIP LOCKED y re-verificación; el evento lleva la fecha
+//      LÓGICA (retiro_programado_para — el cron atrasado no usa el día
+//      físico); mes lógico cerrado ⇒ nada se escribe y la fila se reporta como
+//      requiere_reparacion; bajas legacy sin fecha quedan excluidas y listadas
+//      para decisión humana. Corre ANTES del outbox para que sus syncs de
+//      cupos se empujen en esta misma corrida.
 //   2) procesarOutbox global (el claim con SKIP LOCKED ya serializa) con el
 //      presupuesto restante; lo que no alcance queda pendiente para mañana.
 // Auth fail-closed por CRON_SECRET: sin secreto configurado el endpoint
@@ -14,6 +21,7 @@ import { sql } from '../../../../lib/db'
 import { hoyISO } from '../../../../lib/operaciones'
 import { rechazoCron } from '../../../../lib/cron-auth.mjs'
 import { detectarTransicionesVentana, pendientesPorCentro, procesarOutbox } from '../../../../lib/llenado-service'
+import { procesarRetirosProgramados } from '../../../../lib/retiros-service'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -51,6 +59,18 @@ export async function GET(request) {
     }
   }
 
+  // Fase 1b: retiros programados vencidos (R5, g1-24). Fail-soft: si la fase
+  // completa revienta, el reporte lo dice y las filas quedan programadas para
+  // la próxima corrida — jamás un retiro a medias (transacción por niño).
+  let retiros = { ejecutados: 0, omitidos: 0, reparacion: [], legacy: [], porCentro: {} }
+  try {
+    retiros = await procesarRetirosProgramados({ hoyIso: hoy, budgetMs: Math.max(0, restante()) })
+    for (const [key, n] of Object.entries(retiros.porCentro || {})) filaDe(key).retiros = n
+  } catch (e) {
+    console.error('cron llenado: retiros programados fallaron:', e)
+    retiros.error = 'retiros_fallidos'
+  }
+
   // Fase 2: consumo del outbox con el presupuesto que quede.
   let consumo = { procesadas: 0, fallidas: 0, pendientes: 0, porCentro: {} }
   try {
@@ -79,6 +99,17 @@ export async function GET(request) {
     fallidas: consumo.fallidas,
     pendientes: consumo.pendientes,
     warn: consumo.warn,
+    // Retiros programados (R5): contadores e ids, sin nombres. `reparacion`
+    // lista los retiros cuyo mes lógico ya está CERRADO (reparación manual,
+    // patrón antes/después de g2-4); `legacy` las bajas sin fecha programada
+    // que NO entran al cron (decisión humana).
+    retiros: {
+      ejecutados: retiros.ejecutados,
+      omitidos: retiros.omitidos,
+      requierenReparacion: retiros.reparacion,
+      legacy: retiros.legacy,
+      error: retiros.error,
+    },
     porCentro,
   })
 }

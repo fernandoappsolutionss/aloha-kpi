@@ -5,10 +5,10 @@
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
 import { getSession, isAdminRole } from '../../../../../lib/auth'
-import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
+import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
 import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
-import { iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
+import { iniciosClaseMes, usaIniciosClaseOperativos, grupoEntraAlCuadro } from '../../../../../lib/inicios-clase.mjs'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -98,10 +98,14 @@ export async function GET(request, { params }) {
     horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
   }))
 
-  // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
-  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
+  // Regla del negocio (R1, g1-1): un grupo entra al cuadro desde su fecha de
+  // inicio de clases, EXCLUSIVAMENTE; en llenado (inicio futuro), ni el grupo
+  // ni sus niños cuentan. El grupo veterano con fecha futura se corrige en los
+  // DATOS (preflight g1-1); mientras tanto lo cubre la GUARDIA de runtime de
+  // grupoEntraAlCuadro (nivel 2+ con fecha futura = dato roto: sigue contando,
+  // fail closed). NULL también cuenta como iniciado.
   const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-  const iniciado = (g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= finMes
+  const iniciado = (g) => grupoEntraAlCuadro(g, finMes)
   const gruposCuadro = grupos.filter(iniciado)
   const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
   const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))

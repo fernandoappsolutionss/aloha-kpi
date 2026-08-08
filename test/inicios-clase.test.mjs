@@ -7,8 +7,10 @@ import {
   cierreKpiDeclarado,
   cuadroConBalanceDeclarado,
   estadoMesPermiteCambios,
+  fechaInicioClasesConfiable,
   fechaInicioOperativa,
   finalVisibleKpi,
+  grupoEntraAlCuadro,
   iniciosClaseMes,
   inicioVisibleKpi,
   movimientosVivosMes,
@@ -78,9 +80,14 @@ test('mover el inicio del grupo protege tambien el mes efectivo de cada nino', (
   ])
 })
 
-test('un grupo sin fecha inicial protege desde su apertura al asignarle una', () => {
+// Cascada nueva del respaldo (R1, g1-3): fecha de PUBLICACIÓN — el día civil
+// Panamá de created_at — y, sin created_at, la fecha de referencia. JAMÁS
+// fecha_inicio_clases ni fecha_apertura (columna congelada).
+test('un grupo sin fecha inicial protege desde su publicación al asignarle una', () => {
+  // Publicado a las 19:30 de Panamá del 20-jun = 00:30 UTC del 21-jun: el
+  // respaldo es el día CIVIL de Panamá (20-jun), no el del reloj UTC.
   const periodos = periodosAfectadosCambioInicioGrupo({
-    grupo: grupo({ fecha_inicio_clases: null, fecha_apertura: '2026-06-20' }),
+    grupo: grupo({ fecha_inicio_clases: null, created_at: '2026-06-21T00:30:00.000Z' }),
     fechaNueva: '2026-09-01',
     estudiantes: [estudiante({ fecha_inscripcion: '2026-07-05' })],
     eventos: [inscripcion({ fecha: '2026-07-05' })],
@@ -90,6 +97,42 @@ test('un grupo sin fecha inicial protege desde su apertura al asignarle una', ()
   assert.deepEqual(periodos, [
     { year: 2026, month: 6 },
     { year: 2026, month: 7 },
+    { year: 2026, month: 8 },
+    { year: 2026, month: 9 },
+  ])
+})
+
+test('la fecha_apertura congelada ya no participa del respaldo', () => {
+  // Si el respaldo leyera fecha_apertura (mayo), protegería desde mayo; la
+  // publicación real fue en julio.
+  const periodos = periodosAfectadosCambioInicioGrupo({
+    grupo: grupo({
+      fecha_inicio_clases: null,
+      fecha_apertura: '2026-05-02',
+      created_at: '2026-07-10T15:00:00.000Z',
+    }),
+    fechaNueva: '2026-08-01',
+    estudiantes: [],
+    eventos: [],
+    fechaReferencia: '2026-08-08',
+  })
+
+  assert.deepEqual(periodos, [
+    { year: 2026, month: 7 },
+    { year: 2026, month: 8 },
+  ])
+})
+
+test('sin created_at el respaldo cae a la fecha de referencia', () => {
+  const periodos = periodosAfectadosCambioInicioGrupo({
+    grupo: grupo({ fecha_inicio_clases: null }),
+    fechaNueva: '2026-09-01',
+    estudiantes: [],
+    eventos: [],
+    fechaReferencia: '2026-08-08',
+  })
+
+  assert.deepEqual(periodos, [
     { year: 2026, month: 8 },
     { year: 2026, month: 9 },
   ])
@@ -381,4 +424,86 @@ test('el resumen trimestral no reinterpreta un mes cerrado', () => {
   })
 
   assert.deepEqual(filas, original)
+})
+
+// Regla nueva (R1, g1-1): el inicio operativo es max(evento canónico de
+// inscripción, fecha_inicio_clases del grupo de inscripción). La regla es la
+// misma para todos los niveles, con UNA guardia de runtime: un grupo cuya
+// referencia ya cursa nivel 2+ dio clases por definición — su fecha FUTURA es
+// un dato roto (residuo del backfill D7, pendiente del preflight g1-1) y se
+// trata como NULL (rige la inscripción). Con la fecha corregida (pasada), la
+// guardia es inerte.
+test('venta anticipada en grupo nuevo (nivel 1 o sin plan): manda la fecha del grupo', () => {
+  const estudianteFx = { id: 1, grupo_id: 7, fecha_inscripcion: '2026-06-20' }
+  const inscripcionFx = { estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-06-20', a_grupo_id: 7 }
+  const grupoDeNivel = (nivel) => ({
+    id: 7,
+    fecha_inicio_clases: '2026-08-10',
+    itinerario_clases: nivel == null ? null : { nivel, fecha_inicio: '2026-08-10' },
+  })
+
+  // El llenado normal: grupo en nivel 1 (o sin referencia) con inicio futuro.
+  for (const nivel of [1, null]) {
+    assert.equal(fechaInicioOperativa(estudianteFx, grupoDeNivel(nivel), inscripcionFx), '2026-08-10')
+    assert.equal(iniciosClaseMes([estudianteFx], [grupoDeNivel(nivel)], [inscripcionFx], 2026, 8).length, 1)
+  }
+})
+
+test('guardia g1-1: veterano nivel 2+ con fecha FUTURA no re-estrena ni sale del cuadro', () => {
+  // El dato roto que el preflight g1-1 aún no corrigió: la fecha del grupo
+  // quedó en el arranque futuro de su nivel vigente. La guardia la trata como
+  // NULL: el inicio operativo es la inscripción (nadie vuelve a ser "nuevo")
+  // y el grupo sigue entrando al Cuadro del mes (fail closed).
+  const grupo = {
+    id: 7,
+    fecha_inicio_clases: '2026-09-14',
+    itinerario_clases: { nivel: 5, fecha_inicio: '2026-09-14' },
+  }
+  const estudiante = { id: 1, grupo_id: 7, fecha_inscripcion: '2025-03-04' }
+  const inscripcion = { estudiante_id: 1, tipo: 'inscripcion', fecha: '2025-03-04', a_grupo_id: 7 }
+
+  assert.equal(fechaInicioClasesConfiable(grupo, '2026-08-31'), null)
+  assert.equal(fechaInicioOperativa(estudiante, grupo, inscripcion), '2025-03-04')
+  assert.equal(iniciosClaseMes([estudiante], [grupo], [inscripcion], 2026, 9).length, 0)
+  assert.equal(grupoEntraAlCuadro(grupo, '2026-08-31'), true)
+})
+
+test('guardia g1-1: solo aplica a nivel 2+; el nivel 1 futuro es llenado normal', () => {
+  const enLlenado = {
+    id: 8,
+    fecha_inicio_clases: '2026-09-14',
+    itinerario_clases: { nivel: 1, fecha_inicio: '2026-09-14' },
+  }
+  assert.equal(fechaInicioClasesConfiable(enLlenado, '2026-08-31'), '2026-09-14')
+  assert.equal(grupoEntraAlCuadro(enLlenado, '2026-08-31'), false)
+  assert.equal(grupoEntraAlCuadro(enLlenado, '2026-09-30'), true)
+})
+
+test('guardia g1-1: con la fecha corregida (pasada) es inerte y rige la regla pura', () => {
+  const veteranoCorregido = {
+    id: 9,
+    fecha_inicio_clases: '2025-01-13',
+    itinerario_clases: { nivel: 5, fecha_inicio: '2026-08-10' },
+  }
+  assert.equal(fechaInicioClasesConfiable(veteranoCorregido, '2026-08-31'), '2025-01-13')
+  assert.equal(grupoEntraAlCuadro(veteranoCorregido, '2026-08-31'), true)
+  // itinerario_clases defensivo como string (JSONB serializado).
+  const comoString = { ...veteranoCorregido, itinerario_clases: JSON.stringify({ nivel: 5 }) }
+  assert.equal(fechaInicioClasesConfiable(comoString, '2026-08-31'), '2025-01-13')
+})
+
+test('un grupo veterano con fecha PASADA no re-estrena a su gente al cambiar de nivel', () => {
+  // Así quedan los veteranos tras el preflight g1-1: fecha ≤ la inscripción de
+  // todos sus niños atribuidos → max(inscripción, fecha) no se mueve de la
+  // venta original y nadie vuelve a contar como nuevo.
+  const grupo = {
+    id: 7,
+    fecha_inicio_clases: '2025-01-13',
+    itinerario_clases: { nivel: 5, fecha_inicio: '2026-08-10' },
+  }
+  const estudiante = { id: 1, grupo_id: 7, fecha_inscripcion: '2025-03-04' }
+  const inscripcion = { estudiante_id: 1, tipo: 'inscripcion', fecha: '2025-03-04', a_grupo_id: 7 }
+
+  assert.equal(fechaInicioOperativa(estudiante, grupo, inscripcion), '2025-03-04')
+  assert.equal(iniciosClaseMes([estudiante], [grupo], [inscripcion], 2026, 8).length, 0)
 })
