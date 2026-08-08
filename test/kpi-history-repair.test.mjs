@@ -7,29 +7,43 @@ import {
   guardiaReparacionHistorica,
 } from '../lib/kpi-history-repair.mjs'
 
-test('la reparacion solo incluye meses cerrados auditados', () => {
-  assert.equal(REPARACIONES_HISTORICAS.length, 8)
-  assert.ok(REPARACIONES_HISTORICAS.every((fila) => fila.periodo <= '2026-07'))
+test('la reparacion corrige los ultimos cierres que no conservaron el total mostrado en KPI', () => {
+  assert.deepEqual(REPARACIONES_HISTORICAS, [
+    {
+      centroId: 1,
+      centro: 'BRISAS DEL GOLF',
+      periodo: '2026-07',
+      year: 2026,
+      month: 7,
+      antes: { inicio: 205, final: 205, activos: 0 },
+      despues: { inicio: 205, final: 189, activos: 0 },
+    },
+    {
+      centroId: 2,
+      centro: 'ANCLAS MALL',
+      periodo: '2026-07',
+      year: 2026,
+      month: 7,
+      antes: { inicio: 148, final: 135, activos: 0 },
+      despues: { inicio: 135, final: 122, activos: 0 },
+    },
+    {
+      centroId: 10,
+      centro: 'LOS NARANJOS',
+      periodo: '2026-07',
+      year: 2026,
+      month: 7,
+      antes: { inicio: 86, final: 89, activos: 8 },
+      despues: { inicio: 85, final: 88, activos: 8 },
+    },
+  ])
 })
 
-test('encadena Los Naranjos junio con julio desde cualquiera de sus estados auditados', () => {
-  const reparacionesJunio = REPARACIONES_HISTORICAS.filter(
-    (fila) => fila.centroId === 10 && fila.periodo === '2026-06',
-  )
-  const reparacion = reparacionesJunio[0]
+test('restaura Anclas al cierre que mostraba el KPI antes del snapshot', () => {
+  const reparacion = REPARACIONES_HISTORICAS.find((fila) => fila.centroId === 2)
 
-  assert.equal(reparacionesJunio.length, 1)
-  assert.deepEqual(reparacion.antes, { inicio: 89, final: 85, activos: 0 })
-  assert.deepEqual(reparacion.alternativasAntes, [{ inicio: 88, final: 85, activos: 0 }])
-  assert.deepEqual(reparacion.despues, { inicio: 88, final: 86, activos: 0 })
-  assert.equal(
-    estadoReparacionHistorica({ inicio: 88, final: 85, activos: 0 }, reparacion),
-    'pendiente',
-  )
-  assert.equal(
-    estadoReparacionHistorica({ inicio: 88, final: 86, activos: 0 }, reparacion),
-    'aplicada',
-  )
+  assert.deepEqual(reparacion.antes, { inicio: 148, final: 135, activos: 0 })
+  assert.deepEqual(reparacion.despues, { inicio: 135, final: 122, activos: 0 })
 })
 
 test('detecta una reparacion pendiente cuando la fila conserva el valor auditado', () => {
@@ -43,14 +57,12 @@ test('reconoce una reparacion ya aplicada y permite repetir el proceso', () => {
 })
 
 test('la guardia de escritura usa el estado actual reconocido', () => {
-  const reparacion = REPARACIONES_HISTORICAS.find(
-    (fila) => fila.centroId === 10 && fila.periodo === '2026-06',
-  )
-  const actual = { inicio: '88', final: '85', activos: '0' }
+  const reparacion = REPARACIONES_HISTORICAS.find((fila) => fila.centroId === 10)
+  const actual = { inicio: '86', final: '89', activos: '8' }
 
   assert.deepEqual(guardiaReparacionHistorica(actual, reparacion), {
-    antes: { inicio: 88, final: 85, activos: 0 },
-    despues: { inicio: 88, final: 86, activos: 0 },
+    antes: { inicio: 86, final: 89, activos: 8 },
+    despues: { inicio: 85, final: 88, activos: 8 },
   })
 })
 

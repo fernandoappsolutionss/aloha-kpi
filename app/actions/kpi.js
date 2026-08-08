@@ -3,7 +3,7 @@ import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { balanceMensual, cuadroConBalanceDeclarado, INICIOS_CLASE_DESDE, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
+import { balanceMensual, cierreKpiDeclarado, cuadroConBalanceDeclarado, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
 import { cierreMesAnterior } from '../../lib/cadena'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
@@ -166,20 +166,22 @@ export async function cerrarMes(centroId, year, month) {
         return { error: 'El mes no está disponible para cerrar. Recarga la pantalla e inténtalo de nuevo.' }
       }
 
-      // El bloqueo de mes se mantiene mientras se leen los movimientos, se
-      // congela el cuadro, se encadena el saldo y se marca el cierre.
+      const [resumen] = await query`
+        SELECT ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
+        FROM resumen_mes
+        WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
+        FOR UPDATE
+      `
+      if (!resumen) {
+        return { error: 'Guarda el KPI antes de cerrar el mes.' }
+      }
+
+      // El guardado inmediatamente anterior ya fijo la cifra que vio el
+      // administrador. Aqui solo se congela el detalle del Cuadro alrededor
+      // de esa declaracion; nunca se vuelve a calcular el cierre.
       const datos = await calcularCuadro(centroId, y, m, query)
-      const t = datos?.totales
-      const operativo = Boolean(t && usaIniciosClaseOperativos(y, m))
-      const arrastrado = operativo ? await cierreMesAnterior(centroId, y, m, query) : null
-      const nuevosActivos = datos?.iniciosClase?.length ?? t?.nuevos ?? 0
-      const reincorporados = t?.reincorporados || 0
-      const retirados = Array.isArray(datos?.deserciones) ? datos.deserciones.length : (t?.retirados || 0)
-      const ninosInicio = arrastrado ? arrastrado.valor : (t?.mesAnterior || 0)
-      const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
-      const datosCierre = operativo
-        ? cuadroConBalanceDeclarado({ datos, inicio: ninosInicio, nuevosActivos, reincorporados, retirados })
-        : datos
+      const cierre = cierreKpiDeclarado({ resumen, datos })
+      const datosCierre = cuadroConBalanceDeclarado({ datos, ...cierre })
       const cerradoAt = new Date().toISOString()
 
       await upsertWith(query, 'cuadro_mensual', {
@@ -189,21 +191,6 @@ export async function cerrarMes(centroId, year, month) {
         datos: JSON.stringify(datosCierre),
         cerrado_at: cerradoAt,
       }, ['centro_id', 'year', 'month'])
-
-      // Los meses históricos anteriores a la automatización conservan la
-      // captura manual. Desde agosto, el cierre operativo es la fuente única.
-      if (operativo) {
-        await upsertWith(query, 'resumen_mes', {
-          centro_id: centroId,
-          year: y,
-          month: m,
-          ninos_inicio_mes: ninosInicio,
-          ninos_final_mes: ninosFinal,
-          grupos_activos: t.gruposActivos,
-          nuevos_activos_mes: nuevosActivos,
-          updated_at: cerradoAt,
-        }, ['centro_id', 'year', 'month'])
-      }
 
       await query`
         UPDATE mes_kpi

@@ -104,8 +104,8 @@ test('uses the declared monthly population even when the operational roster look
 test('calculates the current population from the previous close and live movements', () => {
   const history = buildGrowthHistory({
     summaries: [
-      { year: 2026, month: 7, ninos_inicio_mes: 148, ninos_final_mes: 135, nuevos_activos_mes: 0 },
-      { year: 2026, month: 8, ninos_inicio_mes: 135, ninos_final_mes: 127, nuevos_activos_mes: 1 },
+      { year: 2026, month: 7, ninos_inicio_mes: 135, ninos_final_mes: 122, nuevos_activos_mes: 0 },
+      { year: 2026, month: 8, ninos_inicio_mes: 122, ninos_final_mes: 115, nuevos_activos_mes: 1 },
     ],
     states: [
       { year: 2026, month: 7, estado: 'cerrado' },
@@ -120,13 +120,13 @@ test('calculates the current population from the previous close and live movemen
     currentPeriod: '2026-08',
     currentMonthStarts: 1,
     currentMonthWithdrawals: 8,
-  }), 128)
+  }), 115)
 })
 
 test('calculates an open month even before its first KPI row exists', () => {
   const history = buildGrowthHistory({
     summaries: [
-      { year: 2026, month: 7, ninos_inicio_mes: 148, ninos_final_mes: 135, nuevos_activos_mes: 0 },
+      { year: 2026, month: 7, ninos_inicio_mes: 135, ninos_final_mes: 122, nuevos_activos_mes: 0 },
     ],
     states: [{ year: 2026, month: 7, estado: 'cerrado' }],
   })
@@ -135,7 +135,7 @@ test('calculates an open month even before its first KPI row exists', () => {
     currentPeriod: '2026-08',
     currentMonthStarts: 1,
     currentMonthWithdrawals: 8,
-  }), 128)
+  }), 115)
 })
 
 test('does not extrapolate population across a missing month', () => {
