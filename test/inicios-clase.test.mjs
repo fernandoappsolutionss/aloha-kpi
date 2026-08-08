@@ -18,6 +18,7 @@ import {
   resumenConCuadroVivo,
   usaIniciosClaseOperativos,
   valorHistorialMes,
+  grupoYaDioClases,
 } from '../lib/inicios-clase.mjs'
 
 const grupo = (overrides = {}) => ({
@@ -381,4 +382,42 @@ test('el resumen trimestral no reinterpreta un mes cerrado', () => {
   })
 
   assert.deepEqual(filas, original)
+})
+
+// Regla de Fernando 2026-08-08: el itinerario arranca con el inicio de clases y
+// se regenera en cada nivel, asi que grupos.fecha_inicio_clases pasa a ser el
+// arranque del NIVEL vigente. Un grupo de nivel 2+ ya dio su primera clase: sus
+// niños llevan meses o años estudiando y no pueden volver a contar como nuevos.
+test('un grupo de nivel 2+ no vuelve a contar a sus niños como nuevos al arrancar el nivel', () => {
+  const grupo = {
+    id: 7,
+    fecha_inicio_clases: '2026-08-10',
+    itinerario_clases: { nivel: 5, fecha_inicio: '2026-08-10' },
+  }
+  const estudiante = { id: 1, grupo_id: 7, fecha_inscripcion: '2025-03-04' }
+  const inscripcion = { estudiante_id: 1, tipo: 'inscripcion', fecha: '2025-03-04', a_grupo_id: 7 }
+
+  assert.equal(fechaInicioOperativa(estudiante, grupo, inscripcion), '2025-03-04')
+  assert.equal(iniciosClaseMes([estudiante], [grupo], [inscripcion], 2026, 8).length, 0)
+})
+
+test('un grupo de nivel 1 si estrena a sus niños el mes que arranca clases', () => {
+  const grupo = {
+    id: 8,
+    fecha_inicio_clases: '2026-08-10',
+    itinerario_clases: { nivel: 1, fecha_inicio: '2026-08-10' },
+  }
+  const estudiante = { id: 2, grupo_id: 8, fecha_inscripcion: '2026-06-20' }
+  const inscripcion = { estudiante_id: 2, tipo: 'inscripcion', fecha: '2026-06-20', a_grupo_id: 8 }
+
+  assert.equal(fechaInicioOperativa(estudiante, grupo, inscripcion), '2026-08-10')
+  assert.equal(iniciosClaseMes([estudiante], [grupo], [inscripcion], 2026, 8).length, 1)
+})
+
+test('grupoYaDioClases distingue el grupo que estrena del que viene rodando', () => {
+  assert.equal(grupoYaDioClases({ itinerario_clases: { nivel: 1 } }), false)
+  assert.equal(grupoYaDioClases({ itinerario_clases: { nivel: 2 } }), true)
+  assert.equal(grupoYaDioClases({ itinerario_clases: null }), false)
+  assert.equal(grupoYaDioClases({}), false)
+  assert.equal(grupoYaDioClases(null), false)
 })

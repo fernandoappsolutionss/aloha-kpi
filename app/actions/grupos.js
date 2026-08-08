@@ -253,13 +253,17 @@ export async function crearGrupo(centroId, data) {
         VALUES (${g.id}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
       `
     }
-    // El grupo nace con el itinerario de clases de su nivel (regla de Fernando):
-    // inducción, semanas del libro, mental days y cierre, saltando feriados.
-    await regenerarItinerarioClases(centroId, g.id, {
-      fechaInicio: fechaInicio || fechaApertura,
-      horarios: v.horarios,
-      nivel: intOr(data?.nivel, 1),
-    }, query)
+    // El itinerario arranca con el INICIO DE CLASES, nunca con la apertura
+    // (regla de Fernando 2026-08-08): la apertura es el día que el grupo empieza
+    // a llenarse y puede pasar semanas juntando niños. Un grupo todavía en
+    // llenado no tiene itinerario: se genera cuando se fija el inicio de clases.
+    if (fechaInicio) {
+      await regenerarItinerarioClases(centroId, g.id, {
+        fechaInicio,
+        horarios: v.horarios,
+        nivel: intOr(data?.nivel, 1),
+      }, query)
+    }
     return { ok: true, grupoId: g.id }
   })
   if (resultado.error) return resultado

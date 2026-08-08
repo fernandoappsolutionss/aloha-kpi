@@ -78,9 +78,9 @@ test('el universo atribuye por la PRIMERA inscripcion efectiva, no el grupo actu
 })
 
 test('sin niños en el universo la fecha es el inicio del nivel', () => {
-  assert.deepEqual(decidirFechaInicio({ itInicio: '2026-09-07', universo: [] }), {
+  assert.deepEqual(decidirFechaInicio({ itInicio: '2026-09-07' }), {
     fecha: '2026-09-07',
-    regla: 'sin_ninos',
+    regla: 'del_itinerario',
     minInscripcion: null,
   })
 })
@@ -89,23 +89,18 @@ test('con niños la fecha es LEAST(it_inicio, min inscripcion) — cero reclasif
   // Venta anticipada: el niño de julio obliga a retroceder la fecha del grupo
   // para que max(inscripcion, fecha grupo) no se le mueva a nadie.
   assert.deepEqual(
-    decidirFechaInicio({ itInicio: '2026-09-07', universo: [{ estudianteId: 1, fecha: '2026-07-01' }, { estudianteId: 2, fecha: '2026-08-05' }] }),
-    { fecha: '2026-07-01', regla: 'con_ninos', minInscripcion: '2026-07-01' },
+    decidirFechaInicio({ itInicio: '2026-09-07' }),
+    { fecha: '2026-09-07', regla: 'del_itinerario', minInscripcion: null },
   )
   // Todos inscritos despues del inicio del nivel: gana it_inicio.
   assert.deepEqual(
-    decidirFechaInicio({ itInicio: '2026-08-01', universo: [{ estudianteId: 1, fecha: '2026-08-05' }] }),
-    { fecha: '2026-08-01', regla: 'con_ninos', minInscripcion: '2026-08-05' },
+    decidirFechaInicio({ itInicio: '2026-08-01' }),
+    { fecha: '2026-08-01', regla: 'del_itinerario', minInscripcion: null },
   )
 })
 
 test('sin it_inicio o con universo sin fecha el grupo queda EXCLUIDO', () => {
-  assert.equal(decidirFechaInicio({ itInicio: null, universo: [] }).regla, 'sin_it_inicio')
-  const sinFecha = decidirFechaInicio({
-    itInicio: '2026-09-07',
-    universo: [{ estudianteId: 1, fecha: '2026-08-05' }, { estudianteId: 2, fecha: null }],
-  })
-  assert.deepEqual(sinFecha, { fecha: null, regla: 'universo_sin_fecha', minInscripcion: null })
+  assert.equal(decidirFechaInicio({ itInicio: null }).regla, 'sin_it_inicio')
 })
 
 test('patchFechaInicio solo pisa filas en NULL (la condicion del CAS) y no muta', () => {
@@ -115,8 +110,8 @@ test('patchFechaInicio solo pisa filas en NULL (la condicion del CAS) y no muta'
     grupo({ id: 3 }),
   ]
   const decisiones = new Map([
-    ['1', { fecha: '2026-09-07', regla: 'sin_ninos' }],
-    ['2', { fecha: '2026-09-07', regla: 'sin_ninos' }], // ya tiene fecha: no se toca
+    ['1', { fecha: '2026-09-07', regla: 'del_itinerario' }],
+    ['2', { fecha: '2026-09-07', regla: 'del_itinerario' }], // ya tiene fecha: no se toca
   ])
 
   const parchado = patchFechaInicio(original, decisiones)
@@ -157,8 +152,11 @@ test('comparableMes reproduce el filtro del cuadro: grupo con inicio futuro fuer
   assert.equal(septiembre.aPagar, 4)
 })
 
-test('backfill con niños: before/after IDENTICO en el mes abierto', () => {
-  const grupos = [grupo({ id: 1 })] // candidato: itinerario cargado, columna NULL
+// La proteccion real de los niños que ya vienen estudiando: un grupo de nivel
+// 2+ ya dio su primera clase, asi que escribirle la fecha del NIVEL vigente no
+// lo saca del cuadro ni vuelve a estrenar a su gente (grupoYaDioClases).
+test('grupo de nivel 2+ con niños: before/after IDENTICO aunque el nivel arranque despues', () => {
+  const grupos = [grupo({ id: 1, itinerario_clases: { nivel: 5, fecha_inicio: '2026-09-07' } })]
   const estudiantes = [
     estudiante({ id: 1, grupo_id: 1, fecha_inscripcion: '2026-08-05' }),
     estudiante({ id: 2, grupo_id: 1, estado: 'retirado', fecha_inscripcion: '2026-07-01' }),
@@ -168,9 +166,8 @@ test('backfill con niños: before/after IDENTICO en el mes abierto', () => {
     inscripcion({ id: 102, estudiante_id: 2, fecha: '2026-07-01' }),
     { id: 103, estudiante_id: 2, tipo: 'retiro', fecha: '2026-07-20', de_grupo_id: 1 },
   ]
-  const universo = universosPorGrupo(estudiantes, eventos).get('1')
-  const decision = decidirFechaInicio({ itInicio: itInicioDe(grupos[0]), universo })
-  assert.deepEqual(decision, { fecha: '2026-07-01', regla: 'con_ninos', minInscripcion: '2026-07-01' })
+  const decision = decidirFechaInicio({ itInicio: itInicioDe(grupos[0]) })
+  assert.deepEqual(decision, { fecha: '2026-09-07', regla: 'del_itinerario', minInscripcion: null })
 
   const decisiones = new Map([['1', decision]])
   const base = { estudiantes, eventos, year: 2026, month: 8, royaltyRate: 12 }
@@ -183,11 +180,28 @@ test('backfill con niños: before/after IDENTICO en el mes abierto', () => {
   assert.deepEqual(despues.nuevosIds, ['1'])
 })
 
+// Contraparte: un grupo de nivel 1 que todavia no estrena SI sale del mes, y su
+// niño con el. Eso es correcto (esta en llenado), pero cualquier diferencia de
+// niños aborta el backfill para que lo revise un humano.
+test('grupo de nivel 1 con niños y arranque futuro: la verificacion lo marca y aborta', () => {
+  const grupos = [grupo({ id: 1 })]
+  const estudiantes = [estudiante({ id: 1, grupo_id: 1, fecha_inscripcion: '2026-08-05' })]
+  const eventos = [inscripcion({ id: 101, estudiante_id: 1, fecha: '2026-08-05' })]
+  const decisiones = new Map([['1', decidirFechaInicio({ itInicio: itInicioDe(grupos[0]) })]])
+
+  const base = { estudiantes, eventos, year: 2026, month: 8, royaltyRate: 12 }
+  const antes = comparableMes({ ...base, grupos })
+  const despues = comparableMes({ ...base, grupos: patchFechaInicio(grupos, decisiones) })
+  const resultado = compararComparables(antes, despues, { decisiones, finMes: finDeMes(2026, 8) })
+
+  assert.ok(resultado.diferencias.some((d) => d.campo === 'ninosIds' && d.tipo === 'sale' && d.id === '1'))
+})
+
 test('grupo vacio con it_inicio futuro: sale del mes previo como variacion APROBADA', () => {
   const grupos = [grupo({ id: 1 }), grupo({ id: 2, fecha_inicio_clases: '2026-05-04' })]
   const estudiantes = [estudiante({ id: 2, grupo_id: 2, fecha_inscripcion: '2026-05-10' })]
   const eventos = [inscripcion({ id: 102, estudiante_id: 2, fecha: '2026-05-10', a_grupo_id: 2 })]
-  const decision = decidirFechaInicio({ itInicio: '2026-09-07', universo: [] })
+  const decision = decidirFechaInicio({ itInicio: '2026-09-07' })
   const decisiones = new Map([['1', decision]])
 
   const base = { estudiantes, eventos, year: 2026, month: 8, royaltyRate: 12 }
@@ -204,12 +218,13 @@ test('grupo vacio con it_inicio futuro: sale del mes previo como variacion APROB
 test('grupo "vacio" con un niño movido encima: la verificacion lo detecta y aborta', () => {
   // El universo del grupo 1 esta vacio (la primera inscripcion del niño apunta
   // al 2), pero el niño VIVE hoy en el 1: darle fecha futura lo sacaria del
-  // cuadro de agosto. La salida del grupo es variacion aprobada, pero el niño
-  // que sale es DIFERENCIA — y cualquier diferencia aborta.
+  // cuadro de agosto. "Vacio" se mide con los niños DEL MES, no con el universo
+  // de atribucion, asi que ni el grupo ni el niño pasan como variacion: ambos
+  // son diferencia y el backfill aborta.
   const grupos = [grupo({ id: 1 }), grupo({ id: 2, fecha_inicio_clases: '2026-05-04' })]
   const estudiantes = [estudiante({ id: 1, grupo_id: 1, fecha_inscripcion: '2026-05-10' })]
   const eventos = [inscripcion({ id: 101, estudiante_id: 1, fecha: '2026-05-10', a_grupo_id: 2 })]
-  const decision = decidirFechaInicio({ itInicio: '2026-09-07', universo: [] })
+  const decision = decidirFechaInicio({ itInicio: '2026-09-07' })
   const decisiones = new Map([['1', decision]])
 
   const base = { estudiantes, eventos, year: 2026, month: 8, royaltyRate: 12 }
@@ -217,15 +232,16 @@ test('grupo "vacio" con un niño movido encima: la verificacion lo detecta y abo
   const despues = comparableMes({ ...base, grupos: patchFechaInicio(grupos, decisiones) })
   const resultado = compararComparables(antes, despues, { decisiones, finMes: finDeMes(2026, 8) })
 
-  assert.equal(resultado.variaciones.length, 1) // la salida del grupo en si
+  assert.deepEqual(resultado.variaciones, [])
+  assert.ok(resultado.diferencias.some((d) => d.campo === 'gruposIds' && d.tipo === 'sale' && d.id === '1'))
   assert.ok(resultado.diferencias.some((d) => d.campo === 'ninosIds' && d.tipo === 'sale' && d.id === '1'))
   assert.ok(resultado.diferencias.some((d) => d.campo === 'aPagar'))
 })
 
 test('estadoCandidato: aplicada / pendiente / conflicto como la reparacion historica', () => {
-  const entrada = { grupoId: 1, itInicio: '2026-09-07', fecha: '2026-07-01', regla: 'con_ninos' }
+  const entrada = { grupoId: 1, itInicio: '2026-09-07', fecha: '2026-07-01', regla: 'del_itinerario' }
   const viva = grupo({ id: 1 })
-  const decisionViva = { fecha: '2026-07-01', regla: 'con_ninos' }
+  const decisionViva = { fecha: '2026-07-01', regla: 'del_itinerario' }
 
   assert.equal(estadoCandidato(viva, entrada, decisionViva), 'pendiente')
   // Idempotencia: la fecha decidida ya esta puesta (el driver la devuelve como Date).
@@ -233,6 +249,6 @@ test('estadoCandidato: aplicada / pendiente / conflicto como la reparacion histo
   // Derivas: fecha ajena, itinerario regenerado, decision viva distinta, fila ausente.
   assert.equal(estadoCandidato(grupo({ fecha_inicio_clases: '2026-06-01' }), entrada, null), 'conflicto')
   assert.equal(estadoCandidato(grupo({ itinerario_clases: { fecha_inicio: '2026-10-05' } }), entrada, decisionViva), 'conflicto')
-  assert.equal(estadoCandidato(viva, entrada, { fecha: '2026-06-15', regla: 'con_ninos' }), 'conflicto')
+  assert.equal(estadoCandidato(viva, entrada, { fecha: '2026-06-15', regla: 'del_itinerario' }), 'conflicto')
   assert.equal(estadoCandidato(null, entrada, null), 'conflicto')
 })

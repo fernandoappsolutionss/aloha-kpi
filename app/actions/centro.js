@@ -5,7 +5,7 @@ import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
-import { iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
+import { grupoYaDioClases, iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { cierreMesAnterior } from '../../lib/cadena'
@@ -118,7 +118,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const nextMonth = monthActual === 12 ? 1 : monthActual + 1
   const finMesActual = `${yearActual}-${String(monthActual).padStart(2, '0')}-${String(new Date(yearActual, monthActual, 0).getDate()).padStart(2, '0')}`
   const gruposProyeccion = await sql`
-    SELECT id, estado, fecha_inicio_clases FROM grupos WHERE centro_id = ${centroId}
+    SELECT id, estado, fecha_inicio_clases, itinerario_clases FROM grupos WHERE centro_id = ${centroId}
   `
   const estudiantesProyeccion = await sql`
     SELECT id, grupo_id, estado, fecha_inscripcion FROM estudiantes WHERE centro_id = ${centroId}
@@ -133,7 +133,9 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const poblacionOperativa = estudiantesProyeccion.filter((estudiante) => {
     if (estudiante.estado !== 'activo' && estudiante.estado !== 'baja_potencial') return false
     const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
-    const fechaGrupo = fechaIso10(grupo?.fecha_inicio_clases)
+    // Nivel 2+ = el grupo ya dio su primera clase; su fecha es el arranque del
+    // nivel vigente y no debe excluirlo de la población operativa.
+    const fechaGrupo = grupoYaDioClases(grupo) ? null : fechaIso10(grupo?.fecha_inicio_clases)
     const fechaInscripcion = fechaIso10(estudiante.fecha_inscripcion)
     return (!fechaGrupo || fechaGrupo <= finMesActual) && (!fechaInscripcion || fechaInscripcion <= finMesActual)
   })

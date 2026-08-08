@@ -8,7 +8,7 @@ import { getSession, isAdminRole } from '../../../../../lib/auth'
 import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
 import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
-import { iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
+import { grupoYaDioClases, iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -99,9 +99,12 @@ export async function GET(request, { params }) {
   }))
 
   // Regla del negocio: un grupo entra al cuadro desde su fecha de inicio de
-  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan.
+  // clases; en llenado (inicio futuro), ni el grupo ni sus niños cuentan. Un
+  // grupo de nivel 2+ ya dio su primera clase, así que su fecha (el arranque
+  // del nivel vigente) nunca lo saca del cuadro.
   const finMes = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-  const iniciado = (g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= finMes
+  const iniciado = (g) =>
+    !g.fecha_inicio_clases || grupoYaDioClases(g) || fechaIso10(g.fecha_inicio_clases) <= finMes
   const gruposCuadro = grupos.filter(iniciado)
   const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
   const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
