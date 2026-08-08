@@ -1,8 +1,9 @@
 'use server'
-import { sql } from '../../lib/db'
+import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, hoyISO } from '../../lib/operaciones'
 import { pushCuposAlCrm } from '../../lib/cupos-sync'
+import { bloquearMesesEditables } from '../../lib/mes-kpi'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -17,8 +18,8 @@ const ym = (fecha) => {
 // Regla del negocio: un grupo con inscripcion_abierta = false está lleno/cerrado
 // y ya NO entra nadie (inscripción, reincorporación ni cambio de grupo).
 // Devuelve mensaje de error o null si el grupo acepta niños.
-async function grupoAceptaNinos(centroId, grupoId) {
-  const [g] = await sql`
+async function grupoAceptaNinos(centroId, grupoId, query = sql) {
+  const [g] = await query`
     SELECT id, numero, inscripcion_abierta FROM grupos
     WHERE id = ${grupoId} AND centro_id = ${centroId}
   `
@@ -53,27 +54,44 @@ export async function inscribirEstudiante(centroId, data) {
   }
   const fecha = data?.fecha || hoyISO()
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
+  const { year, month } = ym(fecha)
   const fechaCierre = data?.fecha_cierre_nivel || null
   if (fechaCierre && !FECHA_RE.test(fechaCierre)) return { error: 'Fecha de cierre de nivel inválida (AAAA-MM-DD).' }
 
   const now = new Date().toISOString()
-  const [e] = await sql`
-    INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
-      crm_registration_id, fecha_inscripcion, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
-    VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
-      ${crmId}, ${fecha}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
-      ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
-    RETURNING id
-  `
-  const { year, month } = ym(fecha)
-  await sql`
-    INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel)
-    VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel})
-  `
+  const resultado = await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+    if (errorMes) return { error: errorMes }
+    if (grupoId) {
+      const errorGrupo = await grupoAceptaNinos(centroId, grupoId, query)
+      if (errorGrupo) return { error: errorGrupo }
+    }
+    if (crmId) {
+      const [dup] = await query`
+        SELECT id FROM estudiantes
+        WHERE centro_id = ${centroId} AND crm_registration_id = ${crmId}
+      `
+      if (dup) return { error: 'Este registro ya fue inscrito.' }
+    }
+    const [e] = await query`
+      INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
+        crm_registration_id, fecha_inscripcion, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
+      VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
+        ${crmId}, ${fecha}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
+        ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
+      RETURNING id
+    `
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel)
+      VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel})
+    `
+    return { ok: true, estudianteId: e.id }
+  })
+  if (resultado.error) return resultado
   // Si el grupo está vinculado a una clase de prueba, sus cupos viajan al CRM
   // (best effort: nunca lanza ni bloquea el ok).
   if (grupoId) await pushCuposAlCrm(centroId, grupoId)
-  return { ok: true, estudianteId: e.id }
+  return resultado
 }
 
 // Edición general. Si cambia el nivel registra evento 'cambio_nivel'; si cambia
@@ -195,44 +213,54 @@ export async function revertirBajaPotencial(centroId, id) {
 // la fecha de retiro (así el niño cae en el mes correcto del cuadro).
 export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsistencia } = {}) {
   await requireCentroAccess(centroId)
-  const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
-  if (!est) return { error: 'El estudiante no pertenece a este centro.' }
-  if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
   if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'Motivo de retiro inválido.' }
   const fechaRetiro = fecha || hoyISO()
   if (!FECHA_RE.test(fechaRetiro)) return { error: 'Fecha de retiro inválida (AAAA-MM-DD).' }
   if (ultimaAsistencia && !FECHA_RE.test(ultimaAsistencia)) return { error: 'Última asistencia inválida (AAAA-MM-DD).' }
-  const ultimaAsis = ultimaAsistencia || est.ultima_asistencia || null
+  const { year, month } = ym(fechaRetiro)
 
   const now = new Date().toISOString()
-  await sql`
-    UPDATE estudiantes SET estado = 'retirado', status_plataforma = 'DESACTIVAR', motivo_retiro = ${motivo},
-      fecha_retiro = ${fechaRetiro}, ultima_asistencia = ${ultimaAsis}, updated_at = ${now}
-    WHERE id = ${id}
-  `
-  const { year, month } = ym(fechaRetiro)
-  await sql`
-    INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, motivo)
-    VALUES (${id}, ${centroId}, 'retiro', ${year}, ${month}, ${fechaRetiro}, ${est.grupo_id}, ${motivo})
-  `
+  const resultado = await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+    if (errorMes) return { error: errorMes }
+    const [est] = await query`
+      SELECT * FROM estudiantes
+      WHERE id = ${id} AND centro_id = ${centroId}
+      FOR UPDATE
+    `
+    if (!est) return { error: 'El estudiante no pertenece a este centro.' }
+    if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
+    const ultimaAsis = ultimaAsistencia || est.ultima_asistencia || null
+    await query`
+      UPDATE estudiantes SET estado = 'retirado', status_plataforma = 'DESACTIVAR', motivo_retiro = ${motivo},
+        fecha_retiro = ${fechaRetiro}, ultima_asistencia = ${ultimaAsis}, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, motivo)
+      VALUES (${id}, ${centroId}, 'retiro', ${year}, ${month}, ${fechaRetiro}, ${est.grupo_id}, ${motivo})
+    `
+    return { ok: true, grupoId: est.grupo_id, ultimaAsis }
+  })
+  if (resultado.error) return resultado
   // Cupos al CRM si el grupo está vinculado a una clase de prueba (best effort).
-  if (est.grupo_id) await pushCuposAlCrm(centroId, est.grupo_id)
+  if (resultado.grupoId) await pushCuposAlCrm(centroId, resultado.grupoId)
 
   const out = { ok: true }
   // Norma del cuadro: el niño que vio clases en un mes se declara retirado en
   // ESE mes (cuenta al inicio del mes aunque ya sabemos que no sigue). Si la
   // fecha de retiro cae en otro mes que la última asistencia, se avisa.
-  if (ultimaAsis) {
-    const a = ym(ultimaAsis)
+  if (resultado.ultimaAsis) {
+    const a = ym(resultado.ultimaAsis)
     if (a.year !== year || a.month !== month) {
-      out.warn = `La última asistencia fue el ${ultimaAsis} pero el retiro quedó declarado en ${String(month).padStart(2, '0')}/${year}. Norma del cuadro: si el niño vio clases en un mes, se declara retirado en ese mismo mes (usa esa fecha de retiro si ese mes sigue abierto).`
+      out.warn = `La última asistencia fue el ${resultado.ultimaAsis} pero el retiro quedó declarado en ${String(month).padStart(2, '0')}/${year}. Norma del cuadro: si el niño vio clases en un mes, se declara retirado en ese mismo mes (usa esa fecha de retiro si ese mes sigue abierto).`
     }
   }
   // Si el grupo queda sin niños, la UI ofrece cerrarlo (regla del manual).
-  if (est.grupo_id) {
-    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${est.grupo_id} AND estado IN ('activo', 'baja_potencial')`
+  if (resultado.grupoId) {
+    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${resultado.grupoId} AND estado IN ('activo', 'baja_potencial')`
     if (n === 0) {
-      const [g] = await sql`SELECT numero FROM grupos WHERE id = ${est.grupo_id}`
+      const [g] = await sql`SELECT numero FROM grupos WHERE id = ${resultado.grupoId}`
       if (g) out.grupoVacio = g.numero
     }
   }
@@ -243,28 +271,41 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsi
 // del mes (no como nuevo).
 export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
   await requireCentroAccess(centroId)
-  const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
-  if (!est) return { error: 'El estudiante no pertenece a este centro.' }
-  if (est.estado !== 'retirado') return { error: 'El estudiante no está retirado.' }
   if (!grupoId) return { error: 'Selecciona el grupo donde se reincorpora.' }
-  const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'`
-  if (!g) return { error: 'El grupo no está activo o no pertenece a este centro.' }
-  const errCerrado = await grupoAceptaNinos(centroId, grupoId)
-  if (errCerrado) return { error: errCerrado }
 
   const now = new Date().toISOString()
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
-  await sql`
-    UPDATE estudiantes SET estado = 'activo', grupo_id = ${grupoId}, status_plataforma = 'INCLUIR',
-      motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}
-    WHERE id = ${id}
-  `
-  await sql`
-    INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id)
-    VALUES (${id}, ${centroId}, 'reincorporacion', ${year}, ${month}, ${hoy}, ${grupoId})
-  `
+  const resultado = await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+    if (errorMes) return { error: errorMes }
+    const [est] = await query`
+      SELECT * FROM estudiantes
+      WHERE id = ${id} AND centro_id = ${centroId}
+      FOR UPDATE
+    `
+    if (!est) return { error: 'El estudiante no pertenece a este centro.' }
+    if (est.estado !== 'retirado') return { error: 'El estudiante no está retirado.' }
+    const [g] = await query`
+      SELECT id FROM grupos
+      WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'
+    `
+    if (!g) return { error: 'El grupo no está activo o no pertenece a este centro.' }
+    const errorGrupo = await grupoAceptaNinos(centroId, grupoId, query)
+    if (errorGrupo) return { error: errorGrupo }
+    await query`
+      UPDATE estudiantes SET estado = 'activo', grupo_id = ${grupoId}, status_plataforma = 'INCLUIR',
+        motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id)
+      VALUES (${id}, ${centroId}, 'reincorporacion', ${year}, ${month}, ${hoy}, ${grupoId})
+    `
+    return { ok: true }
+  })
+  if (resultado.error) return resultado
   // Cupos al CRM si el grupo está vinculado a una clase de prueba (best effort).
   await pushCuposAlCrm(centroId, grupoId)
-  return { ok: true }
+  return resultado
 }

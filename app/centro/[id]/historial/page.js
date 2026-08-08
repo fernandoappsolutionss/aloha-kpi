@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import { getHistorialCentro } from '../../../actions/centro'
-import { valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
+import { balanceMensual, finalVisibleKpi, inicioVisibleKpi, valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
 
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -126,18 +126,23 @@ export default function HistorialPage() {
       const usaCuadroVivo = estadoMes !== 'cerrado' && cuadro?.vivo === true
       const semana = semanasPorMes.get(`${r.year}-${r.month}`) || null
       const rawInicio = Number(r.ninos_inicio_mes) || 0
-      const nI = keyAnterior === key - 1 && cierreAnterior > 0 ? cierreAnterior : rawInicio
+      const arrastrado = keyAnterior === key - 1 && cierreAnterior != null ? cierreAnterior : null
+      const nI = inicioVisibleKpi({ estado: estadoMes, guardado: rawInicio, arrastrado })
       const gA = valorHistorialMes({ estado: estadoMes, guardado: r.grupos_activos, cuadro, campo: 'gruposActivos' }) || 1
       const nuevosSemanal = Number(semana?.nuevos_ingresos_venta) || 0
       const nuevosCuadro = Number(cuadro?.nuevos) || 0
       const nA = valorHistorialMes({ estado: estadoMes, guardado: r.nuevos_activos_mes, cuadro, campo: 'nuevos' })
-      const totalDes = Number(semana?.total_desercion) || 0
+      const desercionSemanal = Number(semana?.total_desercion) || 0
+      const totalDes = usaCuadroVivo && cuadro?.retirados != null
+        ? Number(cuadro.retirados) || 0
+        : desercionSemanal
       const reincorporados = Number(cuadro?.reincorporados) || 0
       const rawFinal = Number(r.ninos_final_mes) || 0
       const cuadroFinal = Number(cuadro?.aPagar) || 0
-      const ninosFinal = usaCuadroVivo
-        ? valorHistorialMes({ estado: estadoMes, guardado: r.ninos_final_mes, cuadro, campo: 'aPagar' })
+      const calculadoFinal = usaCuadroVivo
+        ? Math.max(0, balanceMensual({ inicio: nI, nuevosActivos: nA, reincorporados, retirados: totalDes }))
         : (rawFinal > 0 ? rawFinal : (cuadroFinal > 0 ? cuadroFinal : Math.max(0, nI + nA + reincorporados - totalDes)))
+      const ninosFinal = finalVisibleKpi({ estado: estadoMes, guardado: r.ninos_final_mes, calculado: calculadoFinal })
       const promG = gA > 0 ? ninosFinal / gA : 0
       const pcv = calcPcv(promG)
       const gpn = calcGpn(ninosFinal, pcv)
