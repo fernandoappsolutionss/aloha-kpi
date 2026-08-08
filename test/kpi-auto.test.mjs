@@ -10,7 +10,7 @@ import {
   usaKpiAutomatico,
 } from '../lib/kpi-auto.mjs'
 import { esOrigenVenta, requiereOrigenVenta } from '../lib/operaciones.js'
-import { formaKpiGuardada, mezclarSemanasAutomaticas } from '../lib/kpi-auto-server.js'
+import { cargarRegistrosPorLotes, formaKpiGuardada, mezclarSemanasAutomaticas } from '../lib/kpi-auto-server.js'
 
 const matriz = () => Array.from({ length: 5 }, () => [0, 0, 0, 0, 0])
 
@@ -62,6 +62,32 @@ test('la poblacion automatica acepta ceros reales y nunca necesita el formulario
     gruposActivos: 19,
     nuevosActivos: 14,
   })
+})
+
+test('consulta todos los eventos CRM en lotes de hasta 500 sin perder registros', async () => {
+  const ids = Array.from({ length: 1001 }, (_, index) => `event-${index}`)
+  const calls = []
+  const crm = async (action, body) => {
+    calls.push({ action, ids: body.event_ids })
+    return { registrations: body.event_ids.map((event_id) => ({ id: `reg-${event_id}`, event_id })) }
+  }
+
+  const result = await cargarRegistrosPorLotes(ids, crm)
+
+  assert.equal(result.complete, true)
+  assert.deepEqual(calls.map((call) => call.ids.length), [500, 500, 1])
+  assert.ok(calls.every((call) => call.action === 'list_registrations_by_event_ids'))
+  assert.equal(result.registrations.length, 1001)
+})
+
+test('un lote CRM fallido invalida la fuente completa', async () => {
+  let call = 0
+  const result = await cargarRegistrosPorLotes(
+    Array.from({ length: 501 }, (_, index) => `event-${index}`),
+    async () => (++call === 2 ? { error: 'CRM no disponible' } : { registrations: [{ id: 'reg-1' }] }),
+  )
+
+  assert.deepEqual(result, { complete: false, error: 'CRM no disponible' })
 })
 
 test('valida el origen comercial separado del origen tecnico', () => {
