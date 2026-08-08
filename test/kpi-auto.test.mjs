@@ -14,7 +14,10 @@ import {
   cargarRegistrosPorLotes,
   filtrarClasesVigentesCrm,
   formaKpiGuardada,
+  mezclarResumenAutomatico,
+  mezclarSemanasPeriodoAutomaticas,
   mezclarSemanasAutomaticas,
+  mezclarTotalesAutomaticos,
   validarEventosCrm,
 } from '../lib/kpi-auto-server.js'
 
@@ -478,4 +481,46 @@ test('mezcla semanas automaticas sin modificar la cobranza manual', () => {
   assert.equal(rows[0].ing_d3, 4)
   assert.equal(rows[0].des_d4, 2)
   assert.equal(rows[1].cob_d1, 0)
+})
+
+test('Resumen e Historial usan la misma foto automatica solo en el mes abierto indicado', () => {
+  const automatic = fuenteVacia({
+    cp_invitados: 27,
+    cp_asistieron: 8,
+    cp_matriculados: 1,
+    orig_por_clasificar: 1,
+  })
+  automatic.ing[0][2] = 1
+  automatic.des[0][3] = 2
+  const resumen = [
+    { year: 2026, month: 7, cp_invitados: 33 },
+    { year: 2026, month: 8, cp_invitados: 0, orig_por_clasificar: 0 },
+  ]
+  const totales = [
+    { year: 2026, month: 7, nuevos_ingresos_venta: 3, total_desercion: 13 },
+    { year: 2026, month: 8, nuevos_ingresos_venta: 0, total_desercion: 0 },
+  ]
+  const semanas = [
+    { centro_id: 2, year: 2026, month: 7, semana: 1, ing_d3: 3, cob_d1: 6 },
+    { centro_id: 2, year: 2026, month: 8, semana: 1, ing_d3: 0, cob_d1: 11 },
+  ]
+
+  const resumenMezclado = mezclarResumenAutomatico(resumen, 2026, 8, automatic)
+  const totalesMezclados = mezclarTotalesAutomaticos(totales, 2026, 8, automatic)
+  const semanasMezcladas = mezclarSemanasPeriodoAutomaticas(semanas, 2, 2026, 8, automatic)
+
+  assert.deepEqual(resumenMezclado[0], resumen[0])
+  assert.equal(resumenMezclado[1].cp_invitados, 27)
+  assert.equal(resumenMezclado[1].cp_asistieron, 8)
+  assert.equal(resumenMezclado[1].cp_matriculados, 1)
+  assert.equal(resumenMezclado[1].orig_por_clasificar, 1)
+  assert.deepEqual(totalesMezclados[0], totales[0])
+  assert.equal(totalesMezclados[1].nuevos_ingresos_venta, 1)
+  assert.equal(totalesMezclados[1].total_desercion, 2)
+  assert.equal(semanasMezcladas.find((row) => row.month === 7).ing_d3, 3)
+  assert.equal(semanasMezcladas.filter((row) => row.month === 8).length, 5)
+  assert.equal(semanasMezcladas.find((row) => row.month === 8 && row.semana === 1).ing_d3, 1)
+  assert.equal(semanasMezcladas.find((row) => row.month === 8 && row.semana === 1).cob_d1, 11)
+  assert.equal(resumen[1].cp_invitados, 0)
+  assert.equal(totales[1].nuevos_ingresos_venta, 0)
 })
