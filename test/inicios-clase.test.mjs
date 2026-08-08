@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   ajusteHistoricoKpi,
   balanceMensual,
+  cierreKpiDeclarado,
   cuadroConBalanceDeclarado,
   estadoMesPermiteCambios,
   fechaInicioOperativa,
@@ -194,12 +195,41 @@ test('el snapshot cerrado conserva el mismo balance que el resumen mensual', () 
   assert.equal(datos.controlGrupos.totales.aPagar, 128)
 })
 
+test('el cierre congela la cifra guardada en KPI aunque el cuadro vivo difiera', () => {
+  const cierre = cierreKpiDeclarado({
+    resumen: {
+      ninos_inicio_mes: 135,
+      ninos_final_mes: 122,
+      nuevos_activos_mes: 0,
+      grupos_activos: 19,
+    },
+    datos: {
+      totales: {
+        mesAnterior: 148,
+        nuevos: 0,
+        reincorporados: 0,
+        retirados: 13,
+        aPagar: 135,
+        gruposActivos: 17,
+      },
+    },
+  })
+
+  assert.deepEqual(cierre, {
+    inicio: 135,
+    final: 122,
+    nuevosActivos: 0,
+    reincorporados: 0,
+    retirados: 13,
+  })
+})
+
 test('un mes cerrado conserva su inicio historico aunque cambie el cierre anterior', () => {
-  assert.equal(inicioVisibleKpi({ estado: 'cerrado', guardado: 148, arrastrado: 135 }), 148)
+  assert.equal(inicioVisibleKpi({ estado: 'cerrado', guardado: 135, arrastrado: 148 }), 135)
 })
 
 test('un mes cerrado conserva su final historico y no lo recalcula en pantalla', () => {
-  assert.equal(finalVisibleKpi({ estado: 'cerrado', guardado: 135, calculado: 122 }), 135)
+  assert.equal(finalVisibleKpi({ estado: 'cerrado', guardado: 122, calculado: 135 }), 122)
 })
 
 test('un mes abierto usa el cierre anterior y su calculo vivo', () => {
@@ -212,9 +242,9 @@ test('un cierre historico de cero sigue siendo un valor guardado valido', () => 
 })
 
 test('identifica un ajuste historico sin alterar el mes cerrado', () => {
-  assert.equal(ajusteHistoricoKpi({ estado: 'cerrado', inicioGuardado: 148, cierreAnterior: 135 }), 13)
+  assert.equal(ajusteHistoricoKpi({ estado: 'cerrado', inicioGuardado: 135, cierreAnterior: 148 }), -13)
   assert.equal(ajusteHistoricoKpi({ estado: 'cerrado', inicioGuardado: 135, cierreAnterior: 135 }), null)
-  assert.equal(ajusteHistoricoKpi({ estado: 'abierto', inicioGuardado: 148, cierreAnterior: 135 }), null)
+  assert.equal(ajusteHistoricoKpi({ estado: 'abierto', inicioGuardado: 135, cierreAnterior: 148 }), null)
 })
 
 test('proyecta el mes siguiente con bajas e inicios programados', () => {
@@ -247,13 +277,13 @@ test('el historial de un mes cerrado conserva el valor guardado', () => {
 
 test('el resumen trimestral usa el balance KPI aunque el roster vivo tenga otra cantidad', () => {
   const filas = resumenConCuadroVivo([
-    { centro_id: 2, year: 2026, month: 7, ninos_inicio_mes: 148, ninos_final_mes: 135, nuevos_activos_mes: 0, grupos_activos: 19 },
-    { centro_id: 2, year: 2026, month: 8, ninos_inicio_mes: 135, ninos_final_mes: 128, nuevos_activos_mes: 1, grupos_activos: 19 },
+    { centro_id: 2, year: 2026, month: 7, ninos_inicio_mes: 135, ninos_final_mes: 122, nuevos_activos_mes: 0, grupos_activos: 19 },
+    { centro_id: 2, year: 2026, month: 8, ninos_inicio_mes: 122, ninos_final_mes: 115, nuevos_activos_mes: 1, grupos_activos: 19 },
   ], {
     year: 2026,
     month: 8,
     estado: 'abierto',
-    inicioArrastrado: 135,
+    inicioArrastrado: 122,
     cuadro: {
       totales: { mesAnterior: 126, aPagar: 127, gruposActivos: 17, reincorporados: 0 },
       iniciosClase: [{}],
@@ -262,8 +292,8 @@ test('el resumen trimestral usa el balance KPI aunque el roster vivo tenga otra 
     motivos: { mot_economico: 4, mot_graduado: 1, mot_otro: 3 },
   })
 
-  assert.equal(filas[1].ninos_inicio_mes, 135)
-  assert.equal(filas[1].ninos_final_mes, 128)
+  assert.equal(filas[1].ninos_inicio_mes, 122)
+  assert.equal(filas[1].ninos_final_mes, 115)
   assert.equal(filas[1].nuevos_activos_mes, 1)
   assert.equal(filas[1].retiros_operativos_mes, 8)
   assert.equal(filas[1].mot_graduado, 1)
@@ -302,7 +332,7 @@ test('el mes abierto se crea desde los movimientos aunque aun no tenga fila KPI'
     year: 2026,
     month: 8,
     estado: 'abierto',
-    inicioArrastrado: 135,
+    inicioArrastrado: 122,
     cuadro: {
       totales: { gruposActivos: 17, reincorporados: 0 },
       iniciosClase: [{}],
@@ -312,8 +342,8 @@ test('el mes abierto se crea desde los movimientos aunque aun no tenga fila KPI'
 
   assert.equal(filas.length, 1)
   assert.equal(filas[0].centro_id, 2)
-  assert.equal(filas[0].ninos_inicio_mes, 135)
-  assert.equal(filas[0].ninos_final_mes, 128)
+  assert.equal(filas[0].ninos_inicio_mes, 122)
+  assert.equal(filas[0].ninos_final_mes, 115)
 })
 
 test('un resumen sin estado sigue abierto aunque ya no sea el mes actual', () => {
@@ -341,7 +371,7 @@ test('un mes en proceso de cierre rechaza nuevas escrituras', () => {
 
 test('el resumen trimestral no reinterpreta un mes cerrado', () => {
   const original = [
-    { centro_id: 2, year: 2026, month: 7, ninos_final_mes: 135, nuevos_activos_mes: 0, grupos_activos: 19 },
+    { centro_id: 2, year: 2026, month: 7, ninos_final_mes: 122, nuevos_activos_mes: 0, grupos_activos: 19 },
   ]
   const filas = resumenConCuadroVivo(original, {
     year: 2026,
