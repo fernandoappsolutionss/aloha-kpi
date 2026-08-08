@@ -5,6 +5,7 @@ import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
 import { usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
+import { cierreMesAnterior } from '../../lib/cadena'
 
 const intOr = (v, d = 0) => {
   const n = parseInt(v)
@@ -136,8 +137,15 @@ export async function sincronizarConKpi(centroId, year, month) {
   const motivos = motivosParaKpi(datos.deserciones)
 
   const t = control.totales
+  // El inicio del mes NO se calcula: se ARRASTRA del cierre del mes anterior
+  // (regla del encadenamiento). Derivarlo del propio mes como
+  // `totalMes − nuevos + retirados` (t.mesAnterior) le da a cada mes un inicio
+  // independiente, y ahí es donde la cadena se parte sin que nadie lo note.
+  // Ese cálculo solo sirve de arranque cuando el centro aún no tiene mes
+  // anterior del cual encadenar.
+  const arrastrado = await cierreMesAnterior(centroId, y, m)
   const aplicado = {
-    ninos_inicio_mes: t.mesAnterior,
+    ninos_inicio_mes: arrastrado ? arrastrado.valor : t.mesAnterior,
     ninos_final_mes: t.aPagar,
     grupos_activos: t.gruposActivos,
     nuevos_activos_mes: datos.iniciosClase?.length ?? t.nuevos,
