@@ -3,7 +3,10 @@ import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { crmCall, crmAccountForCentro, crmConfigured, crmBaseUrl } from '../../lib/crm'
 import { armarAlohaGroup } from '../../lib/cupos-sync'
+import { encolarSyncCrm } from '../../lib/llenado-service'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
+import { hoyISO } from '../../lib/operaciones'
+import { ventanaNuevos } from '../../lib/llenado.mjs'
 
 export async function eventosConfig() {
   return { configured: crmConfigured(), baseUrl: crmBaseUrl() }
@@ -88,11 +91,27 @@ function pickEvent(data, accountId) {
   }
 }
 
-// Valida el grupo por aperturar del formulario: del centro y activo. null = sin grupo.
-async function grupoValido(centroId, grupoId) {
+// (Diseño 2026-08-08, defecto 9) Valida el grupo por aperturar del formulario:
+// del centro, activo y ABIERTO a niños nuevos — vincular una clase de prueba
+// es apuntarle niños NUEVOS al grupo, así que al CREAR o CAMBIAR el vínculo
+// aplica la misma ventana derivada que grupoAceptaNinosNuevos en
+// app/actions/estudiantes.js (réplica local sobre lib/llenado: un 'use server'
+// solo exporta actions). null = sin grupo. `conservarId`: al EDITAR sin
+// cambiar el vínculo se conserva aunque el grupo ya se haya cerrado a nuevos
+// — nunca se desvincula en silencio; la UI lo muestra como opción
+// deshabilitada con el aviso "cerrado a nuevos — reasignar".
+async function grupoValido(centroId, grupoId, conservarId = null) {
   if (!grupoId) return { grupoId: null }
-  const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'`
-  if (!g) return { error: 'El grupo no está activo o no pertenece a este centro.' }
+  const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+  if (!g || g.estado !== 'activo') return { error: 'El grupo no está activo o no pertenece a este centro.' }
+  if (conservarId != null && String(grupoId) === String(conservarId)) return { grupoId: g.id }
+  const v = ventanaNuevos(g, hoyISO())
+  if (!v.abierta) {
+    if (v.razon === 'palanca_cerrada') {
+      return { error: `El grupo ${g.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones antes de vincularlo.` }
+    }
+    return { error: `El grupo ${g.numero} ya no acepta niños NUEVOS: su ventana venció el ${v.fechaLimite} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana desde Grupos y Fusiones o vincula el grupo de la próxima inducción.` }
+  }
   return { grupoId: g.id }
 }
 
@@ -123,7 +142,11 @@ async function eventoDelCentro(centroId, eventId) {
 
 export async function actualizarEvento(centroId, eventId, data) {
   await requireCentroAccess(centroId)
-  if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
+  // El vínculo actual se lee junto con la pertenencia: si el grupo del evento
+  // ya no acepta nuevos pero el formulario lo CONSERVA tal cual, se permite
+  // (grupoValido con conservarId) — solo el vínculo NUEVO exige ventana abierta.
+  const [actual] = await sql`SELECT grupo_id FROM centro_eventos WHERE centro_id = ${centroId} AND crm_event_id = ${eventId}`
+  if (!actual) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
   const ev = pickEvent(data, accountId)
   delete ev.account_id // no se cambia la cuenta en update
@@ -131,7 +154,7 @@ export async function actualizarEvento(centroId, eventId, data) {
   // grupo por aperturar; el CRM recibe el aloha_group nuevo (o null para limpiarlo).
   let grupoId
   if (data?.grupo_id !== undefined) {
-    const vg = await grupoValido(centroId, data.grupo_id)
+    const vg = await grupoValido(centroId, data.grupo_id, actual.grupo_id)
     if (vg.error) return { error: vg.error }
     grupoId = vg.grupoId
     ev.aloha_group = grupoId ? await armarAlohaGroup(centroId, grupoId) : null
@@ -158,7 +181,12 @@ export async function duplicarEvento(centroId, eventId) {
   const s = await requireCentroAccess(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
-  // El duplicado hereda el grupo por aperturar del original (el CRM ya copia su aloha_group).
+  // El duplicado hereda el grupo por aperturar del original, pero el CRM
+  // guarda la copia con aloha_group = null (no congela el snapshot viejo del
+  // original — fix hermano en route.ts). Por eso aquí se RECALCULA el snapshot
+  // fresco (diseño 2026-08-08, defecto 11): primero el outbox durable (si el
+  // push muere o el proceso cae, el cron lo repara en la próxima corrida) y
+  // luego el push inline para que el vendedor vea la tarjeta de una vez.
   const [origen] = await sql`SELECT grupo_id FROM centro_eventos WHERE crm_event_id = ${eventId}`
   const res = await crmCall('duplicate_event', { event_id: eventId })
   if (res.error) return { error: res.error }
@@ -168,6 +196,16 @@ export async function duplicarEvento(centroId, eventId) {
     VALUES (${centroId}, ${ev.id}, ${accountId}, ${ev.name}, ${ev.start_date}, ${origen?.grupo_id || null}, ${s.email || ''})
     ON CONFLICT (crm_event_id) DO NOTHING
   `
+  if (origen?.grupo_id) {
+    await encolarSyncCrm([origen.grupo_id], 'duplicar_evento')
+    const aloha_group = await armarAlohaGroup(centroId, origen.grupo_id)
+    const push = await crmCall('update_event', { event_id: ev.id, event: { aloha_group } })
+    if (push.error) {
+      // El duplicado ya existe en ambos lados: no se rompe el ok — la fila
+      // del outbox de arriba empuja el estado vigente en la próxima corrida.
+      return { ok: true, event: ev, warn: `La copia quedó sin cupos en el CRM (${push.error}); el cron los empuja en la próxima corrida.` }
+    }
+  }
   return { ok: true, event: ev }
 }
 

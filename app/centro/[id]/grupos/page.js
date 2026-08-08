@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
-  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, toggleInscripcionGrupo, linkCoach, siguienteNumero,
+  loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, setInscripcionAbierta, extenderVentanaLlenado, linkCoach, siguienteNumero,
   saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion, ajustarItinerarioGrupo,
 } from '../../../actions/grupos'
 import {
@@ -23,6 +23,7 @@ import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../..
 import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_COACH } from '../../../../lib/reservas'
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
 import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
+import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -93,6 +94,69 @@ function nivelesTexto(g) {
   return partes.length ? partes.join(' · ') : g.itinerario
 }
 
+// Fecha iso corrida N días (para el min/max del input de extensión).
+const sumaDias = (iso, n) => {
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+
+// ── Llenado (cliente puro, lib/llenado.mjs) ──────────────────────────────────
+// Ventana de nuevos + ritmo del grupo, derivados de lo que ya llegó en
+// loadOperaciones — cero queries nuevas. La meta sigue el diseño: apertura
+// mínima del nivel vigente si el nivel aún no inicia, gpn_min una vez andando.
+// El ritmo OBSERVADO se aproxima con el roster embebido (inscripciones de los
+// últimos 14 días que siguen en el grupo): subestima si un niño entró y se
+// retiró dentro de la quincena — señal visual suficiente; el número exacto
+// vive en el servidor (estudiante_eventos).
+function llenadoDe(g, metas, hoy) {
+  const it = g.itinerario_clases
+  const inicioNivel = isoDia(it?.fecha_inicio)
+  const noInicia = !!inicioNivel && hoy < inicioNivel
+  const meta = noInicia ? aperturaMinima(g.itinerario, Number(it?.nivel) || 1) : metas.gpnMin
+  const eventos = (g.estudiantes || []).map((e) => ({ tipo: 'inscripcion', a_grupo_id: g.id, fecha: e.fecha_inscripcion }))
+  return { ventana: ventanaNuevos(g, hoy), ritmo: ritmoLlenado(g, meta, eventos, hoy) }
+}
+
+// Countdown de la card destacada: "cierra a nuevos en X días" / "vence hoy".
+function countdownVentana(v) {
+  if (v.diasHastaLimite == null) return 'sin fecha límite (exento)'
+  if (v.diasHastaLimite === 0) return 'vence hoy'
+  if (v.diasHastaLimite === 1) return 'cierra a nuevos mañana'
+  return `cierra a nuevos en ${v.diasHastaLimite} días`
+}
+
+// Motivo legible cuando el grupo NO acepta niños nuevos (tooltip del botón
+// de inscribir). Espeja los mensajes del server action, que valida igual.
+function motivoNoAceptaNuevos(v) {
+  if (v.razon === 'palanca_cerrada') return 'Cerrado a inscripciones: ya no entra nadie. Ábrelo con “Abrir inscripciones” si tiene cupo.'
+  if (v.razon === 'vencida') return `La ventana de niños nuevos venció el ${fmtDia(v.fechaLimite)} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana o apunta la venta a la inducción del próximo nivel.`
+  if (v.razon === 'no_activo') return 'El grupo no está activo.'
+  return ''
+}
+
+// Chip de llenado del panel — 3 estados (diseño 2026-08-08): verde = en
+// llenado (con la fecha en que cierra a nuevos si el manual la fija), ámbar =
+// ventana del manual vencida (los movimientos internos SÍ siguen entrando),
+// rojo = palanca manual cerrada (no entra nadie).
+function ChipLlenado({ v, programa }) {
+  if (v.razon === 'palanca_cerrada') {
+    return <span className="pill pill--bad" title="Cerrado a inscripciones: ya no entra nadie (ni inscripción, ni reincorporación, ni fusión). Ventas ve 0 cupos."><span className="dot" />🔒 Inscripciones cerradas</span>
+  }
+  if (v.razon === 'vencida') {
+    const sem = SEMANA_LIMITE_NUEVOS[String(programa || '').toUpperCase()]
+    return (
+      <span className="pill pill--warn" title={`Ya no acepta niños NUEVOS: la ventana del manual venció el ${fmtDia(v.fechaLimite)}. Reincorporaciones, cambios de grupo y fusiones sí entran; al pasar de nivel la ventana se reabre sola.`}>
+        <span className="dot" />Cerrado a nuevos (manual{sem ? ` · semana ${sem}` : ''})
+      </span>
+    )
+  }
+  return (
+    <span className="pill pill--ok" title="En llenado: acepta niños nuevos y se puede colocar en las clases de prueba.">
+      <span className="dot" />En llenado{v.fechaLimite ? ` · cierra ${fmtDia(v.fechaLimite)}` : ''}
+    </span>
+  )
+}
+
 export default function GruposPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -155,15 +219,30 @@ export default function GruposPage() {
   const prom = promedios(grupos, metas.gpnMin)
   const ninosActivos = grupos.reduce((s, g) => s + g.estudiantes.length, 0) + (data?.sinGrupo?.length || 0)
 
+  const hoy = hoyISO()
   const pasaFiltro = (g, f) => {
     const st = groupStatus(g, metas.gpnMin)
     if (f === 'todos') return g.estado === 'activo'
     if (f === 'bajo') return st.key === 'bajo'
     if (f === 'estables') return st.key === 'estable'
     if (f === 'kinder') return g.estado === 'activo' && st.key === 'kinder'
+    // Cerrados a nuevos: activos donde un niño NUEVO ya no entra — palanca
+    // manual cerrada o ventana del manual vencida (los movimientos internos
+    // sí siguen entrando mientras la palanca esté abierta).
+    if (f === 'cerradosNuevos') return g.estado === 'activo' && !ventanaNuevos(g, hoy).abierta
     return g.estado !== 'activo'
   }
-  const visibles = grupos.filter((g) => pasaFiltro(g, filtro) && coincideBusqueda(g, busqueda))
+  // Secuencia ÚNICA de la lista (diseño 2026-08-08, defecto 12): base = el
+  // filtro + búsqueda de siempre; EN LLENADO = activos con palanca abierta y
+  // ventana de nuevos vigente, el que cierra primero arriba (sin fecha al
+  // final); resto = el complemento en el orden del servidor. TODO — render,
+  // visiblesKey, flechas ↑/↓, conteos y el auto-cierre del detalle — deriva
+  // de `visibles`, y cada grupo se renderiza UNA sola vez.
+  const base = grupos.filter((g) => pasaFiltro(g, filtro) && coincideBusqueda(g, busqueda))
+  const enLlenado = ordenarPorCierreLlenado(base.filter((g) => ventanaNuevos(g, hoy).abierta), hoy)
+  const idsEnLlenado = new Set(enLlenado.map((g) => String(g.id)))
+  const resto = base.filter((g) => !idsEnLlenado.has(String(g.id)))
+  const visibles = [...enLlenado, ...resto]
   const abierto = openId ? visibles.find((g) => String(g.id) === String(openId)) : null
   const visiblesKey = visibles.map((g) => g.id).join(',')
 
@@ -229,24 +308,44 @@ export default function GruposPage() {
     const horarios = prefill?.horarios?.length
       ? prefill.horarios.map((h) => ({ ...h }))
       : [{ ...(prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }) }]
-    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), fecha_inicio_clases: '', inscripcion_abierta: true, notas: '', nivel: 1, ninos_iniciales: '', horarios })
+    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), fecha_inicio_clases: '', notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
+    // La palanca de inscripciones ya NO viaja al modal: vive solo en el botón
+    // dedicado del panel (CAS). `it_inicio` alimenta el hint de solo lectura
+    // cuando la columna fecha_inicio_clases sigue vacía.
     setGrupoModal({
       id: g.id, numero: String(g.numero), itinerario: g.itinerario, es_online: !!g.es_online,
       coach_id: g.coach_id || '', fecha_apertura: isoDia(g.fecha_apertura),
-      fecha_inicio_clases: isoDia(g.fecha_inicio_clases), inscripcion_abierta: g.inscripcion_abierta !== false,
+      fecha_inicio_clases: isoDia(g.fecha_inicio_clases),
+      it_inicio: isoDia(g.itinerario_clases?.fecha_inicio),
       notas: g.notas || '',
       horarios: (g.horarios || []).map((h) => ({ dia: h.dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || '' })),
     })
   }
   async function onToggleInscripcion(g) {
-    const cerrando = g.inscripcion_abierta !== false
-    if (cerrando && !confirm(`¿Cerrar las inscripciones del grupo ${g.numero}? Ya no entra nadie (ni inscripción, ni reincorporación, ni fusión) y ventas verá 0 cupos.`)) return
-    const res = await toggleInscripcionGrupo(id, g.id)
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(res.abierta ? `✅ Grupo ${g.numero} abierto: en llenado.` : `🔒 Grupo ${g.numero} cerrado a inscripciones.`); refresca() }
+    // CAS: se manda el estado que el usuario VIO (`esperado`); si otra pestaña
+    // movió la palanca primero, el server responde con error legible y aquí
+    // se recarga para mostrar el estado real — nunca se pisa en silencio.
+    const abiertaVista = g.inscripcion_abierta !== false
+    if (abiertaVista && !confirm(`¿Cerrar las inscripciones del grupo ${g.numero}? Ya no entra nadie (ni inscripción, ni reincorporación, ni fusión) y ventas verá 0 cupos.`)) return
+    const res = await setInscripcionAbierta(id, g.id, !abiertaVista, abiertaVista)
+    if (res.error) { setStatus('❌ ' + res.error); refresca(); return }
+    setStatus(res.abierta ? `✅ Grupo ${g.numero} abierto: en llenado.` : `🔒 Grupo ${g.numero} cerrado a inscripciones.`)
+    refresca()
+  }
+  // Extiende (o retira, con fecha null) la ventana de niños nuevos: override
+  // consciente con rastro (llenado_extendido_hasta); vence sola. Devuelve si
+  // se aplicó, para que el bloque Llenado cierre su mini-formulario.
+  async function onExtenderVentana(g, fecha) {
+    const res = await extenderVentanaLlenado(id, g.id, fecha)
+    if (res.error) { setStatus('❌ ' + res.error); return false }
+    setStatus(fecha
+      ? `✅ Ventana de nuevos del grupo ${g.numero} extendida hasta el ${res.hasta}.`
+      : `✅ Extensión de ventana del grupo ${g.numero} retirada: rige la del manual.`)
+    refresca()
+    return true
   }
   async function onCerrarGrupo(g) {
     if (!confirm(`¿Cerrar el grupo ${g.numero}? Deja de contar en la rentabilidad del centro.`)) return
@@ -326,6 +425,7 @@ export default function GruposPage() {
     cerrar: onCerrarGrupo,
     reabrir: onReabrirGrupo,
     toggleInscripcion: onToggleInscripcion,
+    extenderVentana: onExtenderVentana,
     buscarFusion: onBuscarFusion,
     inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
     ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
@@ -349,7 +449,7 @@ export default function GruposPage() {
     { l: 'Niños activos', v: ninosActivos, c: 'var(--text)' },
   ]
   const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones']]
-  const FILTROS = [['todos', 'Todos'], ['bajo', 'Bajo meta'], ['estables', 'Estables'], ['kinder', 'Kinder'], ['cerrados', 'Cerrados']]
+  const FILTROS = [['todos', 'Todos'], ['bajo', 'Bajo meta'], ['estables', 'Estables'], ['kinder', 'Kinder'], ['cerradosNuevos', 'Cerrados a nuevos'], ['cerrados', 'Cerrados']]
 
   return (
     <div className="shell">
@@ -428,11 +528,31 @@ export default function GruposPage() {
                       ? 'Aún no hay grupos. Apertura el primero con “➕ Aperturar grupo”.'
                       : busqueda ? `Ningún grupo coincide con “${busqueda}”.` : 'Sin grupos para este filtro.'}
                   </div>
-                ) : visibles.map((g) => (
-                  <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)}
-                    onAbrir={() => abrirGrupo(g)}
-                    onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
-                ))}
+                ) : (
+                  <>
+                    {/* Sección destacada EN LLENADO: el grupo que cierra a
+                        nuevos primero va arriba. El resto sigue debajo en su
+                        orden de siempre — mismo orden que `visibles`, así las
+                        flechas ↑/↓ recorren exactamente lo que se ve. */}
+                    {enLlenado.length > 0 && (
+                      <div className="label" style={{ color: 'var(--ts-green)' }}>⏳ En llenado · {enLlenado.length}</div>
+                    )}
+                    {enLlenado.map((g) => (
+                      <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)}
+                        llenado={llenadoDe(g, metas, hoy)}
+                        onAbrir={() => abrirGrupo(g)}
+                        onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
+                    ))}
+                    {enLlenado.length > 0 && resto.length > 0 && (
+                      <div className="label" style={{ marginTop: 6 }}>Los demás · {resto.length}</div>
+                    )}
+                    {resto.map((g) => (
+                      <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)}
+                        onAbrir={() => abrirGrupo(g)}
+                        onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
+                    ))}
+                  </>
+                )}
               </div>
 
               {!narrow && (
@@ -571,7 +691,9 @@ function OcupacionBar({ n, metas }) {
 }
 
 // ── Tarjeta de grupo en la lista maestra ────────────────────────────────────
-function GrupoCard({ g, metas, activo, onAbrir, onEditar }) {
+// `llenado` (opcional, solo sección EN LLENADO): countdown de la ventana de
+// nuevos, niños contra la meta y ritmo semanal necesario — de llenadoDe().
+function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar }) {
   const st = groupStatus(g, metas.gpnMin)
   return (
     <div data-grupo={g.id} role="button" tabIndex={0} aria-pressed={activo}
@@ -596,6 +718,19 @@ function GrupoCard({ g, metas, activo, onAbrir, onEditar }) {
         </div>
       </div>
       <div style={{ marginTop: 11 }}><OcupacionBar n={g.estudiantes.length} metas={metas} /></div>
+      {llenado && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline', marginTop: 8, fontSize: 11 }}>
+          <span className="num" style={{ fontWeight: 700, color: llenado.ventana.diasHastaLimite != null && llenado.ventana.diasHastaLimite <= 7 ? 'var(--warn)' : 'var(--ts-green)' }}>
+            ⏳ {countdownVentana(llenado.ventana)}
+          </span>
+          <span className="num" style={{ color: 'var(--text-muted)' }}>{llenado.ritmo.ninos}/{llenado.ritmo.meta} niños</span>
+          {llenado.ritmo.faltan === 0
+            ? <span className="num" style={{ color: 'var(--ok)' }}>meta cumplida</span>
+            : llenado.ritmo.ritmoSemanalNecesario != null && (
+              <span className="num" style={{ color: 'var(--text-dim)' }}>necesita {llenado.ritmo.ritmoSemanalNecesario}/sem</span>
+            )}
+        </div>
+      )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 7 }}>{nivelesTexto(g)}</div>
     </div>
   )
@@ -629,6 +764,11 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
   const bajas = g.estudiantes.filter((e) => e.estado === 'baja_potencial').length
   const faltan = Math.max(0, metas.gpnMin - n)
   const activo = g.estado === 'activo'
+  // Estado de llenado del grupo (ventana de nuevos + ritmo), derivado en
+  // cliente con lib/llenado.mjs — alimenta el chip, el botón de inscribir y
+  // el bloque Llenado. Solo tiene sentido en grupos activos.
+  const ll = activo ? llenadoDe(g, metas, hoyISO()) : null
+  const aceptaNuevos = !!ll?.ventana?.abierta
   const it = g.itinerario_clases
   const idxHoy = it ? semanaEnCurso(it, hoyISO()) : -1
   const TILES = [
@@ -644,9 +784,7 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
             <h3 className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
-              {activo && (g.inscripcion_abierta === false
-                ? <span className="pill pill--bad" title="Cerrado a inscripciones: ya no entra nadie. Ventas ve 0 cupos."><span className="dot" />🔒 Inscripciones cerradas</span>
-                : <span className="pill pill--ok" title="En llenado: acepta niños y se puede colocar en las clases de prueba."><span className="dot" />En llenado</span>)}
+              {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} />}
             </h3>
             <p className="h-sub" style={{ marginTop: 5 }}>
               {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
@@ -659,7 +797,11 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
           <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>✎ Editar grupo</button>
-          {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>+ Inscribir niño aquí</button>}
+          {activo && (
+            <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} disabled={!aceptaNuevos}
+              title={aceptaNuevos ? undefined : motivoNoAceptaNuevos(ll.ventana)}
+              onClick={() => acciones.inscribirEn(g)}>+ Inscribir niño aquí</button>
+          )}
           {activo && (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.toggleInscripcion(g)}>
               {g.inscripcion_abierta === false ? 'Abrir inscripciones' : 'Cerrar inscripciones'}
@@ -699,6 +841,9 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
           ))}
           <div style={{ gridColumn: '1 / -1' }}><OcupacionBar n={n} metas={metas} /></div>
         </div>
+        {activo && ll && (
+          <BloqueLlenado g={g} ll={ll} onExtender={(fecha) => acciones.extenderVentana(g, fecha)} />
+        )}
         {g.notas && (
           <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>
         )}
@@ -782,6 +927,93 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         )}
       </div>
     </section>
+  )
+}
+
+// ── Bloque Llenado del panel: ritmo contra la meta + sugerencias del manual ──
+// Todo derivado en cliente (lib/llenado.mjs); las sugerencias son SOLO las
+// herramientas aprobadas del manual con sus topes — la UI las pinta tal cual,
+// nadie inventa promos. "Extender ventana" escribe llenado_extendido_hasta
+// vía server action (override consciente con rastro, vence solo).
+const ESTADO_RITMO = {
+  meta_cumplida: { t: 'Meta cumplida', pill: 'pill--ok' },
+  a_ritmo: { t: 'A ritmo', pill: 'pill--ok' },
+  apretado: { t: 'Apretado', pill: 'pill--warn' },
+  vencida: { t: 'Ventana vencida', pill: 'pill--bad' },
+  sin_datos: { t: 'Sin datos aún', pill: 'pill--warn' },
+}
+
+function BloqueLlenado({ g, ll, onExtender }) {
+  const [extiendo, setExtiendo] = useState(false)
+  const [fechaExt, setFechaExt] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const { ventana: v, ritmo: r } = ll
+  const hoy = hoyISO()
+  const palancaAbierta = g.inscripcion_abierta !== false
+  // Extender solo aplica donde el manual fija semana límite (Tiny/Kids con
+  // itinerario); en Kinder o sin itinerario no hay ventana que extender.
+  const extensible = palancaAbierta && !!SEMANA_LIMITE_NUEVOS[String(g.itinerario || '').toUpperCase()] && v.razon !== 'exento' && v.razon !== 'sin_itinerario_valido'
+  const extensionVigente = isoDia(g.llenado_extendido_hasta) && isoDia(g.llenado_extendido_hasta) >= hoy
+  const sugerencias = palancaAbierta ? sugerenciasLlenado(r, g) : []
+  const est = ESTADO_RITMO[r.estado] || null
+
+  async function guardar(fecha) {
+    setGuardando(true)
+    const ok = await onExtender(fecha)
+    setGuardando(false)
+    if (ok) { setExtiendo(false); setFechaExt('') }
+  }
+
+  return (
+    <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span className="label" style={{ color: 'var(--ts-green)' }}>Llenado</span>
+        {est && <span className={`pill ${est.pill}`} style={{ fontSize: 10 }}><span className="dot" />{est.t}</span>}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+        <b className="num" style={{ color: 'var(--text)' }}>{r.ninos}/{r.meta}</b> niños contra la meta
+        {r.faltan > 0 ? <> · faltan <b className="num" style={{ color: 'var(--warn)' }}>{r.faltan}</b></> : ' · meta cumplida'}
+        {r.diasParaInicio != null && <> · el nivel inicia en <b className="num" style={{ color: 'var(--text)' }}>{r.diasParaInicio} día{r.diasParaInicio === 1 ? '' : 's'}</b></>}
+        {v.fechaLimite
+          ? <> · acepta nuevos hasta el <b className="num" style={{ color: v.razon === 'vencida' ? 'var(--bad)' : 'var(--text)' }}>{fmtDia(v.fechaLimite)}</b>{v.razon === 'extendida' ? ' (ventana extendida)' : ''}</>
+          : <> · sin fecha límite de nuevos ({v.razon === 'sin_itinerario_valido' ? 'itinerario sin semanas del libro' : 'exento del manual'})</>}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        Ritmo semanal: necesita <b className="num" style={{ color: 'var(--text)' }}>{r.ritmoSemanalNecesario == null ? '—' : r.ritmoSemanalNecesario}</b>/sem ·
+        lleva <b className="num" style={{ color: 'var(--text)' }}>{r.ritmoSemanalObservado === 'sin_datos' ? 'sin datos' : `~${r.ritmoSemanalObservado}`}</b>/sem
+        <span style={{ color: 'var(--text-dim)' }}> (aprox. con las inscripciones de los últimos 14 días)</span>
+      </div>
+      {sugerencias.length > 0 && (
+        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, color: 'var(--text-dim)', display: 'grid', gap: 3 }}>
+          {sugerencias.map((s, i) => (
+            <li key={i}>{s.texto}{s.tope ? <b style={{ color: 'var(--text-muted)' }}> ({s.tope})</b> : null}</li>
+          ))}
+        </ul>
+      )}
+      {extensible && (
+        extiendo ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input type="date" className="input" style={{ width: 160 }} value={fechaExt}
+              min={sumaDias(hoy, 1)} max={sumaDias(hoy, 56)}
+              onChange={(e) => setFechaExt(e.target.value)} />
+            <button className="btn btn--primary" style={BTN_XS} disabled={guardando || !fechaExt} onClick={() => guardar(fechaExt)}>
+              {guardando ? 'Guardando…' : 'Extender'}
+            </button>
+            <button className="btn" style={BTN_XS} onClick={() => { setExtiendo(false); setFechaExt('') }}>Cancelar</button>
+            <span style={{ fontSize: 10.5, color: 'var(--text-dim)' }}>máx. 8 semanas · queda registrado y vence solo</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" style={BTN_XS} title="Permite niños nuevos más allá de la semana límite del manual (queda registrado; vence solo)" onClick={() => setExtiendo(true)}>Extender ventana</button>
+            {extensionVigente && (
+              <button className="btn" style={BTN_XS} disabled={guardando} onClick={() => guardar(null)}>
+                {guardando ? 'Guardando…' : 'Quitar extensión'}
+              </button>
+            )}
+          </div>
+        )
+      )}
+    </div>
   )
 }
 
@@ -1701,6 +1933,11 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
 function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   const isEdit = !!initial.id
   const [f, setF] = useState(initial)
+  // Flag de tocado: la fecha de inicio de clases solo viaja al servidor si el
+  // usuario la editó en ESTA sesión del modal (contrato de actualizarGrupo:
+  // campo ausente = no tocar — así el modal abierto no pisa un ajuste hecho
+  // en paralelo desde otra pestaña).
+  const [inicioTocado, setInicioTocado] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
@@ -1714,10 +1951,12 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
       const data = {
         numero: String(f.numero).trim(), itinerario: f.itinerario, es_online: f.es_online,
         coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null,
-        fecha_inicio_clases: f.fecha_inicio_clases || null, inscripcion_abierta: f.inscripcion_abierta !== false,
         notas: f.notas,
         horarios: f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null })),
       }
+      // La palanca de inscripciones ya no viaja NUNCA (vive en su botón con
+      // CAS); la fecha de inicio solo si el usuario la tocó (o al crear).
+      if (!isEdit || inicioTocado) data.fecha_inicio_clases = f.fecha_inicio_clases || null
       if (!isEdit) { data.nivel = parseInt(f.nivel) || 1; data.ninos_iniciales = f.ninos_iniciales }
       const res = isEdit ? await actualizarGrupo(centroId, initial.id, data) : await crearGrupo(centroId, data)
       setSaving(false)
@@ -1753,16 +1992,16 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         </Field>
         <Field label="Fecha de apertura"><input type="date" className="input" value={f.fecha_apertura} onChange={(e) => set('fecha_apertura', e.target.value)} /></Field>
         <Field label="Fecha de inicio de clases">
-          <input type="date" className="input" value={f.fecha_inicio_clases || ''} onChange={(e) => set('fecha_inicio_clases', e.target.value)} />
-        </Field>
-        <Field label="Inscripciones">
-          <select className="input" value={f.inscripcion_abierta === false ? 'cerrada' : 'abierta'} onChange={(e) => set('inscripcion_abierta', e.target.value === 'abierta')}>
-            <option value="abierta">Abiertas — en llenado</option>
-            <option value="cerrada">Cerradas — ya no entra nadie</option>
-          </select>
+          <input type="date" className="input" value={f.fecha_inicio_clases || ''}
+            onChange={(e) => { set('fecha_inicio_clases', e.target.value); setInicioTocado(true) }} />
+          {isEdit && !initial.fecha_inicio_clases && initial.it_inicio && (
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+              Nivel vigente inicia {fmtDia(initial.it_inicio)} (dato del itinerario; la columna sigue vacía hasta que la fijes aquí).
+            </div>
+          )}
         </Field>
         <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
-          El grupo <b style={{ color: 'var(--text)' }}>entra al Cuadro de Negocio en el mes de su fecha de inicio de clases</b> (sin fecha = cuenta desde ya). Mientras esté <b style={{ color: 'var(--text)' }}>en llenado</b> se puede colocar en las clases de prueba; al cerrarlo, ya no entra nadie y ventas ve 0 cupos.
+          El grupo <b style={{ color: 'var(--text)' }}>entra al Cuadro de Negocio en el mes de su fecha de inicio de clases</b> (sin fecha = cuenta desde ya). La palanca de inscripciones (abrir o cerrar el llenado) ya no vive aquí: se maneja con el botón <b style={{ color: 'var(--text)' }}>Abrir/Cerrar inscripciones</b> del panel del grupo.
         </div>
         {!isEdit && (
           <>
@@ -1923,6 +2162,10 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo')
+  // Inscribir es siempre un niño NUEVO: el select deshabilita tanto la palanca
+  // cerrada como la ventana del manual vencida (el server valida igual).
+  const hoy = hoyISO()
+  const ventanaPorId = new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoy)]))
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
@@ -1967,7 +2210,11 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
         <Field label="Grupo">
           <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
-            {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
+            {activos.map((g) => {
+              const v = ventanaPorId.get(String(g.id))
+              const marca = v?.razon === 'palanca_cerrada' ? ' · 🔒 cerrado' : v?.razon === 'vencida' ? ' · ventana de nuevos vencida' : ''
+              return <option key={g.id} value={g.id} disabled={!v?.abierta}>Grupo {g.numero} · {g.itinerario}{marca}</option>
+            })}
           </select>
         </Field>
         <Field label="Origen">

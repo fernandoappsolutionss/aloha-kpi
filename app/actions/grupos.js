@@ -1,13 +1,14 @@
 'use server'
 import { randomBytes } from 'crypto'
-import { sql } from '../../lib/db'
+import { sql, tx } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO, fechaIso10 } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
 import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } from '../../lib/inventario'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
-import { pushCuposAlCrm, desvincularGrupoEnEventos } from '../../lib/cupos-sync'
+import { encolarSyncCrm } from '../../lib/llenado-service'
+import { fechaLimiteNuevos } from '../../lib/llenado.mjs'
 import { generarItinerario, normalizarExcepciones } from '../../lib/itinerario'
 
 // Genera y guarda el itinerario de clases del nivel (manual ALOHA Panamá):
@@ -278,8 +279,16 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   if (data?.fecha_apertura && !FECHA_RE.test(data.fecha_apertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
   const fechaApertura = data?.fecha_apertura !== undefined ? data.fecha_apertura || null : g.fecha_apertura
   if (data?.fecha_inicio_clases && !FECHA_RE.test(data.fecha_inicio_clases)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
-  const fechaInicio = data?.fecha_inicio_clases !== undefined ? data.fecha_inicio_clases || null : g.fecha_inicio_clases
-  const inscripcionAbierta = data?.inscripcion_abierta !== undefined ? !!data.inscripcion_abierta : g.inscripcion_abierta !== false
+  // Contrato del payload (gate Sol, defecto 7 — carrera del modal): campo
+  // AUSENTE = NO TOCAR. El modal viejo reenviaba SIEMPRE inscripcion_abierta y
+  // fecha_inicio_clases y podía revertir un cierre de palanca concurrente o
+  // pisar una fecha ajustada en paralelo. Por eso:
+  // - inscripcion_abierta ya NO se acepta ni se escribe aquí: la palanca solo
+  //   la mueve setInscripcionAbierta (con CAS).
+  // - fecha_inicio_clases solo se escribe si el payload la trae (el cliente
+  //   manda el campo únicamente cuando el usuario lo editó).
+  const inicioEditado = data?.fecha_inicio_clases !== undefined
+  const fechaInicio = inicioEditado ? data.fecha_inicio_clases || null : fechaIso10(g.fecha_inicio_clases) || null
   const notas = data?.notas !== undefined ? data.notas?.trim() || null : g.notas
 
   let horarios = null
@@ -294,8 +303,9 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   const now = new Date().toISOString()
   await sql`
     UPDATE grupos SET numero = ${numero}, itinerario = ${itinerario}, es_online = ${esOnline},
-      coach_id = ${coachId}, fecha_apertura = ${fechaApertura}, fecha_inicio_clases = ${fechaInicio},
-      inscripcion_abierta = ${inscripcionAbierta}, notas = ${notas}, updated_at = ${now}
+      coach_id = ${coachId}, fecha_apertura = ${fechaApertura},
+      fecha_inicio_clases = CASE WHEN ${inicioEditado} THEN ${inicioEditado ? fechaInicio : null}::date ELSE fecha_inicio_clases END,
+      notas = ${notas}, updated_at = ${now}
     WHERE id = ${grupoId}
   `
   if (horarios) {
@@ -319,8 +329,6 @@ export async function actualizarGrupo(centroId, grupoId, data) {
       excepciones: g.itinerario_clases?.excepciones || [],
     })
   }
-  // Si cambió el estado de inscripciones, ventas debe ver los cupos correctos.
-  if ((g.inscripcion_abierta !== false) !== inscripcionAbierta) await pushCuposAlCrm(centroId, grupoId)
   return { ok: true }
 }
 
@@ -347,12 +355,11 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
   const it = await regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones })
   if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
 
-  // La fecha de inicio del nivel en curso ES la fecha de inicio de clases del
-  // grupo: mantenerlas alineadas evita que el siguiente guardado lo regenere.
-  await sql`
-    UPDATE grupos SET fecha_inicio_clases = ${fechaInicio}, updated_at = ${new Date().toISOString()}
-    WHERE id = ${grupoId}
-  `
+  // (g2-1) Aquí ya NO se copia la fecha del nivel a grupos.fecha_inicio_clases:
+  // itinerario.fecha_inicio es el inicio del NIVEL vigente y la columna es el
+  // inicio operativo del GRUPO — copiarla mezclaba las dos semánticas y
+  // reclasificaba como "nuevos" del mes a niños viejos en el Cuadro de Negocio.
+  // El itinerario se regenera igual (arriba); la columna no se toca.
   return { ok: true, itinerario: it }
 }
 
@@ -370,30 +377,84 @@ export async function linkCoach(centroId, grupoId) {
   return { ok: true, path: `/coach/${token}` }
 }
 
-// Abre o cierra las inscripciones de un grupo (en llenado ↔ ya no entra nadie).
-// Cerrado: no acepta inscripción, reincorporación, cambio de grupo ni fusión.
-export async function toggleInscripcionGrupo(centroId, grupoId) {
+// Palanca manual de inscripciones con CAS (gate Sol, defecto 7): el UPDATE
+// exige el estado que el usuario VIO (`esperado`) — dos pestañas moviendo la
+// palanca a la vez ya no se pisan en silencio: la que llega tarde recibe error
+// y recarga. Cerrada = no entra nadie (ni inscripción, ni reincorporación, ni
+// cambio de grupo, ni fusión hacia él). El CRM se entera por el outbox (ya NO
+// pushCuposAlCrm inline): solo se encola si el CAS ganó, y el consumidor del
+// cron empuja el estado vigente. COALESCE: en filas pre-migración NULL cuenta
+// como abierta (misma convención `!== false` del cliente).
+export async function setInscripcionAbierta(centroId, grupoId, deseado, esperado) {
   await requireCentroAccess(centroId)
-  const [g] = await sql`SELECT id, numero, inscripcion_abierta FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
-  if (!g) return { error: 'El grupo no pertenece a este centro.' }
-  const nueva = g.inscripcion_abierta === false
-  await sql`UPDATE grupos SET inscripcion_abierta = ${nueva}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
-  // Cupos al CRM: cerrado = 0 disponibles aunque tenga espacio (best effort).
-  await pushCuposAlCrm(centroId, grupoId)
-  return { ok: true, abierta: nueva }
+  const r = await sql`
+    UPDATE grupos SET inscripcion_abierta = ${!!deseado}, updated_at = ${new Date().toISOString()}
+    WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'
+      AND COALESCE(inscripcion_abierta, TRUE) = ${!!esperado}
+    RETURNING id
+  `
+  if (!r.length) {
+    const [g] = await sql`SELECT estado, inscripcion_abierta FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+    if (!g) return { error: 'El grupo no pertenece a este centro.' }
+    if (g.estado !== 'activo') return { error: 'El grupo no está activo.' }
+    return { error: 'La palanca cambió en otra pestaña o sesión: recarga para ver el estado actual.', abierta: g.inscripcion_abierta !== false }
+  }
+  await encolarSyncCrm([grupoId], 'palanca')
+  return { ok: true, abierta: !!deseado }
 }
 
-// Cierre manual (manual: un grupo en 0 niños se cierra para no afectar la rentabilidad).
+// Compatibilidad con la UI vieja (se actualiza en la fase Superficie): lee el
+// estado actual y delega en el CAS de setInscripcionAbierta — el toggle "a
+// ciegas" que podía revertir un cierre concurrente desaparece.
+export async function toggleInscripcionGrupo(centroId, grupoId) {
+  await requireCentroAccess(centroId)
+  const [g] = await sql`SELECT id, inscripcion_abierta FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+  if (!g) return { error: 'El grupo no pertenece a este centro.' }
+  const actual = g.inscripcion_abierta !== false
+  return await setInscripcionAbierta(centroId, grupoId, !actual, actual)
+}
+
+// Cierre manual (manual: un grupo en 0 niños se cierra para no afectar la
+// rentabilidad). Transaccional (g2-3 / g2-5): la verificación de 0 niños, el
+// cierre, la desvinculación de las clases de prueba y el encolado clear_group
+// van juntos en una sentencia CTE dentro de tx() — los crm_event_id se
+// capturan al desvincular (RETURNING), así el consumidor del outbox nunca
+// pierde a quién limpiarle aloha_group aunque el vínculo local ya no exista
+// (reemplaza al desvincularGrupoEnEventos best-effort inline).
 export async function cerrarGrupo(centroId, grupoId) {
   await requireCentroAccess(centroId)
   const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
-  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${grupoId} AND estado IN ('activo', 'baja_potencial')`
-  if (n > 0) return { error: `El grupo tiene ${n} niños activos` }
-  await sql`UPDATE grupos SET estado = 'cerrado', fecha_cierre = ${hoyISO()}, updated_at = ${new Date().toISOString()} WHERE id = ${grupoId}`
-  // Un grupo cerrado no puede seguir vendiéndose: se desvincula de las clases
-  // de prueba y el CRM deja de mostrar sus cupos (best effort).
-  await desvincularGrupoEnEventos(centroId, grupoId)
+  const now = new Date().toISOString()
+  const hoy = hoyISO()
+  const [rows] = await tx((txn) => [txn`
+    WITH cerrado AS (
+      UPDATE grupos SET estado = 'cerrado', fecha_cierre = ${hoy}, updated_at = ${now}
+      WHERE id = ${grupoId} AND centro_id = ${centroId}
+        AND NOT EXISTS (
+          SELECT 1 FROM estudiantes
+          WHERE grupo_id = ${grupoId} AND estado IN ('activo', 'baja_potencial')
+        )
+      RETURNING id
+    ), desvinculados AS (
+      UPDATE centro_eventos SET grupo_id = NULL
+      WHERE grupo_id = ${grupoId} AND EXISTS (SELECT 1 FROM cerrado)
+      RETURNING crm_event_id
+    ), outbox AS (
+      INSERT INTO crm_sync_outbox (crm_event_id, grupo_id, op, motivo, clave_idem)
+      SELECT crm_event_id, ${grupoId}, 'clear_group', 'cierre',
+        'clear_group|' || ${grupoId} || '|' || crm_event_id || '|' || ${now}
+      FROM desvinculados
+      ON CONFLICT (clave_idem) DO NOTHING
+    )
+    SELECT (SELECT COUNT(*)::int FROM cerrado) AS cerrado
+  `])
+  if (!Number(rows?.[0]?.cerrado)) {
+    // El gate falló: llegó un niño entre la pantalla y el commit (o el grupo
+    // desapareció). Releer para dar el número real.
+    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${grupoId} AND estado IN ('activo', 'baja_potencial')`
+    return { error: `El grupo tiene ${n} niños activos` }
+  }
   return { ok: true }
 }
 
@@ -420,16 +481,20 @@ export async function siguienteNumero(centroId) {
 }
 
 // Action ligera para selects de otras páginas (eventos → Inscribir, grupo por
-// aperturar). Además de id/numero/itinerario devuelve horarioTexto (am/pm) y
-// cupos frente al modelo ("quedan X de 10") — campos agregados, sin romper consumidores.
+// aperturar). Además de id/numero/itinerario devuelve horarioTexto (am/pm),
+// cupos frente al modelo ("quedan X de 10"), el nivel del itinerario vigente y
+// la fecha límite de niños nuevos (para que el selector de eventos inicialice
+// nivel/itinerario desde el grupo y ordene por cierre de ventana) — campos
+// agregados, sin romper consumidores.
 export async function listarGruposActivos(centroId) {
   await requireCentroAccess(centroId)
   const rows = await sql`
     SELECT g.id, g.numero, g.itinerario, g.inscripcion_abierta, g.fecha_inicio_clases,
+      g.itinerario_clases, g.llenado_extendido_hasta, g.estado,
       COUNT(e.id) FILTER (WHERE e.estado IN ('activo', 'baja_potencial'))::int AS ninos
     FROM grupos g LEFT JOIN estudiantes e ON e.grupo_id = g.id
     WHERE g.centro_id = ${centroId} AND g.estado = 'activo'
-    GROUP BY g.id, g.numero, g.itinerario, g.inscripcion_abierta, g.fecha_inicio_clases
+    GROUP BY g.id
   `
   const horarios = await sql`
     SELECT h.grupo_id, h.dia, h.hora_inicio, h.hora_fin
@@ -444,6 +509,11 @@ export async function listarGruposActivos(centroId) {
       itinerario: g.itinerario,
       inscripcionAbierta: g.inscripcion_abierta !== false,
       fechaInicioClases: fechaIso10(g.fecha_inicio_clases),
+      // Nivel VIGENTE del itinerario del grupo (sin itinerario = nivel 1).
+      nivel: Number(g.itinerario_clases?.nivel) || 1,
+      // Fecha límite de niños nuevos derivada (incluye llenado_extendido_hasta);
+      // null = exento o sin itinerario válido (sin límite que mostrar).
+      fechaLimiteNuevos: fechaLimiteNuevos(g).fechaLimite,
       horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
       cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
     }))
@@ -542,6 +612,9 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
   const tgt = grupos.find((g) => String(g.id) === String(aGrupoId))
   if (!src || !tgt) return { error: 'El grupo no pertenece a este centro.' }
   if (tgt.estado !== 'activo') return { error: 'El grupo destino no está activo.' }
+  // El destino solo respeta la PALANCA manual (movimiento interno, no niño
+  // nuevo): el cierre automático de ventana jamás frena una fusión — pedido
+  // explícito de Fernando (mismo criterio que grupoAceptaMovimientos).
   if (tgt.inscripcion_abierta === false) return { error: `El grupo ${tgt.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo antes de fusionar hacia él.` }
   const ids = new Set(estudianteIds.map((x) => String(x)))
   const moveKids = src.estudiantes.filter((e) => ids.has(String(e.id)))
@@ -557,25 +630,99 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
   const now = new Date().toISOString()
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
-  for (const e of moveKids) {
-    await sql`UPDATE estudiantes SET grupo_id = ${tgt.id}, updated_at = ${now} WHERE id = ${e.id}`
-    await sql`
+  const idsNum = moveKids.map((e) => Number(e.id))
+  // (g2-3) Escritura transaccional en UNA sentencia CTE vía tx(): `movidos`
+  // exige el número EXACTO de niños del origen que vio la UI (`esperado`) y
+  // que el destino siga activo con la palanca abierta — si algo cambió entre
+  // el análisis y el commit, 0 filas y se aborta sin efectos a medias.
+  // Movimientos, eventos, marca de origen fusionado, desvinculación de clases
+  // de prueba y outbox viajan juntos:
+  // - (g2-5) los crm_event_id del origen se capturan al desvincular
+  //   (RETURNING) y su clear_group se encola EN LA MISMA transacción — el
+  //   consumidor nunca pierde a quién limpiarle aloha_group.
+  // - El destino (y el origen, si sigue vivo) encolan sync_group; el push real
+  //   lo hace el consumidor del cron (ya NO pushCuposAlCrm inline).
+  // OJO Postgres: todas las sub-consultas del WITH ven el MISMO snapshot; por
+  // eso outbox_sync decide con NOT EXISTS(marca) y no releyendo centro_eventos
+  // (que aún vería el vínculo recién desvinculado).
+  const [rows] = await tx((txn) => [txn`
+    WITH esperado AS (
+      SELECT COUNT(*)::int AS n FROM estudiantes
+      WHERE grupo_id = ${src.id} AND estado IN ('activo', 'baja_potencial')
+    ), movidos AS (
+      UPDATE estudiantes SET grupo_id = ${tgt.id}, updated_at = ${now}
+      WHERE id = ANY(${idsNum}::int[]) AND grupo_id = ${src.id}
+        AND (SELECT n FROM esperado) = ${src.estudiantes.length}
+        AND EXISTS (
+          SELECT 1 FROM grupos
+          WHERE id = ${tgt.id} AND centro_id = ${centroId} AND estado = 'activo'
+            AND inscripcion_abierta IS NOT FALSE
+        )
+      RETURNING id
+    ), eventos AS (
       INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, a_grupo_id)
-      VALUES (${e.id}, ${centroId}, 'fusion', ${year}, ${month}, ${hoy}, ${src.id}, ${tgt.id})
-    `
+      SELECT movidos.id, ${centroId}, 'fusion', ${year}, ${month}, ${hoy}, ${src.id}, ${tgt.id} FROM movidos
+    ), marca AS (
+      UPDATE grupos SET estado = 'fusionado', fusionado_en = ${tgt.id}, fecha_cierre = ${hoy}, updated_at = ${now}
+      WHERE id = ${src.id} AND centro_id = ${centroId}
+        AND (SELECT COUNT(*) FROM movidos) > 0
+        AND (SELECT n FROM esperado) = (SELECT COUNT(*) FROM movidos)
+      RETURNING id
+    ), desvinculados AS (
+      UPDATE centro_eventos SET grupo_id = NULL
+      WHERE grupo_id = ${src.id} AND EXISTS (SELECT 1 FROM marca)
+      RETURNING crm_event_id
+    ), outbox_clear AS (
+      INSERT INTO crm_sync_outbox (crm_event_id, grupo_id, op, motivo, clave_idem)
+      SELECT crm_event_id, ${src.id}, 'clear_group', 'fusion',
+        'clear_group|' || ${src.id} || '|' || crm_event_id || '|' || ${now}
+      FROM desvinculados
+      ON CONFLICT (clave_idem) DO NOTHING
+    ), outbox_sync AS (
+      INSERT INTO crm_sync_outbox (crm_event_id, grupo_id, op, motivo, clave_idem)
+      SELECT ce.crm_event_id, ce.grupo_id, 'sync_group', 'fusion',
+        'sync_group|' || ce.grupo_id || '|' || ce.crm_event_id || '|' || ${now}
+      FROM centro_eventos ce
+      WHERE (SELECT COUNT(*) FROM movidos) > 0
+        AND (ce.grupo_id = ${tgt.id} OR (ce.grupo_id = ${src.id} AND NOT EXISTS (SELECT 1 FROM marca)))
+      ON CONFLICT (clave_idem) DO NOTHING
+    )
+    SELECT (SELECT COUNT(*)::int FROM movidos) AS movidos,
+           (SELECT COUNT(*)::int FROM marca) AS fusionado
+  `])
+  const r = rows?.[0]
+  if (!Number(r?.movidos)) {
+    return { error: 'La fusión no se aplicó: el grupo origen cambió de niños o el destino se cerró mientras confirmabas. Recarga y revisa el plan.' }
   }
-  // Si el origen queda sin niños se marca fusionado (manual: cerrar para no afectar rentabilidad).
-  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE grupo_id = ${src.id} AND estado IN ('activo', 'baja_potencial')`
-  let cerrado = false
-  if (n === 0) {
-    await sql`UPDATE grupos SET estado = 'fusionado', fusionado_en = ${tgt.id}, fecha_cierre = ${hoy}, updated_at = ${now} WHERE id = ${src.id}`
-    cerrado = true
+  return { ok: true, cerrado: Number(r?.fusionado) > 0 }
+}
+
+// Override consciente de la ventana de niños nuevos (diseño 2026-08-08): un
+// admin extiende el llenado más allá de la semana límite del manual y queda
+// rastro en la columna `llenado_extendido_hasta` — la extensión vence sola
+// (fechaLimiteNuevos solo la respeta mientras sea posterior al límite
+// derivado). Validación: fecha futura y a lo sumo 8 semanas desde hoy Panamá;
+// más que eso ya no es "extender la inducción", es otra decisión de negocio.
+// `fecha` null retira la extensión. El CRM se entera por el outbox (la fecha
+// límite viaja en el payload de cupos), nunca con push inline.
+export async function extenderVentanaLlenado(centroId, grupoId, fecha) {
+  await requireCentroAccess(centroId)
+  const limpia = fecha == null || fecha === ''
+  const f = limpia ? null : String(fecha).slice(0, 10)
+  if (!limpia) {
+    if (!FECHA_RE.test(f)) return { error: 'Fecha de extensión inválida (AAAA-MM-DD).' }
+    const hoy = hoyISO()
+    if (f <= hoy) return { error: 'La extensión debe ser una fecha futura: hoy el grupo ya se rige por su ventana vigente.' }
+    const [y, m, d] = hoy.split('-').map(Number)
+    const tope = new Date(Date.UTC(y, m - 1, d + 56)).toISOString().slice(0, 10)
+    if (f > tope) return { error: `La extensión máxima es de 8 semanas (hasta el ${tope}); más que eso apunta la venta a la inducción del próximo nivel.` }
   }
-  // La fusión mueve matrícula: el CRM recibe los cupos nuevos del destino y,
-  // del origen, los cupos actualizados — o la desvinculación si quedó fusionado
-  // (best effort, nunca rompe el { ok } local).
-  await pushCuposAlCrm(centroId, tgt.id)
-  if (cerrado) await desvincularGrupoEnEventos(centroId, src.id)
-  else await pushCuposAlCrm(centroId, src.id)
-  return { ok: true, cerrado }
+  const r = await sql`
+    UPDATE grupos SET llenado_extendido_hasta = ${f}, updated_at = ${new Date().toISOString()}
+    WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'
+    RETURNING id
+  `
+  if (!r.length) return { error: 'El grupo no está activo o no pertenece a este centro.' }
+  await encolarSyncCrm([grupoId], 'extension_ventana')
+  return { ok: true, hasta: f }
 }
