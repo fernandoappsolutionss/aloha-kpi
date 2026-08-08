@@ -55,6 +55,68 @@ test('una venta anticipada cuenta cuando el grupo inicia clases', () => {
   assert.deepEqual(iniciosClaseMes([e], [g], [ev], 2026, 8).map((x) => x.estudianteId), [1])
 })
 
+test('una venta sin grupo no crea un nuevo activo', () => {
+  const e = estudiante({ grupo_id: null })
+  const ev = inscripcion({ a_grupo_id: null })
+
+  assert.deepEqual(iniciosClaseMes([e], [grupo()], [ev], 2026, 6), [])
+  assert.deepEqual(iniciosClaseMes([e], [grupo()], [ev], 2026, 8), [])
+})
+
+test('retirar una venta que nunca tuvo grupo no descuenta un nino activo', () => {
+  const e = estudiante({ grupo_id: null, estado: 'retirado', fecha_inscripcion: '2026-08-06' })
+  const eventos = [
+    inscripcion({ fecha: '2026-08-06', a_grupo_id: null }),
+    { id: 101, estudiante_id: 1, tipo: 'retiro', fecha: '2026-08-20', year: 2026, month: 8 },
+  ]
+
+  const movimientos = movimientosVivosMes({
+    estudiantes: [e],
+    grupos: [grupo()],
+    eventos,
+    year: 2026,
+    month: 8,
+  })
+
+  assert.equal(movimientos.deserciones.length, 0)
+  assert.equal(movimientos.totales.retirados, 0)
+})
+
+test('una asignacion posterior usa la fecha mayor entre asignacion e inicio del grupo', () => {
+  const eventos = [
+    inscripcion({ fecha: '2026-08-06', a_grupo_id: null }),
+    { id: 101, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-08-20', a_grupo_id: 10 },
+  ]
+
+  const [inicio] = iniciosClaseMes(
+    [estudiante({ fecha_inscripcion: '2026-08-06' })],
+    [grupo({ fecha_inicio_clases: '2026-08-15' })],
+    eventos,
+    2026,
+    8,
+  )
+
+  assert.equal(inicio.grupoId, 10)
+  assert.equal(inicio.fechaInicio, '2026-08-20')
+})
+
+test('una asignacion previa espera la fecha de inicio del grupo', () => {
+  const eventos = [
+    inscripcion({ fecha: '2026-08-06', a_grupo_id: null }),
+    { id: 101, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-08-10', a_grupo_id: 10 },
+  ]
+
+  const [inicio] = iniciosClaseMes(
+    [estudiante({ fecha_inscripcion: '2026-08-06' })],
+    [grupo({ fecha_inicio_clases: '2026-08-15' })],
+    eventos,
+    2026,
+    8,
+  )
+
+  assert.equal(inicio.fechaInicio, '2026-08-15')
+})
+
 test('una inscripcion posterior al inicio del grupo cuenta al inscribirse', () => {
   const e = estudiante({ fecha_inscripcion: '2026-08-21' })
   const ev = inscripcion({ fecha: '2026-08-21' })

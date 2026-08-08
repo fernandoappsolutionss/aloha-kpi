@@ -374,6 +374,22 @@ ALTER TABLE grupos ADD COLUMN IF NOT EXISTS itinerario_clases JSONB;
 ALTER TABLE grupos ADD COLUMN IF NOT EXISTS coach_token TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_grupos_coach_token ON grupos(coach_token) WHERE coach_token IS NOT NULL;
 ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS nota_coach TEXT;
+ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS origen_venta TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_estudiantes_crm_registration
+  ON estudiantes(centro_id, crm_registration_id)
+  WHERE crm_registration_id IS NOT NULL;
+ALTER TABLE resumen_mes ADD COLUMN IF NOT EXISTS orig_por_clasificar INTEGER DEFAULT 0;
+
+-- Ajuste de conciliacion para activar las fuentes automaticas sin borrar lo
+-- que cada centro ya habia declarado manualmente en agosto de 2026.
+CREATE TABLE IF NOT EXISTS kpi_auto_ajustes (
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  ajustes JSONB NOT NULL DEFAULT '{}'::jsonb,
+  initialized_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (centro_id, year, month)
+);
 CREATE TABLE IF NOT EXISTS asistencias (
   id SERIAL PRIMARY KEY,
   grupo_id INTEGER NOT NULL REFERENCES grupos(id) ON DELETE CASCADE,
