@@ -124,6 +124,8 @@ test('rechaza registros CRM incompletos o ajenos al lote solicitado', async () =
     { id: 'reg-1', registered_at: '2026-08-01T12:00:00.000Z' },
     { id: 'reg-1', event_id: 'event-ajeno', registered_at: '2026-08-01T12:00:00.000Z' },
     { id: 'reg-1', event_id: 'event-1', registered_at: 'fecha-invalida' },
+    { id: 'reg-1', event_id: 'event-1', registered_at: '1' },
+    { id: 'reg-1', event_id: 'event-1', registered_at: '2026-08-01T12:00:00.000Z', attendance_status: 'inventado' },
   ]
 
   for (const registration of invalidos) {
@@ -363,17 +365,60 @@ test('una reclasificacion anterior no borra el origen de una venta automatica nu
   dosVentas[0][0] = 2
   const adjustments = crearAjustes(
     fuenteVacia({ ing: unaVenta, orig_referido: 1 }),
-    fuenteVacia({ ing: unaVenta, orig_por_clasificar: 1 }),
+    fuenteVacia({
+      ing: unaVenta,
+      orig_por_clasificar: 1,
+      _origin_sales: [{ id: 'venta-antigua', origin: 'orig_por_clasificar' }],
+    }),
   )
 
   const reconciled = aplicarAjustes(
-    fuenteVacia({ ing: dosVentas, orig_referido: 1, orig_marketing: 1 }),
+    fuenteVacia({
+      ing: dosVentas,
+      orig_referido: 1,
+      orig_marketing: 1,
+      _origin_sales: [
+        { id: 'venta-antigua', origin: 'orig_referido' },
+        { id: 'venta-nueva', origin: 'orig_marketing' },
+      ],
+    }),
     adjustments,
   )
 
   assert.equal(reconciled.orig_referido, 1)
   assert.equal(reconciled.orig_marketing, 1)
   assert.equal(reconciled.orig_por_clasificar, 0)
+})
+
+test('una reclasificacion entre categorias sigue a la venta antigua por identidad', () => {
+  const unaVenta = matriz()
+  unaVenta[0][0] = 1
+  const dosVentas = matriz()
+  dosVentas[0][0] = 2
+  const adjustments = crearAjustes(
+    fuenteVacia({ ing: unaVenta, orig_marketing: 1 }),
+    fuenteVacia({
+      ing: unaVenta,
+      orig_referido: 1,
+      _origin_sales: [{ id: 'venta-antigua', origin: 'orig_referido' }],
+    }),
+  )
+
+  const reconciled = aplicarAjustes(
+    fuenteVacia({
+      ing: dosVentas,
+      orig_marketing: 1,
+      orig_referido: 1,
+      _origin_sales: [
+        { id: 'venta-antigua', origin: 'orig_marketing' },
+        { id: 'venta-nueva', origin: 'orig_referido' },
+      ],
+    }),
+    adjustments,
+  )
+
+  assert.equal(reconciled.orig_marketing, 1)
+  assert.equal(reconciled.orig_referido, 1)
 })
 
 test('un crecimiento posterior de la fuente se suma sobre el ajuste inicial fijo', () => {
