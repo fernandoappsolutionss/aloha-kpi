@@ -1,11 +1,20 @@
 'use server'
 import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
-import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, hoyISO } from '../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, hoyISO, fechaIso10 } from '../../lib/operaciones'
 import { ventanaNuevos } from '../../lib/llenado.mjs'
 import { colocacionInvalida } from '../../lib/colocacion.mjs'
 import { encolarSyncCrm } from '../../lib/llenado-service'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
+import { ejecutarRetiroEn } from '../../lib/retiros-service'
+import {
+  anclaDeAlta,
+  periodosCorreccionInscripcion,
+  primerDiaMesSiguiente,
+  estadoPrevioDeProgramacion,
+} from '../../lib/retiros.mjs'
+import { planNino, posicionPlanNino, calendarioVersionadoDe, crearMemoPlanes } from '../../lib/plan-nino.mjs'
+import { reAnclaEnDestino } from '../../lib/plan-grupo.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -15,6 +24,19 @@ const intOr = (v, d = 0) => {
 const ym = (fecha) => {
   const [y, m] = String(fecha).split('-').map(Number)
   return { year: y, month: m }
+}
+
+// El país del centro define sus fechas patrias (mismo criterio que
+// app/actions/grupos.js; el nombre es solo respaldo pre-columna pais).
+const paisDe = (c) => (c?.pais === 'VE' || (!c?.pais && /naranjos/i.test(c?.nombre || '')) ? 'VE' : 'PA')
+
+// itinerario_clases llega como objeto (JSONB) o, defensivamente, como string.
+const itinerarioVigenteDe = (v) => {
+  if (v == null) return null
+  if (typeof v === 'string') {
+    try { return JSON.parse(v) } catch { return null }
+  }
+  return v
 }
 
 // (Diseño 2026-08-08) Qué bloquea cada cosa — el manual habla de NIÑOS NUEVOS:
@@ -59,8 +81,39 @@ async function grupoDe(centroId, grupoId, query = sql, { bloquear = false } = {}
   return filas[0] || null
 }
 
-// Alta de un niño (clase de prueba, inscripción directa o traslado). Registra
-// el evento de inscripción con el year/month de la fecha de inscripción.
+// Lado {calendarioVersionado, excepciones, pais} de un grupo para el
+// re-anclaje g1-9 (mismo armado que aplicarFusion): calendario y excepciones
+// salen de la fila del grupo + sus horarios, leídos DENTRO de la transacción.
+async function ladoPlanDe(query, grupoFila, pais) {
+  if (!grupoFila) return null
+  const it = itinerarioVigenteDe(grupoFila.itinerario_clases)
+  const horarios = await query`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoFila.id}`
+  const grupoCal = { id: grupoFila.id, itinerario_clases: it, horarios }
+  return { calendarioVersionado: calendarioVersionadoDe(grupoCal), excepciones: it?.excepciones || [], pais }
+}
+
+// Posición derivada de un niño en el calendario de un grupo (para el detalle
+// de los eventos de cierre de nivel, g1-11): sin lado o sin ancla ⇒ sin_plan
+// explícito — nada se inventa.
+function posicionEn(lado, ancla, nivel, hoy, memo) {
+  if (!lado) return { estado: 'sin_plan', indice: null }
+  const plan = planNino({
+    ancla,
+    nivel,
+    pais: lado.pais,
+    calendarioVersionado: lado.calendarioVersionado,
+    excepciones: lado.excepciones,
+  }, memo)
+  const p = posicionPlanNino(plan, hoy)
+  return { estado: p.estado, indice: p.indice }
+}
+
+// Alta de un niño (clase de prueba, inscripción directa o traslado).
+// (g1-8) Con grupo asignado: el evento de venta nace AQUÍ (con origen copiado
+// atómicamente, g1-17) y el ancla = max(fecha_inscripcion,
+// grupo.fecha_inicio_clases). SIN grupo: flujo `pendiente` — ficha solamente,
+// SIN evento de venta y SIN ancla; ambos nacen en la PRIMERA COLOCACIÓN
+// (actualizarEstudiante, tratada como niño nuevo).
 export async function inscribirEstudiante(centroId, data) {
   await requireCentroAccess(centroId)
   const nombre = data?.nombre?.trim()
@@ -96,25 +149,28 @@ export async function inscribirEstudiante(centroId, data) {
   const fecha = data?.fecha || hoy
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
   const { year, month } = ym(fecha)
+  // (g1-11) fecha_cierre_nivel = OVERRIDE MANUAL: solo se escribe si el form
+  // la trajo; el cierre derivado se calcula al vuelo y jamás se persiste.
   const fechaCierre = data?.fecha_cierre_nivel || null
   if (fechaCierre && !FECHA_RE.test(fechaCierre)) return { error: 'Fecha de cierre de nivel inválida (AAAA-MM-DD).' }
 
   const now = new Date().toISOString()
   // (g2-3) Alta ATÓMICA: mes editable, gate de ventana sobre el grupo releído y
-  // BLOQUEADO, duplicado de CRM, estudiante, evento y outbox van en la MISMA
-  // transacción SERIALIZABLE — si la palanca se cerró o la ventana venció entre
-  // el prechequeo y el commit, no queda nada a medias. El CRM se entera por el
-  // outbox (ya NO pushCuposAlCrm inline): el consumidor del cron empuja el
-  // estado vigente y loadOperaciones nunca espera red externa.
+  // BLOQUEADO, duplicado de CRM, estudiante (ficha + ancla + cierre), evento y
+  // outbox van en la MISMA transacción SERIALIZABLE — si la palanca se cerró o
+  // la ventana venció entre el prechequeo y el commit, no queda nada a medias.
+  // El CRM se entera por el outbox (ya NO pushCuposAlCrm inline).
   const resultado = await withTransaction(async (query) => {
     // ORDEN DE LOCKS grupos → mes_kpi → estudiantes, el mismo de
     // actualizarGrupo (PR #81): tomarlos siempre en este orden evita deadlocks
     // entre editar el grupo e inscribir en él. El ORDEN DE MENSAJES no cambia:
     // se bloquea primero y se evalúa después.
     const g = grupoId ? await grupoDe(centroId, grupoId, query, { bloquear: true }) : null
-    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
-    if (errorMes) return { error: errorMes }
+    // El mes KPI solo importa cuando nace el evento de venta (con grupo). El
+    // alta pendiente es ficha pura: ningún periodo del cuadro se toca (g1-8).
     if (grupoId) {
+      const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+      if (errorMes) return { error: errorMes }
       if (!g) return { error: 'El grupo no pertenece a este centro.' }
       // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
       // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
@@ -130,27 +186,45 @@ export async function inscribirEstudiante(centroId, data) {
       `
       if (dup) return { error: 'Este registro ya fue inscrito.' }
     }
+    // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
+    // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
+    const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
     const [e] = await query`
       INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
-        crm_registration_id, fecha_inscripcion, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
+        crm_registration_id, fecha_inscripcion, fecha_inicio_nivel, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
       VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
-        ${crmId}, ${fecha}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
+        ${crmId}, ${fecha}, ${ancla}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
         ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
       RETURNING id
     `
-    await query`
-      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel)
-      VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel})
-    `
-    // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
-    if (grupoId) await encolarSyncCrm([grupoId], 'inscripcion', query)
-    return { ok: true, estudianteId: e.id }
+    if (grupoId) {
+      // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
+      await query`
+        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen)
+        VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen})
+      `
+      // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
+      await encolarSyncCrm([grupoId], 'inscripcion', query)
+    }
+    return { ok: true, estudianteId: e.id, pendiente: !grupoId }
   })
   return resultado
 }
 
-// Edición general. Si cambia el nivel registra evento 'cambio_nivel'; si cambia
-// el grupo, 'cambio_grupo'. Solo se tocan los campos que vienen en `data`.
+// Edición general — TODO en UNA transacción (ficha + ancla + cierre + eventos
+// + outbox, g1-8/g1-9/g1-19). Ramas:
+// - Cambio de nivel manual: evento 'cambio_nivel' con el CIERRE del nivel que
+//   termina en detalle (anclas y posiciones antes/después) y ancla nueva =
+//   fecha del cambio.
+// - PRIMERA colocación de un pendiente: nace el evento de venta canónico con
+//   fecha = fecha de colocación (hoy Panamá, bajo lock del mes) y ancla =
+//   max(fecha_colocacion, fecha_inicio_clases del grupo) — JAMÁS la
+//   fecha_inscripcion vieja de la ficha (g1-8, corrección g2-1).
+// - Traslado de grupo: re-anclaje semántico al calendario del destino (g1-9,
+//   mismo motor que la fusión); sin equivalente se aborta con error legible.
+// - Corrección de fecha_inscripcion: flujo de 4 periodos (g1-19).
+// ultimaAsistencia SALIÓ del contrato público (g1-23): se deriva server-side
+// de las asistencias y este endpoint la ignora aunque el payload la traiga.
 export async function actualizarEstudiante(centroId, id, data) {
   await requireCentroAccess(centroId)
   const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
@@ -163,102 +237,347 @@ export async function actualizarEstudiante(centroId, id, data) {
   const nivel = data?.nivel !== undefined ? intOr(data.nivel) : Number(est.nivel)
   if (nivel < 1 || nivel > NIVEL_MAX[itinerario]) return { error: `El nivel de ${itinerario} va de 1 a ${NIVEL_MAX[itinerario]}.` }
   let grupoId = est.grupo_id
-  if (data?.grupo_id !== undefined) {
-    grupoId = data.grupo_id || null
-    // Solo si el niño CAMBIA de grupo: quedarse donde ya está siempre se puede.
-    if (grupoId && String(grupoId) !== String(est.grupo_id ?? '')) {
-      const g = await grupoDe(centroId, grupoId)
-      if (!g) return { error: 'El grupo no pertenece a este centro.' }
-      // (g2-6) PRIMERA COLOCACIÓN cuenta como niño NUEVO: si el niño no tiene
-      // historial de grupo previo no-nulo (ni grupo actual ni ningún evento
-      // con a_grupo_id — el alta sin grupo que recién se coloca), aplica la
-      // ventana de nuevos completa. Solo el traslado real (ya estuvo en un
-      // grupo) es movimiento y respeta únicamente la palanca.
-      let tuvoGrupo = est.grupo_id != null
-      if (!tuvoGrupo) {
-        const [ev] = await sql`
-          SELECT id FROM estudiante_eventos
-          WHERE estudiante_id = ${id} AND a_grupo_id IS NOT NULL LIMIT 1
-        `
-        tuvoGrupo = !!ev
-      }
-      const err = tuvoGrupo ? grupoAceptaMovimientos(g) : grupoAceptaNinosNuevos(g)
-      if (err) return { error: err }
-      // (Defecto 10) Matriz de colocación, igual que en inscribirEstudiante:
-      // el cruce de itinerarios que frena una fusión frena TAMBIÉN la primera
-      // colocación y el traslado — un Tiny no entra a un grupo Kids ni un
-      // Kids <3 a Tiny, sin importar si el niño es nuevo o movimiento. Se
-      // valida con el itinerario/nivel que el niño tendrá TRAS esta edición.
-      const errCol = colocacionInvalida({ itinerario, nivel }, g.itinerario)
-      if (errCol) return { error: errCol }
-    }
+  if (data?.grupo_id !== undefined) grupoId = data.grupo_id || null
+  const cambiaGrupo = String(grupoId ?? '') !== String(est.grupo_id ?? '')
+  if (cambiaGrupo && grupoId) {
+    const g = await grupoDe(centroId, grupoId)
+    if (!g) return { error: 'El grupo no pertenece a este centro.' }
   }
   const statusPlataforma = data?.status_plataforma !== undefined ? data.status_plataforma : est.status_plataforma
   if (statusPlataforma && !STATUS_PLATAFORMA.includes(statusPlataforma)) return { error: 'Status de plataforma inválido.' }
   const origen = data?.origen !== undefined ? data.origen : est.origen
   if (origen && !ORIGENES.includes(origen)) return { error: 'Origen inválido.' }
-  for (const campo of ['fecha_inscripcion', 'fecha_cierre_nivel', 'ultima_asistencia']) {
+  // (g1-23) ultima_asistencia ya NO se edita desde aquí: es derivada.
+  for (const campo of ['fecha_inscripcion', 'fecha_cierre_nivel']) {
     if (data?.[campo] && !FECHA_RE.test(data[campo])) return { error: 'Las fechas van en formato AAAA-MM-DD.' }
   }
-  const fechaDe = (campo) => (data?.[campo] !== undefined ? data[campo] || null : est[campo])
+  // (g1-19) La fecha de inscripción NUNCA se vacía.
+  if (data?.fecha_inscripcion !== undefined && !data.fecha_inscripcion) {
+    return { error: 'La fecha de inscripción no se puede vaciar: corrígela si hace falta, pero todo niño la necesita.' }
+  }
+  const fechaInscripcionNueva = data?.fecha_inscripcion !== undefined
+    ? String(data.fecha_inscripcion).slice(0, 10)
+    : fechaIso10(est.fecha_inscripcion)
+  const corrigeInscripcion = fechaInscripcionNueva !== fechaIso10(est.fecha_inscripcion)
+  const cierreDe = () => (data?.fecha_cierre_nivel !== undefined ? data.fecha_cierre_nivel || null : est.fecha_cierre_nivel)
   const textoDe = (campo) => {
     if (data?.[campo] === undefined) return est[campo]
     return data[campo] == null ? null : String(data[campo]).trim() || null
   }
+  const nivelCambia = nivel !== Number(est.nivel)
 
   const now = new Date().toISOString()
-  await sql`
-    UPDATE estudiantes SET
-      nombre = ${nombre}, itinerario = ${itinerario}, nivel = ${nivel}, grupo_id = ${grupoId},
-      status_plataforma = ${statusPlataforma}, origen = ${origen},
-      fecha_inscripcion = ${fechaDe('fecha_inscripcion')},
-      fecha_cierre_nivel = ${fechaDe('fecha_cierre_nivel')},
-      ultima_asistencia = ${fechaDe('ultima_asistencia')},
-      representante = ${textoDe('representante')}, correo = ${textoDe('correo')},
-      telefono = ${textoDe('telefono')}, notas = ${textoDe('notas')}, updated_at = ${now}
-    WHERE id = ${id}
-  `
-  const hoy = hoyISO()
-  const { year, month } = ym(hoy)
-  if (nivel !== Number(est.nivel)) {
-    await sql`
-      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_nivel, a_nivel)
-      VALUES (${id}, ${centroId}, 'cambio_nivel', ${year}, ${month}, ${hoy}, ${Number(est.nivel)}, ${nivel})
+  const ERROR_CARRERA = 'El estudiante cambió mientras editabas (otra pestaña u otro usuario). Recarga antes de continuar.'
+  return await withTransaction(async (query) => {
+    const hoy = hoyISO()
+    const { year: yHoy, month: mHoy } = ym(hoy)
+    // ORDEN DE LOCKS grupos → mes_kpi → estudiantes (PR #81). Destino y origen
+    // del traslado se bloquean en UN statement ordenado por id (patrón de
+    // aplicarFusion): dos ediciones cruzadas no se traban entre sí.
+    const idsGrupos = [
+      ...(cambiaGrupo && grupoId ? [Number(grupoId)] : []),
+      ...(cambiaGrupo && est.grupo_id ? [Number(est.grupo_id)] : []),
+    ].sort((a, b) => a - b)
+    const gruposBloqueados = idsGrupos.length
+      ? await query`
+          SELECT * FROM grupos
+          WHERE id = ANY(${idsGrupos}::int[]) AND centro_id = ${centroId}
+          ORDER BY id
+          FOR UPDATE
+        `
+      : []
+    const destino = cambiaGrupo && grupoId
+      ? gruposBloqueados.find((x) => String(x.id) === String(grupoId)) || null
+      : null
+    const origenGrupo = cambiaGrupo && est.grupo_id
+      ? gruposBloqueados.find((x) => String(x.id) === String(est.grupo_id)) || null
+      : null
+    if (cambiaGrupo && grupoId && !destino) return { error: 'El grupo no pertenece a este centro.' }
+
+    // Historia del niño DENTRO de la transacción: define pendiente/colocado.
+    const eventosIns = await query`
+      SELECT id, fecha, year, month, a_grupo_id FROM estudiante_eventos
+      WHERE estudiante_id = ${id} AND tipo = 'inscripcion'
+      ORDER BY fecha, id
     `
-  }
-  if (String(grupoId ?? '') !== String(est.grupo_id ?? '')) {
-    await sql`
-      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, a_grupo_id)
-      VALUES (${id}, ${centroId}, 'cambio_grupo', ${year}, ${month}, ${hoy}, ${est.grupo_id}, ${grupoId})
+    const [evConGrupo] = await query`
+      SELECT id FROM estudiante_eventos
+      WHERE estudiante_id = ${id} AND a_grupo_id IS NOT NULL LIMIT 1
     `
-    // El cambio de grupo mueve cupos en ambos lados: los eventos vinculados de
-    // ambos grupos van al outbox (ya NO push inline) y el consumidor del cron
-    // empuja el estado vigente al CRM.
-    await encolarSyncCrm([est.grupo_id, grupoId], 'cambio_grupo')
-  }
-  return { ok: true }
+    // (g2-6) PRIMERA COLOCACIÓN cuenta como niño NUEVO: sin grupo actual y sin
+    // historial de grupo. Pendiente PURO (g1-8): además sin evento de venta —
+    // su KPI nace al colocarlo, no antes.
+    const tuvoGrupo = est.grupo_id != null || !!evConGrupo
+    const esPendientePuro = !tuvoGrupo && eventosIns.length === 0
+    const primeraColocacion = cambiaGrupo && grupoId && !tuvoGrupo
+
+    // ¿La corrección de fecha toca periodos KPI? Solo si el niño tiene evento
+    // canónico (g1-19, corrección g2-1): el pendiente sin evento corrige la
+    // ficha y ningún periodo se bloquea.
+    let eventoCanonico = null
+    if (corrigeInscripcion && eventosIns.length > 0) {
+      if (eventosIns.length > 1) {
+        return { error: `El niño tiene ${eventosIns.length} eventos de inscripción y debería tener UNO: repara la historia (dedupe g1-17) antes de corregir la fecha.` }
+      }
+      eventoCanonico = eventosIns[0]
+    }
+    if (corrigeInscripcion && eventosIns.length === 0 && tuvoGrupo) {
+      return { error: 'El niño está colocado pero no tiene evento canónico de inscripción: repara la historia (backfill g1-12) antes de corregir la fecha.' }
+    }
+
+    // Bloqueo de meses en UNA sola llamada ordenada: el mes de hoy si nacen
+    // eventos ahora, y los 4 periodos de la corrección (g1-19).
+    const periodos = []
+    const nacenEventosHoy = (nivelCambia && !esPendientePuro) || (cambiaGrupo && !esPendientePuro) || primeraColocacion
+    if (nacenEventosHoy) periodos.push({ year: yHoy, month: mHoy })
+    if (eventoCanonico) {
+      periodos.push(...periodosCorreccionInscripcion({
+        fechaFichaVieja: est.fecha_inscripcion,
+        evento: eventoCanonico,
+        fechaNueva: fechaInscripcionNueva,
+      }))
+    }
+    if (periodos.length) {
+      const errorMes = await bloquearMesesEditables(query, centroId, periodos)
+      if (errorMes) return { error: errorMes }
+    }
+
+    // El niño, bloqueado. La decisión (nivel viejo, grupo viejo, ancla) se
+    // tomó sobre la lectura previa: si la fila ya no coincide, se aborta.
+    const [bloqueado] = await query`
+      SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId} FOR UPDATE
+    `
+    if (!bloqueado) return { error: 'El estudiante no pertenece a este centro.' }
+    if (
+      String(bloqueado.grupo_id ?? '') !== String(est.grupo_id ?? '') ||
+      Number(bloqueado.nivel) !== Number(est.nivel) ||
+      bloqueado.itinerario !== est.itinerario ||
+      bloqueado.estado !== est.estado ||
+      fechaIso10(bloqueado.fecha_inscripcion) !== fechaIso10(est.fecha_inscripcion) ||
+      fechaIso10(bloqueado.fecha_inicio_nivel) !== fechaIso10(est.fecha_inicio_nivel)
+    ) {
+      return { error: ERROR_CARRERA }
+    }
+
+    // Gates del destino sobre la fila BLOQUEADA: primera colocación = niño
+    // nuevo (ventana completa); traslado real = movimiento (solo palanca).
+    if (cambiaGrupo && grupoId) {
+      const errorGrupo = tuvoGrupo ? grupoAceptaMovimientos(destino) : grupoAceptaNinosNuevos(destino, hoy)
+      if (errorGrupo) return { error: errorGrupo }
+      // (Defecto 10) Matriz de colocación, igual que en inscribirEstudiante:
+      // se valida con el itinerario/nivel que el niño tendrá TRAS esta edición.
+      const errCol = colocacionInvalida({ itinerario, nivel }, destino.itinerario)
+      if (errCol) return { error: errCol }
+    }
+
+    const [centro] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+    const pais = paisDe(centro)
+    const memo = crearMemoPlanes()
+
+    // ── Ancla y eventos ──────────────────────────────────────────────────────
+    let ancla = fechaIso10(est.fecha_inicio_nivel)
+    const eventos = [] // se insertan al final, tras decidir la ficha completa
+
+    // (g1-19) Corrección con evento canónico: lock del evento + CAS, ficha +
+    // evento (fecha y year/month) + ancla inicial si no hubo transición.
+    if (eventoCanonico) {
+      const [evBloqueado] = await query`
+        SELECT * FROM estudiante_eventos WHERE id = ${eventoCanonico.id} FOR UPDATE
+      `
+      if (
+        !evBloqueado || evBloqueado.tipo !== 'inscripcion' ||
+        fechaIso10(evBloqueado.fecha) !== fechaIso10(eventoCanonico.fecha) ||
+        Number(evBloqueado.year) !== Number(eventoCanonico.year) ||
+        Number(evBloqueado.month) !== Number(eventoCanonico.month)
+      ) {
+        return { error: ERROR_CARRERA }
+      }
+      const { year: yN, month: mN } = ym(fechaInscripcionNueva)
+      await query`
+        UPDATE estudiante_eventos SET fecha = ${fechaInscripcionNueva}, year = ${yN}, month = ${mN}
+        WHERE id = ${eventoCanonico.id}
+      `
+      // Ancla INICIAL: solo si el niño no tuvo transición posterior (cambio de
+      // nivel, graduación, fusión o cambio de grupo re-anclan por su cuenta —
+      // si existe cualquiera, la ancla vigente ya no es la inicial y no se toca).
+      const [transicion] = await query`
+        SELECT id FROM estudiante_eventos
+        WHERE estudiante_id = ${id}
+          AND tipo IN ('cambio_nivel', 'graduacion_tiny', 'fusion', 'cambio_grupo')
+        LIMIT 1
+      `
+      if (!transicion) {
+        const [gIns] = eventoCanonico.a_grupo_id
+          ? await query`SELECT fecha_inicio_clases FROM grupos WHERE id = ${eventoCanonico.a_grupo_id}`
+          : [null]
+        ancla = anclaDeAlta(fechaInscripcionNueva, gIns?.fecha_inicio_clases)
+      }
+    }
+
+    // Lados del plan para posiciones y re-anclaje (solo si hacen falta).
+    const ladoOrigen = cambiaGrupo && origenGrupo ? await ladoPlanDe(query, origenGrupo, pais) : null
+    const ladoDestino = cambiaGrupo && destino ? await ladoPlanDe(query, destino, pais) : null
+
+    // Cambio de NIVEL manual (g1-11): cierre del nivel que termina en detalle
+    // (anclas y posiciones antes/después) y ancla nueva = fecha del cambio.
+    // En un pendiente puro el nivel es solo dato de ficha: sin venta no hay
+    // transición que registrar (sus eventos nacen en la primera colocación).
+    if (nivelCambia && !esPendientePuro) {
+      // Posición ANTES en el calendario donde el niño estaba (origen si además
+      // se traslada); posición DESPUÉS en el calendario donde quedará.
+      const ladoActual = cambiaGrupo
+        ? ladoOrigen
+        : est.grupo_id ? await ladoPlanDe(query, await grupoDe(centroId, est.grupo_id, query), pais) : null
+      const ladoNuevo = cambiaGrupo ? ladoDestino : ladoActual
+      const detalle = {
+        origen: 'cambio_nivel_manual',
+        cierre_nivel_terminado: hoy,
+        ancla_antes: ancla,
+        posicion_antes: posicionEn(ladoActual, ancla, Number(est.nivel), hoy, memo),
+        ancla_despues: hoy,
+        posicion_despues: posicionEn(ladoNuevo, hoy, nivel, hoy, memo),
+      }
+      eventos.push({
+        tipo: 'cambio_nivel', fecha: hoy, year: yHoy, month: mHoy,
+        de_nivel: Number(est.nivel), a_nivel: nivel, detalle,
+      })
+      ancla = hoy
+    }
+
+    // Cambio de GRUPO.
+    if (cambiaGrupo) {
+      if (primeraColocacion) {
+        if (eventosIns.length === 0) {
+          // (g1-8/g2-1) Nace la fecha KPI canónica: evento_inscripcion.fecha =
+          // fecha de colocación (hoy, bajo el lock del mes de hoy), con origen
+          // copiado atómicamente. La fecha_inscripcion vieja de la ficha
+          // pendiente NO backdatea ni la venta ni el ancla.
+          eventos.push({
+            tipo: 'inscripcion', fecha: hoy, year: yHoy, month: mHoy,
+            a_grupo_id: grupoId, a_nivel: nivel, origen,
+          })
+        } else {
+          // Pendiente LEGACY con venta ya contada: la colocación es un
+          // movimiento de grupo, sin segunda inscripción canónica (g1-17).
+          eventos.push({
+            tipo: 'cambio_grupo', fecha: hoy, year: yHoy, month: mHoy,
+            de_grupo_id: est.grupo_id, a_grupo_id: grupoId,
+          })
+        }
+        ancla = anclaDeAlta(hoy, destino.fecha_inicio_clases)
+      } else if (grupoId && !nivelCambia) {
+        // (g1-9) TRASLADO: se conserva la posición semántica en el calendario
+        // del destino — misma semana (mismo índice), ancla más cercana, empate
+        // → la más antigua; sin equivalente se aborta TODA la edición. El niño
+        // sin plan derivable se mueve sin re-anclar (nada se inventa).
+        const r = reAnclaEnDestino({
+          ancla,
+          nivel,
+          hoy,
+          origen: ladoOrigen || {},
+          destino: ladoDestino || {},
+        }, memo)
+        if (r === null) {
+          return { error: `El traslado no se aplicó: el horario del grupo ${destino.numero} no tiene una semana equivalente para la posición actual del niño (nivel ${nivel}, ancla ${ancla}). Ajusta el plan del destino o elige otro grupo.` }
+        }
+        const detalle = {
+          ancla_antes: ancla,
+          posicion_antes: r.sinPlan ? { estado: 'sin_plan', indice: null } : r.antes,
+          ancla_despues: r.sinPlan ? ancla : r.ancla,
+          posicion_despues: r.sinPlan ? { estado: 'sin_plan', indice: null } : r.despues,
+        }
+        eventos.push({
+          tipo: 'cambio_grupo', fecha: hoy, year: yHoy, month: mHoy,
+          de_grupo_id: est.grupo_id, a_grupo_id: grupoId, detalle,
+        })
+        if (!r.sinPlan) ancla = r.ancla
+      } else if (!esPendientePuro) {
+        // Traslado con cambio de nivel simultáneo (el evento de nivel ya lleva
+        // el ancla nueva = hoy) o salida a "sin grupo": movimiento simple.
+        eventos.push({
+          tipo: 'cambio_grupo', fecha: hoy, year: yHoy, month: mHoy,
+          de_grupo_id: est.grupo_id, a_grupo_id: grupoId,
+          detalle: { ancla_antes: fechaIso10(est.fecha_inicio_nivel), ancla_despues: ancla },
+        })
+      }
+    }
+
+    // ── Ficha completa en UN update (incluye ancla y cierre override) ────────
+    await query`
+      UPDATE estudiantes SET
+        nombre = ${nombre}, itinerario = ${itinerario}, nivel = ${nivel}, grupo_id = ${grupoId},
+        status_plataforma = ${statusPlataforma}, origen = ${origen},
+        fecha_inscripcion = ${fechaInscripcionNueva},
+        fecha_inicio_nivel = ${ancla},
+        fecha_cierre_nivel = ${cierreDe()},
+        representante = ${textoDe('representante')}, correo = ${textoDe('correo')},
+        telefono = ${textoDe('telefono')}, notas = ${textoDe('notas')}, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    for (const ev of eventos) {
+      await query`
+        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha,
+          de_grupo_id, a_grupo_id, de_nivel, a_nivel, origen, detalle)
+        VALUES (${id}, ${centroId}, ${ev.tipo}, ${ev.year}, ${ev.month}, ${ev.fecha},
+          ${ev.de_grupo_id ?? null}, ${ev.a_grupo_id ?? null}, ${ev.de_nivel ?? null}, ${ev.a_nivel ?? null},
+          ${ev.origen ?? null}, ${ev.detalle ? JSON.stringify(ev.detalle) : null})
+      `
+    }
+    // El cambio de grupo mueve cupos en ambos lados: outbox EN la transacción
+    // (el consumidor del cron empuja el estado vigente al CRM).
+    if (cambiaGrupo) await encolarSyncCrm([est.grupo_id, grupoId], 'cambio_grupo', query)
+    return { ok: true }
+  })
 }
 
 // Graduación Tiny → Kids (manual: todo graduado de Tiny 10 que continúa entra
-// en KIDS nivel 5, progresión aprobada sin permiso corporativo).
+// en KIDS nivel 5, progresión aprobada sin permiso corporativo). Transaccional:
+// ficha + ancla + evento con el cierre del nivel que termina en detalle.
 export async function graduarTiny(centroId, id) {
   await requireCentroAccess(centroId)
-  const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
-  if (!est) return { error: 'El estudiante no pertenece a este centro.' }
-  if (est.estado === 'retirado') return { error: 'El estudiante está retirado.' }
-  if (est.itinerario !== 'TINY' || Number(est.nivel) !== 10) return { error: 'Solo se gradúan niños de TINY nivel 10.' }
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
-  await sql`UPDATE estudiantes SET itinerario = 'KIDS', nivel = 5, updated_at = ${new Date().toISOString()} WHERE id = ${id}`
-  await sql`
-    INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_nivel, a_nivel)
-    VALUES (${id}, ${centroId}, 'graduacion_tiny', ${year}, ${month}, ${hoy}, 10, 5)
-  `
-  return { ok: true }
+  const now = new Date().toISOString()
+  return await withTransaction(async (query) => {
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+    if (errorMes) return { error: errorMes }
+    const [est] = await query`
+      SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId} FOR UPDATE
+    `
+    if (!est) return { error: 'El estudiante no pertenece a este centro.' }
+    if (est.estado === 'retirado') return { error: 'El estudiante está retirado.' }
+    if (est.itinerario !== 'TINY' || Number(est.nivel) !== 10) return { error: 'Solo se gradúan niños de TINY nivel 10.' }
+    const [centro] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+    const lado = est.grupo_id
+      ? await ladoPlanDe(query, await grupoDe(centroId, est.grupo_id, query), paisDe(centro))
+      : null
+    const memo = crearMemoPlanes()
+    const anclaAntes = fechaIso10(est.fecha_inicio_nivel)
+    // (g1-11) El cierre real de TINY 10 queda en el detalle del evento; la
+    // ancla nueva del nivel KIDS 5 es la fecha del cambio.
+    const detalle = {
+      origen: 'graduacion_tiny',
+      cierre_nivel_terminado: hoy,
+      ancla_antes: anclaAntes,
+      posicion_antes: posicionEn(lado, anclaAntes, 10, hoy, memo),
+      ancla_despues: hoy,
+      posicion_despues: posicionEn(lado, hoy, 5, hoy, memo),
+    }
+    await query`
+      UPDATE estudiantes SET itinerario = 'KIDS', nivel = 5, fecha_inicio_nivel = ${hoy}, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_nivel, a_nivel, detalle)
+      VALUES (${id}, ${centroId}, 'graduacion_tiny', ${year}, ${month}, ${hoy}, 10, 5, ${JSON.stringify(detalle)})
+    `
+    return { ok: true }
+  })
 }
 
 // Baja potencial (cuadro real: sigue este mes, se va el próximo). El motivo es
-// opcional y queda en el evento para el seguimiento.
+// opcional y queda en el evento para el seguimiento. Alerta MANUAL: no
+// programa nada — el retiro con fecha va por programarRetiro (R5).
 export async function marcarBajaPotencial(centroId, id, { motivo } = {}) {
   await requireCentroAccess(centroId)
   const [est] = await sql`SELECT id, estado FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
@@ -277,26 +596,61 @@ export async function marcarBajaPotencial(centroId, id, { motivo } = {}) {
 
 // Revierte la alerta de baja potencial. Sin evento nuevo: el niño nunca se fue,
 // así que no es una reincorporación (esas son para retirados que vuelven).
+// Un retiro PROGRAMADO no se revierte por aquí: eso es cancelarRetiroProgramado
+// (que restaura estado Y limpia la fecha — si solo se moviera el estado, el
+// CHECK de coherencia lo rechazaría y el cron lo retiraría igual).
 export async function revertirBajaPotencial(centroId, id) {
   await requireCentroAccess(centroId)
-  const [est] = await sql`SELECT id, estado FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
+  const [est] = await sql`SELECT id, estado, retiro_programado_para FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
   if (!est) return { error: 'El estudiante no pertenece a este centro.' }
   if (est.estado !== 'baja_potencial') return { error: 'El estudiante no está en baja potencial.' }
+  if (est.retiro_programado_para) {
+    return { error: `El niño tiene un retiro programado para el ${fechaIso10(est.retiro_programado_para)}: usa "Cancelar retiro programado" para revertirlo completo.` }
+  }
   await sql`UPDATE estudiantes SET estado = 'activo', updated_at = ${new Date().toISOString()} WHERE id = ${id}`
   return { ok: true }
 }
 
-// Retiro con motivo del cuadro de deserciones. El evento lleva el year/month de
-// la fecha de retiro (así el niño cae en el mes correcto del cuadro).
-export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsistencia } = {}) {
-  await requireCentroAccess(centroId)
+// Retiro INMEDIATO con motivo (g1-22..24). Guiado por asistencia: si el niño
+// tiene asistencia PRESENTE en el mes del retiro, este botón no es el correcto
+// — se dirige a "Retirar el próximo mes" (programarRetiro). El EXISTS corre
+// DENTRO de la transacción con el MISMO lock de estudiante que usa la
+// asistencia (g1-23). Override: EXACTAMENTE rol admin_general, con motivo y
+// evidencia que quedan en el detalle del evento junto al actor.
+// ultimaAsistencia salió del contrato público: se deriva de las asistencias.
+export async function retirarEstudiante(centroId, id, { motivo, fecha, override } = {}) {
+  const sesion = await requireCentroAccess(centroId)
   if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'Motivo de retiro inválido.' }
-  const fechaRetiro = fecha || hoyISO()
+  const hoy = hoyISO()
+  const fechaRetiro = fecha || hoy
   if (!FECHA_RE.test(fechaRetiro)) return { error: 'Fecha de retiro inválida (AAAA-MM-DD).' }
-  if (ultimaAsistencia && !FECHA_RE.test(ultimaAsistencia)) return { error: 'Última asistencia inválida (AAAA-MM-DD).' }
+  // La fecha viene libre del caller: sin esta cota, una fecha FUTURA movía el
+  // EXISTS de asistencia a un mes sin marcas y cualquier admin se saltaba la
+  // norma "termina su mes" (g1-23/g1-24). El retiro se declara sobre lo ya
+  // vivido; el "se va el próximo mes" tiene su camino: programarRetiro.
+  if (fechaRetiro > hoy) {
+    return {
+      error: `La fecha de retiro no puede ser futura (hoy es ${hoy}). Para que el niño termine su mes y salga el próximo, usa "Retirar el próximo mes".`,
+      requiereProgramacion: true,
+    }
+  }
   const { year, month } = ym(fechaRetiro)
+  let overrideDetalle = null
+  if (override) {
+    if (sesion.rol !== 'admin_general') {
+      return { error: 'Solo un admin general puede forzar el retiro de un niño con asistencia en el mes.' }
+    }
+    const motivoOv = String(override.motivo || '').trim()
+    const evidencia = String(override.evidencia || '').trim()
+    if (!motivoOv || !evidencia) return { error: 'El override requiere motivo y evidencia (qué pasó y cómo consta).' }
+    overrideDetalle = {
+      actor: sesion.email || sesion.nombre || String(sesion.uid),
+      motivo: motivoOv,
+      evidencia,
+    }
+  }
+  const inicioMes = `${year}-${String(month).padStart(2, '0')}-01`
 
-  const now = new Date().toISOString()
   const resultado = await withTransaction(async (query) => {
     const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
     if (errorMes) return { error: errorMes }
@@ -307,28 +661,39 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsi
     `
     if (!est) return { error: 'El estudiante no pertenece a este centro.' }
     if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
-    const ultimaAsis = ultimaAsistencia || est.ultima_asistencia || null
-    await query`
-      UPDATE estudiantes SET estado = 'retirado', status_plataforma = 'DESACTIVAR', motivo_retiro = ${motivo},
-        fecha_retiro = ${fechaRetiro}, ultima_asistencia = ${ultimaAsis}, updated_at = ${now}
-      WHERE id = ${id}
+    // (g1-23) La evidencia se evalúa DENTRO de la transacción, sobre el mismo
+    // lock que toma marcarAsistencia: nadie marca un presente entre el chequeo
+    // y el commit del retiro. Y cubre el mes del retiro Y LOS POSTERIORES:
+    // backdatear la fecha a un mes abierto sin marcas no esquiva una
+    // asistencia presente más reciente (el niño que vio clases después de esa
+    // fecha no puede quedar retirado antes de su propia evidencia).
+    const [asistio] = await query`
+      SELECT MAX(fecha) AS ultima FROM asistencias
+      WHERE estudiante_id = ${id} AND estado = 'presente'
+        AND fecha >= ${inicioMes}::date
     `
-    await query`
-      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, motivo)
-      VALUES (${id}, ${centroId}, 'retiro', ${year}, ${month}, ${fechaRetiro}, ${est.grupo_id}, ${motivo})
-    `
-    // Cupos al CRM vía outbox si el grupo está vinculado a una clase de prueba,
-    // en la MISMA transacción (ya NO push inline: el consumidor del cron empuja
-    // el estado vigente).
-    if (est.grupo_id) await encolarSyncCrm([est.grupo_id], 'retiro', query)
-    return { ok: true, grupoId: est.grupo_id, ultimaAsis }
+    if (asistio?.ultima && !overrideDetalle) {
+      const u = ym(fechaIso10(asistio.ultima))
+      return {
+        error: `El niño vio clases en ${String(u.month).padStart(2, '0')}/${u.year} (hay asistencia presente registrada). Norma del cuadro: termina su mes — usa "Retirar el próximo mes" para programar el retiro al día 1. Solo un admin general puede forzarlo ya, con motivo y evidencia.`,
+        requiereProgramacion: true,
+      }
+    }
+    await ejecutarRetiroEn(query, {
+      estudiante: est,
+      centroId,
+      motivo,
+      fecha: fechaRetiro,
+      detalle: overrideDetalle ? { override_asistencia: overrideDetalle } : null,
+    })
+    return { ok: true, grupoId: est.grupo_id, ultimaAsis: fechaIso10(est.ultima_asistencia) }
   })
   if (resultado.error) return resultado
 
   const out = { ok: true }
   // Norma del cuadro: el niño que vio clases en un mes se declara retirado en
-  // ESE mes (cuenta al inicio del mes aunque ya sabemos que no sigue). Si la
-  // fecha de retiro cae en otro mes que la última asistencia, se avisa.
+  // ESE mes. La última asistencia es la derivada server-side (g1-23); si cae
+  // en otro mes que el retiro, se avisa.
   if (resultado.ultimaAsis) {
     const a = ym(resultado.ultimaAsis)
     if (a.year !== year || a.month !== month) {
@@ -346,8 +711,106 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, ultimaAsi
   return out
 }
 
+// "Retirar el próximo mes" (g1-24): programa el retiro para el día 1 del mes
+// siguiente. En UNA transacción: guarda el ESTADO PREVIO en el detalle del
+// evento de programación, escribe baja_potencial + retiro_programado_para,
+// BLOQUEA el mes objetivo (g2-4: cerrarMes reconcilia contra esta fila) y
+// encola CRM. El motivo es OBLIGATORIO: sin motivo no hay deserción medible.
+export async function programarRetiro(centroId, id, { motivo } = {}) {
+  await requireCentroAccess(centroId)
+  if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'El motivo del retiro es obligatorio para programarlo.' }
+  const hoy = hoyISO()
+  const { year, month } = ym(hoy)
+  const fechaRetiro = primerDiaMesSiguiente(hoy)
+  const objetivo = ym(fechaRetiro)
+  const now = new Date().toISOString()
+  return await withTransaction(async (query) => {
+    // Mes de hoy (el evento de programación) + mes OBJETIVO (el del retiro):
+    // bloquearMesesEditables ordena y depura — cerrarMes no puede congelar el
+    // mes objetivo mientras esta programación está a medio escribir.
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }, objetivo])
+    if (errorMes) return { error: errorMes }
+    const [est] = await query`
+      SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId} FOR UPDATE
+    `
+    if (!est) return { error: 'El estudiante no pertenece a este centro.' }
+    if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
+    if (est.retiro_programado_para) {
+      return { error: `El niño ya tiene un retiro programado para el ${fechaIso10(est.retiro_programado_para)}. Cancélalo antes de programar otro.` }
+    }
+    const estadoPrevio = est.estado // 'activo' o 'baja_potencial' (alerta manual)
+    await query`
+      UPDATE estudiantes SET estado = 'baja_potencial', retiro_programado_para = ${fechaRetiro}, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    const detalle = { estado_previo: estadoPrevio, retiro_programado_para: fechaRetiro }
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, motivo, detalle)
+      VALUES (${id}, ${centroId}, 'retiro_programado', ${year}, ${month}, ${hoy}, ${est.grupo_id}, ${motivo}, ${JSON.stringify(detalle)})
+    `
+    if (est.grupo_id) await encolarSyncCrm([est.grupo_id], 'retiro_programado', query)
+    return { ok: true, retiroProgramadoPara: fechaRetiro }
+  })
+}
+
+// Cancela un retiro programado — TRANSACCIONAL COMPLETO (g2-3): lock del
+// estudiante + lock del mes objetivo; valida que la programación siga activa;
+// RESTAURA el estado previo guardado por programarRetiro (normalmente
+// 'activo'); LIMPIA retiro_programado_para (si no se limpia, el cron lo
+// retiraría igual: la limpieza es parte del contrato, no un detalle — y el
+// CHECK de coherencia la exige en el MISMO statement); escribe el evento de
+// cancelación (clave de outbox distinta a la de programación) y encola CRM.
+export async function cancelarRetiroProgramado(centroId, id) {
+  await requireCentroAccess(centroId)
+  const hoy = hoyISO()
+  const { year, month } = ym(hoy)
+  const now = new Date().toISOString()
+  return await withTransaction(async (query) => {
+    // La fecha objetivo se lee ANTES de bloquear meses (orden mes → niño);
+    // tras el lock del niño se re-verifica que siga siendo la misma.
+    const [pre] = await query`
+      SELECT estado, retiro_programado_para FROM estudiantes
+      WHERE id = ${id} AND centro_id = ${centroId}
+    `
+    if (!pre) return { error: 'El estudiante no pertenece a este centro.' }
+    if (pre.estado !== 'baja_potencial' || !pre.retiro_programado_para) {
+      return { error: 'El niño no tiene un retiro programado activo.' }
+    }
+    const fechaProg = fechaIso10(pre.retiro_programado_para)
+    const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }, ym(fechaProg)])
+    if (errorMes) return { error: errorMes }
+    const [est] = await query`
+      SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId} FOR UPDATE
+    `
+    if (!est || est.estado !== 'baja_potencial' || fechaIso10(est.retiro_programado_para) !== fechaProg) {
+      return { error: 'La programación cambió mientras cancelabas (otra pestaña o el cron). Recarga y revisa el estado del niño.' }
+    }
+    // Estado previo desde el ÚLTIMO evento de programación (normalmente
+    // 'activo'; fail safe si el evento no aparece).
+    const [evProg] = await query`
+      SELECT detalle FROM estudiante_eventos
+      WHERE estudiante_id = ${id} AND tipo = 'retiro_programado'
+      ORDER BY id DESC LIMIT 1
+    `
+    const estadoRestaurado = estadoPrevioDeProgramacion(evProg?.detalle)
+    await query`
+      UPDATE estudiantes SET estado = ${estadoRestaurado}, retiro_programado_para = NULL, updated_at = ${now}
+      WHERE id = ${id}
+    `
+    const detalle = { estado_restaurado: estadoRestaurado, retiro_programado_para: fechaProg }
+    await query`
+      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, detalle)
+      VALUES (${id}, ${centroId}, 'retiro_cancelado', ${year}, ${month}, ${hoy}, ${est.grupo_id}, ${JSON.stringify(detalle)})
+    `
+    if (est.grupo_id) await encolarSyncCrm([est.grupo_id], 'retiro_cancelado', query)
+    return { ok: true, estado: estadoRestaurado }
+  })
+}
+
 // Un retirado que vuelve: entra a un grupo activo y cuenta como reincorporado
-// del mes (no como nuevo).
+// del mes (no como nuevo). El ancla NO se toca: su comienzo de nivel es un
+// hecho histórico — el plan derivado en el grupo nuevo sale de esa ancla (y si
+// no da, queda sin_plan explícito; nada se inventa).
 export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
   await requireCentroAccess(centroId)
   if (!grupoId) return { error: 'Selecciona el grupo donde se reincorpora.' }

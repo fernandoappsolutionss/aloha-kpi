@@ -9,6 +9,7 @@ import {
 import {
   inscribirEstudiante, actualizarEstudiante, graduarTiny, marcarBajaPotencial,
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
+  programarRetiro, cancelarRetiroProgramado,
 } from '../../../actions/estudiantes'
 import {
   ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, DIAS, TINYMAP, aperturaMinima, hoyISO,
@@ -24,6 +25,8 @@ import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_C
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
 import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
+import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
+import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -51,6 +54,48 @@ const isoDia = (d) => {
 const fmtDia = (d) => isoDia(d) || '—'
 const horarioTexto = (horarios) =>
   (horarios || []).length ? horarios.map((h) => `${DIAS[h.dia]} ${aHora12(aMinutos(h.hora_inicio))}–${aHora12(aMinutos(h.hora_fin))}`).join(' · ') : 'Sin horario'
+
+// ── Plan por niño (R3, g1-13): cada estudiante llega ENRIQUECIDO del server ──
+// con e.plan = { estado, ancla, indiceSemana, semana, cierre } (lib/plan-nino,
+// derivación batch con memo — aquí NADIE vuelve a derivar). Estados explícitos
+// por_iniciar | en_curso | cerrado | sin_plan: jamás se interpreta un -1.
+
+// Texto compacto de la posición: "S4" (semana 4 de su plan) o el estado.
+function semanaNinoTexto(plan) {
+  if (!plan || plan.estado === 'sin_plan') return 'sin plan'
+  if (plan.estado === 'cerrado') return 'cerrado'
+  if (plan.estado === 'por_iniciar') return 'por iniciar'
+  return `S${(plan.indiceSemana ?? 0) + 1}`
+}
+
+// Chip "va por S{x}" del roster y las fusiones, con el estado explícito.
+const CHIP_PLAN_BASE = { fontSize: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+function ChipPlanNino({ plan }) {
+  if (!plan) return null
+  const det = plan.semana?.etiqueta ? ` (${plan.semana.etiqueta})` : ''
+  if (plan.estado === 'sin_plan') {
+    return <span className="pill" style={{ ...CHIP_PLAN_BASE, color: 'var(--text-dim)' }} title="Sin plan derivable: falta el ancla de nivel del niño o el grupo no tiene horario/calendario — nada se adivina.">sin plan</span>
+  }
+  if (plan.estado === 'cerrado') {
+    return <span className="pill" style={CHIP_PLAN_BASE} title={`Su nivel ya cerró${det}.`}>nivel cerrado</span>
+  }
+  const s = `S${(plan.indiceSemana ?? 0) + 1}`
+  if (plan.estado === 'por_iniciar') {
+    return <span className="pill" style={CHIP_PLAN_BASE} title={`Arranca su nivel el ${fmtDia(plan.ancla)}${det}.`}>inicia {fmtDia(plan.ancla)}</span>
+  }
+  return <span className="pill" style={{ ...CHIP_PLAN_BASE, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} title={`Va por la semana ${s} de su plan${det} · ancla ${fmtDia(plan.ancla)}.`}>va por {s}</span>
+}
+
+// Cierre EFECTIVO del nivel del niño (g1-11): override manual ?? derivado del
+// plan, ya resuelto por el server en e.plan.cierre. El fallback al override
+// crudo cubre a los no enriquecidos (sin grupo / retirados).
+function cierreNino(e) {
+  const c = e?.plan?.cierre
+  if (c?.fecha) return c
+  const manual = isoDia(e?.fecha_cierre_nivel)
+  return manual ? { fecha: manual, origen: 'manual' } : { fecha: null, origen: null }
+}
+const ORIGEN_CIERRE = { manual: 'override manual', derivado: 'derivado del plan del niño' }
 
 // Búsqueda tolerante a acentos y mayúsculas.
 const norm = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -183,6 +228,7 @@ export default function GruposPage() {
   const [inscribir, setInscribir] = useState(null) // null | { grupoId? }
   const [editEst, setEditEst] = useState(null)
   const [retiroEst, setRetiroEst] = useState(null)
+  const [progEst, setProgEst] = useState(null) // "Retirar el próximo mes" (R5)
   const [reincEst, setReincEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
 
@@ -269,7 +315,7 @@ export default function GruposPage() {
   }
 
   // Teclado: Esc cierra el detalle, ↑/↓ recorren la lista de grupos.
-  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || reincEst || itinEdit)
+  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || progEst || reincEst || itinEdit)
   useEffect(() => {
     function onKey(e) {
       if (tab !== 'grupos' || hayModal) return
@@ -308,18 +354,17 @@ export default function GruposPage() {
     const horarios = prefill?.horarios?.length
       ? prefill.horarios.map((h) => ({ ...h }))
       : [{ ...(prefill || { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }) }]
-    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_apertura: hoyISO(), fecha_inicio_clases: '', notas: '', nivel: 1, ninos_iniciales: '', horarios })
+    setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_inicio_clases: '', notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
     setStatus('')
     // La palanca de inscripciones ya NO viaja al modal: vive solo en el botón
-    // dedicado del panel (CAS). `it_inicio` alimenta el hint de solo lectura
-    // cuando la columna fecha_inicio_clases sigue vacía.
+    // dedicado del panel (CAS). La fecha de apertura MURIÓ (R1): el modal ya no
+    // la muestra ni la manda — created_at es la historia de publicación.
     setGrupoModal({
       id: g.id, numero: String(g.numero), itinerario: g.itinerario, es_online: !!g.es_online,
-      coach_id: g.coach_id || '', fecha_apertura: isoDia(g.fecha_apertura),
+      coach_id: g.coach_id || '',
       fecha_inicio_clases: isoDia(g.fecha_inicio_clases),
-      it_inicio: isoDia(g.itinerario_clases?.fecha_inicio),
       notas: g.notas || '',
       horarios: (g.horarios || []).map((h) => ({ dia: h.dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || '' })),
     })
@@ -381,6 +426,14 @@ export default function GruposPage() {
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} sigue activo.`); refresca() }
   }
+  // (R5, g2-3) Cancela un retiro programado: el server restaura el estado
+  // previo Y limpia la fecha en la misma transacción — el cron ya no lo toca.
+  async function onCancelarRetiro(e) {
+    if (!confirm(`¿Cancelar el retiro programado de ${e.nombre} (efectivo el ${fmtDia(e.retiro_programado_para)})? Vuelve a su estado anterior y el sistema ya no lo retira.`)) return
+    const res = await cancelarRetiroProgramado(id, e.id)
+    if (res.error) setStatus('❌ ' + res.error)
+    else { setStatus(`✅ Retiro programado de ${e.nombre} cancelado: queda ${res.estado === 'activo' ? 'activo' : 'en baja potencial (alerta manual)'}.`); refresca() }
+  }
   async function retiroGuardado(res, est) {
     setRetiroEst(null)
     let msg = `✅ ${est.nombre} retirado.`
@@ -431,6 +484,8 @@ export default function GruposPage() {
     ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
     retirar: (e) => { setStatus(''); setRetiroEst(e) },
+    programarRetiro: (e) => { setStatus(''); setProgEst(e) },
+    cancelarRetiro: onCancelarRetiro,
     graduar: onGraduar,
     baja: onBaja,
     revertirBaja: onRevertirBaja,
@@ -557,7 +612,7 @@ export default function GruposPage() {
 
               {!narrow && (
                 abierto ? (
-                  <GrupoDetalle g={abierto} metas={metas} acciones={acciones} onCerrarPanel={() => setOpenId(null)} />
+                  <GrupoDetalle g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} onCerrarPanel={() => setOpenId(null)} />
                 ) : (
                   <div className="panel grp-detail grp-detail--vacio">
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -636,7 +691,7 @@ export default function GruposPage() {
       {tab === 'grupos' && narrow && abierto && (
         <>
           <div className="grp-backdrop" onClick={() => setOpenId(null)} />
-          <GrupoDetalle g={abierto} metas={metas} acciones={acciones} sheet onCerrarPanel={() => setOpenId(null)} />
+          <GrupoDetalle g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} sheet onCerrarPanel={() => setOpenId(null)} />
         </>
       )}
 
@@ -658,7 +713,13 @@ export default function GruposPage() {
       {retiroEst && (
         <RetiroModal centroId={id} est={retiroEst}
           onClose={() => setRetiroEst(null)}
-          onSaved={(res) => retiroGuardado(res, retiroEst)} />
+          onSaved={(res) => retiroGuardado(res, retiroEst)}
+          onProgramado={(res) => { setRetiroEst(null); setStatus(`✅ ${retiroEst.nombre}: retiro programado para el ${fmtDia(res.retiroProgramadoPara)} — sigue este mes.`); refresca() }} />
+      )}
+      {progEst && (
+        <ProgramarRetiroModal centroId={id} est={progEst}
+          onClose={() => setProgEst(null)}
+          onSaved={(res) => { setProgEst(null); setStatus(`✅ ${progEst.nombre}: retiro programado para el ${fmtDia(res.retiroProgramadoPara)} — sigue este mes.`); refresca() }} />
       )}
       {itinEdit && (
         <ItinerarioModal centroId={id} g={itinEdit.grupo} nuevaExcepcion={itinEdit.fecha}
@@ -736,8 +797,30 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar }) {
   )
 }
 
+// Estado del niño en el roster. Con retiro programado (R5) la pill dice CUÁNDO
+// se va — la fecha siempre es el día 1, así que se lee por mes.
+function EstadoNinoPill({ e }) {
+  if (e.estado === 'baja_potencial' && e.retiro_programado_para) {
+    return (
+      <span className="pill pill--bad" title={`Retiro programado para el ${fmtDia(e.retiro_programado_para)} (día 1): sigue este mes y el sistema lo retira solo ese día.`}>
+        <span className="dot" />Se retira en {mesDe(isoDia(e.retiro_programado_para))}
+      </span>
+    )
+  }
+  return e.estado === 'baja_potencial'
+    ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
+    : <span className="pill pill--ok"><span className="dot" />Activo</span>
+}
+
 // Acciones de un niño dentro del grupo (mismas en tabla y en panel deslizante).
-function AccionesNino({ e, acciones }) {
+// Retiro guiado por asistencia (R5): UN solo botón cuyo texto lo decide la
+// asistencia PRESENTE del mes (viaja en loadOperaciones, una query) — con
+// presente este mes el niño termina su mes ("Retirar el próximo mes"); sin
+// presente se retira ya ("Retirar"). Con retiro programado solo queda
+// cancelarlo. La verdad final la re-verifica el server bajo lock (g1-23).
+function AccionesNino({ e, acciones, asis }) {
+  const programado = e.estado === 'baja_potencial' && e.retiro_programado_para
+  const presentes = asis?.presentes || 0
   return (
     <>
       <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Editar</button>
@@ -746,10 +829,22 @@ function AccionesNino({ e, acciones }) {
       )}
       {e.estado === 'activo' ? (
         <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }} onClick={() => acciones.baja(e)}>Baja potencial</button>
-      ) : (
+      ) : !programado ? (
         <button className="btn" style={BTN_XS} onClick={() => acciones.revertirBaja(e)}>Sigue activo</button>
+      ) : null}
+      {programado ? (
+        <button className="btn" style={BTN_XS}
+          title={`Retiro programado para el ${fmtDia(e.retiro_programado_para)}: el sistema lo ejecuta solo ese día. Cancélalo si el niño se queda.`}
+          onClick={() => acciones.cancelarRetiro(e)}>Cancelar retiro programado</button>
+      ) : presentes > 0 ? (
+        <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }}
+          title={`Vio clases este mes: ${presentes} presente${presentes === 1 ? '' : 's'}, última el ${fmtDia(asis.ultima)}. Norma del cuadro: termina su mes — el retiro queda programado para el día 1 del próximo mes.`}
+          onClick={() => acciones.programarRetiro(e)}>Retirar el próximo mes</button>
+      ) : (
+        <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }}
+          title="Sin asistencia presente este mes: se puede retirar de una vez (deserción del mes de la fecha de retiro)."
+          onClick={() => acciones.retirar(e)}>Retirar</button>
       )}
-      <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.retirar(e)}>Retirar</button>
     </>
   )
 }
@@ -757,7 +852,7 @@ function AccionesNino({ e, acciones }) {
 // ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
-function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
+function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel }) {
   const [vista, setVista] = useState('ninos')
   const st = groupStatus(g, metas.gpnMin)
   const n = g.estudiantes.length
@@ -786,10 +881,14 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
               {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} />}
             </h3>
+            {/* (R1) Una sola fecha: inicio de clases. created_at es la historia
+                de publicación (fechaPublicacion, día civil de Panamá). */}
             <p className="h-sub" style={{ marginTop: 5 }}>
               {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
-              {g.fecha_apertura ? ` · Apertura: ${fmtDia(g.fecha_apertura)}` : ''}
-              {g.fecha_inicio_clases ? ` · Inicia clases: ${fmtDia(g.fecha_inicio_clases)} (entra al cuadro ese mes)` : ''}
+              {fechaPublicacion(g.created_at) ? ` · Publicado el ${fechaPublicacion(g.created_at)}` : ''}
+              {g.fecha_inicio_clases
+                ? ` · Inicia clases ${fmtDia(g.fecha_inicio_clases)} (entra al cuadro ese mes)`
+                : ' · Sin fecha de inicio (legacy: cuenta como iniciado)'}
             </p>
           </div>
           <button className="btn" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
@@ -869,57 +968,64 @@ function GrupoDetalle({ g, metas, acciones, sheet, onCerrarPanel }) {
         ) : sheet ? (
           // En el panel deslizante la tabla no cabe: cada niño va apilado.
           <div>
-            {g.estudiantes.map((e) => (
+            {g.estudiantes.map((e) => {
+              const cierre = cierreNino(e)
+              return (
               <div key={e.id} className="grp-roster__item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13.5 }}>{e.nombre}</div>
                     {e.representante && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
                   </div>
-                  {e.estado === 'baja_potencial'
-                    ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
-                    : <span className="pill pill--ok"><span className="dot" />Activo</span>}
+                  <EstadoNinoPill e={e} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                  <span className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }}>cierra {fmtDia(e.fecha_cierre_nivel)}</span>
+                  <ChipPlanNino plan={e.plan} />
+                  <span className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
+                    {cierre.fecha ? `cierra ${fmtDia(cierre.fecha)}` : 'sin cierre'}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
-                  <AccionesNino e={e} acciones={acciones} />
+                  <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} />
                 </div>
               </div>
-            ))}
+            ) })}
           </div>
         ) : (
           <table className="table">
             {/* El cierre de nivel va bajo el nivel (y no en columna aparte) para
-                que las acciones de cada niño quepan en una sola línea. */}
+                que las acciones de cada niño quepan en una sola línea. Cierre =
+                efectivo (override manual ?? derivado del plan del niño, g1-11). */}
             <thead><tr>{['Niño', 'Nivel · cierre', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
-              {g.estudiantes.map((e) => (
+              {g.estudiantes.map((e) => {
+                const cierre = cierreNino(e)
+                return (
                 <tr key={e.id} style={{ cursor: 'default' }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>
                     {e.nombre}
                     {e.representante && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
                   </td>
                   <td>
-                    <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                    <div className="num" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{fmtDia(e.fecha_cierre_nivel)}</div>
+                    <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
+                      <ChipPlanNino plan={e.plan} />
+                    </div>
+                    <div className="num" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
+                      {cierre.fecha ? fmtDia(cierre.fecha) : 'sin cierre'}
+                    </div>
                   </td>
-                  <td>
-                    {e.estado === 'baja_potencial'
-                      ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
-                      : <span className="pill pill--ok"><span className="dot" />Activo</span>}
-                  </td>
+                  <td><EstadoNinoPill e={e} /></td>
                   {/* Sin wrap: las acciones de cada niño van en una sola línea
                       y la tabla estrecha la columna del nombre, no los botones. */}
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
-                      <AccionesNino e={e} acciones={acciones} />
+                      <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} />
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) })}
             </tbody>
           </table>
         )}
@@ -1250,6 +1356,19 @@ function resumenNiveles(estudiantes) {
   return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(' · ')
 }
 
+// Distribución de semanas del aula DESTINO tras la fusión (informativo, R3):
+// cada niño conserva su semana al fusionar (re-anclaje semántico g1-9), así
+// que el aula resultante es el conteo de posiciones de TODOS los niños
+// involucrados: "4× S4 · 2× S6 · 1× sin plan".
+function distribucionSemanas(ninos) {
+  const cnt = {}
+  for (const e of ninos || []) {
+    const k = semanaNinoTexto(e.plan)
+    cnt[k] = (cnt[k] || 0) + 1
+  }
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(' · ')
+}
+
 function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
   const banda = scoreBand(analisis.score, analisis.blocked)
   const key = `${from.id}-${to.id}`
@@ -1265,20 +1384,25 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
       ? { k: 'ok', t: `Van por la misma semana del plan (${planFrom.corto})` }
       : { k: 'mb', t: `Planificación desfasada: G${from.numero} va por ${planFrom.corto} (nivel ${planFrom.nivel}), G${to.numero} por ${planTo.corto} (nivel ${planTo.nivel})` }
   }
+  // Chips POR NIÑO (R3): cada uno con su nivel y por dónde va SU plan (ancla
+  // propia, lib/plan-nino) — la referencia del grupo queda solo como dato del
+  // aula. El cierre del tooltip es el efectivo (override ?? derivado, g1-11).
   const GrupoLado = ({ g, plan, titulo }) => (
     <div style={{ flex: '1 1 220px', minWidth: 0 }}>
       <div className="label" style={{ marginBottom: 4 }}>{titulo}: Grupo {g.numero}</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         Niveles: <b style={{ color: 'var(--text)' }}>{resumenNiveles(g.estudiantes) || 'sin niños'}</b>
-        {plan ? <> · va por <b style={{ color: 'var(--ts-green)' }}>{plan.corto}</b>{plan.cierre ? ` · cierra ~${fmtDia(plan.cierre)}` : ''}</> : ' · sin itinerario generado'}
+        {plan ? <> · aula va por <b style={{ color: 'var(--ts-green)' }}>{plan.corto}</b></> : ' · sin itinerario generado'}
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-        {(g.estudiantes || []).map((e) => (
-          <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel}${e.fecha_cierre_nivel ? ` · cierra ${fmtDia(e.fecha_cierre_nivel)}` : ''}`}
+        {(g.estudiantes || []).map((e) => {
+          const cierre = cierreNino(e)
+          return (
+          <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel} · ${e.plan?.estado === 'en_curso' ? `va por S${(e.plan.indiceSemana ?? 0) + 1}` : semanaNinoTexto(e.plan)}${cierre.fecha ? ` · cierra ${fmtDia(cierre.fecha)} (${ORIGEN_CIERRE[cierre.origen]})` : ' · sin cierre resoluble'}`}
             style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-            {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b>
+            {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b> <span style={{ color: e.plan?.estado === 'en_curso' ? 'var(--ts-green)' : 'var(--text-dim)' }}>· {semanaNinoTexto(e.plan)}</span>
           </span>
-        ))}
+        ) })}
       </div>
     </div>
   )
@@ -1310,11 +1434,17 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion }) {
           </span>
         ))}
       </div>
-      {/* Cada niño con su nivel y por dónde va cada grupo en la planificación:
-          lo que el administrador necesita ver ANTES de fusionar. */}
+      {/* Cada niño con su nivel y por dónde va SU plan: lo que el
+          administrador necesita ver ANTES de fusionar. */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
         <GrupoLado g={from} plan={planFrom} titulo="Se mueve" />
         <GrupoLado g={to} plan={planTo} titulo="Recibe" />
+      </div>
+      {/* Aviso de fusión (R3): distribución de semanas en el DESTINO —
+          informativo, cada niño conserva su semana (re-anclaje g1-9). */}
+      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 10 }}
+        title={`Informativo: al fusionar, cada niño conserva su semana del plan (re-anclaje semántico). Así quedaría el aula del grupo ${to.numero}.`}>
+        📚 Semanas en destino tras la fusión: <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas([...(from.estudiantes || []), ...(to.estudiantes || [])]) || 'sin niños'}</b>
       </div>
     </div>
   )
@@ -1329,19 +1459,26 @@ const ROW_H = 26 // px por bloque de 30 min
 const ETIQUETA_COLOR = { Caliente: 'var(--ok)', Buena: 'var(--ok)', Media: 'var(--warn)', 'Difícil': 'var(--bad)', 'Sin historial': 'var(--text-dim)' }
 const ETIQUETA_EMOJI = { Caliente: '🔥 ', Buena: '', Media: '', 'Difícil': '⚠️ ', 'Sin historial': '' }
 
-// Liberación estimada del bloque de un grupo: su itinerario da la fecha de fin
-// del nivel; si el nivel dominante es el ÚLTIMO del programa (TINY 10, KIDS 8,
-// KINDER 3), al cierre el grupo se gradúa y su bloque de horario queda libre —
-// eso permite mercadear ese horario con meses de antelación.
+// Liberación del bloque de un grupo — POR NIÑO (g1-14): el bloque solo se
+// anuncia por liberarse cuando TODOS los activos/baja_potencial del grupo van
+// en el ÚLTIMO nivel de su propio programa (TINY 10, KIDS 8, KINDER 3) y todos
+// tienen cierre resoluble (override manual ?? derivado del plan del niño); la
+// fecha es el MÁXIMO de esos cierres. Grupo vacío, un niño no-final o un niño
+// sin_plan ⇒ sin aviso — nada se anuncia con datos a medias. Eso permite
+// mercadear ese horario con meses de antelación, sin falsas alarmas.
 function liberacionDe(grupo) {
-  const cierre = grupo.itinerario_clases?.fecha_cierre_estimada
-  if (!cierre || grupo.es_online) return null
-  const niveles = (grupo.estudiantes || []).map((e) => Number(e.nivel)).filter(Boolean)
-  if (!niveles.length) return { cierre, libera: false }
-  const conteo = {}
-  for (const n of niveles) conteo[n] = (conteo[n] || 0) + 1
-  const moda = Number(Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0])
-  return { cierre, libera: moda >= (NIVEL_MAX[grupo.itinerario] || 99) }
+  if (grupo.es_online) return null
+  const ninos = grupo.estudiantes || []
+  if (!ninos.length) return { cierre: null, libera: false }
+  let max = null
+  for (const e of ninos) {
+    if (Number(e.nivel) < (NIVEL_MAX[e.itinerario] || 99)) return { cierre: null, libera: false }
+    if (e.plan?.estado === 'sin_plan') return { cierre: null, libera: false }
+    const f = cierreNino(e).fecha
+    if (!f) return { cierre: null, libera: false }
+    if (!max || f > max) max = f
+  }
+  return { cierre: max, libera: true }
 }
 
 function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, onAbrirGrupo, onChanged, setStatus }) {
@@ -1592,7 +1729,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                   )
                 }
                 const lib = liberacionDe(grupo)
-                const tituloLib = lib?.cierre ? ` · cierra nivel ~${fmtDia(lib.cierre)}${lib.libera ? ' y SE LIBERA el bloque (último nivel)' : ''}` : ''
+                const tituloLib = lib?.libera ? ` · SE LIBERA el bloque ~${fmtDia(lib.cierre)} (todos en su último nivel)` : ''
                 return (
                   <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}${tituloLib}`}
                     style={{
@@ -1930,8 +2067,20 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
 }
 
 // ── Modal: aperturar / editar grupo ──────────────────────────────────────────
+// (R2) Grupo iniciado = cerrado a edición: el modal anticipa el candado con la
+// MISMA regla del server (grupoIniciado, fail closed con fecha vacía) y
+// post-inicio muestra SOLO horarios y coach — el payload va EXCLUSIVO de esos
+// dos campos (allowlist g1-4; la verdad final la decide el server tras el
+// FOR UPDATE con hoy Panamá recalculado, g1-5). Notas se edita pre-inicio;
+// post-inicio se muestra en el panel, no aquí (contrato literal de Fernando).
 function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   const isEdit = !!initial.id
+  const iniciado = isEdit && grupoIniciado(initial.fecha_inicio_clases || null, hoyISO())
+  // Reparación legacy (g1-2): un grupo veterano con fecha NULL cuenta como
+  // iniciado (fail closed) pero SÍ puede registrar su fecha real de inicio
+  // (pasada) — es el único campo estructural que el server acepta post-inicio
+  // en ese caso; sin este camino el grupo quedaría ineditable para siempre.
+  const reparaFecha = iniciado && !initial.fecha_inicio_clases
   const [f, setF] = useState(initial)
   // Flag de tocado: la fecha de inicio de clases solo viaja al servidor si el
   // usuario la editó en ESTA sesión del modal (contrato de actualizarGrupo:
@@ -1943,25 +2092,55 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const setH = (i, k, v) => setF((p) => ({ ...p, horarios: p.horarios.map((h, j) => (j === i ? { ...h, [k]: v } : h)) }))
   const minimo = aperturaMinima(f.itinerario, parseInt(f.nivel) || 1)
+  const horariosPayload = () =>
+    f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null }))
+  // Contrato del payload: campo ausente = no tocar. Los horarios solo viajan
+  // si CAMBIARON de verdad — post-inicio un reenvío idéntico igual agregaría
+  // una versión nueva al calendario versionado (R2b) y encolaría CRM de balde.
+  // La hora se normaliza a HH:MM (la BD devuelve HH:MM:SS y el input HH:MM).
+  const fpHorarios = (hs) => JSON.stringify(
+    (hs || [])
+      .filter((h) => h.hora_inicio && h.hora_fin)
+      .map((h) => [Number(h.dia), String(h.hora_inicio).slice(0, 5), String(h.hora_fin).slice(0, 5), h.salon_id ? String(h.salon_id) : null])
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  )
 
   async function save() {
-    if (!String(f.numero).trim()) { setErr('El número de grupo es requerido.'); return }
-    setSaving(true); setErr('')
-    try {
-      const data = {
+    setErr('')
+    const hs = horariosPayload()
+    const horariosCambiaron = !isEdit || fpHorarios(hs) !== fpHorarios(initial.horarios)
+    let data
+    if (iniciado) {
+      // Payload EXCLUSIVO de la allowlist post-inicio (g1-4): cualquier otra
+      // clave presente la rechaza el server, traiga el valor que traiga.
+      data = { coach_id: f.coach_id || null }
+      if (horariosCambiaron) data.horarios = hs
+      // Reparación legacy (g1-2): la fecha solo viaja si el grupo NO la tiene
+      // y el usuario la fijó en esta sesión del modal.
+      if (reparaFecha && inicioTocado && f.fecha_inicio_clases) data.fecha_inicio_clases = f.fecha_inicio_clases
+    } else {
+      if (!String(f.numero).trim()) { setErr('El número de grupo es requerido.'); return }
+      // (g1-2) Fecha de inicio de clases OBLIGATORIA al crear (también KINDER
+      // y online); pre-inicio se puede CAMBIAR, nunca BORRAR.
+      if (!isEdit && !f.fecha_inicio_clases) { setErr('La fecha de inicio de clases es requerida para abrir el grupo (también KINDER y online).'); return }
+      if (isEdit && inicioTocado && !f.fecha_inicio_clases) { setErr('La fecha de inicio de clases no se puede borrar: cámbiala si hace falta, pero todo grupo la necesita.'); return }
+      data = {
         numero: String(f.numero).trim(), itinerario: f.itinerario, es_online: f.es_online,
-        coach_id: f.coach_id || null, fecha_apertura: f.fecha_apertura || null,
-        notas: f.notas,
-        horarios: f.horarios.filter((h) => h.hora_inicio && h.hora_fin).map((h) => ({ dia: parseInt(h.dia), hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || null })),
+        coach_id: f.coach_id || null, notas: f.notas,
       }
+      if (horariosCambiaron) data.horarios = hs
       // La palanca de inscripciones ya no viaja NUNCA (vive en su botón con
-      // CAS); la fecha de inicio solo si el usuario la tocó (o al crear).
+      // CAS); la fecha de inicio solo si el usuario la tocó (o al crear); la
+      // fecha de apertura MURIÓ (R1): ni input ni payload.
       if (!isEdit || inicioTocado) data.fecha_inicio_clases = f.fecha_inicio_clases || null
       if (!isEdit) { data.nivel = parseInt(f.nivel) || 1; data.ninos_iniciales = f.ninos_iniciales }
+    }
+    setSaving(true)
+    try {
       const res = isEdit ? await actualizarGrupo(centroId, initial.id, data) : await crearGrupo(centroId, data)
       setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(isEdit ? `Grupo ${data.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
+      onSaved(isEdit ? `Grupo ${initial.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
     } catch (e) {
       setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
@@ -1969,7 +2148,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={isEdit ? `Editar grupo ${initial.numero}` : 'Aperturar grupo'} width={640} onClose={onClose}
+    <Modal title={iniciado ? `Grupo ${initial.numero} · horario y coach` : (isEdit ? `Editar grupo ${initial.numero}` : 'Aperturar grupo')} width={640} onClose={onClose}
       footer={(
         <>
           <button className="btn" onClick={onClose}>Cancelar</button>
@@ -1977,32 +2156,51 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {iniciado && (
+        <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--text-muted)', background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', padding: '10px 14px', borderRadius: 'var(--r-sm)', lineHeight: 1.7 }}>
+          <b style={{ color: 'var(--warn)' }}>Este grupo ya inició clases{initial.fecha_inicio_clases ? ` (el ${fmtDia(initial.fecha_inicio_clases)})` : ' (grupo veterano sin fecha registrada: cuenta como iniciado)'}.</b>{' '}
+          El modelo lo cierra a edición: solo se cambian el <b style={{ color: 'var(--text)' }}>horario</b> y el <b style={{ color: 'var(--text)' }}>coach</b>. Un horario nuevo entra en vigor <b style={{ color: 'var(--text)' }}>mañana</b> y las clases ya dadas se conservan tal cual. Las notas se leen en el panel del grupo.
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <Field label="Número de grupo *"><input className="input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="Ej: 22" /></Field>
-        <Field label="Itinerario">
-          <select className="input" value={f.itinerario} onChange={(e) => set('itinerario', e.target.value)}>
-            {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
-          </select>
-        </Field>
+        {!iniciado && (
+          <>
+            <Field label="Número de grupo *"><input className="input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="Ej: 22" /></Field>
+            <Field label="Itinerario">
+              <select className="input" value={f.itinerario} onChange={(e) => set('itinerario', e.target.value)}>
+                {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
+              </select>
+            </Field>
+          </>
+        )}
         <Field label="Coach">
           <select className="input" value={f.coach_id || ''} onChange={(e) => set('coach_id', e.target.value)}>
             <option value="">Sin coach</option>
             {coaches.filter((c) => c.activo || String(c.id) === String(f.coach_id)).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </Field>
-        <Field label="Fecha de apertura"><input type="date" className="input" value={f.fecha_apertura} onChange={(e) => set('fecha_apertura', e.target.value)} /></Field>
-        <Field label="Fecha de inicio de clases">
-          <input type="date" className="input" value={f.fecha_inicio_clases || ''}
-            onChange={(e) => { set('fecha_inicio_clases', e.target.value); setInicioTocado(true) }} />
-          {isEdit && !initial.fecha_inicio_clases && initial.it_inicio && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-              Nivel vigente inicia {fmtDia(initial.it_inicio)} (dato del itinerario; la columna sigue vacía hasta que la fijes aquí).
+        {reparaFecha && (
+          <>
+            <Field label="Fecha de inicio de clases (registro histórico)">
+              <input type="date" className="input" value={f.fecha_inicio_clases || ''} max={hoyISO()}
+                onChange={(e) => { set('fecha_inicio_clases', e.target.value); setInicioTocado(true) }} />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+              Este grupo veterano no tiene registrada su fecha de inicio de clases. Puedes fijar aquí la fecha REAL (pasada o de hoy) en que empezó a dar clases; el grupo sigue cerrado a edición para todo lo demás.
             </div>
-          )}
-        </Field>
-        <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
-          El grupo <b style={{ color: 'var(--text)' }}>entra al Cuadro de Negocio en el mes de su fecha de inicio de clases</b> (sin fecha = cuenta desde ya). La palanca de inscripciones (abrir o cerrar el llenado) ya no vive aquí: se maneja con el botón <b style={{ color: 'var(--text)' }}>Abrir/Cerrar inscripciones</b> del panel del grupo.
-        </div>
+          </>
+        )}
+        {!iniciado && (
+          <>
+            <Field label="Fecha de inicio de clases *">
+              <input type="date" className="input" value={f.fecha_inicio_clases || ''}
+                onChange={(e) => { set('fecha_inicio_clases', e.target.value); setInicioTocado(true) }} />
+            </Field>
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
+              El grupo <b style={{ color: 'var(--text)' }}>entra al Cuadro de Negocio en el mes de su fecha de inicio de clases</b>, y cuando esa fecha llega queda cerrado a edición (solo horario y coach). La palanca de inscripciones (abrir o cerrar el llenado) ya no vive aquí: se maneja con el botón <b style={{ color: 'var(--text)' }}>Abrir/Cerrar inscripciones</b> del panel del grupo.
+            </div>
+          </>
+        )}
         {!isEdit && (
           <>
             <Field label="Nivel inicial">
@@ -2016,10 +2214,12 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
             </div>
           </>
         )}
-        <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <input type="checkbox" checked={f.es_online} onChange={(e) => set('es_online', e.target.checked)} />
-          <span><b style={{ color: 'var(--text)' }}>Grupo online</b><br /><span className="h-sub">Exento de la alerta de fusión y del promedio de niños por grupo</span></span>
-        </label>
+        {!iniciado && (
+          <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={f.es_online} onChange={(e) => set('es_online', e.target.checked)} />
+            <span><b style={{ color: 'var(--text)' }}>Grupo online</b><br /><span className="h-sub">Exento de la alerta de fusión y del promedio de niños por grupo</span></span>
+          </label>
+        )}
         <div style={{ gridColumn: '1 / -1' }}>
           <div className="label" style={{ marginBottom: 8 }}>Horarios</div>
           {f.horarios.map((h, i) => (
@@ -2041,7 +2241,11 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
             El programa son <b>2 horas semanales</b>: un bloque de 2 h, o dos bloques de 1 h en días distintos. Ventana: 12:30–8:30 pm (sábado desde 9:00 am) con 15 min entre clases.
           </div>
         </div>
-        <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
+        {/* Notas: editable solo PRE-inicio; post-inicio se leen en el panel del
+            grupo, no en este modal (contrato literal, R2). */}
+        {!iniciado && (
+          <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
+        )}
       </div>
     </Modal>
   )
@@ -2158,6 +2362,9 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
 // ── Modal: inscribir niño ────────────────────────────────────────────────────
 function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
+  // (g1-11) El cierre de nivel es un OVERRIDE MANUAL: solo viaja si el usuario
+  // lo tocó — sin tocarlo, el cierre efectivo se deriva del plan del niño.
+  const [cierreTocado, setCierreTocado] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
@@ -2171,11 +2378,13 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
     try {
-      const res = await inscribirEstudiante(centroId, {
+      const data = {
         nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-        origen: f.origen, fecha: f.fecha, fecha_cierre_nivel: f.fecha_cierre_nivel || null,
+        origen: f.origen, fecha: f.fecha,
         representante: f.representante, correo: f.correo, telefono: f.telefono,
-      })
+      }
+      if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
+      const res = await inscribirEstudiante(centroId, data)
       setSaving(false)
       if (res.error) { setErr(res.error); return }
       const g = activos.find((x) => String(x.id) === String(f.grupo_id))
@@ -2223,7 +2432,13 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
           </select>
         </Field>
         <Field label="Fecha de inscripción"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
-        <Field label="Cierre de nivel"><input type="date" className="input" value={f.fecha_cierre_nivel} onChange={(e) => set('fecha_cierre_nivel', e.target.value)} /></Field>
+        <Field label="Cierre de nivel (override)">
+          <input type="date" className="input" value={f.fecha_cierre_nivel}
+            onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+            Déjalo vacío: el cierre se deriva solo del plan del niño en su grupo.
+          </div>
+        </Field>
         <Field label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
         <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
         <Field full label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
@@ -2239,20 +2454,29 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
     fecha_cierre_nivel: isoDia(est.fecha_cierre_nivel), representante: est.representante || '', correo: est.correo || '',
     telefono: est.telefono || '', notas: est.notas || '',
   })
+  // (g1-11) fecha_cierre_nivel = override manual: SOLO viaja si se tocó en
+  // esta sesión del modal (campo ausente = no tocar). Vaciarla tocada limpia
+  // el override y el cierre vuelve a derivarse del plan.
+  const [cierreTocado, setCierreTocado] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo' || String(g.id) === String(est.grupo_id))
+  // Cierre EFECTIVO vigente (override ?? derivado, resuelto por el server en
+  // est.plan.cierre; los no enriquecidos —sin grupo— caen al override crudo).
+  const cierreVigente = cierreNino(est)
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     setSaving(true); setErr('')
     try {
-      const res = await actualizarEstudiante(centroId, est.id, {
+      const data = {
         nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-        fecha_cierre_nivel: f.fecha_cierre_nivel || null, representante: f.representante, correo: f.correo,
+        representante: f.representante, correo: f.correo,
         telefono: f.telefono, notas: f.notas,
-      })
+      }
+      if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
+      const res = await actualizarEstudiante(centroId, est.id, data)
       setSaving(false)
       if (res.error) { setErr(res.error); return }
       onSaved(`${f.nombre.trim()} actualizado.`)
@@ -2289,7 +2513,13 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
             {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
-        <Field label="Cierre de nivel"><input type="date" className="input" value={f.fecha_cierre_nivel} onChange={(e) => set('fecha_cierre_nivel', e.target.value)} /></Field>
+        <Field label="Cierre de nivel (override)">
+          <input type="date" className="input" value={f.fecha_cierre_nivel}
+            onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+            Efectivo hoy: <b style={{ color: 'var(--text-muted)' }}>{cierreVigente.fecha ? `${fmtDia(cierreVigente.fecha)} (${ORIGEN_CIERRE[cierreVigente.origen]})` : 'sin cierre resoluble'}</b>. Vacío = se deriva del plan del niño.
+          </div>
+        </Field>
         <Field label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
         <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
         <Field full label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
@@ -2300,19 +2530,37 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
 }
 
 // ── Modal: retiro con motivo (cuadro de deserciones) ─────────────────────────
-function RetiroModal({ centroId, est, onClose, onSaved }) {
-  const [f, setF] = useState({ motivo: 'ECONOMICO', fecha: hoyISO(), ultimaAsistencia: '' })
+// Retiro INMEDIATO (R5): para el niño SIN asistencia presente este mes. La
+// última asistencia ya no se escribe a mano: es derivada (g1-23). Si el server
+// detecta presente en el mes (carrera con el coach), la validación dirige al
+// botón correcto y el footer ofrece programar el retiro con el mismo motivo.
+function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
+  const [f, setF] = useState({ motivo: 'ECONOMICO', fecha: hoyISO() })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [requiereProg, setRequiereProg] = useState(false)
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
   async function save() {
     setSaving(true); setErr('')
     try {
-      const res = await retirarEstudiante(centroId, est.id, { motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || null })
+      const res = await retirarEstudiante(centroId, est.id, { motivo: f.motivo, fecha: f.fecha })
+      setSaving(false)
+      if (res.error) { setErr(res.error); if (res.requiereProgramacion) setRequiereProg(true); return }
+      onSaved(res)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
+  }
+
+  async function programar() {
+    setSaving(true); setErr('')
+    try {
+      const res = await programarRetiro(centroId, est.id, { motivo: f.motivo })
       setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(res)
+      onProgramado(res)
     } catch (e) {
       setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
@@ -2324,7 +2572,11 @@ function RetiroModal({ centroId, est, onClose, onSaved }) {
       footer={(
         <>
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Confirmar retiro'}</button>
+          {requiereProg ? (
+            <button className="btn btn--primary" onClick={programar} disabled={saving}>{saving ? 'Guardando…' : 'Retirar el próximo mes'}</button>
+          ) : (
+            <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Confirmar retiro'}</button>
+          )}
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
@@ -2334,9 +2586,53 @@ function RetiroModal({ centroId, est, onClose, onSaved }) {
             {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m]}</option>)}
           </select>
         </Field>
-        <Field label="Fecha de retiro"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
-        <Field label="Última asistencia"><input type="date" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
-        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>El niño pasa al cuadro de deserciones del mes de la fecha de retiro y su status en plataforma queda en DESACTIVAR.</div>
+        <Field label="Fecha de retiro"><input type="date" className="input" value={f.fecha} max={hoyISO()} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>El niño pasa al cuadro de deserciones del mes de la fecha de retiro y su status en plataforma queda en DESACTIVAR. La última asistencia se calcula sola de las clases marcadas por el coach.</div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Modal: "Retirar el próximo mes" (R5, g1-24) ──────────────────────────────
+// El niño vio clases este mes (asistencia presente): por norma del cuadro
+// termina su mes. El retiro queda programado para el día 1 del mes siguiente,
+// el sistema lo ejecuta solo, y se puede cancelar mientras tanto.
+function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
+  const [motivo, setMotivo] = useState('ECONOMICO')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    setSaving(true); setErr('')
+    try {
+      const res = await programarRetiro(centroId, est.id, { motivo })
+      setSaving(false)
+      if (res.error) { setErr(res.error); return }
+      onSaved(res)
+    } catch (e) {
+      setSaving(false)
+      setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    }
+  }
+
+  return (
+    <Modal title={`Retirar a ${est.nombre} el próximo mes`} width={480} onClose={onClose}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Programar retiro'}</button>
+        </>
+      )}>
+      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <div style={{ display: 'grid', gap: 14 }}>
+        <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          El niño <b style={{ color: 'var(--text)' }}>vio clases este mes</b>, así que por norma del cuadro termina su mes: queda en baja potencial y el retiro se ejecuta solo el <b style={{ color: 'var(--text)' }}>día 1 del próximo mes</b>. Puedes cancelarlo mientras tanto desde el roster.
+        </div>
+        <Field label="Motivo de retiro *">
+          <select className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+            {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m]}</option>)}
+          </select>
+        </Field>
       </div>
     </Modal>
   )

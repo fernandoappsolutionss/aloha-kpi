@@ -539,3 +539,82 @@ CREATE TABLE IF NOT EXISTS crm_sync_outbox (
 -- IS NULL, orden por id); lo procesado no estorba en el índice.
 CREATE INDEX IF NOT EXISTS idx_crm_sync_outbox_pendientes
   ON crm_sync_outbox (id) WHERE procesado_at IS NULL;
+
+-- ── REMODELADO GRUPO/NIÑO (diseño 2026-08-08): esquema por niño ─────────────
+-- Modelo de Fernando: la planificación va POR NIÑO, el KPI sale solo de
+-- eventos y el retiro se programa con evidencia de asistencia. Aquí van SOLO
+-- las columnas e índices aplicables hoy sin tocar datos; lo que depende de
+-- preflight o dedupe queda COMENTADO más abajo con su instrucción.
+
+-- Ancla de planificación por niño (R3/g1-8): el plan del niño se DERIVA al
+-- vuelo desde esta fecha (nunca se persiste por niño). Con grupo desde el
+-- alta: max(fecha_inscripcion, grupo.fecha_inicio_clases); pendiente colocado:
+-- max(fecha_colocacion canónica, grupo.fecha_inicio_clases) — jamás la
+-- fecha_inscripcion vieja de la ficha pendiente.
+ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS fecha_inicio_nivel DATE;
+
+-- Retiro programado (R5/g1-24): programarRetiro escribe estado='baja_potencial'
+-- + esta fecha (día 1 del mes siguiente) + evento con el estado previo, todo
+-- en UNA transacción. El cron reclama por lotes (FOR UPDATE SKIP LOCKED) y
+-- registra el retiro con fecha = retiro_programado_para, no el día físico.
+-- cancelarRetiroProgramado RESTAURA el estado previo y LIMPIA esta fecha en la
+-- misma transacción: si no limpia estado+fecha, el cron lo retiraría igual.
+ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS retiro_programado_para DATE;
+
+-- Detalle estructurado del evento (g1-11/g1-24): cierre real de un nivel
+-- terminado (anclas y posiciones antes/después), estado previo del niño al
+-- programar retiro, evidencia de overrides de asistencia. JSONB libre: el
+-- contrato de cada tipo vive en el código, no en el esquema.
+ALTER TABLE estudiante_eventos ADD COLUMN IF NOT EXISTS detalle JSONB;
+
+-- Origen del evento de venta canónico (R4/g1-17): se copia ATÓMICAMENTE del
+-- alta al crear el evento de inscripción, para que calcularKpiSemanalAuto
+-- discrimine orígenes sin depender de la ficha viva del estudiante.
+ALTER TABLE estudiante_eventos ADD COLUMN IF NOT EXISTS origen TEXT;
+
+-- Override manual de cp_matriculados (R4/g1-21): efectivo = override ?? derivado.
+-- Editar fija el override; "Usar valor del módulo" lo limpia (NULL). El efectivo
+-- se materializa en cp_matriculados para no tocar consumidores existentes.
+ALTER TABLE resumen_mes ADD COLUMN IF NOT EXISTS cp_matriculados_override INTEGER;
+
+-- El cron de retiros solo pregunta por baja_potencial con fecha programada:
+-- índice parcial, lo demás no estorba (g1-24).
+CREATE INDEX IF NOT EXISTS idx_retiros_programados
+  ON estudiantes (retiro_programado_para) WHERE estado = 'baja_potencial';
+
+-- Coherencia estado/fecha (R5/g1-24), la mitad aplicable HOY: una fecha de
+-- retiro programado solo puede vivir en un niño en baja_potencial. Todas las
+-- filas existentes tienen la columna recién creada en NULL, así que el
+-- constraint no reclasifica nada; y obliga a que quien mueva el estado limpie
+-- la fecha EN EL MISMO statement (la limpieza es parte del contrato, no un
+-- detalle). DROP + ADD porque Postgres no tiene ADD CONSTRAINT IF NOT EXISTS:
+-- el par es re-ejecutable y plano (compatible con el split por ';' del parser
+-- de scripts/migrate.mjs).
+ALTER TABLE estudiantes DROP CONSTRAINT IF EXISTS chk_retiro_programado_estado;
+ALTER TABLE estudiantes ADD CONSTRAINT chk_retiro_programado_estado
+  CHECK (estado = 'baja_potencial' OR retiro_programado_para IS NULL);
+-- La mitad inversa (todo baja_potencial DEBE tener fecha) NO es aplicable en
+-- plano: las bajas legacy sin fecha quedan marcadas 'legacy', NO entran al
+-- cron y se listan para decisión humana (g1-24). Queda para la fase de datos,
+-- y SOLO si esa fase resuelve o exime a todas las legacy:
+-- ALTER TABLE estudiantes DROP CONSTRAINT IF EXISTS chk_baja_potencial_con_fecha;
+-- ALTER TABLE estudiantes ADD CONSTRAINT chk_baja_potencial_con_fecha
+--   CHECK (estado <> 'baja_potencial' OR retiro_programado_para IS NOT NULL);
+
+-- (g1-2, POST-PREFLIGHT — NO DESCOMENTAR hasta que el preflight de grupos
+-- activos con fecha_inicio_clases NULL pase en prod. Migración en dos pasos:
+-- datos primero, constraint después. Al aplicarlo, sacar las dos sentencias
+-- del comentario tal cual están.)
+-- ALTER TABLE grupos DROP CONSTRAINT IF EXISTS chk_grupo_activo_con_fecha;
+-- ALTER TABLE grupos ADD CONSTRAINT chk_grupo_activo_con_fecha
+--   CHECK (estado <> 'activo' OR fecha_inicio_clases IS NOT NULL);
+
+-- (g1-17, POST-DEDUPE — NO DESCOMENTAR hasta correr el manifiesto/dedupe de la
+-- historia de eventos (scripts/dedupe-inscripciones-2026-08-08.mjs, dry-run →
+-- apply con reporte ok): hoy puede haber inscripciones duplicadas por
+-- estudiante y crm_registration_id repetidos; los índices únicos reventarían
+-- la migración. Al aplicarlos, sacarlos del comentario tal cual están.)
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_evento_inscripcion_canonica
+--   ON estudiante_eventos (estudiante_id) WHERE tipo = 'inscripcion';
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_estudiantes_centro_crm_reg
+--   ON estudiantes (centro_id, crm_registration_id) WHERE crm_registration_id IS NOT NULL;

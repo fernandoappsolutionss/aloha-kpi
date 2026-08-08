@@ -5,10 +5,12 @@ import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
 import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
-import { grupoYaDioClases, iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
+import { iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo, fechaInicioClasesConfiable } from '../../lib/inicios-clase.mjs'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { cierreMesAnterior } from '../../lib/cadena'
+import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
+import { VENTAS_AUTO_DESDE } from '../../lib/kpi-semanal-auto.mjs'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -25,10 +27,18 @@ export async function getCentroResumen(centroId, year, trimestre) {
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
     ORDER BY month
   `
-  const ks = await sql`
+  let ks = await sql`
     SELECT * FROM kpi_semanas
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
+  // (g1-16) Superposición en vivo: en meses abiertos >= gate, ing/des salen
+  // del módulo — la tabla deja de ser fuente hasta que el cierre materializa.
+  ;({ filas: ks } = await superponerKpiAbiertos({
+    filas: ks,
+    centroIds: [centroId],
+    desde: Number(year) * 100 + lo,
+    hasta: Number(year) * 100 + hi,
+  }))
 
   const hoy = hoyISO()
   const [yearActual, monthActual] = hoy.split('-').map(Number)
@@ -102,7 +112,13 @@ export async function getCentroResumen(centroId, year, trimestre) {
   // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
   // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
   const rsAnio = await sql`SELECT month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
-  const ksAnio = await sql`SELECT des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
+  let ksAnio = await sql`SELECT centro_id, year, month, semana, des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
+  ;({ filas: ksAnio } = await superponerKpiAbiertos({
+    filas: ksAnio,
+    centroIds: [centroId],
+    desde: Number(year) * 100 + 1,
+    hasta: Number(year) * 100 + 12,
+  }))
   const graduadosAnio = rsAnio.reduce((a, r) => a + (r.mot_graduado || 0), 0)
   const bajasAnio = ksAnio.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
   const ninosInicioAnio = rsAnio.find((r) => (r.ninos_inicio_mes || 0) > 0)?.ninos_inicio_mes || 0
@@ -133,9 +149,12 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const poblacionOperativa = estudiantesProyeccion.filter((estudiante) => {
     if (estudiante.estado !== 'activo' && estudiante.estado !== 'baja_potencial') return false
     const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
-    // Nivel 2+ = el grupo ya dio su primera clase; su fecha es el arranque del
-    // nivel vigente y no debe excluirlo de la población operativa.
-    const fechaGrupo = grupoYaDioClases(grupo) ? null : fechaIso10(grupo?.fecha_inicio_clases)
+    // (R1, g1-1) La población operativa depende EXCLUSIVAMENTE de la fecha de
+    // inicio de clases del grupo. Los grupos veteranos con fecha futura se
+    // corrigen en los datos (preflight g1-1); mientras tanto los cubre la
+    // GUARDIA de runtime (nivel 2+ con fecha futura = dato roto: se trata
+    // como NULL y el grupo sigue contando, fail closed).
+    const fechaGrupo = fechaInicioClasesConfiable(grupo, finMesActual)
     const fechaInscripcion = fechaIso10(estudiante.fecha_inscripcion)
     return (!fechaGrupo || fechaGrupo <= finMesActual) && (!fechaInscripcion || fechaInscripcion <= finMesActual)
   })
@@ -173,20 +192,32 @@ export async function getHistorialCentro(centroId) {
   const estados = await sql`
     SELECT year, month, estado, cerrado_at FROM mes_kpi WHERE centro_id = ${centroId}
   `
-  const semanas = await sql`
-    SELECT
-      year,
-      month,
-      COALESCE(SUM(
-        COALESCE(ing_d1, 0) + COALESCE(ing_d2, 0) + COALESCE(ing_d3, 0) + COALESCE(ing_d4, 0) + COALESCE(ing_d5, 0)
-      ), 0)::int AS nuevos_ingresos_venta,
-      COALESCE(SUM(
-        COALESCE(des_d1, 0) + COALESCE(des_d2, 0) + COALESCE(des_d3, 0) + COALESCE(des_d4, 0) + COALESCE(des_d5, 0)
-      ), 0)::int AS total_desercion
+  // (g1-16) Las semanas se leen CRUDAS y se agregan en JS: así la
+  // superposición del cálculo vivo (meses abiertos >= gate) entra al total
+  // con el mismo helper compartido, sin duplicar el criterio en SQL.
+  let semanasCrudas = await sql`
+    SELECT centro_id, year, month, semana,
+      ing_d1, ing_d2, ing_d3, ing_d4, ing_d5,
+      des_d1, des_d2, des_d3, des_d4, des_d5
     FROM kpi_semanas
     WHERE centro_id = ${centroId}
-    GROUP BY year, month
   `
+  const [anioHoy, mesHoy] = hoyISO().split('-').map(Number)
+  ;({ filas: semanasCrudas } = await superponerKpiAbiertos({
+    filas: semanasCrudas,
+    centroIds: [centroId],
+    desde: VENTAS_AUTO_DESDE,
+    hasta: anioHoy * 100 + mesHoy,
+  }))
+  const porMes = new Map()
+  for (const fila of semanasCrudas) {
+    const clave = `${fila.year}-${fila.month}`
+    const acumulado = porMes.get(clave) || { year: fila.year, month: fila.month, nuevos_ingresos_venta: 0, total_desercion: 0 }
+    acumulado.nuevos_ingresos_venta += (fila.ing_d1 || 0) + (fila.ing_d2 || 0) + (fila.ing_d3 || 0) + (fila.ing_d4 || 0) + (fila.ing_d5 || 0)
+    acumulado.total_desercion += (fila.des_d1 || 0) + (fila.des_d2 || 0) + (fila.des_d3 || 0) + (fila.des_d4 || 0) + (fila.des_d5 || 0)
+    porMes.set(clave, acumulado)
+  }
+  const semanas = [...porMes.values()]
   // Fotos mensuales del Cuadro de Negocio (solo métricas compactas: la foto
   // completa con niños y contactos se ve en la página del cuadro).
   const fotos = await sql`

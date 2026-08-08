@@ -152,10 +152,14 @@ test('comparableMes reproduce el filtro del cuadro: grupo con inicio futuro fuer
   assert.equal(septiembre.aPagar, 4)
 })
 
-// La proteccion real de los niños que ya vienen estudiando: un grupo de nivel
-// 2+ ya dio su primera clase, asi que escribirle la fecha del NIVEL vigente no
-// lo saca del cuadro ni vuelve a estrenar a su gente (grupoYaDioClases).
-test('grupo de nivel 2+ con niños: before/after IDENTICO aunque el nivel arranque despues', () => {
+// Regla nueva (R1, g1-1) + GUARDIA de runtime: el cuadro depende de la fecha
+// de inicio de clases, pero un grupo cuya referencia ya cursa nivel 2+ dio
+// clases por definición — si el backfill D7 le escribe el arranque FUTURO de
+// su nivel vigente (dato roto), la guardia trata esa fecha como NULL: el grupo
+// y su gente NO se mueven del cuadro (cero reclasificación) mientras el
+// preflight g1-1 corrige la fecha en los datos (LEAST con la primera
+// inscripción atribuida).
+test('grupo de nivel 2+ con niños y arranque futuro: la guardia lo deja quieto (cero diferencias)', () => {
   const grupos = [grupo({ id: 1, itinerario_clases: { nivel: 5, fecha_inicio: '2026-09-07' } })]
   const estudiantes = [
     estudiante({ id: 1, grupo_id: 1, fecha_inscripcion: '2026-08-05' }),
@@ -175,9 +179,14 @@ test('grupo de nivel 2+ con niños: before/after IDENTICO aunque el nivel arranq
   const despues = comparableMes({ ...base, grupos: patchFechaInicio(grupos, decisiones) })
   const resultado = compararComparables(antes, despues, { decisiones, finMes: finDeMes(2026, 8) })
 
-  assert.deepEqual(resultado, { variaciones: [], diferencias: [] })
-  assert.deepEqual(antes.nuevosIds, ['1']) // y el nuevo de agosto sigue siendo el mismo
+  // El niño 1 es el nuevo de agosto ANTES y DESPUÉS del parche: la guardia
+  // (nivel 2+ con fecha futura) neutraliza la fecha rota y nada se reclasifica
+  // — el backfill puede aplicar sin sacar al veterano del cuadro.
+  assert.deepEqual(antes.nuevosIds, ['1'])
   assert.deepEqual(despues.nuevosIds, ['1'])
+  assert.deepEqual(despues.gruposIds, antes.gruposIds)
+  assert.deepEqual(resultado.variaciones, [])
+  assert.deepEqual(resultado.diferencias, [])
 })
 
 // Contraparte: un grupo de nivel 1 que todavia no estrena SI sale del mes, y su

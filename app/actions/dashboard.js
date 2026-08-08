@@ -7,6 +7,7 @@ import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
 import { hoyISO } from '../../lib/operaciones'
 import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
+import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -127,7 +128,15 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   const centros = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
   const [metas] = await sql`SELECT * FROM metas WHERE anio = ${toY} AND trimestre = ${toQ}`
   let rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
-  const ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  let ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  // (g1-16) Superposición en vivo: en meses abiertos >= gate las ventas y
+  // retiros del panel salen del módulo, con el mismo helper que KPI Semanal.
+  ;({ filas: ks } = await superponerKpiAbiertos({
+    filas: ks,
+    centroIds: centros.map((centro) => centro.id),
+    desde: lo,
+    hasta: hi,
+  }))
   const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
   // Semilla del ENCADENAMIENTO: cierre del mes anterior al rango. Un mes
   // recién abierto (sin cierre) hereda los niños del eslabón anterior en vez
@@ -251,8 +260,15 @@ export async function getHistorialAdmin(anio, centroSel, trimSel) {
   const hi = Number(anio) * 100 + 12
   let resumen = (await sql`SELECT * FROM resumen_mes WHERE year = ${anio}`)
     .filter((row) => centroIds.has(Number(row.centro_id)))
-  const semanas = (await sql`SELECT * FROM kpi_semanas WHERE year = ${anio}`)
+  let semanas = (await sql`SELECT * FROM kpi_semanas WHERE year = ${anio}`)
     .filter((row) => centroIds.has(Number(row.centro_id)))
+  // (g1-16) Mismo helper compartido: meses abiertos >= gate ven el cálculo vivo.
+  ;({ filas: semanas } = await superponerKpiAbiertos({
+    filas: semanas,
+    centroIds: [...centroIds],
+    desde: lo,
+    hasta: hi,
+  }))
   const prevRows = (await sql`SELECT centro_id, ninos_final_mes, grupos_activos FROM resumen_mes WHERE year = ${Number(anio) - 1} AND month = 12`)
     .filter((row) => centroIds.has(Number(row.centro_id)))
   resumen = await aplicarMesesAbiertosVivos(resumen, prevRows, lo, hi, [...centroIds])
@@ -302,11 +318,30 @@ export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
     FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   const prev = await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
   rows = await aplicarMesesAbiertosVivos(rows, prev, lo, hi, centros.map((centro) => centro.id))
-  const desMes = await sql`
-    SELECT centro_id, year, month,
-           SUM(des_d1 + des_d2 + des_d3 + des_d4 + des_d5)::int AS des
-    FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}
-    GROUP BY centro_id, year, month`
+  // (g1-16) Filas crudas + agregado en JS: la superposición del cálculo vivo
+  // (meses abiertos >= gate) entra a la serie con el helper compartido.
+  let ksSerie = await sql`
+    SELECT centro_id, year, month, semana,
+           ing_d1, ing_d2, ing_d3, ing_d4, ing_d5,
+           des_d1, des_d2, des_d3, des_d4, des_d5
+    FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  ;({ filas: ksSerie } = await superponerKpiAbiertos({
+    filas: ksSerie,
+    centroIds: centros.map((centro) => centro.id),
+    desde: lo,
+    hasta: hi,
+  }))
+  const desPorMes = new Map()
+  for (const fila of ksSerie) {
+    const clave = `${fila.centro_id}:${fila.year}-${fila.month}`
+    desPorMes.set(clave, (desPorMes.get(clave) || 0) +
+      (fila.des_d1 || 0) + (fila.des_d2 || 0) + (fila.des_d3 || 0) + (fila.des_d4 || 0) + (fila.des_d5 || 0))
+  }
+  const desMes = [...desPorMes.entries()].map(([clave, des]) => {
+    const [centroId, periodo] = clave.split(':')
+    const [year, month] = periodo.split('-').map(Number)
+    return { centro_id: Number(centroId), year, month, des }
+  })
   const cadena = new Map(prev.map((r) => [r.centro_id, r.ninos_final_mes || 0]))
   const out = []
   for (const { year, month } of monthList(desdeY, desdeM, hastaY, hastaM)) {
