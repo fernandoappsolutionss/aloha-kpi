@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless'
 import {
   REPARACIONES_HISTORICAS,
   estadoReparacionHistorica,
+  guardiaReparacionHistorica,
 } from '../lib/kpi-history-repair.mjs'
 
 if (!process.env.DATABASE_URL) throw new Error('Falta DATABASE_URL.')
@@ -42,11 +43,12 @@ if (conflictos.length) {
     const params = []
     const values = pendientes.map((fila) => {
       const r = fila
+      const guardia = guardiaReparacionHistorica(r.actual, r)
       const base = params.length
       params.push(
         r.centroId, r.year, r.month,
-        r.antes.inicio, r.antes.final, r.antes.activos,
-        r.despues.inicio, r.despues.final, r.despues.activos,
+        guardia.antes.inicio, guardia.antes.final, guardia.antes.activos,
+        guardia.despues.inicio, guardia.despues.final, guardia.despues.activos,
       )
       return `($${base + 1}::int,$${base + 2}::int,$${base + 3}::int,$${base + 4}::int,$${base + 5}::int,$${base + 6}::int,$${base + 7}::int,$${base + 8}::int,$${base + 9}::int)`
     }).join(',')
