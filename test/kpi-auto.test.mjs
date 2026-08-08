@@ -125,6 +125,7 @@ test('rechaza registros CRM incompletos o ajenos al lote solicitado', async () =
     { id: 'reg-1', event_id: 'event-ajeno', registered_at: '2026-08-01T12:00:00.000Z' },
     { id: 'reg-1', event_id: 'event-1', registered_at: 'fecha-invalida' },
     { id: 'reg-1', event_id: 'event-1', registered_at: '1' },
+    { id: 'reg-1', event_id: 'event-1', registered_at: '2026-02-30T12:00:00.000Z' },
     { id: 'reg-1', event_id: 'event-1', registered_at: '2026-08-01T12:00:00.000Z', attendance_status: 'inventado' },
   ]
 
@@ -419,6 +420,25 @@ test('una reclasificacion entre categorias sigue a la venta antigua por identida
 
   assert.equal(reconciled.orig_marketing, 1)
   assert.equal(reconciled.orig_referido, 1)
+})
+
+test('un ajuste legado sin identidad falla cerrado en vez de inferir sobre ventas nuevas', () => {
+  const dosVentas = matriz()
+  dosVentas[0][0] = 2
+  const source = fuenteVacia({
+    ing: dosVentas,
+    orig_marketing: 1,
+    orig_referido: 1,
+    _origin_sales: [
+      { id: 'venta-antigua', origin: 'orig_marketing' },
+      { id: 'venta-nueva', origin: 'orig_referido' },
+    ],
+  })
+
+  assert.throws(
+    () => aplicarAjustes(source, fuenteVacia({ orig_referido: -1, orig_marketing: 1 })),
+    /identidad/i,
+  )
 })
 
 test('un crecimiento posterior de la fuente se suma sobre el ajuste inicial fijo', () => {
