@@ -10,7 +10,12 @@ import {
   usaKpiAutomatico,
 } from '../lib/kpi-auto.mjs'
 import { esOrigenVenta, requiereOrigenVenta } from '../lib/operaciones.js'
-import { cargarRegistrosPorLotes, formaKpiGuardada, mezclarSemanasAutomaticas } from '../lib/kpi-auto-server.js'
+import {
+  cargarRegistrosPorLotes,
+  filtrarClasesVigentesCrm,
+  formaKpiGuardada,
+  mezclarSemanasAutomaticas,
+} from '../lib/kpi-auto-server.js'
 
 const matriz = () => Array.from({ length: 5 }, () => [0, 0, 0, 0, 0])
 
@@ -96,6 +101,19 @@ test('una respuesta CRM exitosa pero malformada invalida la fuente completa', as
     assert.equal(result.complete, false)
     assert.match(result.error, /respuesta inválida/i)
   }
+})
+
+test('los espejos de clases eliminadas del CRM no bloquean los registros vigentes', () => {
+  const clases = [
+    { id: 'vigente-1', start_date: '2026-08-06T23:00:00.000Z' },
+    { id: 'eliminada', start_date: '2026-08-15T23:00:00.000Z' },
+    { id: 'vigente-2', start_date: '2026-08-20T23:00:00.000Z' },
+  ]
+
+  assert.deepEqual(
+    filtrarClasesVigentesCrm(clases, [{ id: 'vigente-2' }, { id: 'vigente-1' }]),
+    [clases[0], clases[2]],
+  )
 })
 
 test('valida el origen comercial separado del origen tecnico', () => {
