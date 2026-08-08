@@ -9,6 +9,13 @@ import { iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, re
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { cierreMesAnterior } from '../../lib/cadena'
+import { usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
+import {
+  fotoKpiAutomatica,
+  mezclarResumenAutomatico,
+  mezclarSemanasPeriodoAutomaticas,
+  mezclarTotalesAutomaticos,
+} from '../../lib/kpi-auto-server'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -25,7 +32,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
     ORDER BY month
   `
-  const ks = await sql`
+  let ks = await sql`
     SELECT * FROM kpi_semanas
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
   `
@@ -44,6 +51,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     hasta: Number(year) * 100 + hi,
     periodoActual: yearActual * 100 + monthActual,
   })
+  const automaticosAbiertos = new Map()
 
   for (const abierto of abiertos) {
     try {
@@ -65,6 +73,22 @@ export async function getCentroResumen(centroId, year, trimestre) {
         inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
         motivos: motivosParaKpi(cuadroAbierto?.deserciones || []),
       })
+      if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        if (automatic.complete) {
+          rs = mezclarResumenAutomatico(rs, abierto.year, abierto.month, automatic.data)
+          ks = mezclarSemanasPeriodoAutomaticas(
+            ks,
+            centroId,
+            abierto.year,
+            abierto.month,
+            automatic.data,
+          )
+          automaticosAbiertos.set(`${abierto.year}-${abierto.month}`, automatic.data)
+        } else {
+          console.error(`[getCentroResumen] no se pudo sincronizar ${abierto.year}-${abierto.month}: ${automatic.error}`)
+        }
+      }
     } catch (e) {
       console.error(`[getCentroResumen] no se pudo calcular ${abierto.year}-${abierto.month}:`, e)
     }
@@ -101,8 +125,13 @@ export async function getCentroResumen(centroId, year, trimestre) {
 
   // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
   // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
-  const rsAnio = await sql`SELECT month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
-  const ksAnio = await sql`SELECT des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
+  let rsAnio = await sql`SELECT year, month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
+  let ksAnio = await sql`SELECT centro_id, year, month, semana, des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
+  for (const [periodo, automatic] of automaticosAbiertos) {
+    const [autoYear, autoMonth] = periodo.split('-').map(Number)
+    rsAnio = mezclarResumenAutomatico(rsAnio, autoYear, autoMonth, automatic)
+    ksAnio = mezclarSemanasPeriodoAutomaticas(ksAnio, centroId, autoYear, autoMonth, automatic)
+  }
   const graduadosAnio = rsAnio.reduce((a, r) => a + (r.mot_graduado || 0), 0)
   const bajasAnio = ksAnio.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
   const ninosInicioAnio = rsAnio.find((r) => (r.ninos_inicio_mes || 0) > 0)?.ninos_inicio_mes || 0
@@ -172,7 +201,7 @@ export async function getHistorialCentro(centroId) {
   const estados = await sql`
     SELECT year, month, estado, cerrado_at FROM mes_kpi WHERE centro_id = ${centroId}
   `
-  const semanas = await sql`
+  let semanas = await sql`
     SELECT
       year,
       month,
@@ -238,6 +267,15 @@ export async function getHistorialCentro(centroId) {
         inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
         motivos: motivosParaKpi(d?.deserciones || []),
       })
+      if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        if (automatic.complete) {
+          resumen = mezclarResumenAutomatico(resumen, abierto.year, abierto.month, automatic.data)
+          semanas = mezclarTotalesAutomaticos(semanas, abierto.year, abierto.month, automatic.data)
+        } else {
+          console.error(`[getHistorialCentro] no se pudo sincronizar ${abierto.year}-${abierto.month}: ${automatic.error}`)
+        }
+      }
       const cuadroVivo = {
         year: abierto.year,
         month: abierto.month,
