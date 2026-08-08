@@ -3,7 +3,7 @@ import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { guardarSnapshotCuadro, calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { balanceMensual, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
+import { balanceMensual, INICIOS_CLASE_DESDE, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
 import { cierreMesAnterior } from '../../lib/cadena'
 
@@ -58,14 +58,19 @@ export async function loadKpiMes(centroId, year, month) {
     WHERE centro_id = ${centroId} AND estado = 'cerrado'
     ORDER BY year DESC, month DESC
   `
+  const cierreAnterior = await cierreMesAnterior(centroId, intOr(year), intOr(month))
+  const estado = mes?.estado || 'abierto'
   return {
     centroNombre: c?.nombre || '',
-    estado: mes?.estado || 'abierto',
+    estado,
     resumen: res || null,
     semanas,
     historial,
-    inicioArrastrado: await cierreMesAnterior(centroId, intOr(year), intOr(month)),
-    motivosAuto: await motivosDelModulo(centroId, intOr(year), intOr(month)),
+    // Un cierre es una fotografia: no se reencadena ni se vuelve a leer del
+    // modulo vivo cuando alguien consulta el historial.
+    cierreAnterior,
+    inicioArrastrado: estado === 'cerrado' ? null : cierreAnterior,
+    motivosAuto: estado === 'cerrado' ? null : await motivosDelModulo(centroId, intOr(year), intOr(month)),
   }
 }
 
@@ -160,7 +165,10 @@ export async function cerrarMes(centroId, year, month) {
     try {
       const datos = await guardarSnapshotCuadro(centroId, intOr(year), intOr(month))
       const t = datos?.totales
-      if (t) {
+      // Antes de agosto de 2026 el KPI se capturaba manualmente y una foto
+      // tardia del Cuadro no puede reconstruir quienes estaban activos al
+      // cierre. Se conserva el resumen que guardarKpiMes acaba de grabar.
+      if (t && usaIniciosClaseOperativos(year, month)) {
         // El inicio SIEMPRE se arrastra del cierre del mes anterior — misma
         // regla que guardarKpiMes. Derivarlo de la propia foto (t.mesAnterior)
         // le da al mes un inicio PROPIO y rompe la cadena: cerrar un mes por

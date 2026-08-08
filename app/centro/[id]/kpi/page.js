@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
 import { contarGruposActivos } from '../../../actions/grupos'
+import { ajusteHistoricoKpi, finalVisibleKpi, inicioVisibleKpi } from '../../../../lib/inicios-clase.mjs'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const SEMANAS = [1, 2, 3, 4, 5]
@@ -36,6 +37,8 @@ export default function KPIPage() {
   const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
+  const [finalGuardado, setFinalGuardado] = useState(null)
+  const [cierreAnterior, setCierreAnterior] = useState(null)
   // Cierre del mes anterior: encadena como "niños inicio" de este mes.
   const [arrastrado, setArrastrado] = useState(null)
   // Motivos de deserción que vienen del módulo (retiros registrados).
@@ -53,18 +56,26 @@ export default function KPIPage() {
       setLoading(false)
       return
     }
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, inicioArrastrado: arr, motivosAuto: mAuto } = datos
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto } = datos
     setCentroNombre(cNombre || '')
-    setMesEstado(estado || 'abierto')
+    const estadoActual = estado || 'abierto'
+    setMesEstado(estadoActual)
     setArrastrado(arr || null)
+    setCierreAnterior(cierrePrevio || null)
     setMotivosAuto(mAuto || null)
+    setFinalGuardado(res?.ninos_final_mes ?? null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
-    // anterior cuando existe (el servidor también lo impone al guardar).
+    // anterior solo mientras esta abierto. Un cierre conserva su propia foto.
+    const ninosInicio = inicioVisibleKpi({
+      estado: estadoActual,
+      guardado: res?.ninos_inicio_mes,
+      arrastrado: arr?.valor,
+    })
     if (res) {
-      setConfig({ ninos_inicio: arr ? arr.valor : (res.ninos_inicio_mes||0), grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
     } else {
-      setConfig({ ninos_inicio: arr ? arr.valor : 0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
     }
 
     if (mAuto) setConfig(c => ({
@@ -109,8 +120,11 @@ export default function KPIPage() {
       const res = await saveKpiMes(id, year, month, config, semanas)
       if (res.error) throw new Error(res.error)
       setStatus('✅ KPI de ' + NOMBRES_MES[month-1] + ' ' + year + ' guardado.')
+      setSaving(false)
+      return true
     } catch(e) { setStatus('❌ Error: ' + e.message) }
     setSaving(false)
+    return false
   }
 
   // Sin try/finally, un error del servidor dejaba el botón en "Cerrando…" para
@@ -119,15 +133,17 @@ export default function KPIPage() {
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
     try {
-      await handleSave()
+      const guardado = await handleSave()
+      if (!guardado) return
       const res = await cerrarMes(id, year, month)
       if (res?.error) throw new Error(res.error)
-      setMesEstado('cerrado')
+      await loadData()
       setStatus(res?.warn ? '🔒 Mes cerrado. ' + res.warn : '🔒 Mes cerrado. Datos guardados como historial.')
     } catch (e) {
       setStatus('❌ Error al cerrar: ' + (e?.message || 'desconocido'))
+    } finally {
+      setCerrando(false)
     }
-    setCerrando(false)
   }
 
   async function handleReabrirMes() {
@@ -135,7 +151,8 @@ export default function KPIPage() {
     try {
       const res = await reabrirMes(id, year, month)
       if (res?.error) throw new Error(res.error)
-      setMesEstado('abierto'); setStatus('✅ Mes reabierto para edición.')
+      await loadData()
+      setStatus('✅ Mes reabierto para edición.')
     } catch (e) {
       setStatus('❌ Error al reabrir: ' + (e?.message || 'desconocido'))
     }
@@ -149,7 +166,9 @@ export default function KPIPage() {
   const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const retiradosOperativos = motivosAuto ? motivosAuto.total : totalDes
   const reincorporados = motivosAuto?.reincorporados || 0
-  const ninosFinal = Math.max(0, ni + nA + reincorporados - retiradosOperativos)
+  const ninosFinalCalculado = Math.max(0, ni + nA + reincorporados - retiradosOperativos)
+  const ninosFinal = finalVisibleKpi({ estado: mesEstado, guardado: finalGuardado, calculado: ninosFinalCalculado })
+  const ajusteHistorico = ajusteHistoricoKpi({ estado: mesEstado, inicioGuardado: ni, cierreAnterior: cierreAnterior?.valor })
   const promG = gA > 0 ? ninosFinal / gA : 0
   const pcv = promG > 0 ? (120/promG) + 16 : 0
   const gpn = ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
@@ -264,6 +283,11 @@ export default function KPIPage() {
                 {key === 'ninos_inicio' && arrastrado && (
                   <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                     🔗 Arrastrado del cierre de {NOMBRES_MES[arrastrado.month-1]}: los meses encadenan y este número no se digita.
+                  </span>
+                )}
+                {key === 'ninos_inicio' && ajusteHistorico !== null && (
+                  <span style={{ fontSize: 11, color: 'var(--warn)' }}>
+                    Ajuste histórico: {ajusteHistorico > 0 ? '+' : ''}{ajusteHistorico} vs cierre de {NOMBRES_MES[cierreAnterior.month-1]}.
                   </span>
                 )}
                 {key === 'grupos_activos' && gruposModulo !== null && (
