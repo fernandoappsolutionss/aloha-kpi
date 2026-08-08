@@ -484,3 +484,58 @@ CREATE TABLE IF NOT EXISTS growth_notification_receipts (
 );
 CREATE INDEX IF NOT EXISTS idx_growth_receipts_usuario
   ON growth_notification_receipts(usuario_id, week_start DESC);
+
+-- ── LLENADO AUTOMÁTICO: ventana de niños nuevos (diseño 2026-08-08) ─────────
+-- El cierre de llenado es un ESTADO DERIVADO del itinerario (manual ALOHA:
+-- TINY acepta niños nuevos hasta la semana 4 del libro, KIDS hasta la 2,
+-- aplicado al nivel vigente; KINDER y sin-itinerario exentos). NO hay cron
+-- que mute flags: la palanca inscripcion_abierta sigue siendo solo manual.
+-- llenado_extendido_hasta = override consciente de un admin: extiende la
+-- ventana de nuevos más allá de la fecha límite derivada. Queda rastro y
+-- vence sola; es la única escritura manual de "estado" nueva.
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS llenado_extendido_hasta DATE;
+
+-- llenado_fingerprint = marcador atómico del estado de ventana que ya vio el
+-- cron diario: 'nivel|fecha_limite_efectiva|abierta'. El cron calcula el
+-- vigente en JS y en UN solo statement CTE hace
+-- UPDATE ... WHERE llenado_fingerprint IS DISTINCT FROM $fp + INSERT al
+-- outbox desde las filas cambiadas: marcar y encolar son atómicos, si el
+-- proceso cae no se pierde la transición (cubre apertura Y vencimiento).
+ALTER TABLE grupos ADD COLUMN IF NOT EXISTS llenado_fingerprint TEXT;
+
+-- Palanca manual con defecto explícito (regla 2026-08-01): el cliente mantiene
+-- la convención `!== false`, pero en DB NULL deja de existir — se normaliza
+-- NULL→TRUE y se fija DEFAULT TRUE + NOT NULL para que la palanca nunca quede
+-- ambigua en filas viejas. Sentencias planas: el UPDATE va ANTES del SET NOT
+-- NULL para que la migración no reviente con filas NULL existentes.
+UPDATE grupos SET inscripcion_abierta = TRUE WHERE inscripcion_abierta IS NULL;
+ALTER TABLE grupos ALTER COLUMN inscripcion_abierta SET DEFAULT TRUE;
+ALTER TABLE grupos ALTER COLUMN inscripcion_abierta SET NOT NULL;
+
+-- Outbox durable de sincronización al CRM: el estado derivado cambia sin
+-- evento propio, pero ventas debe ver 0 cupos al vencer la ventana. Una fila
+-- POR EVENTO CRM, no por grupo (corrección g2-5): al cerrar o fusionar, los
+-- centro_eventos.grupo_id se capturan ANTES de desvincular y el encolado
+-- clear_group va en la misma transacción — el consumidor nunca pierde a quién
+-- limpiarle aloha_group (por eso grupo_id admite NULL y va sin FK: debe
+-- sobrevivir a la desvinculación). clave_idem UNIQUE hace idempotente el
+-- encolado; locked_at + lock_token permiten reclamar lotes sin doble
+-- procesamiento; intentos + ultimo_error acotan reintentos (corte en 5).
+CREATE TABLE IF NOT EXISTS crm_sync_outbox (
+  id            SERIAL PRIMARY KEY,
+  crm_event_id  TEXT NOT NULL,
+  grupo_id      INTEGER,
+  op            TEXT NOT NULL CHECK (op IN ('sync_group','clear_group')),
+  motivo        TEXT NOT NULL,
+  clave_idem    TEXT UNIQUE,
+  creado_at     TIMESTAMPTZ DEFAULT now(),
+  procesado_at  TIMESTAMPTZ,
+  intentos      INTEGER DEFAULT 0,
+  ultimo_error  TEXT,
+  locked_at     TIMESTAMPTZ,
+  lock_token    TEXT
+);
+-- Índice parcial: el consumidor solo pregunta por lo pendiente (procesado_at
+-- IS NULL, orden por id); lo procesado no estorba en el índice.
+CREATE INDEX IF NOT EXISTS idx_crm_sync_outbox_pendientes
+  ON crm_sync_outbox (id) WHERE procesado_at IS NULL;

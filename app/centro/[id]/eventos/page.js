@@ -9,8 +9,9 @@ import {
 import { listarGruposActivos } from '../../../actions/grupos'
 import { inscribirEstudiante } from '../../../actions/estudiantes'
 import { origenDeRegistro } from '../../../../lib/registro-origen'
-import { ITINERARIOS, NIVEL_MAX } from '../../../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
+import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
@@ -299,6 +300,14 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
     }).catch(() => setGrupos([]))
   }, [centroId])
   const grupoSel = (grupos || []).find((g) => String(g.id) === String(f.grupo_id)) || null
+  // (Defecto 9) El selector solo ofrece grupos que aceptan niños NUEVOS,
+  // ordenados por cierre de ventana (el que cierra primero arriba). El vínculo
+  // actual cerrado a nuevos queda visible como opción deshabilitada — el
+  // server permite CONSERVARLO al editar, nunca se desvincula en silencio;
+  // para moverlo hay que reasignar a un grupo abierto.
+  const hoy = hoyISO()
+  const abiertos = ordenarPorLimiteNuevos((grupos || []).filter((g) => aceptaNuevosEnSelector(g, hoy)))
+  const vinculoCerrado = grupoSel && !aceptaNuevosEnSelector(grupoSel, hoy) ? grupoSel : null
 
   async function save() {
     if (!f.name.trim() || !f.startLocal) { setErr('Nombre y fecha de inicio son requeridos.'); setTab('info'); return }
@@ -340,11 +349,15 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
               <Field full label="Grupo que se va a aperturar">
                 <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
                   <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
-                  {(grupos || []).filter((g) => g.inscripcionAbierta !== false || String(g.id) === String(f.grupo_id)).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}{g.inscripcionAbierta === false ? ' · 🔒 cerrado' : ''}</option>)}
+                  {vinculoCerrado && (
+                    <option value={vinculoCerrado.id} disabled>Grupo {vinculoCerrado.numero} · {vinculoCerrado.itinerario} · 🔒 {AVISO_CERRADO_A_NUEVOS}</option>
+                  )}
+                  {abiertos.map((g) => <option key={g.id} value={g.id}>{etiquetaGrupoSelector(g, hoy)}</option>)}
                 </select>
                 {grupoSel && (
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
                     {grupoSel.horarioTexto ? `${grupoSel.horarioTexto} · ` : ''}<span style={{ color: cupoColor(grupoSel.cupos), fontWeight: 600 }}>{cupoTexto(grupoSel.cupos)}</span>
+                    {vinculoCerrado && <span style={{ color: 'var(--warn)', fontWeight: 600 }}> · 🔒 {AVISO_CERRADO_A_NUEVOS}</span>}
                   </div>
                 )}
               </Field>
@@ -552,6 +565,15 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   )
 }
 
+// (Defecto 10) El niño de la clase de prueba entra al nivel VIGENTE del grupo
+// vinculado: itinerario y nivel del formulario se inicializan DESDE el grupo
+// (antes siempre TINY nivel 1) y se re-sincronizan al elegir otro grupo.
+// El nivel viene de itinerario_clases del grupo, acotado al máximo del programa.
+const desdeGrupo = (g) => {
+  if (!g || !ITINERARIOS.includes(g.itinerario)) return {}
+  return { itinerario: g.itinerario, nivel: Math.min(Math.max(1, Number(g.nivel) || 1), NIVEL_MAX[g.itinerario] || 1) }
+}
+
 // Pasa un registro de la clase de prueba al módulo de grupos: crea el
 // estudiante con origen 'clase_prueba' y el crm_registration_id del registro
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
@@ -571,10 +593,25 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
     listarGruposActivos(centroId).then((g) => {
       const list = Array.isArray(g) ? g : []
       setGrupos(list)
-      // El grupo preseleccionado debe seguir activo; si no, vuelve a "Sin grupo".
-      setF((p) => (p.grupo_id && !list.some((x) => String(x.id) === String(p.grupo_id)) ? { ...p, grupo_id: '' } : p))
+      setF((p) => {
+        if (!p.grupo_id) return p
+        const sel = list.find((x) => String(x.id) === String(p.grupo_id))
+        // El grupo preseleccionado debe seguir activo Y abierto a niños
+        // nuevos; si no, vuelve a "Sin grupo" (inscribir ahí lo rechazaría el
+        // server de todas formas) y el aviso de abajo explica el porqué.
+        if (!sel || !aceptaNuevosEnSelector(sel, hoyISO())) return { ...p, grupo_id: '' }
+        // Vínculo vigente: el formulario arranca en el itinerario/nivel del grupo.
+        return { ...p, ...desdeGrupo(sel) }
+      })
     }).catch(() => setGrupos([]))
   }, [centroId])
+
+  // Mismo criterio del selector del evento: solo grupos abiertos a nuevos,
+  // ordenados por cierre de ventana.
+  const hoy = hoyISO()
+  const abiertos = ordenarPorLimiteNuevos((grupos || []).filter((g) => aceptaNuevosEnSelector(g, hoy)))
+  const vinculado = grupoId ? (grupos || []).find((x) => String(x.id) === String(grupoId)) : null
+  const vinculoCerrado = vinculado && !aceptaNuevosEnSelector(vinculado, hoy) ? vinculado : null
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
@@ -613,10 +650,18 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
               </select>
             </Field>
             <Field full label="Grupo">
-              <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+              <select className="input" value={f.grupo_id} onChange={(e) => {
+                const sel = (grupos || []).find((x) => String(x.id) === String(e.target.value))
+                setF((p) => ({ ...p, grupo_id: e.target.value, ...desdeGrupo(sel) }))
+              }}>
                 <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo (asignar después)'}</option>
-                {(grupos || []).map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {g.itinerario}</option>)}
+                {abiertos.map((g) => <option key={g.id} value={g.id}>{etiquetaGrupoSelector(g, hoy)}</option>)}
               </select>
+              {vinculoCerrado && (
+                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)', fontWeight: 600 }}>
+                  El grupo {vinculoCerrado.numero} vinculado a esta clase está 🔒 {AVISO_CERRADO_A_NUEVOS}: elige un grupo abierto o deja al niño sin grupo.
+                </div>
+              )}
             </Field>
             <Field full label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
             <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
