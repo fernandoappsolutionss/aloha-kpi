@@ -90,6 +90,14 @@ test('un lote CRM fallido invalida la fuente completa', async () => {
   assert.deepEqual(result, { complete: false, error: 'CRM no disponible' })
 })
 
+test('una respuesta CRM exitosa pero malformada invalida la fuente completa', async () => {
+  for (const response of [{}, { registrations: null }, { registrations: 'no-es-lista' }]) {
+    const result = await cargarRegistrosPorLotes(['event-1'], async () => response)
+    assert.equal(result.complete, false)
+    assert.match(result.error, /respuesta inválida/i)
+  }
+})
+
 test('valida el origen comercial separado del origen tecnico', () => {
   assert.equal(esOrigenVenta('referido'), true)
   assert.equal(esOrigenVenta('activaciones'), true)
@@ -224,6 +232,38 @@ test('la conciliacion conserva cifras manuales y evita duplicar fuentes existent
   assert.equal(adjustments.ing[0][0], 1)
   assert.equal(reconciled.cp_invitados, 15)
   assert.equal(reconciled.ing[0][0], 2)
+})
+
+test('la conciliacion no duplica el origen cuando la misma venta automatica estaba por clasificar', () => {
+  const ing = matriz()
+  ing[0][0] = 1
+  const source = fuenteVacia({ ing, orig_por_clasificar: 1 })
+  const saved = fuenteVacia({ ing, orig_referido: 1 })
+
+  const adjustments = crearAjustes(saved, source)
+  const reconciled = aplicarAjustes(source, adjustments)
+
+  assert.equal(reconciled.orig_referido, 1)
+  assert.equal(reconciled.orig_por_clasificar, 0)
+  assert.equal(
+    reconciled.orig_referido + reconciled.orig_marketing + reconciled.orig_centro
+      + reconciled.orig_activaciones + reconciled.orig_medios + reconciled.orig_por_clasificar,
+    1,
+  )
+})
+
+test('un origen clasificado despues de conciliar sigue limitado al total real de ventas', () => {
+  const ing = matriz()
+  ing[0][0] = 1
+  const adjustments = crearAjustes(
+    fuenteVacia({ ing, orig_referido: 1 }),
+    fuenteVacia({ ing, orig_por_clasificar: 1 }),
+  )
+
+  const reconciled = aplicarAjustes(fuenteVacia({ ing, orig_referido: 1 }), adjustments)
+
+  assert.equal(reconciled.orig_referido, 1)
+  assert.equal(reconciled.orig_por_clasificar, 0)
 })
 
 test('un crecimiento posterior de la fuente se suma sobre el ajuste inicial fijo', () => {

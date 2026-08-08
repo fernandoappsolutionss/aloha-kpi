@@ -11,7 +11,7 @@ import {
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
 } from '../../../actions/estudiantes'
 import {
-  ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, ORIGENES_VENTA, DIAS, TINYMAP, aperturaMinima, hoyISO,
+  ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, ORIGENES_VENTA, DIAS, TINYMAP, aperturaMinima, fechaIso10, hoyISO,
 } from '../../../../lib/operaciones'
 import { groupStatus, underMeta, promedios, sugerenciasPara, scoreBand } from '../../../../lib/fusiones'
 import {
@@ -218,9 +218,10 @@ export default function GruposPage() {
   const activos = grupos.filter((g) => g.estado === 'activo')
   const bajoMetaN = activos.filter((g) => underMeta(g, metas.gpnMin)).length
   const prom = promedios(grupos, metas.gpnMin)
-  const ninosActivos = grupos.reduce((s, g) => s + g.estudiantes.length, 0) + (data?.sinGrupo?.length || 0)
-
   const hoy = hoyISO()
+  const ninosActivos = activos
+    .filter((g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= hoy)
+    .reduce((s, g) => s + g.estudiantes.length, 0)
   const pasaFiltro = (g, f) => {
     const st = groupStatus(g, metas.gpnMin)
     if (f === 'todos') return g.estado === 'activo'

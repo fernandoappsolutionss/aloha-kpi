@@ -8,7 +8,7 @@ import { getSession, isAdminRole } from '../../../../../lib/auth'
 import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
 import { cuadroRoyalties, cuadroControlGrupos, cuadroDeserciones } from '../../../../../lib/cuadro-calc'
 import { leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
-import { iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
+import { INICIOS_CLASE_DESDE_FECHA, iniciosClaseMes, usaIniciosClaseOperativos } from '../../../../../lib/inicios-clase.mjs'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -65,6 +65,13 @@ export async function GET(request, { params }) {
 
   const [c] = await sql`SELECT nombre FROM centros WHERE id = ${id}`
   if (!c) return Response.json({ error: 'Centro no encontrado' }, { status: 404 })
+  const [mesRow] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${id} AND year = ${year} AND month = ${month}`
+  const snapshotCerrado = mesRow?.estado === 'cerrado'
+    ? await leerSnapshotCuadro(id, year, month)
+    : null
+  if (mesRow?.estado === 'cerrado' && !snapshotCerrado?.datos) {
+    return Response.json({ error: 'Este mes cerrado no tiene una foto histórica.' }, { status: 409 })
+  }
 
   const gruposRaw = await sql`SELECT * FROM grupos WHERE centro_id = ${id} ORDER BY numero`
   const coaches = await sql`SELECT * FROM coaches WHERE centro_id = ${id}`
@@ -78,7 +85,7 @@ export async function GET(request, { params }) {
   const todosEventos = await sql`
     SELECT * FROM estudiante_eventos
     WHERE centro_id = ${id}
-      AND ((year = ${year} AND month = ${month}) OR tipo IN ('inscripcion', 'retiro'))
+      AND ((year = ${year} AND month = ${month}) OR tipo IN ('inscripcion', 'retiro', 'cambio_grupo'))
     ORDER BY fecha, id
   `
   const eventos = todosEventos.filter((evento) => Number(evento.year) === year && Number(evento.month) === month)
@@ -104,9 +111,15 @@ export async function GET(request, { params }) {
   const iniciado = (g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= finMes
   const gruposCuadro = grupos.filter(iniciado)
   const noIniciados = new Set(grupos.filter((g) => !iniciado(g)).map((g) => String(g.id)))
-  const estudiantesCuadro = estudiantes.filter((e) => !e.grupo_id || !noIniciados.has(String(e.grupo_id)))
-
   const usaIniciosOperativos = usaIniciosClaseOperativos(year, month)
+  const estudiantesCuadro = estudiantes.filter((e) => {
+    if (usaIniciosOperativos && !e.grupo_id) {
+      const fecha = fechaIso10(e.fecha_inscripcion)
+      return Boolean(fecha && fecha < INICIOS_CLASE_DESDE_FECHA)
+    }
+    return !e.grupo_id || !noIniciados.has(String(e.grupo_id))
+  })
+
   let iniciosClase = usaIniciosOperativos ? iniciosClaseMes(estudiantes, grupos, todosEventos, year, month) : null
   const nuevosActivosIds = usaIniciosOperativos
     ? new Set(iniciosClase.map((inicio) => String(inicio.estudianteId)))
@@ -127,17 +140,13 @@ export async function GET(request, { params }) {
 
   // Mes cerrado → el Excel sale de la foto congelada del cuadro (la misma
   // verdad histórica que muestra la página), no del estado actual.
-  const [mesRow] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${id} AND year = ${year} AND month = ${month}`
-  if (mesRow?.estado === 'cerrado') {
-    const snap = await leerSnapshotCuadro(id, year, month)
-    if (snap?.datos) {
-      royalties = snap.datos.royalties
-      control = snap.datos.controlGrupos
-      deserciones = snap.datos.deserciones
-      iniciosClase = Array.isArray(snap.datos.iniciosClase) ? snap.datos.iniciosClase : iniciosClase
-      pedidos = snap.datos.pedidos || []
-      royaltyRate = snap.datos.royaltyRate || royaltyRate
-    }
+  if (snapshotCerrado?.datos) {
+    royalties = snapshotCerrado.datos.royalties
+    control = snapshotCerrado.datos.controlGrupos
+    deserciones = snapshotCerrado.datos.deserciones
+    iniciosClase = Array.isArray(snapshotCerrado.datos.iniciosClase) ? snapshotCerrado.datos.iniciosClase : []
+    pedidos = snapshotCerrado.datos.pedidos || []
+    royaltyRate = snapshotCerrado.datos.royaltyRate || royaltyRate
   }
   const mesNombre = MESES[month - 1]
 

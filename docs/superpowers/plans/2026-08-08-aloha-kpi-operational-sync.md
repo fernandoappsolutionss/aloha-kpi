@@ -360,25 +360,27 @@ git push -u origin codex/aloha-kpi-sincronizacion-agosto
 gh pr create --base main --head codex/aloha-kpi-sincronizacion-agosto --title "Sincronizar KPI con clases de prueba y operaciones" --body-file /tmp/aloha-kpi-sync-pr.md
 ```
 
-- [ ] **Step 3: Merge and wait for production**
+- [ ] **Step 3: Wait for all PR checks**
 
 Run: `gh pr checks <PR_NUMBER> --watch`
 
-Run: `gh pr merge <PR_NUMBER> --squash --delete-branch`
-
-Wait for the Vercel production deployment to report `Ready`.
-
-- [ ] **Step 4: Apply the idempotent schema**
+- [ ] **Step 4: Apply the idempotent schema before deploying the code**
 
 Run against production: `npm run db:migrate`
 
 Expected: schema completes without changing closed-month rows.
 
-- [ ] **Step 5: Initialize August in every center**
+- [ ] **Step 5: Merge and wait for production**
+
+Run: `gh pr merge <PR_NUMBER> --squash --delete-branch`
+
+Wait for the Vercel production deployment to report `Ready`.
+
+- [ ] **Step 6: Initialize August in every center**
 
 Open `/centro/<id>/kpi` for centers 1 through 6 with August 2026 selected. Each load initializes at most one `kpi_auto_ajustes` row.
 
-- [ ] **Step 6: Audit database invariants**
+- [ ] **Step 7: Audit database invariants**
 
 Verify for every center:
 

@@ -136,9 +136,7 @@ export default function KPIPage() {
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
     try {
-      const guardado = await handleSave()
-      if (!guardado) return
-      const res = await cerrarMes(id, year, month)
+      const res = await cerrarMes(id, year, month, config, semanas)
       if (res?.error) throw new Error(res.error)
       await loadData()
       setStatus(res?.warn ? '🔒 Mes cerrado. ' + res.warn : '🔒 Mes cerrado. Datos guardados como historial.')

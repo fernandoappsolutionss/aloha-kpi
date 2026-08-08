@@ -126,13 +126,14 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const eventosProyeccion = await sql`
     SELECT id, estudiante_id, tipo, fecha, a_grupo_id
     FROM estudiante_eventos
-    WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'retiro')
+    WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'retiro', 'cambio_grupo')
     ORDER BY fecha, id
   `
   const gruposPorId = new Map(gruposProyeccion.map((grupo) => [String(grupo.id), grupo]))
   const poblacionOperativa = estudiantesProyeccion.filter((estudiante) => {
     if (estudiante.estado !== 'activo' && estudiante.estado !== 'baja_potencial') return false
     const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
+    if (!grupo) return false
     const fechaGrupo = fechaIso10(grupo?.fecha_inicio_clases)
     const fechaInscripcion = fechaIso10(estudiante.fecha_inscripcion)
     return (!fechaGrupo || fechaGrupo <= finMesActual) && (!fechaInscripcion || fechaInscripcion <= finMesActual)
