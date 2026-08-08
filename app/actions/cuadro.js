@@ -128,6 +128,9 @@ export async function sincronizarConKpi(centroId, year, month) {
   if (!mesValido(y, m)) return { error: 'Mes inválido.' }
   const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
   if (mes?.estado === 'cerrado') return { error: 'Este mes está cerrado. Reábrelo en KPI Semanal para poder sincronizar.' }
+  if (!usaIniciosClaseOperativos(y, m)) {
+    return { error: 'Los meses anteriores a agosto de 2026 conservan su captura histórica. Corrígelos desde KPI Semanal.' }
+  }
 
   // El mismo cálculo del cuadro (incluida la regla de fecha de inicio de
   // clases: grupos en llenado no cuentan) alimenta el KPI.

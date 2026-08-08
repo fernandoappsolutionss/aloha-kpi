@@ -2,9 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  ajusteHistoricoKpi,
   balanceMensual,
   fechaInicioOperativa,
+  finalVisibleKpi,
   iniciosClaseMes,
+  inicioVisibleKpi,
   proyeccionSiguienteMes,
   resumenConCuadroVivo,
   usaIniciosClaseOperativos,
@@ -116,6 +119,29 @@ test('una reincorporacion no crea un nuevo activo', () => {
 
 test('calcula el balance operativo mensual', () => {
   assert.equal(balanceMensual({ inicio: 150, nuevosActivos: 12, reincorporados: 2, retirados: 5 }), 159)
+})
+
+test('un mes cerrado conserva su inicio historico aunque cambie el cierre anterior', () => {
+  assert.equal(inicioVisibleKpi({ estado: 'cerrado', guardado: 148, arrastrado: 135 }), 148)
+})
+
+test('un mes cerrado conserva su final historico y no lo recalcula en pantalla', () => {
+  assert.equal(finalVisibleKpi({ estado: 'cerrado', guardado: 135, calculado: 122 }), 135)
+})
+
+test('un mes abierto usa el cierre anterior y su calculo vivo', () => {
+  assert.equal(inicioVisibleKpi({ estado: 'abierto', guardado: 134, arrastrado: 135 }), 135)
+  assert.equal(finalVisibleKpi({ estado: 'abierto', guardado: 134, calculado: 136 }), 136)
+})
+
+test('un cierre historico de cero sigue siendo un valor guardado valido', () => {
+  assert.equal(finalVisibleKpi({ estado: 'cerrado', guardado: 0, calculado: 99 }), 0)
+})
+
+test('identifica un ajuste historico sin alterar el mes cerrado', () => {
+  assert.equal(ajusteHistoricoKpi({ estado: 'cerrado', inicioGuardado: 148, cierreAnterior: 135 }), 13)
+  assert.equal(ajusteHistoricoKpi({ estado: 'cerrado', inicioGuardado: 135, cierreAnterior: 135 }), null)
+  assert.equal(ajusteHistoricoKpi({ estado: 'abierto', inicioGuardado: 148, cierreAnterior: 135 }), null)
 })
 
 test('proyecta el mes siguiente con bajas e inicios programados', () => {
