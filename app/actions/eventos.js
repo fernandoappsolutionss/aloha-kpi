@@ -30,8 +30,14 @@ export async function listarEventos(centroId) {
   const rows = await sql`SELECT crm_event_id, grupo_id FROM centro_eventos WHERE centro_id = ${centroId} ORDER BY created_at DESC`
   const ids = rows.map((r) => r.crm_event_id)
   if (ids.length === 0) return { events: [] }
-  const res = await crmCall('get_events_by_ids', { ids })
+  const accountId = crmAccountForCentro(centroId)
+  if (!accountId) return { error: 'El centro no tiene una cuenta CRM configurada.', events: [] }
+  // La cuenta viva permite ignorar espejos locales de eventos eliminados en el
+  // CRM sin relajar la autorización del endpoint batch.
+  const res = await crmCall('list_events', { account_id: accountId })
   if (res.error) return { error: res.error, events: [] }
+  if (!Array.isArray(res.events)) return { error: 'Respuesta inválida del CRM.', events: [] }
+  const idsDelCentro = new Set(ids.map(String))
   const grupoPorEvento = new Map(rows.filter((r) => r.grupo_id).map((r) => [r.crm_event_id, r.grupo_id]))
   const grupoIds = [...new Set(grupoPorEvento.values())]
   const gruposPorId = new Map()
@@ -59,7 +65,7 @@ export async function listarEventos(centroId) {
       })
     }
   }
-  const events = (res.events || []).map((ev) => {
+  const events = res.events.filter((ev) => idsDelCentro.has(String(ev.id))).map((ev) => {
     const gid = grupoPorEvento.get(ev.id)
     return { ...ev, grupo: (gid && gruposPorId.get(String(gid))) || null }
   })

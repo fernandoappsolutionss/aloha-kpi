@@ -3,7 +3,7 @@ import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { calcularCuadro, guardarSnapshotCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
+import { calcularCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
 import { balanceMensual, usaIniciosClaseOperativos } from '../../lib/inicios-clase.mjs'
 import { cierreMesAnterior } from '../../lib/cadena'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
@@ -31,30 +31,17 @@ export async function loadCuadro(centroId, year, month) {
   const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
 
   if (mes?.estado === 'cerrado') {
-    let snap = await leerSnapshotCuadro(centroId, y, m)
-    let retroactivo = false
+    const snap = await leerSnapshotCuadro(centroId, y, m)
     if (!snap) {
-      const datos = await guardarSnapshotCuadro(centroId, y, m)
-      snap = { datos, cerradoAt: new Date().toISOString() }
-      retroactivo = true
-    }
-    let datos = snap.datos
-    if (usaIniciosClaseOperativos(y, m) && !Array.isArray(datos.iniciosClase)) {
-      try {
-        const reconstruido = await calcularCuadro(centroId, y, m)
-        datos = { ...datos, iniciosClase: reconstruido.iniciosClase || [] }
-      } catch (e) {
-        console.error('[loadCuadro] no se pudieron reconstruir los inicios de clase:', e)
-        datos = { ...datos, iniciosClase: [] }
-      }
+      return { error: 'Este mes cerrado no tiene una foto histórica. No se reconstruirá con datos actuales.' }
     }
     return {
       nombre: c.nombre || '',
-      ...datos,
+      ...snap.datos,
       mesEstado: 'cerrado',
       congelado: true,
       congeladoAt: snap.cerradoAt,
-      congeladoRetroactivo: retroactivo,
+      congeladoRetroactivo: false,
     }
   }
 
