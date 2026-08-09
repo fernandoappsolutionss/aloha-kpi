@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 
 import {
   aplicarAjustes,
-  celdaSemanal,
   crearAjustes,
   fuenteKpiAutomatica,
   poblacionKpiAutomatica,
@@ -15,16 +14,14 @@ import {
   filtrarClasesVigentesCrm,
   formaKpiGuardada,
   mezclarResumenAutomatico,
-  mezclarSemanasPeriodoAutomaticas,
-  mezclarSemanasAutomaticas,
-  mezclarTotalesAutomaticos,
   validarEventosCrm,
 } from '../lib/kpi-auto-server.js'
 
-const matriz = () => Array.from({ length: 5 }, () => [0, 0, 0, 0, 0])
-
+// ing/des NO viven en este módulo: los deriva lib/kpi-semanal-auto.mjs (una
+// sola fuente) y aquí solo llegan las ventas y retiros que ese motor contó.
 function fuenteVacia(overrides = {}) {
   return {
+    ventasTotal: 0,
     cp_invitados: 0,
     cp_asistieron: 0,
     cp_matriculados: 0,
@@ -40,8 +37,6 @@ function fuenteVacia(overrides = {}) {
     orig_activaciones: 0,
     orig_medios: 0,
     orig_por_clasificar: 0,
-    ing: matriz(),
-    des: matriz(),
     ...overrides,
   }
 }
@@ -190,13 +185,6 @@ test('exige origen comercial solo para ventas desde agosto de 2026', () => {
   assert.equal(requiereOrigenVenta(new Date('2026-08-01T00:00:00.000Z')), true)
 })
 
-test('ubica movimientos por bloque semanal y acumula el fin de semana en dia 5', () => {
-  assert.deepEqual(celdaSemanal('2026-08-03'), { semana: 1, dia: 1 })
-  assert.deepEqual(celdaSemanal('2026-08-08'), { semana: 2, dia: 5 })
-  assert.deepEqual(celdaSemanal('2026-08-09'), { semana: 2, dia: 5 })
-  assert.deepEqual(celdaSemanal('2026-08-31'), { semana: 5, dia: 1 })
-})
-
 test('sincroniza el embudo y la venta de una clase de prueba sin duplicar registros', () => {
   const source = fuenteKpiAutomatica({
     year: 2026,
@@ -224,8 +212,9 @@ test('sincroniza el embudo y la venta de una clase de prueba sin duplicar regist
         registered_at: '2026-08-02T12:00:00.000Z',
       },
     ],
-    movimientos: [{
-      tipo: 'inscripcion',
+    ventas: [{
+      id: 501,
+      estudiante_id: 9,
       fecha: '2026-08-06',
       crm_registration_id: 'reg-1',
       origen_venta: 'referido',
@@ -236,7 +225,7 @@ test('sincroniza el embudo y la venta de una clase de prueba sin duplicar regist
   assert.equal(source.cp_asistieron, 1)
   assert.equal(source.cp_matriculados, 1)
   assert.equal(source.orig_referido, 1)
-  assert.equal(source.ing[0][3], 1)
+  assert.equal(source.ventasTotal, 1)
 })
 
 test('usa la fecha de la clase como respaldo para una asistencia sin checked_in_at', () => {
@@ -251,7 +240,6 @@ test('usa la fecha de la clase como respaldo para una asistencia sin checked_in_
       registered_at: '2026-07-31T23:00:00.000Z',
       checked_in_at: null,
     }],
-    movimientos: [],
   })
 
   assert.equal(source.cp_invitados, 0)
@@ -269,28 +257,24 @@ test('no suma invitados que no pertenecen a una clase solicitada', () => {
       attendance_status: null,
       registered_at: '2026-08-02T12:00:00.000Z',
     }],
-    movimientos: [],
   })
 
   assert.equal(source.cp_invitados, 0)
 })
 
-test('distribuye retiros por semana y agrupa sus motivos', () => {
+test('agrupa los motivos de los retiros que contó el motor semanal', () => {
   const source = fuenteKpiAutomatica({
     year: 2026,
     month: 8,
     clases: [],
     registros: [],
-    movimientos: [
-      { tipo: 'retiro', fecha: '2026-08-08', motivo: 'PERDIDA_CLASES' },
-      { tipo: 'retiro', fecha: '2026-08-10', motivo: 'ECONOMICO' },
-      { tipo: 'retiro', fecha: '2026-08-11', motivo: 'NO_CONFIRMO' },
+    retiros: [
+      { fecha: '2026-08-08', motivo: 'PERDIDA_CLASES' },
+      { fecha: '2026-08-10', motivo: 'ECONOMICO' },
+      { fecha: '2026-08-11', motivo: 'NO_CONFIRMO' },
     ],
   })
 
-  assert.equal(source.des[1][4], 1)
-  assert.equal(source.des[1][0], 1)
-  assert.equal(source.des[1][1], 1)
   assert.equal(source.mot_perdida_clase, 1)
   assert.equal(source.mot_economico, 1)
   assert.equal(source.mot_otro, 1)
@@ -302,9 +286,9 @@ test('clasifica ventas sin origen sin adjudicar una categoria inventada', () => 
     month: 8,
     clases: [],
     registros: [],
-    movimientos: [
-      { tipo: 'inscripcion', fecha: '2026-08-04', origen_venta: null },
-      { tipo: 'inscripcion', fecha: '2026-08-05', origen_venta: 'desconocido' },
+    ventas: [
+      { id: 1, fecha: '2026-08-04', origen_venta: null },
+      { id: 2, fecha: '2026-08-05', origen_venta: 'desconocido' },
     ],
   })
 
@@ -313,28 +297,23 @@ test('clasifica ventas sin origen sin adjudicar una categoria inventada', () => 
   assert.equal(source.orig_marketing, 0)
 })
 
-test('la conciliacion conserva cifras manuales y evita duplicar fuentes existentes', () => {
-  const sourceIng = matriz()
-  sourceIng[0][0] = 1
-  const savedIng = matriz()
-  savedIng[0][0] = 2
-  const source = fuenteVacia({ cp_invitados: 10, ing: sourceIng })
-  const saved = fuenteVacia({ cp_invitados: 15, ing: savedIng })
+test('la conciliacion conserva cifras manuales de resumen y jamas toca ing/des', () => {
+  const source = fuenteVacia({ cp_invitados: 10, ventasTotal: 1 })
+  const saved = fuenteVacia({ cp_invitados: 15 })
 
   const adjustments = crearAjustes(saved, source)
   const reconciled = aplicarAjustes(source, adjustments)
 
   assert.equal(adjustments.cp_invitados, 5)
-  assert.equal(adjustments.ing[0][0], 1)
+  assert.equal(adjustments.ing, undefined)
+  assert.equal(adjustments.des, undefined)
   assert.equal(reconciled.cp_invitados, 15)
-  assert.equal(reconciled.ing[0][0], 2)
+  assert.equal(reconciled.ing, undefined)
 })
 
 test('la conciliacion no duplica el origen cuando la misma venta automatica estaba por clasificar', () => {
-  const ing = matriz()
-  ing[0][0] = 1
-  const source = fuenteVacia({ ing, orig_por_clasificar: 1 })
-  const saved = fuenteVacia({ ing, orig_referido: 1 })
+  const source = fuenteVacia({ ventasTotal: 1, orig_por_clasificar: 1 })
+  const saved = fuenteVacia({ orig_referido: 1 })
 
   const adjustments = crearAjustes(saved, source)
   const reconciled = aplicarAjustes(source, adjustments)
@@ -349,28 +328,22 @@ test('la conciliacion no duplica el origen cuando la misma venta automatica esta
 })
 
 test('un origen clasificado despues de conciliar sigue limitado al total real de ventas', () => {
-  const ing = matriz()
-  ing[0][0] = 1
   const adjustments = crearAjustes(
-    fuenteVacia({ ing, orig_referido: 1 }),
-    fuenteVacia({ ing, orig_por_clasificar: 1 }),
+    fuenteVacia({ orig_referido: 1 }),
+    fuenteVacia({ ventasTotal: 1, orig_por_clasificar: 1 }),
   )
 
-  const reconciled = aplicarAjustes(fuenteVacia({ ing, orig_referido: 1 }), adjustments)
+  const reconciled = aplicarAjustes(fuenteVacia({ ventasTotal: 1, orig_referido: 1 }), adjustments)
 
   assert.equal(reconciled.orig_referido, 1)
   assert.equal(reconciled.orig_por_clasificar, 0)
 })
 
 test('una reclasificacion anterior no borra el origen de una venta automatica nueva', () => {
-  const unaVenta = matriz()
-  unaVenta[0][0] = 1
-  const dosVentas = matriz()
-  dosVentas[0][0] = 2
   const adjustments = crearAjustes(
-    fuenteVacia({ ing: unaVenta, orig_referido: 1 }),
+    fuenteVacia({ orig_referido: 1 }),
     fuenteVacia({
-      ing: unaVenta,
+      ventasTotal: 1,
       orig_por_clasificar: 1,
       _origin_sales: [{ id: 'venta-antigua', origin: 'orig_por_clasificar' }],
     }),
@@ -378,7 +351,7 @@ test('una reclasificacion anterior no borra el origen de una venta automatica nu
 
   const reconciled = aplicarAjustes(
     fuenteVacia({
-      ing: dosVentas,
+      ventasTotal: 2,
       orig_referido: 1,
       orig_marketing: 1,
       _origin_sales: [
@@ -395,14 +368,10 @@ test('una reclasificacion anterior no borra el origen de una venta automatica nu
 })
 
 test('una reclasificacion entre categorias sigue a la venta antigua por identidad', () => {
-  const unaVenta = matriz()
-  unaVenta[0][0] = 1
-  const dosVentas = matriz()
-  dosVentas[0][0] = 2
   const adjustments = crearAjustes(
-    fuenteVacia({ ing: unaVenta, orig_marketing: 1 }),
+    fuenteVacia({ orig_marketing: 1 }),
     fuenteVacia({
-      ing: unaVenta,
+      ventasTotal: 1,
       orig_referido: 1,
       _origin_sales: [{ id: 'venta-antigua', origin: 'orig_referido' }],
     }),
@@ -410,7 +379,7 @@ test('una reclasificacion entre categorias sigue a la venta antigua por identida
 
   const reconciled = aplicarAjustes(
     fuenteVacia({
-      ing: dosVentas,
+      ventasTotal: 2,
       orig_marketing: 1,
       orig_referido: 1,
       _origin_sales: [
@@ -426,10 +395,8 @@ test('una reclasificacion entre categorias sigue a la venta antigua por identida
 })
 
 test('un ajuste legado sin identidad falla cerrado en vez de inferir sobre ventas nuevas', () => {
-  const dosVentas = matriz()
-  dosVentas[0][0] = 2
   const source = fuenteVacia({
-    ing: dosVentas,
+    ventasTotal: 2,
     orig_marketing: 1,
     orig_referido: 1,
     _origin_sales: [
@@ -452,35 +419,14 @@ test('un crecimiento posterior de la fuente se suma sobre el ajuste inicial fijo
   assert.equal(aplicarAjustes(fuenteVacia({ cp_invitados: 12 }), adjustments).cp_invitados, 17)
 })
 
-test('convierte el resumen y las semanas guardadas a la forma conciliable', () => {
-  const saved = formaKpiGuardada(
-    { cp_invitados: 15, orig_centro: 2, mot_horario: 1 },
-    [{ semana: 2, ing_d1: 3, des_d5: 2 }],
-  )
+test('convierte el resumen guardado a la forma conciliable (sin semanas)', () => {
+  const saved = formaKpiGuardada({ cp_invitados: 15, orig_centro: 2, mot_horario: 1 })
 
   assert.equal(saved.cp_invitados, 15)
   assert.equal(saved.orig_centro, 2)
   assert.equal(saved.mot_horario, 1)
-  assert.equal(saved.ing[1][0], 3)
-  assert.equal(saved.des[1][4], 2)
-})
-
-test('mezcla semanas automaticas sin modificar la cobranza manual', () => {
-  const automatic = fuenteVacia()
-  automatic.ing[0][2] = 4
-  automatic.des[0][3] = 2
-
-  const rows = mezclarSemanasAutomaticas(
-    [{ semana: 1, cob_d1: 7, cob_d2: 3, ing_d3: 99, des_d4: 99 }],
-    automatic,
-  )
-
-  assert.equal(rows.length, 5)
-  assert.equal(rows[0].cob_d1, 7)
-  assert.equal(rows[0].cob_d2, 3)
-  assert.equal(rows[0].ing_d3, 4)
-  assert.equal(rows[0].des_d4, 2)
-  assert.equal(rows[1].cob_d1, 0)
+  assert.equal(saved.ing, undefined)
+  assert.equal(saved.des, undefined)
 })
 
 test('Resumen e Historial usan la misma foto automatica solo en el mes abierto indicado', () => {
@@ -490,37 +436,17 @@ test('Resumen e Historial usan la misma foto automatica solo en el mes abierto i
     cp_matriculados: 1,
     orig_por_clasificar: 1,
   })
-  automatic.ing[0][2] = 1
-  automatic.des[0][3] = 2
   const resumen = [
     { year: 2026, month: 7, cp_invitados: 33 },
     { year: 2026, month: 8, cp_invitados: 0, orig_por_clasificar: 0 },
   ]
-  const totales = [
-    { year: 2026, month: 7, nuevos_ingresos_venta: 3, total_desercion: 13 },
-    { year: 2026, month: 8, nuevos_ingresos_venta: 0, total_desercion: 0 },
-  ]
-  const semanas = [
-    { centro_id: 2, year: 2026, month: 7, semana: 1, ing_d3: 3, cob_d1: 6 },
-    { centro_id: 2, year: 2026, month: 8, semana: 1, ing_d3: 0, cob_d1: 11 },
-  ]
 
   const resumenMezclado = mezclarResumenAutomatico(resumen, 2026, 8, automatic)
-  const totalesMezclados = mezclarTotalesAutomaticos(totales, 2026, 8, automatic)
-  const semanasMezcladas = mezclarSemanasPeriodoAutomaticas(semanas, 2, 2026, 8, automatic)
 
   assert.deepEqual(resumenMezclado[0], resumen[0])
   assert.equal(resumenMezclado[1].cp_invitados, 27)
   assert.equal(resumenMezclado[1].cp_asistieron, 8)
   assert.equal(resumenMezclado[1].cp_matriculados, 1)
   assert.equal(resumenMezclado[1].orig_por_clasificar, 1)
-  assert.deepEqual(totalesMezclados[0], totales[0])
-  assert.equal(totalesMezclados[1].nuevos_ingresos_venta, 1)
-  assert.equal(totalesMezclados[1].total_desercion, 2)
-  assert.equal(semanasMezcladas.find((row) => row.month === 7).ing_d3, 3)
-  assert.equal(semanasMezcladas.filter((row) => row.month === 8).length, 5)
-  assert.equal(semanasMezcladas.find((row) => row.month === 8 && row.semana === 1).ing_d3, 1)
-  assert.equal(semanasMezcladas.find((row) => row.month === 8 && row.semana === 1).cob_d1, 11)
   assert.equal(resumen[1].cp_invitados, 0)
-  assert.equal(totales[1].nuevos_ingresos_venta, 0)
 })

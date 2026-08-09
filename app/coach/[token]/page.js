@@ -40,8 +40,12 @@ export default function CoachPage() {
   if (!data) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text-dim)' }}>Cargando…</div>
 
   const { grupo, estudiantes } = data
+  // Columnas desde el CALENDARIO VERSIONADO del grupo (R2b): `semanas[]` es la
+  // verdad aplanada — un cambio de horario post-inicio conserva toda clase ya
+  // dada o con asistencia y solo regenera el sufijo futuro, así que las
+  // columnas históricas (y sus marcas) nunca desaparecen de esta lista.
   const semanas = grupo.itinerario_clases?.semanas || []
-  const fechas = semanas.flatMap((s) => s.fechas.map((f) => ({ fecha: f, corto: s.corto || '', etiqueta: s.etiqueta })))
+  const fechas = semanas.flatMap((s) => (s.fechas || []).map((f) => ({ fecha: f, corto: s.corto || '', etiqueta: s.etiqueta })))
   const hoyISO = hoy()
 
   async function clickCelda(est, fecha) {

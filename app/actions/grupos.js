@@ -9,9 +9,31 @@ import { validarSesion, chocanConBuffer, aMinutos, KINDER_INICIO, KINDER_FIN } f
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 import { encolarSyncCrm, encolarOutboxEn } from '../../lib/llenado-service'
 import { fechaLimiteNuevos } from '../../lib/llenado.mjs'
-import { generarItinerario, normalizarExcepciones } from '../../lib/itinerario'
+import { generarItinerario, normalizarExcepciones, regenerarSufijo, versionesDe } from '../../lib/itinerario'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
 import { periodosAfectadosCambioInicioGrupo } from '../../lib/inicios-clase.mjs'
+import { enriquecerNinos, crearMemoPlanes, calendarioVersionadoDe, generarItinerarioVersionado } from '../../lib/plan-nino.mjs'
+import {
+  grupoIniciado,
+  clavesNoPermitidasPostInicio,
+  fingerprintPlanGrupo,
+  cohorteDeTransicion,
+  reAnclaEnDestino,
+  errorExcepcionesPasado,
+} from '../../lib/plan-grupo.mjs'
+
+// El país del centro define sus fechas patrias; el nombre es solo respaldo
+// para centros creados antes de la columna pais.
+const paisDe = (c) => (c?.pais === 'VE' || (!c?.pais && /naranjos/i.test(c?.nombre || '')) ? 'VE' : 'PA')
+
+// itinerario_clases llega como objeto (JSONB) o, defensivamente, como string.
+const itinerarioVigenteDe = (v) => {
+  if (v == null) return null
+  if (typeof v === 'string') {
+    try { return JSON.parse(v) } catch { return null }
+  }
+  return v
+}
 
 // Genera y guarda el itinerario de clases del nivel (manual ALOHA Panamá):
 // necesita fecha de inicio + días de clase. Los Naranjos opera con el
@@ -19,9 +41,7 @@ import { periodosAfectadosCambioInicioGrupo } from '../../lib/inicios-clase.mjs'
 async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }, query = sql) {
   if (!fechaInicio || !horarios?.length) return null
   const [c] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
-  // El país del centro define sus fechas patrias; el nombre es solo respaldo
-  // para centros creados antes de la columna pais.
-  const pais = c?.pais === 'VE' || (!c?.pais && /naranjos/i.test(c?.nombre || '')) ? 'VE' : 'PA'
+  const pais = paisDe(c)
   const it = generarItinerario({
     fechaInicio,
     dias: horarios.map((h) => h.dia),
@@ -30,11 +50,19 @@ async function regenerarItinerarioClases(centroId, grupoId, { fechaInicio, horar
     excepciones,
   })
   if (!it) return null
+  // El sello de generación vive SOLO aquí, al persistir la referencia del
+  // grupo: el motor puro de lib/itinerario.js es determinista (g1-13).
+  const referencia = { ...it, generado_at: new Date().toISOString() }
   await query`
-    UPDATE grupos SET itinerario_clases = ${JSON.stringify(it)}, updated_at = ${new Date().toISOString()}
+    UPDATE grupos SET itinerario_clases = ${JSON.stringify(referencia)}, updated_at = ${new Date().toISOString()}
     WHERE id = ${grupoId}
   `
-  return it
+  // (g1-15) Toda mutación de la referencia del aula (horario/fecha/nivel/
+  // excepciones) encola el sync al CRM EN LA MISMA transacción; el push real
+  // lo hace el consumidor del outbox. Un grupo recién creado aún no tiene
+  // eventos vinculados: encola 0 filas y no pasa nada.
+  await encolarSyncCrm([grupoId], 'itinerario', query)
+  return referencia
 }
 
 const HORA_RE = /^\d{2}:\d{2}$/
@@ -49,8 +77,12 @@ const ym = (fecha) => {
 }
 
 // Grupos del centro con coach, horarios y niños (activos + baja potencial)
-// embebidos, en la forma que esperan lib/fusiones y lib/cuadro-calc.
+// embebidos, en la forma que esperan lib/fusiones y lib/cuadro-calc. Cada niño
+// viaja ENRIQUECIDO con su plan derivado (g1-13: una sola pasada por carga,
+// memo compartido): operaciones, fusiones y el bucle de pares leen
+// `e.plan.{estado, semana, cierre}` sin volver a derivar nada.
 async function cargarGrupos(centroId) {
+  const [c] = await sql`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
   const grupos = await sql`SELECT * FROM grupos WHERE centro_id = ${centroId}`
   const coaches = await sql`SELECT * FROM coaches WHERE centro_id = ${centroId}`
   const horarios = await sql`
@@ -63,7 +95,7 @@ async function cargarGrupos(centroId) {
     ORDER BY nombre
   `
   const coachPorId = new Map(coaches.map((co) => [String(co.id), co]))
-  return grupos
+  const armados = grupos
     .map((g) => ({
       ...g,
       coach: (g.coach_id && coachPorId.get(String(g.coach_id))) || null,
@@ -71,6 +103,13 @@ async function cargarGrupos(centroId) {
       estudiantes: kids.filter((e) => String(e.grupo_id) === String(g.id)),
     }))
     .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
+  const memo = crearMemoPlanes()
+  const hoy = hoyISO()
+  const pais = paisDe(c)
+  return armados.map((g) => ({
+    ...g,
+    estudiantes: enriquecerNinos(g.estudiantes, g, { hoy, pais, memo }),
+  }))
 }
 
 // Meta de niños por grupo (gpn_min) y cupo máximo del trimestre actual.
@@ -207,7 +246,23 @@ export async function loadOperaciones(centroId) {
     ? await sql`SELECT reserva_id, salon_id, rol, coach_id FROM centro_reserva_salones WHERE reserva_id = ANY(${rs.map((r) => r.id)})`
     : []
   const reservas = rs.map((r) => ({ ...r, salones: rsSal.filter((x) => x.reserva_id === r.id) }))
-  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas, reservas }
+  // (R5) Asistencia PRESENTE del mes en curso para el botón único de retiro:
+  // UNA query para todo el centro, no N por niño. Presente cuenta; justificada
+  // y ausente no. La UI solo decide con esto qué botón mostrar ("Retirar" vs
+  // "Retirar el próximo mes"); la verdad final la re-verifica el server con el
+  // EXISTS dentro de la transacción del retiro (g1-23).
+  const hoy = hoyISO()
+  const inicioMes = `${hoy.slice(0, 7)}-01`
+  const asis = await sql`
+    SELECT a.estudiante_id, COUNT(*)::int AS presentes, MAX(a.fecha) AS ultima
+    FROM asistencias a JOIN estudiantes e ON e.id = a.estudiante_id
+    WHERE e.centro_id = ${centroId} AND a.estado = 'presente'
+      AND a.fecha >= ${inicioMes}::date AND a.fecha < (${inicioMes}::date + interval '1 month')
+    GROUP BY a.estudiante_id
+  `
+  const asistenciaMes = {}
+  for (const a of asis) asistenciaMes[String(a.estudiante_id)] = { presentes: a.presentes, ultima: fechaIso10(a.ultima) }
+  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas, reservas, asistenciaMes }
 }
 
 export async function crearGrupo(centroId, data) {
@@ -223,11 +278,14 @@ export async function crearGrupo(centroId, data) {
     const [co] = await sql`SELECT id FROM coaches WHERE id = ${coachId} AND centro_id = ${centroId}`
     if (!co) return { error: 'El coach no pertenece a este centro.' }
   }
-  const fechaApertura = data?.fecha_apertura || null
-  if (fechaApertura && !FECHA_RE.test(fechaApertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
+  // (R1) Una sola fecha: fecha_apertura MURIÓ — no se acepta ni se escribe
+  // (created_at es la historia de publicación; la columna queda congelada).
+  // (g1-2) La fecha de inicio de clases es OBLIGATORIA para todo grupo nuevo,
+  // incluidos KINDER y online: un grupo activo sin fecha ya no nace.
   const fechaInicio = data?.fecha_inicio_clases || null
-  if (fechaInicio && !FECHA_RE.test(fechaInicio)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
-  const periodoInicio = ym(fechaInicio || hoyISO())
+  if (!fechaInicio) return { error: 'La fecha de inicio de clases es requerida para abrir el grupo (también KINDER y online).' }
+  if (!FECHA_RE.test(fechaInicio)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
+  const periodoInicio = ym(fechaInicio)
   const inscripcionAbierta = data?.inscripcion_abierta === undefined ? true : !!data.inscripcion_abierta
   const v = await validarHorarios(centroId, data?.horarios)
   if (v.error) return { error: v.error }
@@ -243,8 +301,8 @@ export async function crearGrupo(centroId, data) {
     `
     if (duplicado) return { error: `Ya existe el grupo ${numero}` }
     const [g] = await query`
-      INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_apertura, fecha_inicio_clases, inscripcion_abierta, notas, updated_at)
-      VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaApertura}, ${fechaInicio}, ${inscripcionAbierta}, ${data?.notas?.trim() || null}, ${now})
+      INSERT INTO grupos (centro_id, numero, itinerario, es_online, coach_id, estado, fecha_inicio_clases, inscripcion_abierta, notas, updated_at)
+      VALUES (${centroId}, ${numero}, ${itinerario}, ${!!data?.es_online}, ${coachId}, 'activo', ${fechaInicio}, ${inscripcionAbierta}, ${data?.notas?.trim() || null}, ${now})
       RETURNING id
     `
     for (const h of v.horarios) {
@@ -253,10 +311,13 @@ export async function crearGrupo(centroId, data) {
         VALUES (${g.id}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
       `
     }
-    // El grupo nace con el itinerario de clases de su nivel (regla de Fernando):
-    // inducción, semanas del libro, mental days y cierre, saltando feriados.
+    // El itinerario arranca con el INICIO DE CLASES, nunca con la publicación
+    // (regla de Fernando 2026-08-08): la fecha ya es obligatoria (g1-2), así
+    // que el primer plan nace aquí siempre que haya horario. Un grupo sin
+    // horario conserva su fecha pero queda `sin_plan` para los consumidores:
+    // jamás se inventa horario (regenerarItinerarioClases devuelve null).
     await regenerarItinerarioClases(centroId, g.id, {
-      fechaInicio: fechaInicio || fechaApertura,
+      fechaInicio,
       horarios: v.horarios,
       nivel: intOr(data?.nivel, 1),
     }, query)
@@ -292,8 +353,9 @@ export async function actualizarGrupo(centroId, grupoId, data) {
     if (!co) return { error: 'El coach no pertenece a este centro.' }
   }
   const esOnline = data?.es_online !== undefined ? !!data.es_online : g.es_online
-  if (data?.fecha_apertura && !FECHA_RE.test(data.fecha_apertura)) return { error: 'Fecha de apertura inválida (AAAA-MM-DD).' }
-  const fechaApertura = data?.fecha_apertura !== undefined ? data.fecha_apertura || null : g.fecha_apertura
+  // (R1) fecha_apertura MURIÓ: no se acepta ni se escribe. Si un payload viejo
+  // la trae, se ignora — la columna queda congelada, sin escrituras nuevas
+  // (created_at es la historia de publicación).
   if (data?.fecha_inicio_clases && !FECHA_RE.test(data.fecha_inicio_clases)) return { error: 'Fecha de inicio de clases inválida (AAAA-MM-DD).' }
   // Contrato del payload (gate Sol, defecto 7 — carrera del modal): campo
   // AUSENTE = NO TOCAR. El modal viejo reenviaba SIEMPRE inscripcion_abierta y
@@ -306,7 +368,12 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   //   la transacción se relee el grupo con FOR UPDATE y se aborta si la fecha
   //   cambió mientras el modal estaba abierto (PR #81).
   const inicioEditado = data?.fecha_inicio_clases !== undefined
-  const fechaInicio = inicioEditado ? data.fecha_inicio_clases || null : fechaIso10(g.fecha_inicio_clases)
+  // (g1-2) Pre-inicio la fecha se CAMBIA, nunca se BORRA; post-inicio ni se
+  // toca (la corta la allowlist). Un payload que intente vaciarla muere aquí.
+  if (inicioEditado && !data.fecha_inicio_clases) {
+    return { error: 'La fecha de inicio de clases no se puede borrar: cámbiala si hace falta, pero todo grupo la necesita (R1).' }
+  }
+  const fechaInicio = inicioEditado ? data.fecha_inicio_clases : fechaIso10(g.fecha_inicio_clases)
   const inicioCambio = fechaIso10(fechaInicio) !== fechaIso10(g.fecha_inicio_clases)
   const notas = data?.notas !== undefined ? data.notas?.trim() || null : g.notas
 
@@ -330,6 +397,127 @@ export async function actualizarGrupo(centroId, grupoId, data) {
     if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
       return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
     }
+    // (g1-5) El candado se decide con hoy Panamá RECALCULADO tras el lock,
+    // sobre la fila bloqueada: una petición que esperó el lock cruzando
+    // medianoche ya cuenta como post-inicio (la UI solo anticipa). Fecha NULL
+    // legacy = INICIADO (fail closed, R1): nunca abre la edición completa.
+    const hoyPanama = hoyISO()
+    const iniciado = grupoIniciado(grupoBloqueado.fecha_inicio_clases, hoyPanama)
+    const itVigente = itinerarioVigenteDe(grupoBloqueado.itinerario_clases)
+
+    if (iniciado) {
+      // (g1-4) ALLOWLIST ESTRICTA post-inicio: SOLO horarios y coach_id — ni
+      // notas (post-inicio las notas van en el panel, no en este modal).
+      // Cualquier otra clave PRESENTE en el payload se rechaza con error
+      // legible, traiga el valor que traiga: nada se adivina.
+      // ÚNICA excepción (g1-2, reparación legacy): un grupo activo con fecha
+      // NULL cuenta como iniciado (fail closed) pero necesita un camino para
+      // FIJARLE su fecha real — sin él quedaría ineditable para siempre
+      // (regresión: antes del remodelado actualizarGrupo sí la fijaba). Solo
+      // aplica con la fecha actual en NULL, solo acepta fecha PASADA o de hoy
+      // (una futura sacaría al veterano del Cuadro, g1-1) y protege los meses
+      // que el inicio efectivo de sus niños pueda mover.
+      const reparaFechaNull = grupoBloqueado.fecha_inicio_clases == null && inicioEditado
+      const extras = clavesNoPermitidasPostInicio(data)
+        .filter((k) => !(reparaFechaNull && k === 'fecha_inicio_clases'))
+      if (extras.length) {
+        return { error: `El grupo ya inició clases: solo se pueden cambiar horario y coach. Quita del cambio: ${extras.join(', ')}.` }
+      }
+      if (reparaFechaNull) {
+        if (fechaIso10(fechaInicio) > hoyPanama) {
+          return { error: 'El grupo ya opera: su fecha de inicio de clases solo puede registrarse en el pasado (o hoy). Una fecha futura lo sacaría del Cuadro de Negocio.' }
+        }
+        const estudiantes = await query`
+          SELECT id, grupo_id, fecha_inscripcion FROM estudiantes
+          WHERE centro_id = ${centroId}
+        `
+        const eventos = await query`
+          SELECT id, estudiante_id, tipo, fecha, a_grupo_id
+          FROM estudiante_eventos
+          WHERE centro_id = ${centroId} AND tipo = 'inscripcion'
+          ORDER BY fecha, id
+        `
+        const periodos = periodosAfectadosCambioInicioGrupo({
+          grupo: grupoBloqueado,
+          fechaNueva: fechaInicio,
+          estudiantes,
+          eventos,
+          fechaReferencia: hoyPanama,
+        })
+        const errorMes = await bloquearMesesEditables(query, centroId, periodos)
+        if (errorMes) return { error: errorMes }
+        await query`UPDATE grupos SET fecha_inicio_clases = ${fechaInicio}, updated_at = ${now} WHERE id = ${grupoId}`
+        // La referencia del aula NO se regenera por fijar una fecha
+        // administrativa: si el grupo tiene plan, su itinerario ya manda; si
+        // no lo tiene, el plan nace al editar el horario (nunca se reescribe
+        // un calendario en producción desde aquí).
+      }
+      // Rama SQL SEPARADA (g1-4): no menciona numero/itinerario/online/fecha/
+      // notas — esta rama no puede tocar un campo estructural ni por accidente.
+      if (data?.coach_id !== undefined) {
+        await query`UPDATE grupos SET coach_id = ${coachId}, updated_at = ${now} WHERE id = ${grupoId}`
+      } else {
+        await query`UPDATE grupos SET updated_at = ${now} WHERE id = ${grupoId}`
+      }
+      if (horarios) {
+        await query`DELETE FROM grupo_horarios WHERE grupo_id = ${grupoId}`
+        for (const h of horarios) {
+          await query`
+            INSERT INTO grupo_horarios (grupo_id, dia, hora_inicio, hora_fin, salon_id)
+            VALUES (${grupoId}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
+          `
+        }
+        // R2b (g1-7): POST-INICIO el horario nuevo entra en vigor MAÑANA
+        // (Panamá) y solo se regenera el sufijo futuro del calendario
+        // versionado — toda clase ya dada o con asistencia registrada se
+        // conserva. La verdad del plan vigente es la FILA BLOQUEADA
+        // (itinerario_clases.fecha_inicio/nivel/excepciones del FOR UPDATE):
+        // fecha_inicio_clases SOLO inicializa el primer plan del grupo, nunca
+        // re-ancla niveles posteriores.
+        if (itVigente?.semanas?.length) {
+          const [yh, mh, dh] = hoyPanama.split('-').map(Number)
+          const desde = new Date(Date.UTC(yh, mh - 1, dh + 1)).toISOString().slice(0, 10)
+          // Set protegido: toda fecha con asistencia registrada del grupo se
+          // conserva aunque caiga en el futuro (marcas por adelantado).
+          const asis = await query`SELECT DISTINCT fecha FROM asistencias WHERE grupo_id = ${grupoId}`
+          const it = regenerarSufijo(itVigente, {
+            desde,
+            diasNuevos: horarios.map((h) => h.dia),
+            excepciones: itVigente.excepciones || [],
+            fechasConAsistencia: new Set(asis.map((a) => fechaIso10(a.fecha))),
+          })
+          if (it) {
+            // Mismo contrato que regenerarItinerarioClases: el motor es puro y
+            // el sello de generación se agrega SOLO al persistir (g1-13).
+            const referencia = { ...it, generado_at: new Date().toISOString() }
+            await query`
+              UPDATE grupos SET itinerario_clases = ${JSON.stringify(referencia)}, updated_at = ${now}
+              WHERE id = ${grupoId}
+            `
+            // (g1-15) La referencia del aula cambió: el CRM se entera EN la
+            // misma transacción, nunca con push inline.
+            await encolarSyncCrm([grupoId], 'itinerario', query)
+          }
+        } else if (grupoBloqueado.fecha_inicio_clases) {
+          // Iniciado con fecha pero aún sin plan: fecha_inicio_clases
+          // inicializa el PRIMER plan (regeneración completa).
+          await regenerarItinerarioClases(centroId, grupoId, {
+            fechaInicio: fechaIso10(grupoBloqueado.fecha_inicio_clases),
+            horarios,
+            nivel: itVigente?.nivel || 1,
+            excepciones: itVigente?.excepciones || [],
+          }, query)
+        }
+        // Legacy NULL sin plan: no hay referencia que regenerar y nada se
+        // inventa (g1-2) — el cambio de horario queda solo en grupo_horarios.
+      }
+      return { ok: true }
+    }
+
+    // ── PRE-INICIO: edición completa. Sin fecha_apertura (R1, columna
+    // congelada) y sin inscripcion_abierta (solo la mueve setInscripcionAbierta
+    // con CAS); la fecha no editada tampoco se escribe: el CASE deja la
+    // columna intacta cuando el payload no trajo el campo. ──
     if (inicioCambio) {
       const estudiantes = await query`
         SELECT id, grupo_id, fecha_inscripcion FROM estudiantes
@@ -346,17 +534,14 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         fechaNueva: fechaInicio,
         estudiantes,
         eventos,
-        fechaReferencia: hoyISO(),
+        fechaReferencia: hoyPanama,
       })
       const errorMes = await bloquearMesesEditables(query, centroId, periodos)
       if (errorMes) return { error: errorMes }
     }
-    // Ni `inscripcion_abierta` (la mueve solo setInscripcionAbierta con CAS) ni
-    // la fecha no editada se escriben: el CASE deja la columna intacta cuando el
-    // payload no trajo el campo.
     await query`
       UPDATE grupos SET numero = ${numero}, itinerario = ${itinerario}, es_online = ${esOnline},
-        coach_id = ${coachId}, fecha_apertura = ${fechaApertura},
+        coach_id = ${coachId},
         fecha_inicio_clases = CASE WHEN ${inicioEditado}::boolean
           THEN ${inicioEditado ? fechaInicio : null}::date ELSE fecha_inicio_clases END,
         notas = ${notas}, updated_at = ${now}
@@ -371,15 +556,16 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         `
       }
     }
-    // Regenera el itinerario si cambió lo que lo define (fecha de inicio u
-    // horarios); el nivel y las clases suspendidas del grupo se conservan.
+    // R2b (g1-7): PRE-INICIO la regeneración es completa, como siempre (el
+    // primer plan se ancla en fecha_inicio_clases); nivel y excepciones
+    // vigentes se conservan de la fila bloqueada.
     if ((horarios || inicioCambio) && fechaInicio) {
       const hs = horarios || (await query`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`)
       await regenerarItinerarioClases(centroId, grupoId, {
         fechaInicio,
         horarios: hs,
-        nivel: g.itinerario_clases?.nivel || 1,
-        excepciones: g.itinerario_clases?.excepciones || [],
+        nivel: itVigente?.nivel || 1,
+        excepciones: itVigente?.excepciones || [],
       }, query)
     }
     return { ok: true }
@@ -389,10 +575,15 @@ export async function actualizarGrupo(centroId, grupoId, data) {
   return resultado
 }
 
-// Ajusta el itinerario del nivel de UN grupo: nivel que cursa, fecha de inicio
-// del nivel y clases suspendidas (excepciones). La plantilla de semanas es la
-// base de franquicia y no se toca aquí; lo que cambia es cómo cae en el
-// calendario de este grupo. Devuelve el itinerario ya regenerado.
+// (g1-10) TRANSICIÓN DE COHORTE: ajustar el itinerario del grupo dejó de ser
+// un bypass del candado — es la transición de plan de R3. La referencia del
+// aula cambia (nivel, fecha de inicio del nivel, excepciones) y con ella se
+// mueve SOLO la cohorte: los niños activos/baja_potencial cuyo (itinerario,
+// nivel, fecha_inicio_nivel) coincide EXACTAMENTE con la referencia ANTERIOR;
+// el niño adelantado, atrasado o con ancla propia queda intacto. El cliente
+// manda `fingerprint` del plan que VIO (fingerprintPlanGrupo — CAS optimista):
+// si la referencia cambió en otra pestaña, se aborta sin efectos. La plantilla
+// de semanas es la base de franquicia y no se toca aquí.
 export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
   await requireCentroAccess(centroId)
   const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
@@ -405,10 +596,16 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
   const fechaInicio = String(data?.fecha_inicio || '').slice(0, 10)
   if (!FECHA_RE.test(fechaInicio)) return { error: 'La fecha de inicio del nivel es requerida (AAAA-MM-DD).' }
   const excepciones = normalizarExcepciones(data?.excepciones)
+  if (data?.fingerprint === undefined) {
+    return { error: 'Falta el fingerprint del plan que estás editando: recarga el grupo e intenta de nuevo.' }
+  }
 
   return await withTransaction(async (query) => {
+    // ORDEN DE LOCKS grupos → mes_kpi → estudiantes (PR #81): el mismo de
+    // actualizarGrupo y del alta — tomados siempre en este orden no hay
+    // deadlock entre ajustar el plan e inscribir/retirar.
     const [grupoBloqueado] = await query`
-      SELECT fecha_inicio_clases FROM grupos
+      SELECT * FROM grupos
       WHERE id = ${grupoId} AND centro_id = ${centroId}
       FOR UPDATE
     `
@@ -416,9 +613,133 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
     if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
       return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
     }
+    // CAS del plan sobre la FILA BLOQUEADA: el fingerprint que vio el cliente
+    // debe coincidir con la referencia vigente (g1-10).
+    const referenciaAnterior = itinerarioVigenteDe(grupoBloqueado.itinerario_clases)
+    if (fingerprintPlanGrupo(referenciaAnterior) !== data.fingerprint) {
+      return { error: 'El plan del grupo cambió mientras editabas (otra pestaña u otro usuario). Recarga el grupo antes de continuar.' }
+    }
     const horarios = await query`SELECT dia FROM grupo_horarios WHERE grupo_id = ${grupoId}`
     if (!horarios.length) return { error: 'El grupo no tiene horario registrado: sin días de clase no hay itinerario.' }
 
+    // (g1-5, mismo patrón) hoy Panamá RECALCULADO tras el lock decide si la
+    // transición es VIGENTE (fecha <= hoy: la cohorte se mueve ya) o FUTURA
+    // (queda pendiente: nivel y royalties no cambian anticipadamente).
+    const hoyPanama = hoyISO()
+    const vigente = fechaInicio <= hoyPanama
+    const cambiaCohorte =
+      nivel !== (Number(referenciaAnterior?.nivel) || null) ||
+      fechaInicio !== fechaIso10(referenciaAnterior?.fecha_inicio)
+
+    if (vigente && cambiaCohorte) {
+      // Los eventos de la cohorte caen en el mes de HOY: se serializa contra
+      // cerrarMes antes de tocar niños (mes cerrado = intocable).
+      const errorMes = await bloquearMesesEditables(query, centroId, [ym(hoyPanama)])
+      if (errorMes) return { error: errorMes }
+    }
+    // Lock de los niños del grupo (cohorte y no-cohorte: el filtro exacto se
+    // decide sobre filas congeladas, no sobre una foto vieja).
+    const ninos = await query`
+      SELECT id, itinerario, nivel, fecha_inicio_nivel, estado FROM estudiantes
+      WHERE grupo_id = ${grupoId} AND centro_id = ${centroId}
+        AND estado IN ('activo', 'baja_potencial')
+      ORDER BY id
+      FOR UPDATE
+    `
+    const cohorte = cohorteDeTransicion(referenciaAnterior, grupoBloqueado.itinerario, ninos)
+
+    // (g2-1) La fecha del nivel vive dentro del itinerario y aquí ya NO se copia
+    // a grupos.fecha_inicio_clases: itinerario.fecha_inicio es el inicio del
+    // NIVEL vigente y la columna es el inicio operativo del GRUPO (la que
+    // determina cuándo cada niño se vuelve activo) — mezclarlas reclasificaba
+    // como "nuevos" del mes a niños viejos en el Cuadro de Negocio.
+
+    if (!referenciaAnterior) {
+      // Grupo SIN plan: nace la PRIMERA referencia del aula (no hay transición
+      // que programar ni cohorte que mover — mismo camino del primer plan de
+      // crearGrupo). El CAS de arriba garantiza que el cliente vio 'sin_plan'.
+      const it = await regenerarItinerarioClases(
+        centroId, grupoId, { fechaInicio, horarios, nivel, excepciones }, query,
+      )
+      if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
+      return { ok: true, itinerario: it, ninosActualizados: 0 }
+    }
+
+    if (!cambiaCohorte) {
+      // Solo cambiaron EXCEPCIONES (mismo nivel, misma ancla). La referencia
+      // NO se re-tira con generarItinerario plano: eso resetearía versiones[]
+      // a los días ACTUALES y reescribiría el pasado del calendario (un grupo
+      // que cambió de día a mitad de nivel perdería sus clases viejas con
+      // asistencia — contrato R2b/g1-7). Se regenera con el GENERADOR
+      // VERSIONADO (g1-13) sobre el calendario vigente: el tramo ya vivido se
+      // reproduce idéntico y las excepciones nuevas solo tocan de hoy en
+      // adelante (validación g1-7/g1-23 sobre las marcas del grupo).
+      const asis = await query`SELECT DISTINCT fecha FROM asistencias WHERE grupo_id = ${grupoId}`
+      const errorExc = errorExcepcionesPasado({
+        referencia: referenciaAnterior,
+        excepciones,
+        hoy: hoyPanama,
+        fechasConAsistencia: new Set(asis.map((a) => fechaIso10(a.fecha))),
+      })
+      if (errorExc) return { error: errorExc }
+      const [c] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+      const it = generarItinerarioVersionado({
+        fechaInicio: fechaIso10(referenciaAnterior.fecha_inicio),
+        calendarioVersionado: versionesDe(referenciaAnterior),
+        nivel: Number(referenciaAnterior.nivel) || nivel,
+        pais: paisDe(c),
+        excepciones,
+      })
+      if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
+      // El sello de generación se agrega SOLO al persistir (g1-13); una
+      // transición futura pendiente colgada de la referencia se conserva.
+      const referencia = {
+        ...it,
+        ...(referenciaAnterior.transicion_pendiente
+          ? { transicion_pendiente: referenciaAnterior.transicion_pendiente }
+          : {}),
+        generado_at: new Date().toISOString(),
+      }
+      await query`
+        UPDATE grupos SET itinerario_clases = ${JSON.stringify(referencia)}, updated_at = ${new Date().toISOString()}
+        WHERE id = ${grupoId}
+      `
+      // (g1-15) La referencia del aula cambió: el CRM se entera EN la misma
+      // transacción, nunca con push inline.
+      await encolarSyncCrm([grupoId], 'itinerario', query)
+      return { ok: true, itinerario: referencia, ninosActualizados: 0 }
+    }
+    if (!vigente) {
+      // TRANSICIÓN FUTURA (g1-10) → SOLO la fila de transición pendiente
+      // IDEMPOTENTE colgada de la referencia (una sola por grupo: reintentar
+      // el mismo ajuste la reescribe igual). La referencia VIGENTE del aula NO
+      // se toca anticipadamente: hasta aplica_desde, el calendario que ven el
+      // coach y marcarAsistencia sigue siendo el actual (persistir aquí la
+      // referencia futura dejaba al aula sin sus clases de HOY). Nivel y
+      // royalties de los niños tampoco cambian; el aplicador consume la fila
+      // cuando llegue la fecha (fase R5 del rollout) usando la cohorte aquí
+      // congelada.
+      const pendiente = {
+        aplica_desde: fechaInicio,
+        nivel,
+        ancla: fechaInicio,
+        cohorte: {
+          itinerario: grupoBloqueado.itinerario,
+          nivel: Number(referenciaAnterior?.nivel) || null,
+          fecha_inicio_nivel: fechaIso10(referenciaAnterior?.fecha_inicio),
+        },
+      }
+      await query`
+        UPDATE grupos
+        SET itinerario_clases = itinerario_clases || ${JSON.stringify({ transicion_pendiente: pendiente })}::jsonb,
+          updated_at = ${new Date().toISOString()}
+        WHERE id = ${grupoId}
+      `
+      return { ok: true, itinerario: referenciaAnterior, transicionPendiente: pendiente, ninosActualizados: 0 }
+    }
+    // TRANSICIÓN VIGENTE: la referencia nueva del nivel se persiste y encola
+    // CRM EN la transacción (g1-15) — plan nuevo anclado en fechaInicio — y la
+    // cohorte se mueve YA.
     const it = await regenerarItinerarioClases(
       centroId,
       grupoId,
@@ -426,13 +747,26 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
       query,
     )
     if (!it) return { error: 'No se pudo generar el itinerario con esos datos.' }
-
-    // (g2-1) La fecha del nivel vive dentro del itinerario y aquí ya NO se copia
-    // a grupos.fecha_inicio_clases: itinerario.fecha_inicio es el inicio del
-    // NIVEL vigente y la columna es el inicio operativo del GRUPO (la que
-    // determina cuándo cada niño se vuelve activo) — mezclarlas reclasificaba
-    // como "nuevos" del mes a niños viejos en el Cuadro de Negocio.
-    return { ok: true, itinerario: it }
+    // La cohorte se mueve YA — nivel + ancla + evento por
+    // niño, todo en la misma transacción; los demás niños quedan intactos.
+    const { year, month } = ym(hoyPanama)
+    const now = new Date().toISOString()
+    for (const n of cohorte) {
+      await query`
+        UPDATE estudiantes SET nivel = ${nivel}, fecha_inicio_nivel = ${fechaInicio}, updated_at = ${now}
+        WHERE id = ${n.id}
+      `
+      const detalle = {
+        origen: 'transicion_cohorte',
+        ancla_antes: fechaIso10(n.fecha_inicio_nivel),
+        ancla_despues: fechaInicio,
+      }
+      await query`
+        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_nivel, a_nivel, detalle)
+        VALUES (${n.id}, ${centroId}, 'cambio_nivel', ${year}, ${month}, ${hoyPanama}, ${Number(n.nivel)}, ${nivel}, ${JSON.stringify(detalle)})
+      `
+    }
+    return { ok: true, itinerario: it, ninosActualizados: cohorte.length }
   })
 }
 
@@ -449,6 +783,28 @@ export async function linkCoach(centroId, grupoId) {
   }
   return { ok: true, path: `/coach/${token}` }
 }
+
+// ── MATRIZ DE COMANDOS POST-INICIO (g1-6) ───────────────────────────────────
+// Con el grupo iniciado, la ÚNICA puerta estructural es actualizarGrupo y su
+// allowlist (horarios + coach, g1-4; más la reparación puntual del legacy con
+// fecha NULL: fijarle su fecha real PASADA una sola vez, g1-2). Estos
+// comandos de operación/lifecycle
+// siguen PERMITIDOS post-inicio, cada uno sujeto a sus invariantes propias y
+// SIN capacidad de tocar campos estructurales (numero, itinerario, es_online,
+// fecha_inicio_clases, notas):
+//   - setInscripcionAbierta → solo `inscripcion_abierta` (palanca, CAS).
+//   - cerrarGrupo → solo `estado`/`fecha_cierre` (+ desvincular clases de
+//     prueba y outbox).
+//   - reabrirGrupo → solo `estado`/`fecha_cierre`/`fusionado_en`, y EXIGE
+//     fecha de inicio presente (g1-2).
+//   - aplicarFusion → mueve niños (grupo_id + re-anclaje g1-9) y marca el
+//     origen `fusionado`; jamás edita campos del destino.
+//   - extenderVentanaLlenado → solo `llenado_extendido_hasta`.
+//   - ajustarItinerarioGrupo → dejó de ser bypass: es la transición de plan de
+//     R3 (cohorte exacta + fingerprint CAS, g1-10); solo `itinerario_clases` y
+//     la cohorte de niños.
+// Si un comando nuevo necesita tocar otra columna de `grupos`, NO entra en
+// esta matriz: pasa por actualizarGrupo y su candado.
 
 // Palanca manual de inscripciones con CAS (gate Sol, defecto 7): el UPDATE
 // exige el estado que el usuario VIO (`esperado`) — dos pestañas moviendo la
@@ -528,13 +884,21 @@ export async function cerrarGrupo(centroId, grupoId) {
   })
 }
 
+// (g1-2) Reabrir EXIGE fecha de inicio presente: un grupo activo sin fecha ya
+// no puede existir (R1, fail closed). El legacy NULL se trata como iniciado en
+// el resto del código, pero aquí se bloquea la reapertura hasta fijarla.
 export async function reabrirGrupo(centroId, grupoId) {
   await requireCentroAccess(centroId)
   const r = await sql`
     UPDATE grupos SET estado = 'activo', fecha_cierre = NULL, fusionado_en = NULL, updated_at = ${new Date().toISOString()}
-    WHERE id = ${grupoId} AND centro_id = ${centroId} RETURNING id
+    WHERE id = ${grupoId} AND centro_id = ${centroId} AND fecha_inicio_clases IS NOT NULL
+    RETURNING id
   `
-  if (!r.length) return { error: 'El grupo no pertenece a este centro.' }
+  if (!r.length) {
+    const [g] = await sql`SELECT fecha_inicio_clases FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
+    if (!g) return { error: 'El grupo no pertenece a este centro.' }
+    return { error: 'El grupo no tiene fecha de inicio de clases: todo grupo activo la necesita (R1). Fíjala antes de reabrirlo.' }
+  }
   return { ok: true }
 }
 
@@ -717,7 +1081,8 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
     // Los dos grupos se bloquean en UN statement ordenado por id: dos fusiones
     // cruzadas toman los locks en el mismo orden y no se traban entre sí.
     const bloqueados = await query`
-      SELECT id, numero, estado, inscripcion_abierta FROM grupos
+      SELECT id, numero, estado, inscripcion_abierta, itinerario, itinerario_clases
+      FROM grupos
       WHERE id = ANY(${[Number(src.id), Number(tgt.id)]}::int[]) AND centro_id = ${centroId}
       ORDER BY id
       FOR UPDATE
@@ -733,28 +1098,96 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
     }
     // INVARIANTE: el conteo de niños del origen NO cambió entre la validación
     // y el movimiento. Se relee con FOR UPDATE (nadie los mueve ni los retira
-    // hasta el commit) y se compara con lo que vio la UI.
+    // hasta el commit) y se compara con lo que vio la UI. Las columnas del
+    // plan (nivel, ancla) salen de estas filas CONGELADAS, no de la foto que
+    // vio la UI.
     const enOrigen = await query`
-      SELECT id FROM estudiantes
+      SELECT id, itinerario, nivel, fecha_inicio_nivel, fecha_cierre_nivel, estado
+      FROM estudiantes
       WHERE grupo_id = ${src.id} AND estado IN ('activo', 'baja_potencial')
       ORDER BY id
       FOR UPDATE
     `
     if (enOrigen.length !== src.estudiantes.length) return { error: ERROR_CARRERA }
 
-    const movidos = await query`
-      UPDATE estudiantes SET grupo_id = ${tgt.id}, updated_at = ${now}
-      WHERE id = ANY(${idsNum}::int[]) AND grupo_id = ${src.id}
-      RETURNING id
+    // (g1-9) RE-ANCLAJE SEMÁNTICO al calendario del destino, bajo lock: cada
+    // niño conserva su posición (índice de semana a la fecha efectiva `hoy`) —
+    // se busca la ancla del destino que produce EL MISMO índice; la más
+    // cercana; empate → la más antigua; sin equivalente → se aborta TODA la
+    // fusión con error legible. El niño sin plan derivable (sin ancla o grupo
+    // sin calendario) se mueve sin re-anclar: nada que preservar, nada se
+    // inventa. Calendarios y excepciones salen de las filas bloqueadas.
+    const [centro] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+    const pais = paisDe(centro)
+    const horariosFusion = await query`
+      SELECT grupo_id, dia FROM grupo_horarios
+      WHERE grupo_id = ANY(${[Number(src.id), Number(tgt.id)]}::int[])
     `
-    if (movidos.length !== idsNum.length) return { error: ERROR_CARRERA }
-    await query`
-      INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, a_grupo_id)
-      SELECT m, ${centroId}, 'fusion', ${year}, ${month}, ${hoy}, ${src.id}, ${tgt.id}
-      FROM UNNEST(${movidos.map((e) => Number(e.id))}::int[]) AS m
-    `
+    const ladoDe = (fila) => {
+      const it = itinerarioVigenteDe(fila.itinerario_clases)
+      const grupoCal = {
+        id: fila.id,
+        itinerario_clases: it,
+        horarios: horariosFusion.filter((h) => String(h.grupo_id) === String(fila.id)),
+      }
+      return { calendarioVersionado: calendarioVersionadoDe(grupoCal), excepciones: it?.excepciones || [], pais }
+    }
+    const ladoOrigen = ladoDe(origen)
+    const ladoDestino = ladoDe(destino)
+    const memo = crearMemoPlanes()
+    const reAnclas = new Map() // por (ancla|nivel): los que comparten plan comparten re-anclaje
+    const porId = new Map(enOrigen.map((e) => [String(e.id), e]))
+    const planMovidos = []
+    for (const idNino of idsNum) {
+      const e = porId.get(String(idNino))
+      if (!e) return { error: ERROR_CARRERA }
+      const anclaAntes = fechaIso10(e.fecha_inicio_nivel)
+      const key = `${anclaAntes}|${Number(e.nivel)}`
+      if (!reAnclas.has(key)) {
+        reAnclas.set(key, reAnclaEnDestino({
+          ancla: anclaAntes,
+          nivel: e.nivel,
+          hoy,
+          origen: ladoOrigen,
+          destino: ladoDestino,
+        }, memo))
+      }
+      const r = reAnclas.get(key)
+      if (r === null) {
+        return { error: `La fusión no se aplicó: el horario del grupo ${destino.numero} no tiene una semana equivalente para la posición actual de los niños de nivel ${e.nivel} (ancla ${anclaAntes}). Ajusta el plan del destino o elige otro grupo.` }
+      }
+      planMovidos.push({ id: Number(e.id), anclaAntes, anclaDespues: r.sinPlan ? anclaAntes : r.ancla, reAncla: r })
+    }
+
+    // Movimiento + re-anclaje por niño (las anclas difieren entre niños, así
+    // que el UPDATE masivo con UNNEST murió con el fallback al grupo).
+    let movidosTotal = 0
+    for (const m of planMovidos) {
+      const movido = await query`
+        UPDATE estudiantes SET grupo_id = ${tgt.id}, fecha_inicio_nivel = ${m.anclaDespues}, updated_at = ${now}
+        WHERE id = ${m.id} AND grupo_id = ${src.id}
+        RETURNING id
+      `
+      movidosTotal += movido.length
+    }
+    if (movidosTotal !== idsNum.length) return { error: ERROR_CARRERA }
+    // El evento de fusión guarda ancla y posición ANTES/DESPUÉS (g1-9): la
+    // auditoría (y el backfill g1-12) reconstruyen el plan de cada niño sin
+    // adivinar. sin_plan queda explícito — jamás un -1 ni una fecha inventada.
+    for (const m of planMovidos) {
+      const detalle = {
+        ancla_antes: m.anclaAntes,
+        posicion_antes: m.reAncla.sinPlan ? { estado: 'sin_plan', indice: null } : m.reAncla.antes,
+        ancla_despues: m.anclaDespues,
+        posicion_despues: m.reAncla.sinPlan ? { estado: 'sin_plan', indice: null } : m.reAncla.despues,
+      }
+      await query`
+        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_grupo_id, a_grupo_id, detalle)
+        VALUES (${m.id}, ${centroId}, 'fusion', ${year}, ${month}, ${hoy}, ${src.id}, ${tgt.id}, ${JSON.stringify(detalle)})
+      `
+    }
     // El origen queda fusionado solo si se llevó a TODOS sus niños.
-    const cerrado = movidos.length === enOrigen.length
+    const cerrado = planMovidos.length === enOrigen.length
     if (cerrado) {
       await query`
         UPDATE grupos SET estado = 'fusionado', fusionado_en = ${tgt.id}, fecha_cierre = ${hoy}, updated_at = ${now}

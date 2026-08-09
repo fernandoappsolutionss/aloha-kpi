@@ -111,7 +111,7 @@ const decidir = (grupo) => {
   const datos = datosPorCentro.get(Number(grupo.centro_id))
   const universos = universosPorGrupo(datos.estudiantes, datos.eventos)
   const universo = universos.get(String(grupo.id)) || []
-  return { ...decidirFechaInicio({ itInicio: itInicioDe(grupo), universo }), universo: universo.length }
+  return { ...decidirFechaInicio({ itInicio: itInicioDe(grupo) }), universo: universo.length }
 }
 
 const entradaDe = (grupo, decision) => ({

@@ -2,8 +2,11 @@
 // Acciones del LINK DE COACH: autenticadas por el token del grupo (sin sesión).
 // El coach recibe /coach/<token> y ahí marca la asistencia de cada clase del
 // itinerario y lleva sus notas por niño (formato de la lista de Anclas Mall).
-import { sql, upsert } from '../../lib/db'
+import { sql, withTransaction, upsertWith } from '../../lib/db'
 import { horarioTextoDe } from '../../lib/modelo'
+import { hoyISO } from '../../lib/operaciones'
+import { bloquearMesesEditables } from '../../lib/mes-kpi'
+import { errorFechaAsistencia } from '../../lib/retiros.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const ESTADOS = ['presente', 'ausente', 'justificada']
@@ -16,6 +19,16 @@ async function grupoPorToken(token) {
     WHERE g.coach_token = ${String(token)}
   `
   return g || null
+}
+
+// itinerario_clases llega como objeto (JSONB) o, defensivamente, como string.
+const itinerarioDe = (g) => {
+  const it = g?.itinerario_clases
+  if (it == null) return null
+  if (typeof it === 'string') {
+    try { return JSON.parse(it) } catch { return null }
+  }
+  return it
 }
 
 // Carga de la página del coach: grupo, itinerario, roster y asistencia.
@@ -44,7 +57,7 @@ export async function loadGrupoCoach(token) {
       coach: coach?.nombre || null,
       horarioTexto: horarioTextoDe(horarios),
       estado: g.estado,
-      itinerario_clases: typeof g.itinerario_clases === 'string' ? JSON.parse(g.itinerario_clases) : g.itinerario_clases,
+      itinerario_clases: itinerarioDe(g),
     },
     estudiantes,
     asistencias: asistencias.map((a) => ({
@@ -57,32 +70,51 @@ export async function loadGrupoCoach(token) {
 
 // Marca la asistencia de un niño en una fecha del itinerario.
 // estado: 'presente' | 'ausente' | 'justificada' | null (borrar la marca).
-// Presente actualiza estudiantes.ultima_asistencia — así el retiro del cuadro
-// (norma: se declara en el mes en que vio clases) sale de datos reales.
+// (g1-23) Evidencia confiable: la fecha debe ser una clase REAL del calendario
+// versionado del grupo y <= hoy Panamá (nada de marcar el futuro), y respeta
+// el bloqueo de mes. La escritura toma el MISMO lock de estudiante que el
+// retiro (el EXISTS del retiro corre sobre esta misma fila bloqueada) y
+// estudiantes.ultima_asistencia se RECALCULA server-side en cada cambio —
+// también al borrar o degradar una presencia (salió del contrato público).
 export async function marcarAsistencia(token, estudianteId, fecha, estado) {
   const g = await grupoPorToken(token)
   if (!g) return { error: 'Link inválido.' }
-  if (!FECHA_RE.test(String(fecha || ''))) return { error: 'Fecha inválida.' }
-  const [e] = await sql`
-    SELECT id FROM estudiantes WHERE id = ${estudianteId} AND grupo_id = ${g.id}
-  `
-  if (!e) return { error: 'El niño ya no está en este grupo.' }
-  if (estado == null || estado === '') {
-    await sql`DELETE FROM asistencias WHERE estudiante_id = ${estudianteId} AND fecha = ${fecha}`
-    return { ok: true }
-  }
-  if (!ESTADOS.includes(estado)) return { error: 'Estado de asistencia inválido.' }
-  await upsert('asistencias', {
-    grupo_id: g.id, estudiante_id: estudianteId, fecha, estado,
-    updated_at: new Date().toISOString(),
-  }, ['estudiante_id', 'fecha'])
-  if (estado === 'presente') {
-    await sql`
-      UPDATE estudiantes SET ultima_asistencia = GREATEST(COALESCE(ultima_asistencia, ${fecha}::date), ${fecha}::date)
+  const f = String(fecha || '').slice(0, 10)
+  if (!FECHA_RE.test(f)) return { error: 'Fecha inválida.' }
+  const hoy = hoyISO()
+  const errFecha = errorFechaAsistencia(itinerarioDe(g), f, hoy)
+  if (errFecha) return { error: errFecha }
+  const borrar = estado == null || estado === ''
+  if (!borrar && !ESTADOS.includes(estado)) return { error: 'Estado de asistencia inválido.' }
+  const [y, m] = f.split('-').map(Number)
+
+  return await withTransaction(async (query) => {
+    // Orden de locks del repo (mes_kpi → estudiantes): el mes de la clase debe
+    // seguir abierto — un mes cerrado es histórico congelado.
+    const errorMes = await bloquearMesesEditables(query, g.centro_id, [{ year: y, month: m }])
+    if (errorMes) return { error: errorMes }
+    const [e] = await query`
+      SELECT id FROM estudiantes WHERE id = ${estudianteId} AND grupo_id = ${g.id} FOR UPDATE
+    `
+    if (!e) return { error: 'El niño ya no está en este grupo.' }
+    if (borrar) {
+      await query`DELETE FROM asistencias WHERE estudiante_id = ${estudianteId} AND fecha = ${f}`
+    } else {
+      await upsertWith(query, 'asistencias', {
+        grupo_id: g.id, estudiante_id: estudianteId, fecha: f, estado,
+        updated_at: new Date().toISOString(),
+      }, ['estudiante_id', 'fecha'])
+    }
+    // ultima_asistencia derivada: el máximo PRESENTE real del niño, recalculado
+    // en la misma transacción (cubre marcar, cambiar y borrar).
+    await query`
+      UPDATE estudiantes SET ultima_asistencia = (
+        SELECT MAX(fecha) FROM asistencias WHERE estudiante_id = ${estudianteId} AND estado = 'presente'
+      )
       WHERE id = ${estudianteId}
     `
-  }
-  return { ok: true }
+    return { ok: true }
+  })
 }
 
 // Nota del coach sobre un niño (puntuación, status, observaciones — texto libre).

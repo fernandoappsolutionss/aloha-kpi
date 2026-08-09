@@ -34,7 +34,7 @@ export default function KPIPage() {
   const [cerrando, setCerrando] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
-  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
+  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
   const [finalGuardado, setFinalGuardado] = useState(null)
@@ -45,6 +45,10 @@ export default function KPIPage() {
   const [motivosAuto, setMotivosAuto] = useState(null)
   const [autoSync, setAutoSync] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
+  // KPI sin manos (g1-16/g1-20): resultado discriminado del módulo. 'auto'
+  // bloquea ing/des (el cero también es auto); 'fallo' las deja editables con
+  // advertencia; null = mes cerrado o anterior al gate (todo manual).
+  const [kpiAuto, setKpiAuto] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true); setStatus(''); setAutoSync(null)
@@ -57,13 +61,14 @@ export default function KPIPage() {
       setLoading(false)
       return
     }
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, autoSync: sync } = datos
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, kpiAuto: kAuto, autoSync: sync } = datos
     setCentroNombre(cNombre || '')
     const estadoActual = estado || 'abierto'
     setMesEstado(estadoActual)
     setArrastrado(arr || null)
     setCierreAnterior(cierrePrevio || null)
     setMotivosAuto(mAuto || null)
+    setKpiAuto(kAuto || null)
     setAutoSync(sync || null)
     setFinalGuardado(res?.ninos_final_mes ?? null)
 
@@ -75,9 +80,9 @@ export default function KPIPage() {
       arrastrado: arr?.valor,
     })
     if (res) {
-      setConfig({ ninos_inicio: ninosInicio, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0, orig_por_clasificar: res.orig_por_clasificar||0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, cp_matriculados_override: res.cp_matriculados_override ?? null, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0, orig_por_clasificar: res.orig_por_clasificar||0 })
     } else {
-      setConfig({ ninos_inicio: ninosInicio, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
     }
 
     if (mAuto) setConfig(c => ({
@@ -117,7 +122,6 @@ export default function KPIPage() {
 
   async function handleSave() {
     if (mesEstado === 'cerrado') { setStatus('❌ Este mes está cerrado. No se puede editar.'); return }
-    if (autoSync?.ok === false) { setStatus('❌ No se puede guardar hasta recuperar la sincronización automática.'); return }
     setSaving(true); setStatus('')
     try {
       const res = await saveKpiMes(id, year, month, config, semanas)
@@ -166,19 +170,29 @@ export default function KPIPage() {
   const inp = (val, onChange, disabled) => <input type="number" min="0" value={val} onChange={e=>onChange(e.target.value)} disabled={disabled} className="num" style={{width:58,padding:'5px 6px',border:'1px solid var(--border-strong)',borderRadius:6,fontSize:13,textAlign:'center',background:disabled?'var(--surface-3)':'var(--bg)',color:'var(--text)',outline:'none',opacity:disabled?0.6:1}}/>
   const badge = ok => <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Sí' : 'No'}</span>
   const locked = mesEstado === 'cerrado'
+  // (g1-20) Solo el estado 'auto' bloquea ventas y retiros (el CERO también es
+  // auto); en 'fallo' quedan editables con la advertencia visible.
+  const autoIngDes = kpiAuto?.estado === 'auto'
+  const cpDerivado = autoIngDes ? kpiAuto.cp : null
+  // Sincronización de los campos de RESUMEN (clase de prueba, motivos, origen
+  // comercial). Es independiente del motor semanal: su fallo NO bloquea el KPI.
   const automatic = autoSync?.ok === true
   const syncFailed = autoSync?.ok === false
-  const autoPeriod = automatic || syncFailed
+  const autoPeriod = automatic
 
   const kpiRow = (tipo, label, semIdx) => {
     const s = semanas[semIdx], dias = s[tipo]
     const res = calcRes(tipo, dias), meta = calcMeta(tipo, ni, metaN)
     const ok = cumple(tipo, res, meta)
     const resColor = tipo==='cob' ? 'var(--text)' : tipo==='des' ? 'var(--bad)' : 'var(--ok)'
+    const deModulo = autoIngDes && (tipo === 'ing' || tipo === 'des')
     return (
       <tr key={tipo}>
-        <td style={{padding:'8px 16px',width:210,fontWeight:600,color:'var(--text-muted)',fontSize:12}}>{label}</td>
-        {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{inp(d, v => upd(semIdx,tipo,di,v), locked || (autoPeriod && tipo !== 'cob'))}</td>)}
+        <td style={{padding:'8px 16px',width:210,fontWeight:600,color:'var(--text-muted)',fontSize:12}}>
+          {label}
+          {deModulo && <span style={{ display: 'block', fontSize: 10, color: 'var(--ts-green)', fontWeight: 500 }}>🔗 del módulo</span>}
+        </td>
+        {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{inp(d, v => upd(semIdx,tipo,di,v), locked || deModulo)}</td>)}
         <td className="num" style={{padding:'5px 8px',textAlign:'center',fontWeight:700,color:resColor,minWidth:50}}>{res}</td>
         <td className="num" style={{padding:'5px 6px',textAlign:'center',color:'var(--text-dim)',fontSize:12}}>{meta}</td>
         <td style={{padding:'5px 6px',textAlign:'center'}}>{badge(ok)}</td>
@@ -211,10 +225,10 @@ export default function KPIPage() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {!locked && (
               <>
-                <button onClick={handleSave} disabled={saving || syncFailed} className="btn btn--primary">
+                <button onClick={handleSave} disabled={saving} className="btn btn--primary">
                   {saving ? 'Guardando…' : 'Guardar'}
                 </button>
-                <button onClick={handleCerrarMes} disabled={cerrando || syncFailed} className="btn">
+                <button onClick={handleCerrarMes} disabled={cerrando} className="btn">
                   {cerrando ? 'Cerrando…' : 'Cerrar mes'}
                 </button>
               </>
@@ -237,7 +251,7 @@ export default function KPIPage() {
 
         {!locked && syncFailed && (
           <div className="alert alert--error" style={{ marginBottom: 16 }}>
-            {autoSync.error || 'No se pudo sincronizar el KPI.'} Los últimos valores guardados siguen visibles; guardar y cerrar están bloqueados.
+            {autoSync.error || 'No se pudo sincronizar el KPI.'} Clase de prueba, motivos y origen comercial quedan con los últimos valores guardados: revísalos antes de guardar.
           </div>
         )}
 
@@ -316,6 +330,9 @@ export default function KPIPage() {
           {[
             {l:'Retiros del mes', v:retiradosOperativos, c:'var(--bad)'},
             {l:'Nuevos ingresos venta', v:totalIng, c:'var(--ok)'},
+            // (g1-17) Traslados aparte: entran al centro pero NO son venta
+            // nueva, por eso jamás suman en ing_* ni en la meta comercial.
+            ...(autoIngDes ? [{l:'Traslados (fuera de venta)', v:kpiAuto.traslados, c:'var(--text-dim)'}] : []),
             {l:'Nuevos activos del mes', v:nA, c:'var(--ok)'},
             {l:'Niños Final Mes', v:ninosFinal, c:'var(--text)'},
             {l:'Prom. Niños/Grupo', v:promG.toFixed(2), c:promG>=8?'var(--ok)':'var(--bad)', m:'≥ 8', ok:promG>=8},
@@ -335,6 +352,18 @@ export default function KPIPage() {
           <span className="num" style={{ fontSize: 24, fontWeight: 700, color: gpn>=0 ? 'var(--ok)' : 'var(--bad)', fontFamily: 'var(--font-serif)' }}>${gpn.toFixed(2)}</span>
           <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
         </div>
+
+        {/* KPI sin manos: fuente visible y fallback explícito (g1-20) */}
+        {!locked && autoIngDes && (
+          <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7', marginBottom: 16 }}>
+            🔗 Ventas y retiros vienen del módulo (inscripciones y retiros registrados; el cero también cuenta). Para cambiarlos, corrige el evento del niño — aquí no se digitan.
+          </div>
+        )}
+        {!locked && kpiAuto?.estado === 'fallo' && (
+          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
+            ⚠️ El cálculo automático falló: {kpiAuto.mensaje} Mientras se repara el dato, ventas y retiros quedan editables a mano.
+          </div>
+        )}
 
         {/* Tabla KPI semanal */}
         <div className="panel" style={{ marginBottom: 20 }}>
@@ -382,12 +411,46 @@ export default function KPIPage() {
                     {source || `Se llena con los ${motivosAuto?.total || 0} retiros registrados este mes.`}
                   </div>
                 )}
-                {fields.map(([lbl,key]) => (
-                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
-                    {cfgInput(key, false, !!auto)}
-                  </div>
-                ))}
+                {fields.map(([lbl,key]) => {
+                  // (g1-21) cp_matriculados: efectivo = override ?? derivado.
+                  // Editar fija el override; "Usar valor del módulo" lo limpia.
+                  // Invitados/Asistieron siguen manuales: el módulo no los sabe.
+                  if (key === 'cp_matriculados') {
+                    const override = config.cp_matriculados_override
+                    const tieneOverride = override !== null && override !== undefined && override !== ''
+                    const efectivo = override ?? cpDerivado ?? config.cp_matriculados
+                    return (
+                      <div key={key} style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
+                          <input type="number" min="0" value={efectivo} disabled={locked}
+                            onChange={e=>setConfig(c=>({...c, cp_matriculados_override: e.target.value}))}
+                            className="input num"
+                            style={{ width: 65, padding: '6px 8px', textAlign: 'center', opacity: locked ? 0.6 : 1, background: locked ? 'var(--surface-3)' : 'var(--bg)' }}/>
+                        </div>
+                        {cpDerivado != null && (
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {tieneOverride ? (
+                              <>
+                                <span>Ajustado a mano · del módulo: {cpDerivado}</span>
+                                <button onClick={()=>setConfig(c=>({...c, cp_matriculados_override: null}))} disabled={locked}
+                                  className="btn" style={{ padding: '2px 8px', fontSize: 11 }}>Usar valor del módulo</button>
+                              </>
+                            ) : (
+                              <span>🔗 del módulo</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
+                      {cfgInput(key, false, !!auto)}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}
