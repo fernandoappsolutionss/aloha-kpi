@@ -9,7 +9,7 @@ import {
 import { listarGruposActivos } from '../../../actions/grupos'
 import { inscribirEstudiante } from '../../../actions/estudiantes'
 import { origenDeRegistro } from '../../../../lib/registro-origen'
-import { ITINERARIOS, NIVEL_MAX, hoyISO } from '../../../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, ORIGENES_VENTA, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 
@@ -19,8 +19,14 @@ const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
 const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
 const ACTION_MENU_WIDTH = 238
-const ACTION_MENU_HEIGHT = 248
-const compactActionMenuHeight = (ev) => ev?.status === 'published' ? ACTION_MENU_HEIGHT : 178
+const ACTION_MENU_HEIGHT = 178
+const ORIGEN_VENTA_LABELS = {
+  referido: 'Referido',
+  marketing: 'Marketing',
+  centro: 'Centro',
+  activaciones: 'Activaciones',
+  medios: 'Medios',
+}
 // Semáforo de cupos del grupo por aperturar: verde >3, ámbar 1–3, rojo 0.
 const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
 const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
@@ -115,7 +121,7 @@ export default function EventosPage() {
     if (menuId === ev.id) { setMenuId(null); return }
     const r = e.currentTarget.getBoundingClientRect()
     const gap = 8
-    const menuHeight = compactActionMenuHeight(ev)
+    const menuHeight = ACTION_MENU_HEIGHT
     const left = Math.max(gap, Math.min(window.innerWidth - ACTION_MENU_WIDTH - gap, r.right - ACTION_MENU_WIDTH))
     const below = r.bottom + gap
     const top = below + menuHeight > window.innerHeight - gap
@@ -124,7 +130,6 @@ export default function EventosPage() {
     setMenuPos({ left, top })
     setMenuId(ev.id)
   }
-  const regUrl = (e) => `${config.baseUrl}/events/${e.share_token}`
   const segUrl = (e) => `${config.baseUrl}/events/tracking/${e.tracking_token}`
 
   const isError = status.includes('❌')
@@ -246,9 +251,7 @@ export default function EventosPage() {
           {[
             ['✏️ Editar', () => { setMenuId(null); openEdit(menuEvent, setEditing) }],
             ['⧉ Duplicar', () => onDuplicate(menuEvent)],
-            menuEvent.status === 'published' && ['🔗 Copiar link de registro', () => copy(regUrl(menuEvent), 'Link de registro copiado.')],
             ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
-            menuEvent.status === 'published' && ['👁 Ver página pública', () => { setMenuId(null); window.open(regUrl(menuEvent), '_blank') }],
             ['🗑 Eliminar', () => onDelete(menuEvent), true],
           ].filter(Boolean).map(([txt, fn, danger], k) => (
             <button key={k} onClick={fn}
@@ -582,7 +585,7 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
     nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
-    representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
+    origen_venta: '', representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
   })
   const [grupos, setGrupos] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -615,10 +618,11 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
+    if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     setSaving(true); setErr('')
     const res = await inscribirEstudiante(centroId, {
       nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
-      origen: 'clase_prueba', crm_registration_id: String(reg.id),
+      origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
       representante: f.representante, telefono: f.telefono, correo: f.correo,
     })
     setSaving(false)
@@ -662,6 +666,12 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
                   El grupo {vinculoCerrado.numero} vinculado a esta clase está 🔒 {AVISO_CERRADO_A_NUEVOS}: elige un grupo abierto o deja al niño sin grupo.
                 </div>
               )}
+            </Field>
+            <Field full label="Origen del nuevo ingreso *">
+              <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+                <option value="">Seleccionar origen</option>
+                {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
+              </select>
             </Field>
             <Field full label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
             <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>

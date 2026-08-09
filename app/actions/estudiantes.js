@@ -1,7 +1,7 @@
 'use server'
 import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
-import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, hoyISO, fechaIso10 } from '../../lib/operaciones'
+import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, esOrigenVenta, hoyISO, fechaIso10, requiereOrigenVenta } from '../../lib/operaciones'
 import { ventanaNuevos } from '../../lib/llenado.mjs'
 import { colocacionInvalida } from '../../lib/colocacion.mjs'
 import { encolarSyncCrm } from '../../lib/llenado-service'
@@ -148,6 +148,9 @@ export async function inscribirEstudiante(centroId, data) {
   }
   const fecha = data?.fecha || hoy
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
+  const origenVenta = data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
+  if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
+  if (!origenVenta && requiereOrigenVenta(fecha)) return { error: 'Selecciona el origen comercial de la venta.' }
   const { year, month } = ym(fecha)
   // (g1-11) fecha_cierre_nivel = OVERRIDE MANUAL: solo se escribe si el form
   // la trajo; el cierre derivado se calcula al vuelo y jamás se persiste.
@@ -160,54 +163,63 @@ export async function inscribirEstudiante(centroId, data) {
   // outbox van en la MISMA transacción SERIALIZABLE — si la palanca se cerró o
   // la ventana venció entre el prechequeo y el commit, no queda nada a medias.
   // El CRM se entera por el outbox (ya NO pushCuposAlCrm inline).
-  const resultado = await withTransaction(async (query) => {
-    // ORDEN DE LOCKS grupos → mes_kpi → estudiantes, el mismo de
-    // actualizarGrupo (PR #81): tomarlos siempre en este orden evita deadlocks
-    // entre editar el grupo e inscribir en él. El ORDEN DE MENSAJES no cambia:
-    // se bloquea primero y se evalúa después.
-    const g = grupoId ? await grupoDe(centroId, grupoId, query, { bloquear: true }) : null
-    // El mes KPI solo importa cuando nace el evento de venta (con grupo). El
-    // alta pendiente es ficha pura: ningún periodo del cuadro se toca (g1-8).
-    if (grupoId) {
-      const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
-      if (errorMes) return { error: errorMes }
-      if (!g) return { error: 'El grupo no pertenece a este centro.' }
-      // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
-      // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
-      const errorGrupo = grupoAceptaNinosNuevos(g, hoy)
-      if (errorGrupo) return { error: errorGrupo }
-      const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
-      if (errorColocacion) return { error: errorColocacion }
-    }
-    if (crmId) {
-      const [dup] = await query`
-        SELECT id FROM estudiantes
-        WHERE centro_id = ${centroId} AND crm_registration_id = ${crmId}
+  let resultado
+  try {
+    resultado = await withTransaction(async (query) => {
+      // ORDEN DE LOCKS grupos → mes_kpi → estudiantes, el mismo de
+      // actualizarGrupo (PR #81): tomarlos siempre en este orden evita deadlocks
+      // entre editar el grupo e inscribir en él. El ORDEN DE MENSAJES no cambia:
+      // se bloquea primero y se evalúa después.
+      const g = grupoId ? await grupoDe(centroId, grupoId, query, { bloquear: true }) : null
+      // El mes KPI solo importa cuando nace el evento de venta (con grupo). El
+      // alta pendiente es ficha pura: ningún periodo del cuadro se toca (g1-8).
+      if (grupoId) {
+        const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+        if (errorMes) return { error: errorMes }
+        if (!g) return { error: 'El grupo no pertenece a este centro.' }
+        // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
+        // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
+        const errorGrupo = grupoAceptaNinosNuevos(g, hoy)
+        if (errorGrupo) return { error: errorGrupo }
+        const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
+        if (errorColocacion) return { error: errorColocacion }
+      }
+      if (crmId) {
+        const [dup] = await query`
+          SELECT id FROM estudiantes
+          WHERE centro_id = ${centroId} AND crm_registration_id = ${crmId}
+        `
+        if (dup) return { error: 'Este registro ya fue inscrito.' }
+      }
+      // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
+      // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
+      const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
+      const [e] = await query`
+        INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
+          origen_venta, crm_registration_id, fecha_inscripcion, fecha_inicio_nivel, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
+        VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
+          ${origenVenta}, ${crmId}, ${fecha}, ${ancla}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
+          ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
+        RETURNING id
       `
-      if (dup) return { error: 'Este registro ya fue inscrito.' }
-    }
-    // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
-    // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
-    const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
-    const [e] = await query`
-      INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
-        crm_registration_id, fecha_inscripcion, fecha_inicio_nivel, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
-      VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
-        ${crmId}, ${fecha}, ${ancla}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
-        ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
-      RETURNING id
-    `
-    if (grupoId) {
-      // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
-      await query`
-        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen)
-        VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen})
-      `
-      // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
-      await encolarSyncCrm([grupoId], 'inscripcion', query)
-    }
-    return { ok: true, estudianteId: e.id, pendiente: !grupoId }
-  })
+      if (grupoId) {
+        // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
+        await query`
+          INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen)
+          VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen})
+        `
+        // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
+        await encolarSyncCrm([grupoId], 'inscripcion', query)
+      }
+      return { ok: true, estudianteId: e.id, pendiente: !grupoId }
+    })
+  } catch (error) {
+    // El índice único (centro_id, crm_registration_id) es la última palabra
+    // contra dos altas simultáneas del mismo registro de CRM: el 23505 se
+    // traduce al mismo mensaje del prechequeo, nunca a un error crudo.
+    if (crmId && error?.code === '23505') return { error: 'Este registro ya fue inscrito.' }
+    throw error
+  }
   return resultado
 }
 
@@ -247,6 +259,12 @@ export async function actualizarEstudiante(centroId, id, data) {
   if (statusPlataforma && !STATUS_PLATAFORMA.includes(statusPlataforma)) return { error: 'Status de plataforma inválido.' }
   const origen = data?.origen !== undefined ? data.origen : est.origen
   if (origen && !ORIGENES.includes(origen)) return { error: 'Origen inválido.' }
+  // Canal comercial de la venta (independiente del origen técnico de arriba):
+  // alimenta los orig_* del KPI.
+  const origenVenta = data?.origen_venta !== undefined
+    ? String(data.origen_venta || '').trim().toLowerCase() || null
+    : est.origen_venta
+  if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
   // (g1-23) ultima_asistencia ya NO se edita desde aquí: es derivada.
   for (const campo of ['fecha_inscripcion', 'fecha_cierre_nivel']) {
     if (data?.[campo] && !FECHA_RE.test(data[campo])) return { error: 'Las fechas van en formato AAAA-MM-DD.' }
@@ -506,7 +524,7 @@ export async function actualizarEstudiante(centroId, id, data) {
     await query`
       UPDATE estudiantes SET
         nombre = ${nombre}, itinerario = ${itinerario}, nivel = ${nivel}, grupo_id = ${grupoId},
-        status_plataforma = ${statusPlataforma}, origen = ${origen},
+        status_plataforma = ${statusPlataforma}, origen = ${origen}, origen_venta = ${origenVenta},
         fecha_inscripcion = ${fechaInscripcionNueva},
         fecha_inicio_nivel = ${ancla},
         fecha_cierre_nivel = ${cierreDe()},

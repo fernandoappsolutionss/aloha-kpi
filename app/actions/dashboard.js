@@ -57,7 +57,7 @@ async function aplicarMesesAbiertosVivos(rows, prevRows, lo, hi, centroIds = [])
       sql`
         SELECT id, centro_id, estudiante_id, tipo, motivo, fecha, year, month, a_grupo_id
         FROM estudiante_eventos
-        WHERE ((year * 100 + month) BETWEEN ${lo} AND ${hi}) OR tipo IN ('inscripcion', 'retiro')
+        WHERE ((year * 100 + month) BETWEEN ${lo} AND ${hi}) OR tipo IN ('inscripcion', 'retiro', 'cambio_grupo')
         ORDER BY fecha, id
       `,
     ])

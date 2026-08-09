@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
+import { loadKpiMes, saveKpiMes, cerrarMes } from '../../../actions/kpi'
 import { contarGruposActivos } from '../../../actions/grupos'
 import { ajusteHistoricoKpi, finalVisibleKpi, inicioVisibleKpi } from '../../../../lib/inicios-clase.mjs'
 
@@ -34,7 +34,7 @@ export default function KPIPage() {
   const [cerrando, setCerrando] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
-  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+  const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
   const [finalGuardado, setFinalGuardado] = useState(null)
@@ -43,6 +43,7 @@ export default function KPIPage() {
   const [arrastrado, setArrastrado] = useState(null)
   // Motivos de deserción que vienen del módulo (retiros registrados).
   const [motivosAuto, setMotivosAuto] = useState(null)
+  const [autoSync, setAutoSync] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
   // KPI sin manos (g1-16/g1-20): resultado discriminado del módulo. 'auto'
   // bloquea ing/des (el cero también es auto); 'fallo' las deja editables con
@@ -50,7 +51,7 @@ export default function KPIPage() {
   const [kpiAuto, setKpiAuto] = useState(null)
 
   const loadData = useCallback(async () => {
-    setLoading(true); setStatus('')
+    setLoading(true); setStatus(''); setAutoSync(null)
     let datos
     try {
       datos = await loadKpiMes(id, year, month)
@@ -60,7 +61,7 @@ export default function KPIPage() {
       setLoading(false)
       return
     }
-    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, kpiAuto: kAuto } = datos
+    const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, kpiAuto: kAuto, autoSync: sync } = datos
     setCentroNombre(cNombre || '')
     const estadoActual = estado || 'abierto'
     setMesEstado(estadoActual)
@@ -68,6 +69,7 @@ export default function KPIPage() {
     setCierreAnterior(cierrePrevio || null)
     setMotivosAuto(mAuto || null)
     setKpiAuto(kAuto || null)
+    setAutoSync(sync || null)
     setFinalGuardado(res?.ninos_final_mes ?? null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
@@ -78,9 +80,9 @@ export default function KPIPage() {
       arrastrado: arr?.valor,
     })
     if (res) {
-      setConfig({ ninos_inicio: ninosInicio, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, cp_matriculados_override: res.cp_matriculados_override ?? null, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos: res.grupos_activos||0, meta_nuevos_mensual: res.meta_nuevos_mensual||20, nuevos_activos_mes: res.nuevos_activos_mes||0, cp_invitados: res.cp_invitados||0, cp_asistieron: res.cp_asistieron||0, cp_matriculados: res.cp_matriculados||0, cp_matriculados_override: res.cp_matriculados_override ?? null, mot_tecnica: res.mot_tecnica||0, mot_perdida_clase: res.mot_perdida_clase||0, mot_economico: res.mot_economico||0, mot_horario: res.mot_horario||0, mot_graduado: res.mot_graduado||0, mot_otro: res.mot_otro||0, orig_referido: res.orig_referido||0, orig_marketing: res.orig_marketing||0, orig_centro: res.orig_centro||0, orig_activaciones: res.orig_activaciones||0, orig_medios: res.orig_medios||0, orig_por_clasificar: res.orig_por_clasificar||0 })
     } else {
-      setConfig({ ninos_inicio: ninosInicio, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0 })
+      setConfig({ ninos_inicio: ninosInicio, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
     }
 
     if (mAuto) setConfig(c => ({
@@ -138,9 +140,7 @@ export default function KPIPage() {
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
     try {
-      const guardado = await handleSave()
-      if (!guardado) return
-      const res = await cerrarMes(id, year, month)
+      const res = await cerrarMes(id, year, month, config, semanas)
       if (res?.error) throw new Error(res.error)
       await loadData()
       setStatus(res?.warn ? '🔒 Mes cerrado. ' + res.warn : '🔒 Mes cerrado. Datos guardados como historial.')
@@ -148,18 +148,6 @@ export default function KPIPage() {
       setStatus('❌ Error al cerrar: ' + (e?.message || 'desconocido'))
     } finally {
       setCerrando(false)
-    }
-  }
-
-  async function handleReabrirMes() {
-    if (!confirm('¿Reabrir ' + NOMBRES_MES[month-1] + ' ' + year + ' para edición?')) return
-    try {
-      const res = await reabrirMes(id, year, month)
-      if (res?.error) throw new Error(res.error)
-      await loadData()
-      setStatus('✅ Mes reabierto para edición.')
-    } catch (e) {
-      setStatus('❌ Error al reabrir: ' + (e?.message || 'desconocido'))
     }
   }
 
@@ -186,6 +174,11 @@ export default function KPIPage() {
   // auto); en 'fallo' quedan editables con la advertencia visible.
   const autoIngDes = kpiAuto?.estado === 'auto'
   const cpDerivado = autoIngDes ? kpiAuto.cp : null
+  // Sincronización de los campos de RESUMEN (clase de prueba, motivos, origen
+  // comercial). Es independiente del motor semanal: su fallo NO bloquea el KPI.
+  const automatic = autoSync?.ok === true
+  const syncFailed = autoSync?.ok === false
+  const autoPeriod = automatic
 
   const kpiRow = (tipo, label, semIdx) => {
     const s = semanas[semIdx], dias = s[tipo]
@@ -230,7 +223,7 @@ export default function KPIPage() {
             <p className="h-sub">{centroNombre}</p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {!locked ? (
+            {!locked && (
               <>
                 <button onClick={handleSave} disabled={saving} className="btn btn--primary">
                   {saving ? 'Guardando…' : 'Guardar'}
@@ -239,10 +232,6 @@ export default function KPIPage() {
                   {cerrando ? 'Cerrando…' : 'Cerrar mes'}
                 </button>
               </>
-            ) : (
-              <button onClick={handleReabrirMes} className="btn" style={{ borderColor: 'var(--warn-line)', color: 'var(--warn)' }}>
-                Reabrir mes
-              </button>
             )}
           </div>
         </div>
@@ -251,6 +240,18 @@ export default function KPIPage() {
         {locked && (
           <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
             Mes cerrado — Solo lectura. Los datos están guardados como historial.
+          </div>
+        )}
+
+        {!locked && automatic && (
+          <div className="alert" style={{ marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok)' }}>
+            Sincronizado con Clases de Prueba, Grupos y Cuadro de Negocio.{autoSync.adjusted ? ' Se conserva el ajuste inicial de agosto.' : ''}
+          </div>
+        )}
+
+        {!locked && syncFailed && (
+          <div className="alert alert--error" style={{ marginBottom: 16 }}>
+            {autoSync.error || 'No se pudo sincronizar el KPI.'} Clase de prueba, motivos y origen comercial quedan con los últimos valores guardados: revísalos antes de guardar.
           </div>
         )}
 
@@ -292,7 +293,7 @@ export default function KPIPage() {
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual']].map(([lbl,key]) => (
               <div key={key} className="field">
                 <label className="label">{lbl}</label>
-                {cfgInput(key, true, key === 'ninos_inicio' && !!arrastrado)}
+                {cfgInput(key, true, (key === 'ninos_inicio' && !!arrastrado) || (autoPeriod && key !== 'meta_nuevos_mensual'))}
                 {key === 'ninos_inicio' && arrastrado && (
                   <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                     🔗 Arrastrado del cierre de {NOMBRES_MES[arrastrado.month-1]}: los meses encadenan y este número no se digita.
@@ -306,7 +307,7 @@ export default function KPIPage() {
                 {key === 'grupos_activos' && gruposModulo !== null && (
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     El módulo de grupos cuenta {gruposModulo} activos
-                    <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={locked}
+                    <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={locked || autoPeriod}
                       className="btn" style={{ padding: '2px 8px', fontSize: 11 }}>Usar</button>
                   </span>
                 )}
@@ -318,7 +319,7 @@ export default function KPIPage() {
             </div>
             <div className="field">
               <label className="label">Nuevos activos del mes</label>
-              {cfgInput('nuevos_activos_mes', true, !!motivosAuto)}
+              {cfgInput('nuevos_activos_mes', true, autoPeriod || !!motivosAuto)}
               {motivosAuto && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{nA} inicio{nA === 1 ? '' : 's'} de clase declarado{nA === 1 ? '' : 's'} en Cuadro de Negocio</span>}
             </div>
           </div>
@@ -394,12 +395,12 @@ export default function KPIPage() {
         </div>
 
         {/* Clase de prueba / Motivos / Origen */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba', accent:'var(--ts-green)', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
-            {title:'Motivo Deserción', accent:'var(--bad)', auto: !!motivosAuto, fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
-            {title:'Origen Nuevos Ingresos', accent:'var(--ok)', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios']]},
-          ].map(({title,accent,fields,auto}) => (
+            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde Clases de Prueba.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Motivo Deserción', accent:'var(--bad)', auto:autoPeriod || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
+            {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
+          ].map(({title,accent,fields,auto,source}) => (
             <div key={title} className="panel">
               <div className="panel__head" style={{ padding: '12px 16px', borderTop: `2px solid ${accent}` }}>
                 <span className="label">{title}</span>
@@ -407,7 +408,7 @@ export default function KPIPage() {
               <div style={{ padding: 14 }}>
                 {auto && (
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
-                    🔗 Se llena solo con los {motivosAuto.total} retiro{motivosAuto.total === 1 ? '' : 's'} registrado{motivosAuto.total === 1 ? '' : 's'} este mes en Cuadro de Negocio o Grupos. Para cambiarlo, corrige el motivo al retirar al niño.
+                    {source || `Se llena con los ${motivosAuto?.total || 0} retiros registrados este mes.`}
                   </div>
                 )}
                 {fields.map(([lbl,key]) => {

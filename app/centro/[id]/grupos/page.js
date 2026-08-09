@@ -12,7 +12,7 @@ import {
   programarRetiro, cancelarRetiroProgramado,
 } from '../../../actions/estudiantes'
 import {
-  ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, DIAS, TINYMAP, aperturaMinima, hoyISO,
+  ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, ORIGENES_VENTA, DIAS, TINYMAP, aperturaMinima, fechaIso10, hoyISO,
 } from '../../../../lib/operaciones'
 import { groupStatus, underMeta, promedios, sugerenciasPara, scoreBand } from '../../../../lib/fusiones'
 import {
@@ -42,6 +42,7 @@ const ESTADO_TITULO = {
 }
 const BANDA_PILL = { Alta: 'pill--ok', Media: 'pill--warn', Baja: 'pill--bad', Bloqueado: 'pill--bad' }
 const ORIGEN_LABELS = { clase_prueba: 'Clase de prueba', directo: 'Inscripción directa', traslado: 'Traslado de centro' }
+const ORIGEN_VENTA_LABELS = { referido: 'Referido', marketing: 'Marketing', centro: 'Centro', activaciones: 'Activaciones', medios: 'Medios' }
 const BTN_XS = { padding: '4px 10px', fontSize: 11 }
 
 // Fechas DATE de Postgres llegan como string 'AAAA-MM-DD' o como Date según el driver.
@@ -263,9 +264,10 @@ export default function GruposPage() {
   const activos = grupos.filter((g) => g.estado === 'activo')
   const bajoMetaN = activos.filter((g) => underMeta(g, metas.gpnMin)).length
   const prom = promedios(grupos, metas.gpnMin)
-  const ninosActivos = grupos.reduce((s, g) => s + g.estudiantes.length, 0) + (data?.sinGrupo?.length || 0)
-
   const hoy = hoyISO()
+  const ninosActivos = activos
+    .filter((g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= hoy)
+    .reduce((s, g) => s + g.estudiantes.length, 0)
   const pasaFiltro = (g, f) => {
     const st = groupStatus(g, metas.gpnMin)
     if (f === 'todos') return g.estado === 'activo'
@@ -2361,7 +2363,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
 
 // ── Modal: inscribir niño ────────────────────────────────────────────────────
 function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
-  const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
+  const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', origen_venta: '', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
   // (g1-11) El cierre de nivel es un OVERRIDE MANUAL: solo viaja si el usuario
   // lo tocó — sin tocarlo, el cierre efectivo se deriva del plan del niño.
   const [cierreTocado, setCierreTocado] = useState(false)
@@ -2376,11 +2378,12 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
+    if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     setSaving(true); setErr('')
     try {
       const data = {
         nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-        origen: f.origen, fecha: f.fecha,
+        origen: f.origen, origen_venta: f.origen_venta, fecha: f.fecha,
         representante: f.representante, correo: f.correo, telefono: f.telefono,
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
@@ -2431,6 +2434,12 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
             {ORIGENES.map((o) => <option key={o} value={o}>{ORIGEN_LABELS[o] || o}</option>)}
           </select>
         </Field>
+        <Field label="Origen comercial *">
+          <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+            <option value="">Seleccionar origen</option>
+            {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
+          </select>
+        </Field>
         <Field label="Fecha de inscripción"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
         <Field label="Cierre de nivel (override)">
           <input type="date" className="input" value={f.fecha_cierre_nivel}
@@ -2452,7 +2461,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   const [f, setF] = useState({
     nombre: est.nombre || '', itinerario: est.itinerario, nivel: Number(est.nivel) || 1, grupo_id: est.grupo_id || '',
     fecha_cierre_nivel: isoDia(est.fecha_cierre_nivel), representante: est.representante || '', correo: est.correo || '',
-    telefono: est.telefono || '', notas: est.notas || '',
+    telefono: est.telefono || '', notas: est.notas || '', origen_venta: est.origen_venta || '',
   })
   // (g1-11) fecha_cierre_nivel = override manual: SOLO viaja si se tocó en
   // esta sesión del modal (campo ausente = no tocar). Vaciarla tocada limpia
@@ -2473,7 +2482,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
       const data = {
         nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
         representante: f.representante, correo: f.correo,
-        telefono: f.telefono, notas: f.notas,
+        telefono: f.telefono, notas: f.notas, origen_venta: f.origen_venta,
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
       const res = await actualizarEstudiante(centroId, est.id, data)
@@ -2511,6 +2520,12 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
           <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
             {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
+          </select>
+        </Field>
+        <Field label="Origen comercial">
+          <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+            <option value="">Por clasificar</option>
+            {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
           </select>
         </Field>
         <Field label="Cierre de nivel (override)">

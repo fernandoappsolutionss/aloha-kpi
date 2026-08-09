@@ -11,6 +11,8 @@ import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { cierreMesAnterior } from '../../lib/cadena'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { VENTAS_AUTO_DESDE } from '../../lib/kpi-semanal-auto.mjs'
+import { usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
+import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -54,6 +56,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     hasta: Number(year) * 100 + hi,
     periodoActual: yearActual * 100 + monthActual,
   })
+  const automaticosAbiertos = new Map()
 
   for (const abierto of abiertos) {
     try {
@@ -75,6 +78,22 @@ export async function getCentroResumen(centroId, year, trimestre) {
         inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
         motivos: motivosParaKpi(cuadroAbierto?.deserciones || []),
       })
+      if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        if (automatic.complete) {
+          rs = mezclarResumenAutomatico(rs, abierto.year, abierto.month, automatic.data)
+          ks = mezclarSemanasPeriodoAutomaticas(
+            ks,
+            centroId,
+            abierto.year,
+            abierto.month,
+            automatic.data,
+          )
+          automaticosAbiertos.set(`${abierto.year}-${abierto.month}`, automatic.data)
+        } else {
+          console.error(`[getCentroResumen] no se pudo sincronizar ${abierto.year}-${abierto.month}: ${automatic.error}`)
+        }
+      }
     } catch (e) {
       console.error(`[getCentroResumen] no se pudo calcular ${abierto.year}-${abierto.month}:`, e)
     }
@@ -111,7 +130,10 @@ export async function getCentroResumen(centroId, year, trimestre) {
 
   // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
   // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
-  const rsAnio = await sql`SELECT month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
+  let rsAnio = await sql`SELECT year, month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
+  // Deserción anual: ing/des salen SIEMPRE de la superposición del motor
+  // semanal (una sola derivación); del automático de resumen solo se toman los
+  // campos que ese motor no cubre (mot_graduado y compañía).
   let ksAnio = await sql`SELECT centro_id, year, month, semana, des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
   ;({ filas: ksAnio } = await superponerKpiAbiertos({
     filas: ksAnio,
@@ -119,6 +141,10 @@ export async function getCentroResumen(centroId, year, trimestre) {
     desde: Number(year) * 100 + 1,
     hasta: Number(year) * 100 + 12,
   }))
+  for (const [periodo, automatic] of automaticosAbiertos) {
+    const [autoYear, autoMonth] = periodo.split('-').map(Number)
+    rsAnio = mezclarResumenAutomatico(rsAnio, autoYear, autoMonth, automatic)
+  }
   const graduadosAnio = rsAnio.reduce((a, r) => a + (r.mot_graduado || 0), 0)
   const bajasAnio = ksAnio.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
   const ninosInicioAnio = rsAnio.find((r) => (r.ninos_inicio_mes || 0) > 0)?.ninos_inicio_mes || 0
@@ -142,13 +168,16 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const eventosProyeccion = await sql`
     SELECT id, estudiante_id, tipo, fecha, a_grupo_id
     FROM estudiante_eventos
-    WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'retiro')
+    WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'retiro', 'cambio_grupo')
     ORDER BY fecha, id
   `
   const gruposPorId = new Map(gruposProyeccion.map((grupo) => [String(grupo.id), grupo]))
   const poblacionOperativa = estudiantesProyeccion.filter((estudiante) => {
     if (estudiante.estado !== 'activo' && estudiante.estado !== 'baja_potencial') return false
     const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
+    // Sin grupo no hay población operativa: una venta sin colocar todavía no
+    // es un niño activo.
+    if (!grupo) return false
     // (R1, g1-1) La población operativa depende EXCLUSIVAMENTE de la fecha de
     // inicio de clases del grupo. Los grupos veteranos con fecha futura se
     // corrigen en los datos (preflight g1-1); mientras tanto los cubre la
@@ -270,6 +299,16 @@ export async function getHistorialCentro(centroId) {
         inicioArrastrado: cierreVivoAnterior ?? cierreAnterior?.valor,
         motivos: motivosParaKpi(d?.deserciones || []),
       })
+      if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        if (automatic.complete) {
+          // Solo los campos de resumen: los totales de ventas y deserción del
+          // mes abierto ya vienen superpuestos arriba desde el motor semanal.
+          resumen = mezclarResumenAutomatico(resumen, abierto.year, abierto.month, automatic.data)
+        } else {
+          console.error(`[getHistorialCentro] no se pudo sincronizar ${abierto.year}-${abierto.month}: ${automatic.error}`)
+        }
+      }
       const cuadroVivo = {
         year: abierto.year,
         month: abierto.month,
