@@ -18,6 +18,7 @@ const grupoSelector = (overrides = {}) => ({
   nivel: 1,
   inscripcionAbierta: true,
   fechaLimiteNuevos: '2026-10-07',
+  razonLimiteNuevos: null,
   cupos: 4,
   horarioTexto: 'lun 3:00–4:00 pm',
   ...overrides,
@@ -68,7 +69,25 @@ test('ventana vencida = no acepta', () => {
 })
 
 test('sin fecha límite (exento o sin itinerario válido) se falla ABIERTO', () => {
-  assert.equal(aceptaNuevosEnSelector(grupoSelector({ fechaLimiteNuevos: null }), '2027-01-01'), true)
+  assert.equal(aceptaNuevosEnSelector(grupoSelector({ fechaLimiteNuevos: null, razonLimiteNuevos: 'exento' }), '2027-01-01'), true)
+  assert.equal(
+    aceptaNuevosEnSelector(grupoSelector({ fechaLimiteNuevos: null, razonLimiteNuevos: 'sin_itinerario_valido' }), '2027-01-01'),
+    true,
+  )
+  // Razón ausente (payload viejo en vuelo): tampoco se cierra a ciegas.
+  assert.equal(aceptaNuevosEnSelector(grupoSelector({ fechaLimiteNuevos: null, razonLimiteNuevos: undefined }), '2027-01-01'), true)
+})
+
+test('cerrado por nivel avanzado: fecha null pero NO es exento — el selector no lo ofrece', () => {
+  // Del nivel 2 en adelante el llenado del grupo ya pasó (lib/llenado.mjs).
+  // Sin la razón, ese null se leía como "sin límite" y el vendedor escogía un
+  // grupo que el server rechaza al guardar (desajuste UI↔server).
+  const veterano = grupoSelector({ nivel: 10, fechaLimiteNuevos: null, razonLimiteNuevos: 'nivel_avanzado' })
+  assert.equal(aceptaNuevosEnSelector(veterano, '2026-08-10'), false)
+  // Con extensión manual vuelve a tener fecha y razón null: sí acepta.
+  const extendido = grupoSelector({ nivel: 10, fechaLimiteNuevos: '2026-09-15', razonLimiteNuevos: null })
+  assert.equal(aceptaNuevosEnSelector(extendido, '2026-08-10'), true)
+  assert.equal(aceptaNuevosEnSelector(extendido, '2026-09-16'), false)
 })
 
 // --- ordenarPorLimiteNuevos ---

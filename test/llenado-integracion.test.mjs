@@ -7,8 +7,11 @@ import assert from 'node:assert/strict'
 // secuencia única `visibles` de la lista de grupos. Lo que necesita BD o red
 // (SKIP LOCKED real, presupuesto, push al CRM) queda para el smoke en preview.
 
+import { readFileSync } from 'node:fs'
+
 import { fingerprintLlenado } from '../lib/llenado-outbox.mjs'
-import { ventanaNuevos, ordenarPorCierreLlenado } from '../lib/llenado.mjs'
+import { ventanaNuevos, ordenarPorCierreLlenado, fechaLimiteNuevos } from '../lib/llenado.mjs'
+import { aceptaNuevosEnSelector, ordenarPorLimiteNuevos } from '../lib/colocacion.mjs'
 import { armarAlohaGroupPayload } from '../lib/cupos-payload.mjs'
 
 // --- Fixtures: misma forma de itinerario que genera lib/itinerario.js -------
@@ -214,4 +217,79 @@ test('al vencer una ventana el grupo pasa a resto sin duplicarse ni perderse', (
   assert.deepEqual(resto.map((g) => g.id), [10, 20, 40, 60])
   assert.equal(visiblesKey, '30,50,10,20,40,60')
   assert.equal(new Set(visibles.map((g) => String(g.id))).size, visibles.length)
+})
+
+// =============================================================================
+// El selector del vendedor y el server tienen que decir LO MISMO (2026-08-10)
+// =============================================================================
+
+// Espejo de la proyección de listarGruposActivos (app/actions/grupos.js:939-961):
+// lo ÚNICO que el navegador recibe del llenado de cada grupo. Si esa proyección
+// pierde información, el cliente decide distinto que el server y el vendedor
+// escoge un grupo que al guardar se rechaza.
+const proyectarParaSelector = (g) => ({
+  id: g.id,
+  numero: g.numero ?? 1,
+  itinerario: g.itinerario,
+  nivel: Number(g.itinerario_clases?.nivel) || 1,
+  inscripcionAbierta: g.inscripcion_abierta !== false,
+  fechaLimiteNuevos: fechaLimiteNuevos(g).fechaLimite,
+  razonLimiteNuevos: fechaLimiteNuevos(g).razon,
+  cupos: 4,
+})
+
+// Un TINY veterano: itinerario del nivel 10 recién regenerado (semana 4 del
+// libro cayendo dentro de la ventana). El manual NO lo reabre a nuevos: su
+// llenado fue en el arranque del grupo.
+const veteranoNivel10 = (extra = {}) => grupoTiny({
+  id: 22,
+  itinerario_clases: {
+    nivel: 10,
+    fecha_inicio: '2026-08-03',
+    semanas: [semana('4', 'clase', ['2026-09-30'])],
+  },
+  ...extra,
+})
+
+test('selector ≡ server: la razón viaja en el payload y nadie ofrece lo que el server rechaza', () => {
+  const hoy = '2026-08-10'
+  const casos = [
+    ['nivel 1 en ventana', conLimite(10, '2026-09-30')],
+    ['nivel 1 vencido', conLimite(40, '2026-08-01')],
+    ['exento (KINDER)', grupoTiny({ id: 50, itinerario: 'KINDER' })],
+    ['palanca cerrada', conLimite(20, '2026-09-30', { inscripcion_abierta: false })],
+    ['veterano nivel 10', veteranoNivel10()],
+    ['veterano con extensión vigente', veteranoNivel10({ llenado_extendido_hasta: '2026-08-31' })],
+    ['veterano con extensión vencida', veteranoNivel10({ llenado_extendido_hasta: '2026-08-01' })],
+  ]
+  for (const [nombre, g] of casos) {
+    const server = ventanaNuevos(g, hoy).abierta
+    const cliente = aceptaNuevosEnSelector(proyectarParaSelector(g), hoy)
+    assert.equal(cliente, server, `${nombre}: el selector dice ${cliente} y el server ${server}`)
+  }
+})
+
+test('selector: el veterano de nivel 10 no se ordena como exento — ni siquiera entra a la lista', () => {
+  const hoy = '2026-08-10'
+  const grupos = [conLimite(10, '2026-09-30'), veteranoNivel10(), grupoTiny({ id: 50, itinerario: 'KINDER' })]
+    .map(proyectarParaSelector)
+  const abiertos = ordenarPorLimiteNuevos(grupos.filter((g) => aceptaNuevosEnSelector(g, hoy)))
+  assert.deepEqual(abiertos.map((g) => g.id), [10, 50]) // el 22 (nivel 10) no se ofrece
+  // Y su etiqueta jamás se pinta como un exento con cupos libres.
+  assert.equal(abiertos.some((g) => g.id === 22), false)
+})
+
+// =============================================================================
+// La superficie tiene que nombrar TODA razón de cierre (defecto Calle 50 G22)
+// =============================================================================
+
+// La pantalla de grupos es JSX y el repo no corre React en los tests: lo que sí
+// se puede verificar en frío es que ninguna razón de cierre se quede sin
+// tratamiento en el archivo. El defecto real fue exactamente ese — la regla se
+// arregló en lib/llenado.mjs y el panel siguió pintando "En llenado".
+test('la pantalla de grupos trata cada razón por la que un grupo NO acepta nuevos', () => {
+  const fuente = readFileSync(new URL('../app/centro/[id]/grupos/page.js', import.meta.url), 'utf8')
+  for (const razon of ['no_activo', 'palanca_cerrada', 'vencida', 'nivel_avanzado']) {
+    assert.ok(fuente.includes(`'${razon}'`), `la pantalla no contempla la razón ${razon}`)
+  }
 })

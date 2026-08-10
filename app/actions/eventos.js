@@ -116,6 +116,11 @@ async function grupoValido(centroId, grupoId, conservarId = null) {
     if (v.razon === 'palanca_cerrada') {
       return { error: `El grupo ${g.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones antes de vincularlo.` }
     }
+    // Sin fecha límite que mostrar (el llenado del grupo ya pasó): mensaje
+    // propio en vez del "venció el null" que salía por la rama de abajo.
+    if (v.razon === 'nivel_avanzado') {
+      return { error: `El grupo ${g.numero} ya no acepta niños NUEVOS: su llenado fue en el arranque y hoy va en un nivel más adelantado. Extiende la ventana desde Grupos y Fusiones o vincula un grupo en llenado.` }
+    }
     return { error: `El grupo ${g.numero} ya no acepta niños NUEVOS: su ventana venció el ${v.fechaLimite} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana desde Grupos y Fusiones o vincula el grupo de la próxima inducción.` }
   }
   return { grupoId: g.id }

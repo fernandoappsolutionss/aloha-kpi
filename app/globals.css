@@ -190,6 +190,12 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .pill--warn .dot { background: var(--warn); }
 .pill--bad  { background: var(--bad-bg);  color: #FCA5A5; border: 1px solid var(--bad-line); }
 .pill--bad  .dot { background: var(--bad); }
+/* Pill que ABRE algo (el chip "va por S{x}" → el plan del niño). El realce va
+   por box-shadow: el color y el borde del chip vienen en estilo inline según
+   su estado y no deben cambiar al pasar el mouse. */
+.pill--link { cursor: pointer; transition: box-shadow 0.15s var(--ease); }
+.pill--link:hover { box-shadow: 0 0 0 2px var(--ts-green-soft); }
+.pill--link:focus-visible { outline: 2px solid var(--ts-green); outline-offset: 2px; }
 
 .bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden; min-width: 64px; flex: 1; }
 .bar__fill { height: 100%; border-radius: 99px; transform-origin: left; animation: barGrow 0.7s var(--ease) both; }
@@ -364,6 +370,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .itin-fecha:hover { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
 /* Clase que NO se dio (feriado o suspensión): por eso corrió el plan. */
 .itin-fecha--out { color: var(--text-faint); text-decoration: line-through; cursor: help; }
+/* Fecha de solo lectura (plan de UN niño): suspender una clase es del aula, no
+   suya — el hover no debe insinuar que aquí se toca el calendario del grupo. */
+.itin-fecha--fija { cursor: default; }
+.itin-fecha--fija:hover { color: var(--text-dim); border-color: transparent; background: transparent; }
 
 /* Roster apilado (panel deslizante): la tabla no cabe en pantalla angosta. */
 .grp-roster__item { padding: 13px 18px; border-bottom: 1px solid var(--border); }

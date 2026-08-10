@@ -13,8 +13,10 @@ import {
   primerDiaMesSiguiente,
   estadoPrevioDeProgramacion,
 } from '../../lib/retiros.mjs'
-import { planNino, posicionPlanNino, calendarioVersionadoDe, crearMemoPlanes } from '../../lib/plan-nino.mjs'
+import { planNino, posicionPlanNino, calendarioVersionadoDe, crearMemoPlanes, enriquecerNinos } from '../../lib/plan-nino.mjs'
 import { reAnclaEnDestino } from '../../lib/plan-grupo.mjs'
+import { ORIGENES_ANCLA, TIPOS_EVENTO_ANCLA, errorFechaAncla, sugerenciasAncla, topeAncla } from '../../lib/ancla-sugerencias.mjs'
+import { idsDeLote, preparaFijadoAncla } from '../../lib/ancla-lote.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -57,6 +59,11 @@ function grupoAceptaNinosNuevos(grupo, hoy = hoyISO()) {
   if (v.razon === 'no_activo') return 'El grupo no está activo.'
   if (v.razon === 'palanca_cerrada') {
     return `El grupo ${grupo.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones si tiene cupo.`
+  }
+  // Cerrado por nivel avanzado no tiene fecha límite que mostrar: decir
+  // "venció el null" era el mensaje que salía antes de esta rama.
+  if (v.razon === 'nivel_avanzado') {
+    return `El grupo ${grupo.numero} ya no acepta niños NUEVOS: su llenado fue en el arranque y hoy va en un nivel más adelantado. Extiende la ventana desde Grupos y Fusiones (queda registrado) o coloca al niño en un grupo en llenado.`
   }
   return `El grupo ${grupo.numero} ya no acepta niños NUEVOS: su ventana venció el ${v.fechaLimite} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana desde Grupos y Fusiones o apunta la venta a la inducción del próximo nivel.`
 }
@@ -591,6 +598,236 @@ export async function graduarTiny(centroId, id) {
     `
     return { ok: true }
   })
+}
+
+// ── Fijar el ancla de nivel a mano (R3, la salida de los "sin plan") ────────
+// El backfill (g1-12) dejó fuera A PROPÓSITO a los niños cuya historia no
+// demuestra su ancla (evento de inscripción con nivel discordante, movimientos
+// que no calzan, aula con otro nivel): salen con el chip "sin plan" y sin plan
+// no hay semana, ni cierre, ni aviso de liberación. Esta es la única puerta
+// para ponerles el ancla — y NO es un cambio de nivel: el niño sigue en el
+// nivel que ya cursa; lo que se declara es CUÁNDO lo empezó.
+// Las opciones que la pantalla ofrece las arma lib/ancla-sugerencias.mjs
+// (puro): con el grupo, con la cohorte, desde su inscripción o a mano.
+
+// Las aulas de una lista de niños con sus horarios: de ahí sale el calendario
+// versionado con el que se deriva cualquier plan (lib/plan-nino).
+async function gruposDeNinos(query, centroId, ninos) {
+  const idsGrupos = [...new Set((ninos || []).map((n) => n.grupo_id).filter((v) => v != null).map(Number))]
+  if (!idsGrupos.length) return []
+  const filas = await query`
+    SELECT * FROM grupos WHERE id = ANY(${idsGrupos}::int[]) AND centro_id = ${centroId}
+  `
+  const horarios = await query`
+    SELECT grupo_id, dia FROM grupo_horarios WHERE grupo_id = ANY(${idsGrupos}::int[])
+  `
+  return filas.map((g) => ({
+    ...g,
+    horarios: horarios.filter((h) => String(h.grupo_id) === String(g.id)),
+  }))
+}
+
+// Los niños de la operación con su plan derivado RECALCULADO, en la MISMA
+// forma que el roster (lib/plan-nino: { estado, ancla, indiceSemana, semana,
+// cierre, itinerario }) — así la UI lo pinta sin recargar y sin derivar nada.
+async function planesDerivadosDe(query, centroId, ninos, hoy) {
+  const [centro] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+  const grupos = await gruposDeNinos(query, centroId, ninos)
+  return enriquecerNinos(ninos, grupos, { hoy, pais: paisDe(centro), memo: crearMemoPlanes() })
+}
+
+// Motor compartido por fijarInicioNivel y fijarInicioNivelLote: MISMA
+// validación, UNA transacción, lock por niño y evento de rastro por cambio
+// real. Devuelve { ok, actualizados, ninos: [{ id, nombre, actualizado, plan }] }.
+async function fijarAnclasDeNivel(centroId, ids, { fecha, origen } = {}) {
+  const hoy = hoyISO()
+  const errorFecha = errorFechaAncla(fecha, hoy)
+  if (errorFecha) return { error: errorFecha }
+  const ancla = fechaIso10(fecha)
+  const origenAncla = origen == null || origen === '' ? 'manual' : String(origen)
+  if (!ORIGENES_ANCLA.includes(origenAncla)) {
+    return { error: 'Origen de la sugerencia inválido: usa una de las opciones de la pantalla o escribe la fecha a mano.' }
+  }
+  // Únicos y ORDENADOS: el orden ascendente es el mismo del lock (idsDeLote).
+  const unicos = idsDeLote(ids)
+  if (!unicos.length) return { error: 'Selecciona al menos un niño para fijarle el inicio de nivel.' }
+
+  const now = new Date().toISOString()
+  return await withTransaction(async (query) => {
+    // Se bloquean el mes del ANCLA (mover el ancla mueve el cierre de nivel
+    // que se declara) y el mes de HOY (donde nace el evento de rastro). El mes
+    // del ancla VIEJA no se bloquea a propósito: el ancla no alimenta ing_*/
+    // des_* ni el snapshot mensual, y exigirlo dejaría sin reparación a los
+    // niños cuyo dato malo cayó en un mes ya cerrado.
+    const errorMes = await bloquearMesesEditables(query, centroId, [ym(ancla), ym(hoy)])
+    if (errorMes) {
+      // Qué mes lo frenó no puede quedar en misterio: el admin necesita saber
+      // si el problema es la fecha que propuso o el mes en curso.
+      const mes = (f) => `${String(ym(f).month).padStart(2, '0')}/${ym(f).year}`
+      return { error: `${errorMes} El inicio que propones cae en ${mes(ancla)} y el rastro del cambio en ${mes(hoy)}: los dos meses tienen que estar abiertos.` }
+    }
+    // Lock por id ascendente (mismo patrón de aplicarFusion): dos ediciones
+    // cruzadas del mismo grupo no se traban entre sí.
+    const ninos = await query`
+      SELECT * FROM estudiantes
+      WHERE id = ANY(${unicos}::int[]) AND centro_id = ${centroId}
+      ORDER BY id
+      FOR UPDATE
+    `
+    // La regla de quién se escribe vive en lib/ancla-lote (puro, con test
+    // espejo): cohorte completa, nadie retirado, nadie sin grupo, y el que ya
+    // tiene esa misma fecha sale con `cambia: false` (idempotencia).
+    const prep = preparaFijadoAncla({ ninos, ids: unicos, ancla })
+    if (prep.error) return { error: prep.error }
+
+    const { year, month } = ym(hoy)
+    const cambios = new Map(prep.cambios.map((c) => [String(c.id), c.cambia]))
+    for (const c of prep.cambios) {
+      // Idempotente: fijar la MISMA fecha no toca la ficha ni duplica evento.
+      if (!c.cambia) continue
+      await query`
+        UPDATE estudiantes SET fecha_inicio_nivel = ${ancla}, updated_at = ${now} WHERE id = ${c.id}
+      `
+      // Evento de RASTRO, no de nivel: de_nivel = a_nivel = el que ya cursa.
+      // Con a_nivel concordante, un backfill futuro lo reconoce como fuente
+      // legítima del ancla (peldaño 1 de lib/backfill-anclas-nivel.mjs) en vez
+      // de marcar al niño como historia rota.
+      const detalle = {
+        ancla_antes: c.anclaAntes,
+        ancla_despues: ancla,
+        origen: origenAncla,
+        motivo: 'fijar_inicio_nivel',
+      }
+      await query`
+        INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, de_nivel, a_nivel, detalle)
+        VALUES (${c.id}, ${centroId}, 'cambio_nivel', ${year}, ${month}, ${hoy},
+          ${c.nivel}, ${c.nivel}, ${JSON.stringify(detalle)})
+      `
+    }
+    const actualizados = prep.actualizados
+
+    // (g1-15) SIN encolarSyncCrm: las anclas individuales no alimentan ni la
+    // ventana de llenado ni el CRM — solo la referencia del grupo lo hace.
+
+    // Plan derivado con el ancla YA escrita (misma transacción): la fila leída
+    // arriba es la vieja, así que se recalcula sobre el valor nuevo.
+    const enriquecidos = await planesDerivadosDe(
+      query,
+      centroId,
+      ninos.map((n) => ({ ...n, fecha_inicio_nivel: ancla })),
+      hoy,
+    )
+    return {
+      ok: true,
+      actualizados,
+      ninos: enriquecidos.map((n) => ({
+        id: Number(n.id),
+        nombre: n.nombre,
+        actualizado: cambios.get(String(n.id)) === true,
+        plan: n.plan,
+      })),
+    }
+  })
+}
+
+// Fija el inicio de nivel de UN niño. `origen` es la fuente que escogió el
+// admin (lib/ancla-sugerencias.mjs); queda en el detalle del evento para saber
+// después POR QUÉ esa fecha. Devuelve el plan derivado recalculado.
+export async function fijarInicioNivel(centroId, estudianteId, { fecha, origen } = {}) {
+  await requireCentroAccess(centroId)
+  const r = await fijarAnclasDeNivel(centroId, [estudianteId], { fecha, origen })
+  if (r.error) return r
+  const [n] = r.ninos
+  return { ok: true, actualizado: !!n?.actualizado, plan: n?.plan || null }
+}
+
+// Variante en LOTE: los niños de un grupo que comparten la misma situación
+// (caso Calle 50 G71: 7 niños KIDS 3, todos sin ancla) se resuelven de un
+// tirón — MISMA validación, UNA sola transacción: o entran todos o no entra
+// ninguno.
+export async function fijarInicioNivelLote(centroId, { estudianteIds, fecha, origen } = {}) {
+  await requireCentroAccess(centroId)
+  return await fijarAnclasDeNivel(centroId, estudianteIds, { fecha, origen })
+}
+
+// Las opciones de ancla de uno o varios niños — SOLO LECTURA: no escribe nada
+// (eso es fijarInicioNivel/fijarInicioNivelLote). Se calcula en el SERVIDOR
+// porque las tres fuentes viven en la BD y el navegador no las tiene: la
+// referencia del aula, las anclas de los compañeros y sobre todo el EVENTO de
+// inscripción canónico — que NO es la `fecha_inscripcion` de la ficha (en el
+// pendiente colocado la fecha KPI nace en la colocación, g1-8). El país sale
+// del centro, no del reloj del navegador.
+// → { ok, hoy, tope, ninos: [{ id, nombre, itinerario, nivel, grupo_id, opciones, recomendada }] }
+export async function sugerenciasAnclaNinos(centroId, estudianteIds) {
+  await requireCentroAccess(centroId)
+  const ids = [...new Set((estudianteIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+  if (!ids.length) return { error: 'Selecciona al menos un niño para ver sus opciones de inicio de nivel.' }
+  const [centro] = await sql`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
+  const ninos = await sql`
+    SELECT * FROM estudiantes WHERE id = ANY(${ids}::int[]) AND centro_id = ${centroId} ORDER BY nombre
+  `
+  if (ninos.length !== ids.length) {
+    return { error: 'Alguno de los niños ya no está en este centro. Recarga la pantalla antes de continuar.' }
+  }
+  const grupos = await gruposDeNinos(sql, centroId, ninos)
+  const idsGrupos = grupos.map((g) => Number(g.id))
+  // Compañeros = los OTROS del aula que siguen asistiendo (activo o baja
+  // potencial): un retirado ya no define la cohorte del nivel.
+  const companeros = idsGrupos.length
+    ? await sql`
+        SELECT id, grupo_id, itinerario, nivel, estado, fecha_inicio_nivel
+        FROM estudiantes
+        WHERE centro_id = ${centroId} AND grupo_id = ANY(${idsGrupos}::int[])
+          AND estado IN ('activo', 'baja_potencial')
+      `
+    : []
+  // Los eventos que hacen falta para VERIFICAR cada fuente, no solo la
+  // inscripción: los movimientos que pudieron re-anclar al niño (traslado,
+  // fusión, cambio de nivel) y, en todos, `a_nivel` y `a_grupo_id`. Sin esas
+  // dos columnas la pantalla ofrecía como "la más probable" la inscripción de
+  // OTRO nivel — justo la que el backfill rechazó por discordante — y le
+  // prestaba la fecha del aula a un niño que ese día estaba en otro salón.
+  const eventos = await sql`
+    SELECT id, estudiante_id, tipo, fecha, a_nivel, a_grupo_id
+    FROM estudiante_eventos
+    WHERE estudiante_id = ANY(${ids}::int[]) AND centro_id = ${centroId}
+      AND tipo = ANY(${TIPOS_EVENTO_ANCLA}::text[])
+    ORDER BY fecha, id
+  `
+  const hoy = hoyISO()
+  const pais = paisDe(centro)
+  const memo = crearMemoPlanes()
+  const porGrupo = new Map(grupos.map((g) => [String(g.id), g]))
+  return {
+    ok: true,
+    hoy,
+    tope: topeAncla(hoy),
+    ninos: ninos.map((n) => {
+      const grupo = n.grupo_id == null ? null : porGrupo.get(String(n.grupo_id)) || null
+      const s = sugerenciasAncla(
+        {
+          nino: n,
+          grupo,
+          companeros: companeros.filter(
+            (c) => String(c.grupo_id) === String(n.grupo_id) && String(c.id) !== String(n.id),
+          ),
+          eventos: eventos.filter((e) => String(e.estudiante_id) === String(n.id)),
+          hoy,
+          pais,
+        },
+        memo,
+      )
+      return {
+        id: Number(n.id),
+        nombre: n.nombre,
+        itinerario: n.itinerario,
+        nivel: Number(n.nivel),
+        grupo_id: n.grupo_id == null ? null : Number(n.grupo_id),
+        opciones: s.opciones,
+        recomendada: s.recomendada,
+      }
+    }),
+  }
 }
 
 // Baja potencial (cuadro real: sigue este mes, se va el próximo). El motivo es

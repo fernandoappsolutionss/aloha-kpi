@@ -56,7 +56,7 @@ test('fingerprint: cruzar la fecha límite lo cambia sin tocar el grupo (vencimi
   assert.notEqual(antes, despues)
 })
 
-test('fingerprint: pasar de nivel reabre y cambia el fingerprint (apertura)', () => {
+test('fingerprint: pasar de nivel CIERRA la ventana y cambia el fingerprint', () => {
   const vencido = fingerprintLlenado(grupoTiny(), '2026-10-01')
   const nivel2 = fingerprintLlenado(grupoTiny({
     itinerario_clases: {
@@ -71,7 +71,9 @@ test('fingerprint: pasar de nivel reabre y cambia el fingerprint (apertura)', ()
     },
   }), '2026-10-01')
   assert.equal(vencido, 'TINY 1|2026-09-23|cerrada')
-  assert.equal(nivel2, 'TINY 2|2027-02-03|abierta')
+  // Regla de Fernando 2026-08-10: la ventana es del llenado del grupo, no de
+  // cada nivel — un veterano que arranca nivel 2 no vuelve a aceptar nuevos.
+  assert.equal(nivel2, 'TINY 2|nivel_avanzado|cerrada')
 })
 
 test('fingerprint: la palanca manual cerrada también lo cambia', () => {
