@@ -3,7 +3,7 @@ import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { balanceMensual, cierreKpiDeclarado, cuadroConBalanceDeclarado, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
+import { balanceMensual, cierreKpiDeclarado, cuadroConBalanceDeclarado, ESTADO_MES_CERRANDO, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
 import { fallo } from '../../lib/errores'
 import { cierreMesAnterior } from '../../lib/cadena'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
@@ -408,5 +408,57 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
     })
   } catch (e) {
     return fallo('cerrarMes', e)
+  }
+}
+
+// Reabre un mes cerrado para corregirlo. Los cierres los hace la
+// administradora del centro y se equivoca: sin esto, un mes mal cerrado queda
+// congelado para siempre y hay que entrar por la base de datos a arreglarlo.
+//
+// La foto del Cuadro (cuadro_mensual) NO se borra: mientras el mes esté
+// abierto el Cuadro se calcula en vivo y esa foto se ignora; al volver a
+// cerrar, cerrarMes la reemplaza. Así reabrir nunca deja al centro sin
+// historial, ni siquiera si el mes se queda abierto.
+export async function reabrirMes(centroId, year, month) {
+  const y = intOr(year)
+  const m = intOr(month)
+  try {
+    await requireCentroAccess(centroId)
+    return await withTransaction(async (query) => {
+      const [mes] = await query`
+        SELECT estado FROM mes_kpi
+        WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
+        FOR UPDATE
+      `
+      if (!mes) return { error: 'Ese mes no existe en el historial del centro.' }
+      if (mes.estado === ESTADO_MES_CERRANDO) {
+        return { error: 'El mes se está cerrando. Intenta de nuevo en unos segundos.' }
+      }
+      if (mes.estado !== 'cerrado') return { ok: true, yaAbierto: true }
+
+      await query`
+        UPDATE mes_kpi SET estado = 'abierto', cerrado_at = NULL
+        WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
+      `
+      // Aviso, no bloqueo: el cierre de este mes es el inicio del siguiente,
+      // así que si ya hay meses cerrados después, corregir aquí NO los mueve
+      // solos — hay que reabrirlos y volverlos a cerrar en orden.
+      const posteriores = await query`
+        SELECT year, month FROM mes_kpi
+        WHERE centro_id = ${centroId} AND estado = 'cerrado'
+          AND (year * 100 + month) > ${y * 100 + m}
+        ORDER BY year, month
+      `
+      if (posteriores.length) {
+        const lista = posteriores.map((p) => `${String(p.month).padStart(2, '0')}/${p.year}`).join(', ')
+        return {
+          ok: true,
+          warn: `Ojo: ${lista} ya está${posteriores.length === 1 ? '' : 'n'} cerrado${posteriores.length === 1 ? '' : 's'}. Si cambias el cierre de este mes, ese arranque no se actualiza solo — hay que reabrir y volver a cerrar en orden.`,
+        }
+      }
+      return { ok: true }
+    })
+  } catch (e) {
+    return fallo('reabrirMes', e)
   }
 }

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { loadKpiMes, saveKpiMes, cerrarMes } from '../../../actions/kpi'
+import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
 import { contarGruposActivos } from '../../../actions/grupos'
 import { ajusteHistoricoKpi, finalVisibleKpi, inicioVisibleKpi } from '../../../../lib/inicios-clase.mjs'
 
@@ -151,6 +151,23 @@ export default function KPIPage() {
     }
   }
 
+  // Un mes cerrado por error no puede quedar congelado para siempre: la
+  // administradora lo reabre, corrige y vuelve a cerrar.
+  async function handleReabrirMes() {
+    if (!confirm('¿Reabrir ' + NOMBRES_MES[month-1] + ' ' + year + '? Volverá a ser editable y tendrás que cerrarlo de nuevo para que quede como historial.')) return
+    setCerrando(true)
+    try {
+      const res = await reabrirMes(id, year, month)
+      if (res?.error) throw new Error(res.error)
+      await loadData()
+      setStatus(res?.warn ? '🔓 Mes reabierto. ⚠️ ' + res.warn : '🔓 Mes reabierto: ya puedes corregirlo. Recuerda cerrarlo otra vez.')
+    } catch (e) {
+      setStatus('❌ Error al reabrir: ' + (e?.message || 'desconocido'))
+    } finally {
+      setCerrando(false)
+    }
+  }
+
   const ni = parseInt(config.ninos_inicio)||0
   const nA = parseInt(config.nuevos_activos_mes)||0
   const gA = parseInt(config.grupos_activos)||1
@@ -223,7 +240,11 @@ export default function KPIPage() {
             <p className="h-sub">{centroNombre}</p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {!locked && (
+            {locked ? (
+              <button onClick={handleReabrirMes} disabled={cerrando} className="btn">
+                {cerrando ? 'Reabriendo…' : 'Reabrir mes'}
+              </button>
+            ) : (
               <>
                 <button onClick={handleSave} disabled={saving} className="btn btn--primary">
                   {saving ? 'Guardando…' : 'Guardar'}
@@ -239,7 +260,7 @@ export default function KPIPage() {
         {/* Estado del mes */}
         {locked && (
           <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
-            Mes cerrado — Solo lectura. Los datos están guardados como historial.
+            Mes cerrado — Solo lectura. Los datos están guardados como historial. Si quedó mal, usa “Reabrir mes”, corrige y vuelve a cerrarlo.
           </div>
         )}
 
