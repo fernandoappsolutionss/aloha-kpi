@@ -10,7 +10,12 @@ import {
   inscribirEstudiante, actualizarEstudiante, graduarTiny,
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
   programarRetiro, cancelarRetiroProgramado,
+  sugerenciasAnclaNinos, fijarInicioNivel, fijarInicioNivelLote,
 } from '../../../actions/estudiantes'
+import SelectorAncla from '../../../../components/SelectorAncla'
+// Montones del aula (uno por itinerario+nivel: un libro, con sus cohortes de
+// arranque) y opciones que se pueden aplicar a TODO un lote a la vez.
+import { montonesConPlan, subgruposSinPlan, opcionesComunes, siguePlanDelAula } from '../../../../lib/ancla-lote.mjs'
 import {
   ITINERARIOS, NIVEL_MAX, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, ORIGENES, ORIGENES_VENTA, DIAS, TINYMAP, aperturaMinima, fechaIso10, hoyISO,
 } from '../../../../lib/operaciones'
@@ -23,7 +28,11 @@ import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, 
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
 import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_COACH } from '../../../../lib/reservas'
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
-import { generarItinerario, semanaEnCurso, TIPOS_SEMANA } from '../../../../lib/itinerario'
+import { generarItinerario, semanaEnCurso } from '../../../../lib/itinerario'
+// La línea de tiempo del plan vive en components/PlanNino (misma pinta para el
+// aula y para el niño); el modal del plan individual se abre desde el chip.
+import { LineaTiempoPlan, NotasPlan, ProgresoPlan, PlanNinoModal, mesDe } from '../../../../components/PlanNino'
+import { posicionDeIndice } from '../../../../lib/plan-nino-vista.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
@@ -69,22 +78,38 @@ function semanaNinoTexto(plan) {
   return `S${(plan.indiceSemana ?? 0) + 1}`
 }
 
-// Chip "va por S{x}" del roster y las fusiones, con el estado explícito.
+// Chip "va por S{x}" del roster y las fusiones, con el estado explícito. Con
+// `onVer` el chip es la PUERTA al plan individual del niño (PlanNinoModal):
+// botón de verdad, con foco y con un title que invita a abrirlo. Sin `onVer`
+// (fusiones) sigue siendo el mismo texto de solo lectura de siempre.
 const CHIP_PLAN_BASE = { fontSize: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
-function ChipPlanNino({ plan }) {
+function ChipPlanNino({ plan, nombre, onVer }) {
   if (!plan) return null
   const det = plan.semana?.etiqueta ? ` (${plan.semana.etiqueta})` : ''
-  if (plan.estado === 'sin_plan') {
-    return <span className="pill" style={{ ...CHIP_PLAN_BASE, color: 'var(--text-dim)' }} title="Sin plan derivable: falta el ancla de nivel del niño o el grupo no tiene horario/calendario — nada se adivina.">sin plan</span>
-  }
-  if (plan.estado === 'cerrado') {
-    return <span className="pill" style={CHIP_PLAN_BASE} title={`Su nivel ya cerró${det}.`}>nivel cerrado</span>
-  }
   const s = `S${(plan.indiceSemana ?? 0) + 1}`
-  if (plan.estado === 'por_iniciar') {
-    return <span className="pill" style={CHIP_PLAN_BASE} title={`Arranca su nivel el ${fmtDia(plan.ancla)}${det}.`}>inicia {fmtDia(plan.ancla)}</span>
+  let texto = `va por ${s}`
+  let title = `Va por la semana ${s} de su plan${det} · ancla ${fmtDia(plan.ancla)}.`
+  let tono = { color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }
+  if (plan.estado === 'sin_plan') {
+    texto = 'sin plan'
+    title = 'Sin plan derivable: falta el ancla de nivel del niño o el grupo no tiene horario/calendario — nada se adivina.'
+    tono = { color: 'var(--text-dim)' }
+  } else if (plan.estado === 'cerrado') {
+    texto = 'nivel cerrado'
+    title = `Su nivel ya cerró${det}.`
+    tono = {}
+  } else if (plan.estado === 'por_iniciar') {
+    texto = `inicia ${fmtDia(plan.ancla)}`
+    title = `Arranca su nivel el ${fmtDia(plan.ancla)}${det}.`
+    tono = {}
   }
-  return <span className="pill" style={{ ...CHIP_PLAN_BASE, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} title={`Va por la semana ${s} de su plan${det} · ancla ${fmtDia(plan.ancla)}.`}>va por {s}</span>
+  const style = { ...CHIP_PLAN_BASE, ...tono }
+  if (!onVer) return <span className="pill" style={style} title={title}>{texto}</span>
+  const quien = nombre || 'este niño'
+  return (
+    <button type="button" className="pill pill--link" style={style} onClick={onVer}
+      title={`Ver plan de ${quien} — ${title}`} aria-label={`Ver plan de ${quien}`}>{texto}</button>
+  )
 }
 
 // Cierre EFECTIVO del nivel del niño (g1-11): override manual ?? derivado del
@@ -176,17 +201,30 @@ function countdownVentana(v) {
 function motivoNoAceptaNuevos(v) {
   if (v.razon === 'palanca_cerrada') return 'Cerrado a inscripciones: ya no entra nadie. Ábrelo con “Abrir inscripciones” si tiene cupo.'
   if (v.razon === 'vencida') return `La ventana de niños nuevos venció el ${fmtDia(v.fechaLimite)} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana o apunta la venta a la inducción del próximo nivel.`
+  if (v.razon === 'nivel_avanzado') return 'El llenado de este grupo ya pasó: la ventana de niños nuevos es del arranque (nivel 1) y este grupo va en un nivel más adelantado. Para meter a alguien aquí, usa “Extender ventana” (queda registrado y vence solo) o apúntalo a un grupo en llenado.'
   if (v.razon === 'no_activo') return 'El grupo no está activo.'
   return ''
 }
 
-// Chip de llenado del panel — 3 estados (diseño 2026-08-08): verde = en
-// llenado (con la fecha en que cierra a nuevos si el manual la fija), ámbar =
-// ventana del manual vencida (los movimientos internos SÍ siguen entrando),
-// rojo = palanca manual cerrada (no entra nadie).
-function ChipLlenado({ v, programa }) {
+// Chip de llenado del panel — 4 estados (diseño 2026-08-08 + regla del
+// 2026-08-10): verde = en llenado (con la fecha en que cierra a nuevos si el
+// manual la fija), ámbar = ventana del manual vencida o grupo ya pasado de
+// nivel (los movimientos internos SÍ siguen entrando), rojo = palanca manual
+// cerrada (no entra nadie).
+function ChipLlenado({ v, programa, nivel }) {
   if (v.razon === 'palanca_cerrada') {
     return <span className="pill pill--bad" title="Cerrado a inscripciones: ya no entra nadie (ni inscripción, ni reincorporación, ni fusión). Ventas ve 0 cupos."><span className="dot" />🔒 Inscripciones cerradas</span>
+  }
+  // (2026-08-10) El llenado es del ARRANQUE del grupo: del nivel 2 en adelante
+  // no entran niños nuevos aunque el itinerario se acabe de regenerar. Sin
+  // esta rama el panel pintaba "En llenado · acepta niños nuevos" a un grupo
+  // en nivel 10 (Calle 50 G22) que el server rechaza al guardar.
+  if (v.razon === 'nivel_avanzado') {
+    return (
+      <span className="pill pill--warn" title="El llenado de este grupo ya pasó: la ventana de niños nuevos es del arranque (nivel 1) y este grupo va más adelantado. Reincorporaciones, cambios de grupo y fusiones sí entran; para un niño NUEVO hay que extender la ventana a mano (queda registrado y vence solo).">
+        <span className="dot" />Cerrado a nuevos{Number.isFinite(Number(nivel)) ? ` (va en nivel ${Number(nivel)})` : ' (grupo ya pasado de nivel)'}
+      </span>
+    )
   }
   if (v.razon === 'vencida') {
     const sem = SEMANA_LIMITE_NUEVOS[String(programa || '').toUpperCase()]
@@ -232,6 +270,7 @@ export default function GruposPage() {
   const [progEst, setProgEst] = useState(null) // "Retirar el próximo mes" (R5)
   const [reincEst, setReincEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
+  const [verPlan, setVerPlan] = useState(null) // { nino, grupo } — plan individual del niño (R3)
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
@@ -293,6 +332,10 @@ export default function GruposPage() {
   const visibles = [...enLlenado, ...resto]
   const abierto = openId ? visibles.find((g) => String(g.id) === String(openId)) : null
   const visiblesKey = visibles.map((g) => g.id).join(',')
+  // El plan del niño abierto se re-lee de la lista viva: tras refrescar (p. ej.
+  // al fijarle el ancla) el modal muestra el dato nuevo, no la copia del clic.
+  const grupoPlan = verPlan ? grupos.find((g) => String(g.id) === String(verPlan.grupo?.id)) || verPlan.grupo : null
+  const ninoPlan = verPlan ? grupoPlan?.estudiantes?.find((e) => String(e.id) === String(verPlan.nino?.id)) || verPlan.nino : null
 
   // Si el grupo abierto se sale de la vista (cambió el filtro o la búsqueda),
   // se cierra el detalle para no mostrar algo que ya no está en la lista.
@@ -317,7 +360,7 @@ export default function GruposPage() {
   }
 
   // Teclado: Esc cierra el detalle, ↑/↓ recorren la lista de grupos.
-  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || progEst || reincEst || itinEdit)
+  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || progEst || reincEst || itinEdit || verPlan)
   useEffect(() => {
     function onKey(e) {
       if (tab !== 'grupos' || hayModal) return
@@ -468,6 +511,14 @@ export default function GruposPage() {
     }
   }
 
+  // (R3) Se acaba de CREAR el plan que faltaba: el mensaje dice en qué semana
+  // queda el niño —que es lo que el admin fue a buscar— y la pantalla se
+  // recarga para que el chip, el cierre y el aviso de liberación cuadren.
+  function onPlanFijado({ ninos, etiqueta, fecha }) {
+    setStatus('✅ ' + mensajeAnclaFijada(ninos, etiqueta, fecha))
+    refresca()
+  }
+
   const acciones = {
     linkCoach: onLinkCoach,
     editarGrupo: abrirEditarGrupo,
@@ -478,12 +529,15 @@ export default function GruposPage() {
     buscarFusion: onBuscarFusion,
     inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
     ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
+    // El chip del niño abre SU plan (no el del aula): mismo dibujo, distinta ancla.
+    verPlanNino: (e, g) => { setStatus(''); setVerPlan({ nino: e, grupo: g }) },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
     retirar: (e) => { setStatus(''); setRetiroEst(e) },
     programarRetiro: (e) => { setStatus(''); setProgEst(e) },
     cancelarRetiro: onCancelarRetiro,
     graduar: onGraduar,
     revertirBaja: onRevertirBaja,
+    planFijado: onPlanFijado,
   }
 
   if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text-dim)' }}>Cargando…</div>
@@ -607,7 +661,7 @@ export default function GruposPage() {
 
               {!narrow && (
                 abierto ? (
-                  <GrupoDetalle g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} onCerrarPanel={() => setOpenId(null)} />
+                  <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} onCerrarPanel={() => setOpenId(null)} />
                 ) : (
                   <div className="panel grp-detail grp-detail--vacio">
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -686,7 +740,7 @@ export default function GruposPage() {
       {tab === 'grupos' && narrow && abierto && (
         <>
           <div className="grp-backdrop" onClick={() => setOpenId(null)} />
-          <GrupoDetalle g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} sheet onCerrarPanel={() => setOpenId(null)} />
+          <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} sheet onCerrarPanel={() => setOpenId(null)} />
         </>
       )}
 
@@ -720,6 +774,25 @@ export default function GruposPage() {
         <ItinerarioModal centroId={id} g={itinEdit.grupo} nuevaExcepcion={itinEdit.fecha}
           onClose={() => setItinEdit(null)}
           onSaved={(msg) => { setItinEdit(null); setStatus('✅ ' + msg); refresca() }} />
+      )}
+      {/* Plan individual del niño (R3): se abre desde su chip. El plan ya viene
+          enriquecido por lote desde loadOperaciones — el modal no re-deriva.
+          Si le falta el ancla, ahí mismo se crea (bloque de creación rápida). */}
+      {verPlan && ninoPlan && (
+        <PlanNinoModal nino={ninoPlan} grupo={grupoPlan} hoy={hoy}
+          onClose={() => setVerPlan(null)}
+          renderCreacion={({ nino, onPlanFijado }) => (
+            <div style={{ padding: '16px 18px' }}>
+              <BloqueCrearPlan centroId={id} ninos={[nino]} etiqueta={`${nino.itinerario} ${nino.nivel}`}
+                onFijado={(r) => {
+                  setStatus('✅ ' + mensajeAnclaFijada(r.ninos, r.etiqueta, r.fecha))
+                  // El modal repinta con el plan que devolvió el server y avisa
+                  // a la pantalla (onCambio) para recargar el roster.
+                  onPlanFijado(r.plan)
+                }} />
+            </div>
+          )}
+          onCambio={() => refresca()} />
       )}
       {reincEst && (
         <ReincorporarModal centroId={id} est={reincEst} grupos={grupos}
@@ -856,7 +929,7 @@ function AccionesNino({ e, acciones, asis }) {
 // ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
-function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel }) {
+function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel }) {
   const [vista, setVista] = useState('ninos')
   const st = groupStatus(g, metas.gpnMin)
   const n = g.estudiantes.length
@@ -883,7 +956,7 @@ function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarP
             <h3 className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
-              {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} />}
+              {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} nivel={it?.nivel} />}
             </h3>
             {/* (R1) Una sola fecha: inicio de clases. created_at es la historia
                 de publicación (fechaPublicacion, día civil de Panamá). */}
@@ -931,7 +1004,9 @@ function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarP
 
       <div className="grp-detail__body">
         {vista === 'itinerario' ? (
-          <ItinerarioNivel g={g} it={it} idxHoy={idxHoy} onAjustar={(fecha) => acciones.ajustarItinerario(g, fecha)} />
+          <ItinerarioNivel centroId={centroId} g={g} it={it} idxHoy={idxHoy}
+            onAjustar={(fecha) => acciones.ajustarItinerario(g, fecha)}
+            onPlanFijado={acciones.planFijado} />
         ) : (
         <>
         <div className="grp-stats">
@@ -985,7 +1060,7 @@ function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarP
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                  <ChipPlanNino plan={e.plan} />
+                  <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} />
                   <span className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
                     {cierre.fecha ? `cierra ${fmtDia(cierre.fecha)}` : 'sin cierre'}
                   </span>
@@ -1014,7 +1089,7 @@ function GrupoDetalle({ g, metas, acciones, asistenciaMes = {}, sheet, onCerrarP
                   <td>
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                      <ChipPlanNino plan={e.plan} />
+                      <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} />
                     </div>
                     <div className="num" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
                       {cierre.fecha ? fmtDia(cierre.fecha) : 'sin cierre'}
@@ -1086,7 +1161,10 @@ function BloqueLlenado({ g, ll, onExtender }) {
         {r.diasParaInicio != null && <> · el nivel inicia en <b className="num" style={{ color: 'var(--text)' }}>{r.diasParaInicio} día{r.diasParaInicio === 1 ? '' : 's'}</b></>}
         {v.fechaLimite
           ? <> · acepta nuevos hasta el <b className="num" style={{ color: v.razon === 'vencida' ? 'var(--bad)' : 'var(--text)' }}>{fmtDia(v.fechaLimite)}</b>{v.razon === 'extendida' ? ' (ventana extendida)' : ''}</>
-          : <> · sin fecha límite de nuevos ({v.razon === 'sin_itinerario_valido' ? 'itinerario sin semanas del libro' : 'exento del manual'})</>}
+          : v.razon === 'nivel_avanzado'
+            // Sin fecha límite NO es sinónimo de exento: aquí está cerrado.
+            ? <> · <b style={{ color: 'var(--warn)' }}>cerrado a niños nuevos</b>: el llenado fue en el arranque y el grupo ya va en nivel <b className="num" style={{ color: 'var(--text)' }}>{Number(g.itinerario_clases?.nivel) || '—'}</b></>
+            : <> · sin fecha límite de nuevos ({v.razon === 'sin_itinerario_valido' ? 'itinerario sin semanas del libro' : 'exento del manual'})</>}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         Ritmo semanal: necesita <b className="num" style={{ color: 'var(--text)' }}>{r.ritmoSemanalNecesario == null ? '—' : r.ritmoSemanalNecesario}</b>/sem ·
@@ -1131,21 +1209,173 @@ function BloqueLlenado({ g, ll, onExtender }) {
 // La plantilla de semanas es la base de franquicia; lo que se ajusta por grupo
 // es cómo cae en SU calendario (nivel que cursa, fecha de inicio y clases
 // suspendidas). Cada suspensión corre el plan y mueve el cierre estimado.
-const TIPO_ESTILO = {
-  induccion: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
-  clase: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
-  evaluacion: { bg: 'var(--warn-bg)', line: 'var(--warn-line)', fg: 'var(--warn)' },
-  mental: { bg: 'var(--ts-green-soft)', line: 'var(--ts-green-line)', fg: 'var(--ts-green)' },
-  cierre: { bg: 'var(--bad-bg)', line: 'var(--bad-line)', fg: 'var(--bad)' },
-}
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-const mesDe = (f) => {
-  const [y, m] = String(f).slice(0, 10).split('-').map(Number)
-  return `${MESES[(m || 1) - 1]} ${y}`
-}
-const diaMes = (f) => String(f).slice(8, 10) + '/' + String(f).slice(5, 7)
+// El dibujo (casillas, leyenda, agenda mes a mes y notas) vive en
+// components/PlanNino: el plan del NIÑO usa exactamente el mismo, y su
+// posición entra por {estado, indice} — aquí se traduce el índice legacy de
+// semanaEnCurso con posicionDeIndice.
+// ── Crear el plan que falta (R3): el bloque de creación rápida ──────────────
+// Pide al SERVER las opciones de ancla (las tres fuentes viven en la BD: la
+// referencia del aula, las anclas de los compañeros y el evento de inscripción
+// canónico), las pinta con components/SelectorAncla y escribe con
+// fijarInicioNivel (uno) o fijarInicioNivelLote (un montón homogéneo). Con
+// varios niños solo se ofrecen las fuentes que TODOS comparten con la MISMA
+// fecha (lib/ancla-lote): el lote no promedia fechas ajenas.
+function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar }) {
+  const [sug, setSug] = useState(null)
+  const [cargando, setCargando] = useState(true)
+  const [err, setErr] = useState('')
+  const ids = (ninos || []).map((n) => Number(n.id))
+  const idsKey = ids.join(',')
 
-function ItinerarioNivel({ g, it, idxHoy, onAjustar }) {
+  useEffect(() => {
+    let vivo = true
+    setCargando(true); setErr(''); setSug(null)
+    sugerenciasAnclaNinos(centroId, idsKey.split(',').map(Number))
+      .then((res) => {
+        if (!vivo) return
+        setCargando(false)
+        if (res?.error) { setErr(res.error); return }
+        setSug({ ...opcionesComunes(res.ninos), hoy: res.hoy })
+      })
+      .catch((e) => {
+        if (!vivo) return
+        setCargando(false)
+        setErr('No se pudieron calcular las opciones: ' + (e?.message || e))
+      })
+    return () => { vivo = false }
+  }, [centroId, idsKey])
+
+  // Uno o varios, la escritura devuelve el plan YA recalculado por el server:
+  // el mensaje puede decir en qué semana quedó el niño sin recargar nada.
+  async function fijar({ fecha, origen }) {
+    const res = ids.length === 1
+      ? await fijarInicioNivel(centroId, ids[0], { fecha, origen })
+      : await fijarInicioNivelLote(centroId, { estudianteIds: ids, fecha, origen })
+    if (res?.error) return res
+    const lista = res.ninos || [{ id: ids[0], nombre: ninos[0]?.nombre, actualizado: res.actualizado, plan: res.plan }]
+    onFijado?.({ fecha, origen, etiqueta, ninos: lista, plan: res.plan || lista[0]?.plan || null })
+    return res
+  }
+
+  if (cargando) return <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 0' }}>Calculando las opciones…</div>
+  if (err) return <div className="alert alert--error" style={{ fontSize: 12 }}>{err}</div>
+  if (!sug?.opciones?.length) return <div className="alert alert--error" style={{ fontSize: 12 }}>No hay ninguna fecha que ofrecer para estos niños.</div>
+
+  const uno = ninos.length === 1 ? ninos[0] : null
+  return (
+    <SelectorAncla
+      opciones={sug.opciones} recomendada={sug.recomendada} descartadas={sug.descartadas} hoy={sug.hoy}
+      nota={uno
+        ? `Es el día en que ${uno.nombre} empezó el nivel que cursa hoy (${etiqueta}). El sistema no la dedujo porque su historia no la demuestra —y no la inventa—: escoge la fuente que la sostenga o escríbela.`
+        : `Los ${ninos.length} niños comparten ${etiqueta}: una sola fecha los resuelve a todos. Solo se ofrecen las fuentes en las que TODOS coinciden.`}
+      cta={uno ? `Fijar el plan de ${String(uno.nombre).split(' ')[0]}` : `Fijar el plan de los ${ninos.length} niños`}
+      onFijar={fijar} onCancelar={onCancelar} />
+  )
+}
+
+// Los montones de niños SIN plan del grupo, uno por itinerario+nivel: cada
+// tarjeta abre el MISMO bloque de creación rápida y lo aplica en lote.
+function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
+  const [abierto, setAbierto] = useState(null)
+  return (
+    <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 10, background: 'var(--surface-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span className="label" style={{ color: 'var(--warn)' }}>Sin plan</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          {total === 1 ? 'Un niño de este grupo no tiene' : `${total} niños de este grupo no tienen`} la fecha en que empezaron su nivel:
+          sin ella no hay semana, ni cierre, ni aviso de liberación del bloque.
+        </span>
+      </div>
+      {subgrupos.map((sub) => {
+        const n = sub.ninos.length
+        const on = abierto === sub.clave
+        return (
+          <div key={sub.clave} className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0 }}>
+                <b style={{ color: 'var(--text)', fontSize: 13 }}>{sub.etiqueta} · {n} niño{n === 1 ? '' : 's'} sin plan</b>
+                <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{sub.ninos.map((x) => x.nombre).join(' · ')}</div>
+              </div>
+              {!on && (
+                <button className="btn btn--primary" style={BTN_XS} onClick={() => setAbierto(sub.clave)}
+                  title="Fija el día en que empezaron el nivel que cursan: de ahí sale su plan completo.">
+                  {n === 1 ? `Fijar el plan de ${String(sub.ninos[0].nombre).split(' ')[0]}` : `Fijar el plan de los ${n} niños de ${sub.etiqueta}`}
+                </button>
+              )}
+            </div>
+            {on && (
+              <BloqueCrearPlan centroId={centroId} ninos={sub.ninos} etiqueta={sub.etiqueta}
+                onCancelar={() => setAbierto(null)}
+                onFijado={(r) => { setAbierto(null); onPlanFijado?.(r) }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Un montón del aula MEZCLADA (un itinerario+nivel: un libro): quiénes lo
+// cursan y su línea de tiempo — la misma de siempre (components/PlanNino), con
+// la posición que ya trae el niño enriquecido. Sin `onFecha`: suspender una
+// clase es del aula, y eso se hace abajo, en el plan de referencia del grupo.
+// `esReferencia` = el montón cursa EXACTAMENTE el plan del aula: se dice y se
+// apunta al de abajo, en vez de pintar la MISMA línea de tiempo dos veces.
+// ESCALONADO (varias anclas en el mismo nivel: entraron en semanas distintas)
+// = no hay UNA línea de tiempo del montón; se listan las cohortes con su
+// semana y punto. Pintar una línea por ancla llenaba el salón de calendarios
+// (15 niños KIDS 2 = 16 líneas) y ninguno era el de todos.
+function MontonPlan({ m, esReferencia }) {
+  const it = m.plan
+  const n = m.ninos.length
+  const escalonado = m.cohortes.length > 1
+  return (
+    <div style={{ borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '12px 18px 4px', display: 'grid', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--text)' }}>{m.etiqueta}</span>
+          <span className="pill" style={{ fontSize: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            {n} niño{n === 1 ? '' : 's'}
+          </span>
+          <span className="num" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+            {escalonado
+              ? `${m.cohortes.length} fechas de arranque · ${distribucionSemanas(m.ninos)}`
+              : `empezó el ${fmtDia(m.ancla)}${it?.fecha_cierre_estimada ? ` → cierra el ${fmtDia(it.fecha_cierre_estimada)}` : ''}`}
+          </span>
+        </div>
+        {!escalonado && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{m.ninos.map((x) => x.nombre).join(' · ')}</div>
+        )}
+      </div>
+      {escalonado ? (
+        <div style={{ padding: '2px 18px 14px', display: 'grid', gap: 6 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            Mismo libro, arrancado en fechas distintas: no hay una sola línea de tiempo para el montón. El plan exacto de cada niño está en su chip “va por S{'{x}'}”.
+          </div>
+          {m.cohortes.map((c) => (
+            <div key={c.clave} style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              <b className="num" style={{ color: 'var(--text)' }}>{fmtDia(c.ancla)}</b> · {c.ninos.length} niño{c.ninos.length === 1 ? '' : 's'} ·{' '}
+              {semanaNinoTexto({ estado: c.estado, indiceSemana: c.indiceSemana })} — {c.ninos.map((x) => x.nombre).join(' · ')}
+            </div>
+          ))}
+        </div>
+      ) : esReferencia ? (
+        <div style={{ padding: '2px 18px 14px', fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+          Van por el plan del aula tal cual (misma fecha de inicio y mismo nivel): su línea de tiempo es la de abajo.
+        </div>
+      ) : (
+        <>
+          <div style={{ padding: '6px 18px 0' }}>
+            <ProgresoPlan it={it} estado={m.estado} indice={m.indiceSemana} />
+          </div>
+          <LineaTiempoPlan it={it} estado={m.estado} indice={m.indiceSemana} />
+        </>
+      )}
+    </div>
+  )
+}
+
+function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
   if (!it?.semanas?.length) {
     return (
       <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
@@ -1158,22 +1388,40 @@ function ItinerarioNivel({ g, it, idxHoy, onAjustar }) {
     )
   }
   const total = it.semanas.length
-  const hechas = idxHoy < 0 ? total : idxHoy
-  const pct = Math.round((hechas / total) * 100)
-  // Agrupa las semanas por mes calendario para que el plan se lea como agenda.
-  const porMes = []
-  it.semanas.forEach((s, i) => {
-    const mes = mesDe(s.fechas[0])
-    if (!porMes.length || porMes[porMes.length - 1].mes !== mes) porMes.push({ mes, filas: [] })
-    porMes[porMes.length - 1].filas.push({ s, i })
-  })
+  const pos = posicionDeIndice(idxHoy, total)
+  // (R3) El aula puede ir toda junta o ir mezclada: MEZCLADA = más de un
+  // libro (itinerario+nivel) conviviendo en el salón, que es el caso de la
+  // fusión. Homogénea (o vacía) se ve como siempre: una sola línea de tiempo,
+  // aunque sus niños hayan entrado en semanas distintas — el manual deja
+  // incorporar hasta la semana 2 (KIDS) o 4 (TINY) y cada uno arranca con SU
+  // fecha, pero es el mismo libro corrido, no otro plan.
+  // Los niños SIN ancla tampoco cuentan como "otro plan" (no hay nada que
+  // dictar): salen en su propio bloque, arriba.
+  const ninos = g.estudiantes || []
+  const montones = montonesConPlan(ninos)
+  const mixto = montones.length > 1
+  // Aula homogénea pero escalonada: una sola línea (la del aula) y una línea
+  // de texto que dice quién va por dónde. Nada de 15 calendarios.
+  const escalonadoUnico = !mixto && montones[0]?.cohortes.length > 1 ? montones[0] : null
+  const refAula = { itinerario: g.itinerario, nivel: it.nivel, fecha_inicio: it.fecha_inicio }
+  const sinPlan = subgruposSinPlan(ninos)
+  const nSinPlan = sinPlan.reduce((s, x) => s + x.ninos.length, 0)
+
+  // El plan del aula, identificado como tal: es la REFERENCIA del grupo, no el
+  // plan de nadie en particular (cada niño va por su ancla).
+  const planDelAula = (
+    <>
+      <LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={(f) => onAjustar(f)} />
+      <NotasPlan it={it} />
+    </>
+  )
 
   return (
     <div>
       <div className="itin-head">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <span className="label">Itinerario del nivel</span>
+            <span className="label" title="Plan de referencia del aula: de aquí sale el itinerario del grupo. Cada niño va por SU ancla (fecha en que empezó el nivel).">Itinerario del nivel</span>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
               {g.itinerario} · Nivel {it.nivel}
             </div>
@@ -1186,88 +1434,70 @@ function ItinerarioNivel({ g, it, idxHoy, onAjustar }) {
         </div>
 
         <div style={{ marginTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 5 }}>
-            <span>{idxHoy < 0 ? 'Nivel terminado' : `En curso: ${it.semanas[idxHoy].etiqueta} (${idxHoy + 1} de ${total})`}</span>
-            <span className="num">{pct}%</span>
-          </div>
-          <div className="bar"><div className="bar__fill" style={{ width: `${pct}%`, background: 'var(--ts-green)' }} /></div>
+          <ProgresoPlan it={it} estado={pos.estado} indice={pos.indice} />
         </div>
       </div>
 
-      {/* Línea de tiempo: una casilla por semana, con hoy marcado */}
-      <div className="itin-tl">
-        {it.semanas.map((s, i) => {
-          const est = TIPO_ESTILO[s.tipo] || TIPO_ESTILO.clase
-          const pasada = idxHoy < 0 || i < idxHoy
-          const hoy = i === idxHoy
-          return (
-            <div key={i} className={`itin-blk${hoy ? ' itin-blk--hoy' : ''}${pasada ? ' itin-blk--hecha' : ''}`}
-              title={`${s.etiqueta} · ${s.fechas.map(fmtDia).join(' · ')}${hoy ? ' · SEMANA EN CURSO' : ''}`}
-              style={{ background: est.bg, borderColor: hoy ? 'var(--ts-green)' : est.line, color: est.fg }}>
-              {s.corto || String(i + 1)}
+      {nSinPlan > 0 && (
+        <BloqueSinPlanGrupo centroId={centroId} subgrupos={sinPlan} total={nSinPlan} onPlanFijado={onPlanFijado} />
+      )}
+
+      {escalonadoUnico && (
+        <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+          Todos van en <b style={{ color: 'var(--text-muted)' }}>{escalonadoUnico.etiqueta}</b>, pero arrancaron en{' '}
+          {escalonadoUnico.cohortes.length} fechas distintas
+          {' '}({escalonadoUnico.cohortes.slice(0, 3).map((c) => fmtDia(c.ancla)).join(' · ')}{escalonadoUnico.cohortes.length > 3 ? ' …' : ''}):{' '}
+          <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas(escalonadoUnico.ninos)}</b>.
+          La línea de tiempo de abajo es la del aula; cada niño va por su ancla (su chip lo dice).
+        </div>
+      )}
+
+      {mixto ? (
+        <>
+          {/* Aula mezclada (fusión): primero cómo quedó repartida y después UNA
+              línea de tiempo por montón — así se ve qué se le dicta a quién. */}
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            📚 Este grupo va <b style={{ color: 'var(--text)' }}>mezclado</b>: {montones.length} niveles distintos conviviendo en el salón ·{' '}
+            <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas(ninos)}</b>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              Cada niño va por su propia ancla; el plan del aula (abajo) queda como referencia del grupo.
             </div>
-          )
-        })}
-      </div>
-      <div className="itin-leyenda">
-        {Object.entries(TIPOS_SEMANA).map(([k, v]) => (
-          <span key={k} title={v.desc}>
-            <i style={{ background: (TIPO_ESTILO[k] || TIPO_ESTILO.clase).bg, borderColor: (TIPO_ESTILO[k] || TIPO_ESTILO.clase).line }} />{v.label}
-          </span>
-        ))}
-      </div>
-
-      {/* Agenda mes a mes */}
-      {porMes.map(({ mes, filas }) => (
-        <div key={mes}>
-          <div className="itin-mes">{mes}</div>
-          {filas.map(({ s, i }) => {
-            const est = TIPO_ESTILO[s.tipo] || TIPO_ESTILO.clase
-            const pasada = idxHoy < 0 || i < idxHoy
-            const hoy = i === idxHoy
-            return (
-              <div key={i} className={`itin-fila${hoy ? ' itin-fila--hoy' : ''}`} style={pasada ? { opacity: 0.55 } : undefined}>
-                <span className="itin-fila__chip" style={{ background: est.bg, borderColor: est.line, color: est.fg }}>{s.corto}</span>
-                <span style={{ color: hoy ? 'var(--text)' : 'var(--text-muted)', fontWeight: hoy ? 600 : 400 }}>{s.etiqueta}</span>
-                {hoy && <span className="pill pill--ok" style={{ fontSize: 10 }}><span className="dot" />Hoy</span>}
-                <span className="num itin-fila__fechas">
-                  {(s.saltadas || []).map((k) => (
-                    <span key={k.fecha} className="itin-fecha itin-fecha--out" title={`${fmtDia(k.fecha)}: ${k.motivo} — por eso corrió el plan`}>
-                      {diaMes(k.fecha)}
-                    </span>
-                  ))}
-                  {s.fechas.map((f) => (
-                    <button key={f} className="itin-fecha" title={`Suspender la clase del ${fmtDia(f)} (corre el plan)`} onClick={() => onAjustar(f)}>
-                      {diaMes(f)}
-                    </button>
-                  ))}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      ))}
-
-      <div style={{ padding: '12px 18px', display: 'grid', gap: 8 }}>
-        {it.clases_suspendidas?.length > 0 && (
-          <div style={{ fontSize: 11.5, color: 'var(--warn)' }}>
-            ⏸ Clases suspendidas del grupo: {it.clases_suspendidas.map((c) => `${fmtDia(c.fecha)}${c.motivo ? ` (${c.motivo})` : ''}`).join(' · ')}
           </div>
-        )}
-        {it.feriados_saltados?.length > 0 && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
-            🎌 Sin clases por feriados y vacaciones del manual: {it.feriados_saltados.map(fmtDia).join(' · ')}
-          </div>
-        )}
-        {it.inicio_siguiente_nivel && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
-            ➡️ El nivel {it.nivel + 1} arrancaría el <b style={{ color: 'var(--text)' }}>{fmtDia(it.inicio_siguiente_nivel)}</b>
-            {Number(it.nivel) % 2 === 0 ? ' (incluye la semana de vacaciones de fin de ciclo)' : ''}.
-          </div>
-        )}
-      </div>
+          {montones.map((m) => <MontonPlan key={m.clave} m={m} esReferencia={siguePlanDelAula(m, refAula)} />)}
+          <div className="itin-mes" style={{ borderTop: '1px solid var(--border)' }}>Plan del aula (referencia del grupo)</div>
+          {planDelAula}
+        </>
+      ) : (
+        planDelAula
+      )}
     </div>
   )
+}
+
+// Mensaje de resultado tras fijar el ancla: lo que el admin fue a buscar es la
+// SEMANA en la que queda el niño, no un "listo". El plan viene RECALCULADO por
+// el server (misma forma del roster), así que no se adivina nada aquí.
+function mensajeAnclaFijada(ninos, etiqueta, fecha) {
+  const lista = ninos || []
+  if (!lista.length) return `Inicio de nivel fijado el ${fmtDia(fecha)}.`
+  if (lista.length === 1) {
+    const u = lista[0]
+    // Con ancla y SIN plan solo puede pasar una cosa: el aula no tiene
+    // calendario. Decirlo es más útil que "queda en sin plan".
+    if (u.plan?.estado === 'sin_plan') {
+      return `${u.nombre} ya tiene su inicio de nivel (${fmtDia(fecha)}), pero su grupo no tiene horario ni itinerario: sin calendario del aula no hay plan que derivar.`
+    }
+    const sem = semanaNinoTexto(u.plan)
+    return u.actualizado
+      ? `${u.nombre} queda en ${sem} de ${etiqueta} (empezó su nivel el ${fmtDia(fecha)}).`
+      : `${u.nombre} ya tenía ese inicio de nivel: sigue en ${sem} de ${etiqueta}.`
+  }
+  const nuevos = lista.filter((n) => n.actualizado).length
+  if (!nuevos) return `Los ${lista.length} niños de ${etiqueta} ya tenían ese inicio de nivel — ${distribucionSemanas(lista)}.`
+  const cabeza = nuevos === lista.length
+    ? `Los ${lista.length} niños de ${etiqueta}`
+    : `${nuevos} de ${lista.length} niños de ${etiqueta}`
+  return `${cabeza} arrancan su nivel el ${fmtDia(fecha)} — ${distribucionSemanas(lista)}.`
 }
 
 // ── Tab Fusiones: bajo meta, destinos por grupo y plan sugerido del mes ──────

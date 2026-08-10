@@ -937,20 +937,28 @@ export async function listarGruposActivos(centroId) {
     ORDER BY h.dia, h.hora_inicio
   `
   return rows
-    .map((g) => ({
-      id: g.id,
-      numero: g.numero,
-      itinerario: g.itinerario,
-      inscripcionAbierta: g.inscripcion_abierta !== false,
-      fechaInicioClases: fechaIso10(g.fecha_inicio_clases),
-      // Nivel VIGENTE del itinerario del grupo (sin itinerario = nivel 1).
-      nivel: Number(g.itinerario_clases?.nivel) || 1,
-      // Fecha límite de niños nuevos derivada (incluye llenado_extendido_hasta);
-      // null = exento o sin itinerario válido (sin límite que mostrar).
-      fechaLimiteNuevos: fechaLimiteNuevos(g).fechaLimite,
-      horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
-      cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
-    }))
+    .map((g) => {
+      const limite = fechaLimiteNuevos(g)
+      return {
+        id: g.id,
+        numero: g.numero,
+        itinerario: g.itinerario,
+        inscripcionAbierta: g.inscripcion_abierta !== false,
+        fechaInicioClases: fechaIso10(g.fecha_inicio_clases),
+        // Nivel VIGENTE del itinerario del grupo (sin itinerario = nivel 1).
+        nivel: Number(g.itinerario_clases?.nivel) || 1,
+        // Fecha límite de niños nuevos derivada (incluye llenado_extendido_hasta);
+        // null = exento, sin itinerario válido O cerrado por nivel avanzado.
+        fechaLimiteNuevos: limite.fechaLimite,
+        // La RAZÓN viaja junto a la fecha: sin ella, un `null` de
+        // 'nivel_avanzado' (grupo del nivel 2 en adelante, cerrado a nuevos)
+        // se leía en el selector como "exento" y el vendedor escogía un grupo
+        // que el server rechaza al guardar.
+        razonLimiteNuevos: limite.razon,
+        horarioTexto: horarioTextoDe(horarios.filter((h) => String(h.grupo_id) === String(g.id))),
+        cupos: Math.max(0, NINOS_POR_GRUPO_MODELO - g.ninos),
+      }
+    })
     .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'es', { numeric: true }))
 }
 
