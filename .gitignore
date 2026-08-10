@@ -20,3 +20,6 @@
 # vercel
 .vercel
 .claude/
+
+# Reportes de corridas de scripts (dry-run/--apply): son evidencia local, no código
+scripts/out/

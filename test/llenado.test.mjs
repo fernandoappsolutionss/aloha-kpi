@@ -35,7 +35,7 @@ const itinerarioTiny = () => ({
 })
 
 const itinerarioKids = () => ({
-  nivel: 2,
+  nivel: 1,
   fecha_inicio: '2026-08-17',
   semanas: [
     semana('INT', 'induccion', ['2026-08-17', '2026-08-20']),
@@ -383,4 +383,51 @@ test('ordena bien aunque las fechas de un itinerario lleguen como Date', () => {
   }))
   const kids = grupoTiny({ id: 6, numero: 6, itinerario: 'KIDS', itinerario_clases: itinerarioKids() })
   assert.deepEqual(ordenarPorCierreLlenado([conDates, kids], '2026-09-01').map((g) => g.numero), [6, 5])
+})
+
+// Regla de Fernando 2026-08-10: la ventana de nuevos es del LLENADO del grupo,
+// no de cada nivel. Un veterano que arranca nivel 2+ NO vuelve a "en llenado".
+test('la ventana no se reabre al empezar un nivel avanzado', () => {
+  const veterano = {
+    estado: 'activo',
+    itinerario: 'TINY',
+    inscripcion_abierta: true,
+    itinerario_clases: {
+      nivel: 10,
+      semanas: [{ tipo: 'clase', corto: '4', fechas: ['2026-08-22'] }],
+    },
+  }
+  const v = ventanaNuevos(veterano, '2026-08-10')
+  assert.equal(v.abierta, false)
+  assert.equal(v.razon, 'nivel_avanzado')
+  assert.equal(v.fechaLimite, null)
+})
+
+test('un grupo de nivel 1 conserva su ventana de llenado', () => {
+  const nuevo = {
+    estado: 'activo',
+    itinerario: 'TINY',
+    inscripcion_abierta: true,
+    itinerario_clases: {
+      nivel: 1,
+      semanas: [{ tipo: 'clase', corto: '4', fechas: ['2026-08-22'] }],
+    },
+  }
+  const v = ventanaNuevos(nuevo, '2026-08-10')
+  assert.equal(v.abierta, true)
+  assert.equal(v.fechaLimite, '2026-08-22')
+})
+
+test('la extension manual manda incluso en nivel avanzado', () => {
+  const conExtension = {
+    estado: 'activo',
+    itinerario: 'KIDS',
+    inscripcion_abierta: true,
+    llenado_extendido_hasta: '2026-09-15',
+    itinerario_clases: { nivel: 5, semanas: [{ tipo: 'clase', corto: '2', fechas: ['2026-08-20'] }] },
+  }
+  const v = ventanaNuevos(conExtension, '2026-08-10')
+  assert.equal(v.abierta, true)
+  assert.equal(v.fechaLimite, '2026-09-15')
+  assert.equal(v.razon, 'extendida')
 })
