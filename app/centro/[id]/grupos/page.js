@@ -1997,7 +1997,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 if (h.fin - Math.max(h.inicio, vf) > 0) muertas.push({ inicio: Math.max(h.inicio, vf), fin: h.fin })
                 const razonMuerta = dia === 6
                   ? 'Después de las 5:00 pm el sábado casi no se vende (las jornadas van de 9 am a 5 pm).'
-                  : 'Hora muerta: los niños salen del colegio ~1:00 pm. A las 2:00 pm abre la zona Kinder y a las 3:30 pm la parrilla de Tiny/Kids.'
+                  : 'Hora muerta: los niños salen del colegio ~1:00 pm. A las 2:45 pm abre la zona Kinder y a las 4:00 pm la parrilla de Tiny/Kids.'
                 return muertas.map((seg) => (
                   <div key={`m-${seg.inicio}`} title={razonMuerta}
                     style={{
@@ -2035,7 +2035,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 return (
                   <button key={`s-${sl.inicio}`} onClick={() => onAbrirGrupo({ horarios, itinerario: esKinder ? 'KINDER' : undefined })}
                     title={esKinder
-                      ? `Zona Kinder (2:00–3:30 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`
+                      ? `Zona Kinder (2:45–3:45 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`
                       : `${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
