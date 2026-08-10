@@ -7,7 +7,7 @@ import {
   saveCoach, toggleCoach, saveSalon, toggleSalon, sugerenciasFusion, aplicarFusion, ajustarItinerarioGrupo,
 } from '../../../actions/grupos'
 import {
-  inscribirEstudiante, actualizarEstudiante, graduarTiny, marcarBajaPotencial,
+  inscribirEstudiante, actualizarEstudiante, graduarTiny,
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
   programarRetiro, cancelarRetiroProgramado,
 } from '../../../actions/estudiantes'
@@ -417,12 +417,6 @@ export default function GruposPage() {
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} graduado 🎓 — ahora es KIDS nivel 5.`); refresca() }
   }
-  async function onBaja(e) {
-    if (!confirm(`¿Marcar a ${e.nombre} como baja potencial? Sigue este mes pero se iría el próximo.`)) return
-    const res = await marcarBajaPotencial(id, e.id, {})
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(`✅ ${e.nombre} marcado como baja potencial.`); refresca() }
-  }
   async function onRevertirBaja(e) {
     const res = await revertirBajaPotencial(id, e.id)
     if (res.error) setStatus('❌ ' + res.error)
@@ -489,7 +483,6 @@ export default function GruposPage() {
     programarRetiro: (e) => { setStatus(''); setProgEst(e) },
     cancelarRetiro: onCancelarRetiro,
     graduar: onGraduar,
-    baja: onBaja,
     revertirBaja: onRevertirBaja,
   }
 
@@ -809,8 +802,10 @@ function EstadoNinoPill({ e }) {
       </span>
     )
   }
+  // Sin fecha programada y en baja_potencial = marca LEGACY previa al
+  // remodelado (el flujo nuevo siempre escribe retiro_programado_para).
   return e.estado === 'baja_potencial'
-    ? <span className="pill pill--warn"><span className="dot" />Baja potencial</span>
+    ? <span className="pill pill--warn" title="Marca antigua de baja potencial, anterior al retiro programado: revísala y decide si el niño sigue activo o se le programa el retiro."><span className="dot" />Baja potencial (marca antigua)</span>
     : <span className="pill pill--ok"><span className="dot" />Activo</span>
 }
 
@@ -829,23 +824,30 @@ function AccionesNino({ e, acciones, asis }) {
       {e.itinerario === 'TINY' && Number(e.nivel) === 10 && (
         <button className="btn" style={{ ...BTN_XS, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
       )}
-      {e.estado === 'activo' ? (
-        <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }} onClick={() => acciones.baja(e)}>Baja potencial</button>
-      ) : !programado ? (
-        <button className="btn" style={BTN_XS} onClick={() => acciones.revertirBaja(e)}>Sigue activo</button>
-      ) : null}
+      {/* "Baja potencial" murió como botón (regla de Fernando 2026-08-10): el
+          estado baja_potencial ya solo significa RETIRO PROGRAMADO. Quedan dos
+          salidas, ambas de retiro, y la asistencia del mes decide cuál se
+          RECOMIENDA; el server re-verifica bajo lock y rechaza el retiro
+          inmediato de quien vio clases (g1-23). */}
       {programado ? (
         <button className="btn" style={BTN_XS}
           title={`Retiro programado para el ${fmtDia(e.retiro_programado_para)}: el sistema lo ejecuta solo ese día. Cancélalo si el niño se queda.`}
           onClick={() => acciones.cancelarRetiro(e)}>Cancelar retiro programado</button>
-      ) : presentes > 0 ? (
-        <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }}
-          title={`Vio clases este mes: ${presentes} presente${presentes === 1 ? '' : 's'}, última el ${fmtDia(asis.ultima)}. Norma del cuadro: termina su mes — el retiro queda programado para el día 1 del próximo mes.`}
-          onClick={() => acciones.programarRetiro(e)}>Retirar el próximo mes</button>
+      ) : e.estado !== 'activo' ? (
+        <button className="btn" style={BTN_XS} onClick={() => acciones.revertirBaja(e)}>Sigue activo</button>
       ) : (
-        <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }}
-          title="Sin asistencia presente este mes: se puede retirar de una vez (deserción del mes de la fecha de retiro)."
-          onClick={() => acciones.retirar(e)}>Retirar</button>
+        <>
+          <button className="btn" style={{ ...BTN_XS, color: 'var(--warn)', borderColor: 'var(--warn-line)' }}
+            title={presentes > 0
+              ? `Vio clases este mes: ${presentes} presente${presentes === 1 ? '' : 's'}, última el ${fmtDia(asis.ultima)}. Norma del cuadro: termina su mes — el retiro se ejecuta solo el día 1 del próximo mes.`
+              : 'Marca al niño para retirarlo el día 1 del próximo mes: sigue contando este mes y el sistema lo retira solo.'}
+            onClick={() => acciones.programarRetiro(e)}>Retiro programado</button>
+          {presentes === 0 && (
+            <button className="btn" style={{ ...BTN_XS, color: 'var(--bad)', borderColor: 'var(--bad-line)' }}
+              title="Sin asistencia presente este mes: se puede retirar de una vez (deserción del mes de la fecha de retiro)."
+              onClick={() => acciones.retirar(e)}>Retirar</button>
+          )}
+        </>
       )}
     </>
   )

@@ -1,0 +1,1631 @@
+{
+  "script": "backfill-anclas-nivel-2026-08-08",
+  "modo": "apply",
+  "generado_at": "2026-08-10T12:32:32.879Z",
+  "ok": false,
+  "motivo": "conflictos: la fila viva no coincide con el manifiesto auditado",
+  "datos": {
+    "conflictos": [
+      {
+        "estudianteId": 1,
+        "esperado": {
+          "estudianteId": 1,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 9,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[1,\"TINY\",9,1,\"activo\",null,\"2026-07-11\",[1],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[1,\"TINY\",9,1,\"activo\",\"2026-06-01\",\"2026-07-11\",[1],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 2,
+        "esperado": {
+          "estudianteId": 2,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 9,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[2,\"TINY\",9,1,\"activo\",null,\"2026-07-11\",[2],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[2,\"TINY\",9,1,\"activo\",\"2026-06-01\",\"2026-07-11\",[2],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 3,
+        "esperado": {
+          "estudianteId": 3,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[3,\"TINY\",8,1,\"activo\",null,\"2026-06-27\",[3],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[3,\"TINY\",8,1,\"activo\",\"2026-06-01\",\"2026-06-27\",[3],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 4,
+        "esperado": {
+          "estudianteId": 4,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[4,\"TINY\",7,1,\"activo\",null,\"2026-06-27\",[4],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[4,\"TINY\",7,1,\"activo\",\"2026-06-01\",\"2026-06-27\",[4],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 5,
+        "esperado": {
+          "estudianteId": 5,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[5,\"TINY\",7,1,\"activo\",null,\"2026-06-27\",[5],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[5,\"TINY\",7,1,\"activo\",\"2026-06-01\",\"2026-06-27\",[5],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 6,
+        "esperado": {
+          "estudianteId": 6,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[6,\"TINY\",6,1,\"activo\",null,\"2026-06-27\",[6],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[6,\"TINY\",6,1,\"activo\",\"2026-06-01\",\"2026-06-27\",[6],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 7,
+        "esperado": {
+          "estudianteId": 7,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[7,\"TINY\",5,1,\"activo\",null,\"2026-10-24\",[7],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[7,\"TINY\",5,1,\"activo\",\"2026-06-01\",\"2026-10-24\",[7],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 8,
+        "esperado": {
+          "estudianteId": 8,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[8,\"TINY\",6,1,\"activo\",null,\"2026-08-13\",[8],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[8,\"TINY\",6,1,\"activo\",\"2026-06-01\",\"2026-08-13\",[8],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 9,
+        "esperado": {
+          "estudianteId": 9,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[9,\"KIDS\",5,1,\"activo\",null,\"2026-10-24\",[9],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[9,\"KIDS\",5,1,\"activo\",\"2026-06-01\",\"2026-10-24\",[9],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 10,
+        "esperado": {
+          "estudianteId": 10,
+          "centroId": 3,
+          "grupoId": 1,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-18",
+          "fingerprint": "[10,\"TINY\",5,1,\"activo\",null,\"2026-08-29\",[10],\"inscripcion_canonica\",\"2026-07-18\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[10,\"TINY\",5,1,\"activo\",\"2026-06-01\",\"2026-08-29\",[10],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 11,
+        "esperado": {
+          "estudianteId": 11,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 10,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[11,\"TINY\",10,2,\"activo\",null,\"2026-08-29\",[11],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[11,\"TINY\",10,2,\"activo\",\"2026-06-01\",\"2026-08-29\",[11],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 12,
+        "esperado": {
+          "estudianteId": 12,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[12,\"TINY\",6,2,\"activo\",null,\"2026-07-25\",[12],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[12,\"TINY\",6,2,\"activo\",\"2026-06-01\",\"2026-07-25\",[12],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 13,
+        "esperado": {
+          "estudianteId": 13,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[13,\"TINY\",6,2,\"activo\",null,\"2026-07-25\",[13],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[13,\"TINY\",6,2,\"activo\",\"2026-06-01\",\"2026-07-25\",[13],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 14,
+        "esperado": {
+          "estudianteId": 14,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[14,\"TINY\",6,2,\"activo\",null,\"2026-07-25\",[14],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[14,\"TINY\",6,2,\"activo\",\"2026-06-01\",\"2026-07-25\",[14],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 15,
+        "esperado": {
+          "estudianteId": 15,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 10,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[15,\"TINY\",10,2,\"activo\",null,\"2026-08-29\",[15],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[15,\"TINY\",10,2,\"activo\",\"2026-06-01\",\"2026-08-29\",[15],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 16,
+        "esperado": {
+          "estudianteId": 16,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[16,\"TINY\",8,2,\"activo\",null,\"2026-06-27\",[16],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[16,\"TINY\",8,2,\"activo\",\"2026-06-01\",\"2026-06-27\",[16],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 17,
+        "esperado": {
+          "estudianteId": 17,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[17,\"TINY\",8,2,\"activo\",null,\"2026-06-27\",[17],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[17,\"TINY\",8,2,\"activo\",\"2026-06-01\",\"2026-06-27\",[17],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 18,
+        "esperado": {
+          "estudianteId": 18,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[18,\"TINY\",8,2,\"activo\",null,\"2026-06-27\",[18],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[18,\"TINY\",8,2,\"activo\",\"2026-06-01\",\"2026-06-27\",[18],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 19,
+        "esperado": {
+          "estudianteId": 19,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[19,\"TINY\",8,2,\"activo\",null,\"2026-06-27\",[19],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[19,\"TINY\",8,2,\"activo\",\"2026-06-01\",\"2026-06-27\",[19],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 21,
+        "esperado": {
+          "estudianteId": 21,
+          "centroId": 3,
+          "grupoId": 2,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-04",
+          "fingerprint": "[21,\"TINY\",8,2,\"activo\",null,\"2026-06-27\",[21],\"inscripcion_canonica\",\"2026-07-04\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[21,\"TINY\",8,2,\"activo\",\"2026-06-01\",\"2026-06-27\",[21],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 37,
+        "esperado": {
+          "estudianteId": 37,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[37,\"KIDS\",7,5,\"activo\",null,\"2026-10-26\",[37],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[37,\"KIDS\",7,5,\"activo\",\"2026-06-01\",\"2026-10-26\",[37],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 38,
+        "esperado": {
+          "estudianteId": 38,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 8,
+          "estadoNino": "baja_potencial",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[38,\"KIDS\",8,5,\"baja_potencial\",null,\"2026-07-27\",[38],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[38,\"KIDS\",8,5,\"baja_potencial\",\"2026-06-01\",\"2026-07-27\",[38],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 39,
+        "esperado": {
+          "estudianteId": 39,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 8,
+          "estadoNino": "baja_potencial",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[39,\"KIDS\",8,5,\"baja_potencial\",null,\"2026-07-27\",[39],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[39,\"KIDS\",8,5,\"baja_potencial\",\"2026-06-01\",\"2026-07-27\",[39],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 40,
+        "esperado": {
+          "estudianteId": 40,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[40,\"KIDS\",8,5,\"activo\",null,\"2026-10-12\",[40],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[40,\"KIDS\",8,5,\"activo\",\"2026-06-01\",\"2026-10-12\",[40],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 41,
+        "esperado": {
+          "estudianteId": 41,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[41,\"KIDS\",7,5,\"activo\",null,\"2026-07-20\",[41],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[41,\"KIDS\",7,5,\"activo\",\"2026-06-01\",\"2026-07-20\",[41],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 42,
+        "esperado": {
+          "estudianteId": 42,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "baja_potencial",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[42,\"KIDS\",7,5,\"baja_potencial\",null,\"2026-07-20\",[42],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[42,\"KIDS\",7,5,\"baja_potencial\",\"2026-06-01\",\"2026-07-20\",[42],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 48,
+        "esperado": {
+          "estudianteId": 48,
+          "centroId": 3,
+          "grupoId": 5,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-08",
+          "fingerprint": "[48,\"KIDS\",7,5,\"activo\",null,\"2026-07-20\",[48],\"inscripcion_canonica\",\"2026-06-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[48,\"KIDS\",7,5,\"activo\",\"2026-06-01\",\"2026-07-20\",[48],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 52,
+        "esperado": {
+          "estudianteId": 52,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[52,\"TINY\",5,7,\"activo\",null,\"2026-08-31\",[52],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[52,\"TINY\",5,7,\"activo\",\"2026-06-01\",\"2026-08-31\",[52],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 53,
+        "esperado": {
+          "estudianteId": 53,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[53,\"TINY\",4,7,\"activo\",null,\"2026-07-27\",[53],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[53,\"TINY\",4,7,\"activo\",\"2026-06-01\",\"2026-07-27\",[53],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 54,
+        "esperado": {
+          "estudianteId": 54,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[54,\"TINY\",4,7,\"activo\",null,\"2026-07-27\",[54],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[54,\"TINY\",4,7,\"activo\",\"2026-06-01\",\"2026-07-27\",[54],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 55,
+        "esperado": {
+          "estudianteId": 55,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[55,\"TINY\",6,7,\"activo\",null,\"2026-09-28\",[55],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[55,\"TINY\",6,7,\"activo\",\"2026-06-01\",\"2026-09-28\",[55],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 56,
+        "esperado": {
+          "estudianteId": 56,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[56,\"TINY\",6,7,\"activo\",null,\"2026-07-27\",[56],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[56,\"TINY\",6,7,\"activo\",\"2026-06-01\",\"2026-07-27\",[56],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 59,
+        "esperado": {
+          "estudianteId": 59,
+          "centroId": 3,
+          "grupoId": 7,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-10",
+          "fingerprint": "[59,\"TINY\",6,7,\"activo\",null,\"2026-07-11\",[59],\"inscripcion_canonica\",\"2026-08-10\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[59,\"TINY\",6,7,\"activo\",\"2026-06-01\",\"2026-07-11\",[59],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 61,
+        "esperado": {
+          "estudianteId": 61,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[61,\"KIDS\",5,8,\"activo\",null,\"2026-10-24\",[61],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[61,\"KIDS\",5,8,\"activo\",\"2026-06-01\",\"2026-10-24\",[61],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 62,
+        "esperado": {
+          "estudianteId": 62,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[62,\"KIDS\",5,8,\"activo\",null,\"2026-10-24\",[62],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[62,\"KIDS\",5,8,\"activo\",\"2026-06-01\",\"2026-10-24\",[62],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 63,
+        "esperado": {
+          "estudianteId": 63,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[63,\"KIDS\",5,8,\"activo\",null,\"2026-10-24\",[63],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[63,\"KIDS\",5,8,\"activo\",\"2026-06-01\",\"2026-10-24\",[63],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 64,
+        "esperado": {
+          "estudianteId": 64,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[64,\"KIDS\",5,8,\"activo\",null,\"2026-08-29\",[64],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[64,\"KIDS\",5,8,\"activo\",\"2026-06-01\",\"2026-08-29\",[64],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 65,
+        "esperado": {
+          "estudianteId": 65,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[65,\"KIDS\",7,8,\"activo\",null,\"2026-11-21\",[65],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[65,\"KIDS\",7,8,\"activo\",\"2026-06-01\",\"2026-11-21\",[65],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 66,
+        "esperado": {
+          "estudianteId": 66,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[66,\"KIDS\",7,8,\"activo\",null,\"2026-11-21\",[66],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[66,\"KIDS\",7,8,\"activo\",\"2026-06-01\",\"2026-11-21\",[66],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 67,
+        "esperado": {
+          "estudianteId": 67,
+          "centroId": 3,
+          "grupoId": 8,
+          "itinerario": "KIDS",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-13",
+          "fingerprint": "[67,\"KIDS\",6,8,\"activo\",null,\"2026-06-13\",[67],\"inscripcion_canonica\",\"2026-06-13\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[67,\"KIDS\",6,8,\"activo\",\"2026-06-01\",\"2026-06-13\",[67],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 79,
+        "esperado": {
+          "estudianteId": 79,
+          "centroId": 3,
+          "grupoId": 9,
+          "itinerario": "TINY",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-12",
+          "fingerprint": "[79,\"TINY\",4,9,\"activo\",null,\"2026-10-28\",[79],\"inscripcion_canonica\",\"2026-08-12\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[79,\"TINY\",4,9,\"activo\",\"2026-06-01\",\"2026-10-28\",[79],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 88,
+        "esperado": {
+          "estudianteId": 88,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[88,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[88],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[88,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[88],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 89,
+        "esperado": {
+          "estudianteId": 89,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[89,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[89],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[89,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[89],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 90,
+        "esperado": {
+          "estudianteId": 90,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[90,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[90],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[90,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[90],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 91,
+        "esperado": {
+          "estudianteId": 91,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[91,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[91],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[91,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[91],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 92,
+        "esperado": {
+          "estudianteId": 92,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[92,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[92],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[92,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[92],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 93,
+        "esperado": {
+          "estudianteId": 93,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[93,\"TINY\",2,12,\"activo\",null,\"2026-11-14\",[93],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[93,\"TINY\",2,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[93],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 95,
+        "esperado": {
+          "estudianteId": 95,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[95,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[95],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[95,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[95],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 96,
+        "esperado": {
+          "estudianteId": 96,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[96,\"TINY\",3,12,\"activo\",null,\"2026-11-14\",[96],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[96,\"TINY\",3,12,\"activo\",\"2026-06-01\",\"2026-11-14\",[96],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 97,
+        "esperado": {
+          "estudianteId": 97,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[97,\"TINY\",5,12,\"activo\",null,\"2026-09-26\",[97],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[97,\"TINY\",5,12,\"activo\",\"2026-06-01\",\"2026-09-26\",[97],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 98,
+        "esperado": {
+          "estudianteId": 98,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[98,\"TINY\",5,12,\"activo\",null,\"2026-09-26\",[98],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[98,\"TINY\",5,12,\"activo\",\"2026-06-01\",\"2026-09-26\",[98],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 99,
+        "esperado": {
+          "estudianteId": 99,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[99,\"TINY\",5,12,\"activo\",null,\"2026-09-26\",[99],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[99,\"TINY\",5,12,\"activo\",\"2026-06-01\",\"2026-09-26\",[99],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 100,
+        "esperado": {
+          "estudianteId": 100,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[100,\"TINY\",5,12,\"activo\",null,\"2026-09-26\",[100],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[100,\"TINY\",5,12,\"activo\",\"2026-06-01\",\"2026-09-26\",[100],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 101,
+        "esperado": {
+          "estudianteId": 101,
+          "centroId": 3,
+          "grupoId": 12,
+          "itinerario": "TINY",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-20",
+          "fingerprint": "[101,\"TINY\",4,12,\"activo\",null,\"2026-11-28\",[101],\"inscripcion_canonica\",\"2026-06-20\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[101,\"TINY\",4,12,\"activo\",\"2026-06-01\",\"2026-11-28\",[101],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 321,
+        "esperado": {
+          "estudianteId": 321,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[321,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[321],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[321,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[321],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 322,
+        "esperado": {
+          "estudianteId": 322,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[322,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[322],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[322,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[322],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 324,
+        "esperado": {
+          "estudianteId": 324,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "TINY",
+          "nivel": 10,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[324,\"TINY\",10,46,\"activo\",null,\"2026-12-19\",[324],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[324,\"TINY\",10,46,\"activo\",\"2026-06-01\",\"2026-12-19\",[324],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 329,
+        "esperado": {
+          "estudianteId": 329,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[329,\"KIDS\",7,46,\"activo\",null,\"2026-10-28\",[329],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[329,\"KIDS\",7,46,\"activo\",\"2026-06-01\",\"2026-10-28\",[329],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 332,
+        "esperado": {
+          "estudianteId": 332,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[332,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[332],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[332,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[332],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 336,
+        "esperado": {
+          "estudianteId": 336,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "TINY",
+          "nivel": 6,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[336,\"TINY\",6,46,\"activo\",null,\"2026-10-28\",[336],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[336,\"TINY\",6,46,\"activo\",\"2026-06-01\",\"2026-10-28\",[336],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 337,
+        "esperado": {
+          "estudianteId": 337,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[337,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[337],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[337,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[337],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 343,
+        "esperado": {
+          "estudianteId": 343,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[343,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[343],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[343,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[343],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 354,
+        "esperado": {
+          "estudianteId": 354,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[354,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[354],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[354,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[354],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 359,
+        "esperado": {
+          "estudianteId": 359,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[359,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[359],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[359,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[359],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 360,
+        "esperado": {
+          "estudianteId": 360,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[360,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[360],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[360,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[360],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 363,
+        "esperado": {
+          "estudianteId": 363,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[363,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[363],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[363,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[363],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 369,
+        "esperado": {
+          "estudianteId": 369,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "KIDS",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[369,\"KIDS\",4,53,\"activo\",null,\"2026-12-18\",[369],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[369,\"KIDS\",4,53,\"activo\",\"2026-06-01\",\"2026-12-18\",[369],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 370,
+        "esperado": {
+          "estudianteId": 370,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[370,\"TINY\",7,51,\"activo\",null,\"2026-12-16\",[370],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[370,\"TINY\",7,51,\"activo\",\"2026-06-01\",\"2026-12-16\",[370],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 379,
+        "esperado": {
+          "estudianteId": 379,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[379,\"TINY\",2,58,\"activo\",null,\"2026-12-16\",[379],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[379,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-12-16\",[379],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 380,
+        "esperado": {
+          "estudianteId": 380,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[380,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[380],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[380,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[380],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 386,
+        "esperado": {
+          "estudianteId": 386,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "TINY",
+          "nivel": 3,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[386,\"TINY\",3,53,\"activo\",null,\"2026-11-27\",[386],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[386,\"TINY\",3,53,\"activo\",\"2026-06-01\",\"2026-11-27\",[386],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 387,
+        "esperado": {
+          "estudianteId": 387,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[387,\"KIDS\",5,53,\"activo\",null,\"2026-09-25\",[387],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[387,\"KIDS\",5,53,\"activo\",\"2026-06-01\",\"2026-09-25\",[387],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 391,
+        "esperado": {
+          "estudianteId": 391,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[391,\"TINY\",5,46,\"activo\",null,\"2026-08-28\",[391],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[391,\"TINY\",5,46,\"activo\",\"2026-06-01\",\"2026-08-28\",[391],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 392,
+        "esperado": {
+          "estudianteId": 392,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[392,\"TINY\",5,51,\"activo\",null,\"2026-09-28\",[392],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[392,\"TINY\",5,51,\"activo\",\"2026-06-01\",\"2026-09-28\",[392],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 393,
+        "esperado": {
+          "estudianteId": 393,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "TINY",
+          "nivel": 9,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[393,\"TINY\",9,46,\"activo\",null,\"2026-11-27\",[393],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[393,\"TINY\",9,46,\"activo\",\"2026-06-01\",\"2026-11-27\",[393],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 395,
+        "esperado": {
+          "estudianteId": 395,
+          "centroId": 2,
+          "grupoId": 46,
+          "itinerario": "KIDS",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-08",
+          "fingerprint": "[395,\"KIDS\",7,46,\"activo\",null,\"2026-12-19\",[395],\"inscripcion_canonica\",\"2026-08-08\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[395,\"KIDS\",7,46,\"activo\",\"2026-06-01\",\"2026-12-19\",[395],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 401,
+        "esperado": {
+          "estudianteId": 401,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[401,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[401],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[401,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[401],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 406,
+        "esperado": {
+          "estudianteId": 406,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "KIDS",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[406,\"KIDS\",4,53,\"activo\",null,\"2026-12-18\",[406],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[406,\"KIDS\",4,53,\"activo\",\"2026-06-01\",\"2026-12-18\",[406],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 411,
+        "esperado": {
+          "estudianteId": 411,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[411,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[411],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[411,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[411],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 414,
+        "esperado": {
+          "estudianteId": 414,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[414,\"TINY\",7,51,\"activo\",null,\"2026-12-16\",[414],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[414,\"TINY\",7,51,\"activo\",\"2026-06-01\",\"2026-12-16\",[414],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 437,
+        "esperado": {
+          "estudianteId": 437,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "KIDS",
+          "nivel": 5,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[437,\"KIDS\",5,53,\"activo\",null,\"2026-09-25\",[437],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[437,\"KIDS\",5,53,\"activo\",\"2026-06-01\",\"2026-09-25\",[437],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 441,
+        "esperado": {
+          "estudianteId": 441,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 7,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[441,\"TINY\",7,51,\"activo\",null,\"2026-12-16\",[441],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[441,\"TINY\",7,51,\"activo\",\"2026-06-01\",\"2026-12-16\",[441],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 446,
+        "esperado": {
+          "estudianteId": 446,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "KIDS",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[446,\"KIDS\",4,53,\"activo\",null,\"2026-09-25\",[446],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[446,\"KIDS\",4,53,\"activo\",\"2026-06-01\",\"2026-09-25\",[446],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 448,
+        "esperado": {
+          "estudianteId": 448,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 8,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[448,\"TINY\",8,51,\"activo\",null,\"2027-01-27\",[448],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[448,\"TINY\",8,51,\"activo\",\"2026-06-01\",\"2027-01-27\",[448],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 451,
+        "esperado": {
+          "estudianteId": 451,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[451,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[451],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[451,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[451],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 454,
+        "esperado": {
+          "estudianteId": 454,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[454,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[454],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[454,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[454],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 455,
+        "esperado": {
+          "estudianteId": 455,
+          "centroId": 2,
+          "grupoId": 58,
+          "itinerario": "TINY",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-01",
+          "fingerprint": "[455,\"TINY\",2,58,\"activo\",null,\"2026-11-28\",[455],\"inscripcion_canonica\",\"2026-07-01\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[455,\"TINY\",2,58,\"activo\",\"2026-06-01\",\"2026-11-28\",[455],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 456,
+        "esperado": {
+          "estudianteId": 456,
+          "centroId": 2,
+          "grupoId": 59,
+          "itinerario": "KIDS",
+          "nivel": 2,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-06-30",
+          "fingerprint": "[456,\"KIDS\",2,59,\"activo\",null,\"2026-11-28\",[456],\"inscripcion_canonica\",\"2026-06-30\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[456,\"KIDS\",2,59,\"activo\",\"2026-06-01\",\"2026-11-28\",[456],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 457,
+        "esperado": {
+          "estudianteId": 457,
+          "centroId": 2,
+          "grupoId": 51,
+          "itinerario": "TINY",
+          "nivel": 9,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-07-29",
+          "fingerprint": "[457,\"TINY\",9,51,\"activo\",null,\"2026-10-28\",[457],\"inscripcion_canonica\",\"2026-07-29\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[457,\"TINY\",9,51,\"activo\",\"2026-06-01\",\"2026-10-28\",[457],null,\"2026-06-01\"]"
+        }
+      },
+      {
+        "estudianteId": 460,
+        "esperado": {
+          "estudianteId": 460,
+          "centroId": 2,
+          "grupoId": 53,
+          "itinerario": "TINY",
+          "nivel": 4,
+          "estadoNino": "activo",
+          "fuente": "inscripcion_canonica",
+          "ancla": "2026-08-07",
+          "fingerprint": "[460,\"TINY\",4,53,\"activo\",null,\"2026-09-25\",[460],\"inscripcion_canonica\",\"2026-08-07\"]"
+        },
+        "vivo": {
+          "ancla": "2026-06-01T04:00:00.000Z",
+          "fingerprint": "[460,\"TINY\",4,53,\"activo\",\"2026-06-01\",\"2026-09-25\",[460],null,\"2026-06-01\"]"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,1452 @@
+{
+  "script": "preflight-remodelado-2026-08-08",
+  "modo": "dry-run",
+  "generado_at": "2026-08-10T12:27:09.795Z",
+  "hoy": "2026-08-10",
+  "activosSinFecha": [
+    {
+      "grupoId": 1,
+      "centroId": 3,
+      "numero": "22",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-07-18",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 2,
+      "centroId": 3,
+      "numero": "36",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-07-04",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 3,
+      "centroId": 3,
+      "numero": "39",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-03-07",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 4,
+      "centroId": 3,
+      "numero": "40",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-02",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 5,
+      "centroId": 3,
+      "numero": "42",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-06-08",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 7,
+      "centroId": 3,
+      "numero": "55",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-10",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 8,
+      "centroId": 3,
+      "numero": "59",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-06-13",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 9,
+      "centroId": 3,
+      "numero": "61",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-12",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 12,
+      "centroId": 3,
+      "numero": "70",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-06-20",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 13,
+      "centroId": 3,
+      "numero": "71",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-14",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 14,
+      "centroId": 3,
+      "numero": "72",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-11",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 15,
+      "centroId": 3,
+      "numero": "73",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-21",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 16,
+      "centroId": 3,
+      "numero": "74",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-05-18",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 17,
+      "centroId": 3,
+      "numero": "75",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-03-25",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 18,
+      "centroId": 3,
+      "numero": "76",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-03-27",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 19,
+      "centroId": 3,
+      "numero": "ONLINE VZLA",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 20,
+      "centroId": 3,
+      "numero": "77",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-18",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 21,
+      "centroId": 3,
+      "numero": "KINDER JANETH",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 22,
+      "centroId": 3,
+      "numero": "78",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-05-13",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 23,
+      "centroId": 5,
+      "numero": "ONLINE VIRTUAL",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 24,
+      "centroId": 5,
+      "numero": "22",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 25,
+      "centroId": 5,
+      "numero": "41",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 26,
+      "centroId": 5,
+      "numero": "21",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 28,
+      "centroId": 5,
+      "numero": "26",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 29,
+      "centroId": 5,
+      "numero": "35",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 30,
+      "centroId": 5,
+      "numero": "36",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 31,
+      "centroId": 5,
+      "numero": "KINDER 7",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 32,
+      "centroId": 5,
+      "numero": "47",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 34,
+      "centroId": 5,
+      "numero": "48",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 35,
+      "centroId": 5,
+      "numero": "51",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 36,
+      "centroId": 5,
+      "numero": "52",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 37,
+      "centroId": 5,
+      "numero": "KINDER 9",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 38,
+      "centroId": 5,
+      "numero": "54",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 39,
+      "centroId": 5,
+      "numero": "55",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 40,
+      "centroId": 5,
+      "numero": "58",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 42,
+      "centroId": 5,
+      "numero": "59",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 43,
+      "centroId": 5,
+      "numero": "61",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 44,
+      "centroId": 5,
+      "numero": "62",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 45,
+      "centroId": 5,
+      "numero": "63",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 46,
+      "centroId": 2,
+      "numero": "23",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-08",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 48,
+      "centroId": 2,
+      "numero": "28",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-10",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 49,
+      "centroId": 2,
+      "numero": "41",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 50,
+      "centroId": 2,
+      "numero": "45",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 51,
+      "centroId": 2,
+      "numero": "51",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-07-29",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 52,
+      "centroId": 2,
+      "numero": "66",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 53,
+      "centroId": 2,
+      "numero": "70",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-08-07",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 54,
+      "centroId": 2,
+      "numero": "71",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 55,
+      "centroId": 2,
+      "numero": "73",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 56,
+      "centroId": 2,
+      "numero": "78",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 58,
+      "centroId": 2,
+      "numero": "81",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-07-01",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 59,
+      "centroId": 2,
+      "numero": "80",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-06-30",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 60,
+      "centroId": 2,
+      "numero": "82",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 61,
+      "centroId": 2,
+      "numero": "83",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-01",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 62,
+      "centroId": 2,
+      "numero": "ONLINE VZLA",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 63,
+      "centroId": 2,
+      "numero": "85",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 64,
+      "centroId": 2,
+      "numero": "84",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 65,
+      "centroId": 1,
+      "numero": "25",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 66,
+      "centroId": 1,
+      "numero": "33",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 67,
+      "centroId": 1,
+      "numero": "36",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 68,
+      "centroId": 1,
+      "numero": "40",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 69,
+      "centroId": 1,
+      "numero": "46",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 70,
+      "centroId": 1,
+      "numero": "50",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 71,
+      "centroId": 1,
+      "numero": "54",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 72,
+      "centroId": 1,
+      "numero": "60",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 73,
+      "centroId": 1,
+      "numero": "68",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 74,
+      "centroId": 1,
+      "numero": "73",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 75,
+      "centroId": 1,
+      "numero": "78",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 76,
+      "centroId": 1,
+      "numero": "82",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 77,
+      "centroId": 1,
+      "numero": "83",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 78,
+      "centroId": 1,
+      "numero": "86",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 79,
+      "centroId": 1,
+      "numero": "87",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 80,
+      "centroId": 1,
+      "numero": "88",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 81,
+      "centroId": 1,
+      "numero": "89",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 82,
+      "centroId": 1,
+      "numero": "90",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 83,
+      "centroId": 1,
+      "numero": "91",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 84,
+      "centroId": 1,
+      "numero": "92",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 85,
+      "centroId": 1,
+      "numero": "93",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 86,
+      "centroId": 1,
+      "numero": "94",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 87,
+      "centroId": 1,
+      "numero": "95",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 88,
+      "centroId": 1,
+      "numero": "96",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 89,
+      "centroId": 1,
+      "numero": "97",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 90,
+      "centroId": 1,
+      "numero": "KINDER RAQUEL",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 91,
+      "centroId": 1,
+      "numero": "KINDER YENIBEL",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 92,
+      "centroId": 6,
+      "numero": "1-2",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-05-30",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 93,
+      "centroId": 6,
+      "numero": "3",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 94,
+      "centroId": 6,
+      "numero": "4",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 95,
+      "centroId": 6,
+      "numero": "5",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-03-21",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 96,
+      "centroId": 6,
+      "numero": "6",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-11",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 97,
+      "centroId": 6,
+      "numero": "7",
+      "itinerario": "KIDS",
+      "tieneItinerario": true,
+      "itInicio": "2026-01-24",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 98,
+      "centroId": 6,
+      "numero": "8",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 99,
+      "centroId": 6,
+      "numero": "9",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 100,
+      "centroId": 6,
+      "numero": "10",
+      "itinerario": "TINY",
+      "tieneItinerario": true,
+      "itInicio": "2026-04-18",
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 101,
+      "centroId": 6,
+      "numero": "11",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-01"
+    },
+    {
+      "grupoId": 102,
+      "centroId": 10,
+      "numero": "KINDER 1A",
+      "itinerario": "KINDER",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 103,
+      "centroId": 10,
+      "numero": "3",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 104,
+      "centroId": 10,
+      "numero": "4",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 105,
+      "centroId": 10,
+      "numero": "6",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 106,
+      "centroId": 10,
+      "numero": "7",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 107,
+      "centroId": 10,
+      "numero": "9",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 108,
+      "centroId": 10,
+      "numero": "10",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 109,
+      "centroId": 10,
+      "numero": "11",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 110,
+      "centroId": 10,
+      "numero": "12",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 111,
+      "centroId": 10,
+      "numero": "13",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 112,
+      "centroId": 10,
+      "numero": "14",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 113,
+      "centroId": 10,
+      "numero": "15",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 114,
+      "centroId": 10,
+      "numero": "16",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 115,
+      "centroId": 10,
+      "numero": "17",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 116,
+      "centroId": 10,
+      "numero": "18",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 117,
+      "centroId": 10,
+      "numero": "19",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 118,
+      "centroId": 10,
+      "numero": "20",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 119,
+      "centroId": 10,
+      "numero": "21",
+      "itinerario": "KIDS",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    },
+    {
+      "grupoId": 120,
+      "centroId": 10,
+      "numero": "22",
+      "itinerario": "TINY",
+      "tieneItinerario": false,
+      "itInicio": null,
+      "fechaPublicacion": "2026-08-04"
+    }
+  ],
+  "candidatos": [],
+  "revisiones": [],
+  "informativos": [
+    {
+      "grupoId": 123,
+      "centroId": 2,
+      "numero": "86",
+      "itinerario": "TINY",
+      "fecha": "2026-09-26",
+      "nivel": 1,
+      "itInicio": "2026-09-26",
+      "estado": "nivel_1_en_llenado"
+    },
+    {
+      "grupoId": 124,
+      "centroId": 2,
+      "numero": "87",
+      "itinerario": "TINY",
+      "fecha": "2026-10-26",
+      "nivel": 1,
+      "itInicio": "2026-10-26",
+      "estado": "nivel_1_en_llenado"
+    },
+    {
+      "grupoId": 125,
+      "centroId": 2,
+      "numero": "88",
+      "itinerario": "KIDS",
+      "fecha": "2026-10-27",
+      "nivel": 1,
+      "itInicio": "2026-10-27",
+      "estado": "nivel_1_en_llenado"
+    },
+    {
+      "grupoId": 126,
+      "centroId": 2,
+      "numero": "89",
+      "itinerario": "KIDS",
+      "fecha": "2026-10-26",
+      "nivel": 1,
+      "itInicio": "2026-10-26",
+      "estado": "nivel_1_en_llenado"
+    },
+    {
+      "grupoId": 127,
+      "centroId": 2,
+      "numero": "90",
+      "itinerario": "TINY",
+      "fecha": "2026-10-08",
+      "nivel": 1,
+      "itInicio": "2026-10-08",
+      "estado": "nivel_1_en_llenado"
+    }
+  ],
+  "conflictos": [],
+  "yaAplicadas": [],
+  "fueraDeManifiesto": [],
+  "historiaApertura": {
+    "total": 127,
+    "sinApertura": 19,
+    "coinciden": 1,
+    "distintos": 107,
+    "muestras": [
+      {
+        "grupoId": 1,
+        "centroId": 3,
+        "numero": "22",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 2,
+        "centroId": 3,
+        "numero": "36",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 3,
+        "centroId": 3,
+        "numero": "39",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 4,
+        "centroId": 3,
+        "numero": "40",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 5,
+        "centroId": 3,
+        "numero": "42",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 6,
+        "centroId": 3,
+        "numero": "KINDER DIANA",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 7,
+        "centroId": 3,
+        "numero": "55",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 8,
+        "centroId": 3,
+        "numero": "59",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 9,
+        "centroId": 3,
+        "numero": "61",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 10,
+        "centroId": 3,
+        "numero": "62",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 11,
+        "centroId": 3,
+        "numero": "69",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 12,
+        "centroId": 3,
+        "numero": "70",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 13,
+        "centroId": 3,
+        "numero": "71",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 14,
+        "centroId": 3,
+        "numero": "72",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 15,
+        "centroId": 3,
+        "numero": "73",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 16,
+        "centroId": 3,
+        "numero": "74",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 17,
+        "centroId": 3,
+        "numero": "75",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 18,
+        "centroId": 3,
+        "numero": "76",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 19,
+        "centroId": 3,
+        "numero": "ONLINE VZLA",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 20,
+        "centroId": 3,
+        "numero": "77",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 21,
+        "centroId": 3,
+        "numero": "KINDER JANETH",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 22,
+        "centroId": 3,
+        "numero": "78",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 23,
+        "centroId": 5,
+        "numero": "ONLINE VIRTUAL",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 24,
+        "centroId": 5,
+        "numero": "22",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 25,
+        "centroId": 5,
+        "numero": "41",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 26,
+        "centroId": 5,
+        "numero": "21",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 27,
+        "centroId": 5,
+        "numero": "KINDER 5",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 28,
+        "centroId": 5,
+        "numero": "26",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 29,
+        "centroId": 5,
+        "numero": "35",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 30,
+        "centroId": 5,
+        "numero": "36",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 31,
+        "centroId": 5,
+        "numero": "KINDER 7",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 32,
+        "centroId": 5,
+        "numero": "47",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 33,
+        "centroId": 5,
+        "numero": "46",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 34,
+        "centroId": 5,
+        "numero": "48",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 35,
+        "centroId": 5,
+        "numero": "51",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 36,
+        "centroId": 5,
+        "numero": "52",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 37,
+        "centroId": 5,
+        "numero": "KINDER 9",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 38,
+        "centroId": 5,
+        "numero": "54",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 39,
+        "centroId": 5,
+        "numero": "55",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 40,
+        "centroId": 5,
+        "numero": "58",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 41,
+        "centroId": 5,
+        "numero": "60",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 42,
+        "centroId": 5,
+        "numero": "59",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 43,
+        "centroId": 5,
+        "numero": "61",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 44,
+        "centroId": 5,
+        "numero": "62",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 45,
+        "centroId": 5,
+        "numero": "63",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 46,
+        "centroId": 2,
+        "numero": "23",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 47,
+        "centroId": 2,
+        "numero": "26",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 48,
+        "centroId": 2,
+        "numero": "28",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 49,
+        "centroId": 2,
+        "numero": "41",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      },
+      {
+        "grupoId": 50,
+        "centroId": 2,
+        "numero": "45",
+        "fechaApertura": "2026-07-01",
+        "fechaPublicacion": "2026-08-01"
+      }
+    ]
+  },
+  "verificacion": {
+    "mesesVerificados": [
+      {
+        "centroId": 2,
+        "year": 2026,
+        "month": 8,
+        "estadoMes": "abierto",
+        "resultado": "identico"
+      }
+    ],
+    "mesesOmitidos": []
+  },
+  "diferencias": [],
+  "bloqueos": {
+    "activosSinFecha": 112,
+    "candidatosPendientes": 0,
+    "revisionesHumanas": 0,
+    "fueraDeManifiesto": 0
+  },
+  "ok": true,
+  "rolloutBloqueado": true
+}

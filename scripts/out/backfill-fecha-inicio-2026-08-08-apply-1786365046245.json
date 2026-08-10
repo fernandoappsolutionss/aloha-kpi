@@ -1,7 +1,7 @@
 {
   "script": "backfill-fecha-inicio-2026-08-08",
-  "modo": "dry-run",
-  "generado_at": "2026-08-10T12:30:32.970Z",
+  "modo": "apply",
+  "generado_at": "2026-08-10T12:30:37.981Z",
   "hoy": "2026-08-10",
   "candidatos": [
     {
@@ -409,5 +409,40 @@
   },
   "variacionesAprobadas": [],
   "diferencias": [],
-  "ok": true
+  "ok": true,
+  "aplicadas": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    20,
+    22,
+    46,
+    47,
+    48,
+    51,
+    53,
+    58,
+    59,
+    61,
+    92,
+    95,
+    96,
+    97,
+    100
+  ],
+  "fallida": null,
+  "postDiferencias": []
 }
