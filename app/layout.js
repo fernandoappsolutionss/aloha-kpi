@@ -1,24 +1,4 @@
 import './globals.css'
-import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
-
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-fraunces',
-  display: 'swap',
-})
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
-const jetbrains = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-jetbrains',
-  display: 'swap',
-})
 
 export const metadata = {
   title: 'KPI Dashboard · Team Solutionss',
@@ -32,7 +12,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es" suppressHydrationWarning className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
+    <html lang="es" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('ts_theme');document.documentElement.dataset.theme=(t==='light')?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();` }} />
         {children}

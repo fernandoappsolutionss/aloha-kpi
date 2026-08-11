@@ -31,6 +31,16 @@ const ORIGEN_VENTA_LABELS = {
 const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
 const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
 
+function monthKey(date, timeZone = 'America/Panama') {
+  const parts = new Intl.DateTimeFormat('en', { timeZone, year: 'numeric', month: '2-digit' }).formatToParts(date)
+  const year = parts.find((p) => p.type === 'year')?.value
+  const month = parts.find((p) => p.type === 'month')?.value
+  return year && month ? `${year}-${month}` : ''
+}
+function eventMonthKey(event, fallbackTz) {
+  return event?.start_date ? monthKey(new Date(event.start_date), event.timezone || fallbackTz) : ''
+}
+
 // datetime-local (wall-clock) + zona → ISO con offset.
 function localToISO(local, tz) {
   if (!local) return null
@@ -67,6 +77,7 @@ export default function EventosPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
+  const [filterPeriodo, setFilterPeriodo] = useState('mes_actual')
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
@@ -88,15 +99,19 @@ export default function EventosPage() {
   }, [id])
   useEffect(() => { load() }, [load])
 
+  const currentMonthKey = monthKey(new Date(), defaultTz)
+  const periodEvents = events.filter((e) =>
+    filterPeriodo === 'todos' || eventMonthKey(e, defaultTz) === currentMonthKey)
+
   // Stats agregadas (tarjetas como en el CRM).
-  const agg = events.reduce((a, e) => {
+  const agg = periodEvents.reduce((a, e) => {
     const s = e.stats || {}
     a.total += s.total || 0; a.attended += s.attended || 0; a.not_attended += s.not_attended || 0
     a.pending += s.pending || 0; a.paid += s.paid || 0; a.revenue += s.total_revenue || 0
     return a
   }, { total: 0, attended: 0, not_attended: 0, pending: 0, paid: 0, revenue: 0 })
 
-  const visible = events.filter((e) =>
+  const visible = periodEvents.filter((e) =>
     (filterEstado === 'todos' || e.status === filterEstado) &&
     (!q || (e.name || '').toLowerCase().includes(q.toLowerCase())))
 
@@ -187,11 +202,16 @@ export default function EventosPage() {
         {/* Filtros */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           <input className="input" style={{ maxWidth: 280 }} placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="input" style={{ maxWidth: 180 }} value={filterPeriodo} onChange={(e) => { setFilterPeriodo(e.target.value); setOpenId(null) }}>
+            <option value="mes_actual">Este mes</option>
+            <option value="todos">Todos los meses</option>
+          </select>
           <select className="input" style={{ maxWidth: 200 }} value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
             <option value="published">Publicado</option>
             <option value="draft">Borrador</option>
             <option value="completed">Finalizado</option>
+            <option value="cancelled">Cancelado</option>
           </select>
         </div>
 
