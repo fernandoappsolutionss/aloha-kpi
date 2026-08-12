@@ -457,6 +457,29 @@ test('el panel agregado aplica los inicios y retiros vivos del mes abierto', () 
   assert.equal(filas[1].ninos_final_mes, 200)
 })
 
+test('el panel cuenta solo grupos operativos presenciales con ninos vivos', () => {
+  const movimientos = movimientosVivosMes({
+    estudiantes: [
+      estudiante({ id: 1, grupo_id: 1 }),
+      estudiante({ id: 2, grupo_id: 2 }),
+      estudiante({ id: 3, grupo_id: 6, estado: 'baja_potencial' }),
+    ],
+    grupos: [
+      grupo({ id: 1, estado: 'activo', fecha_inicio_clases: '2026-08-01' }),
+      grupo({ id: 2, estado: 'activo', es_online: true, fecha_inicio_clases: '2026-08-01' }),
+      grupo({ id: 3, estado: 'activo', fecha_inicio_clases: '2026-08-01' }),
+      grupo({ id: 4, estado: 'fusionado', fecha_inicio_clases: '2026-08-01' }),
+      grupo({ id: 5, estado: 'activo', fecha_inicio_clases: '2026-09-15' }),
+      grupo({ id: 6, estado: 'activo', fecha_inicio_clases: '2026-08-01' }),
+    ],
+    eventos: [],
+    year: 2026,
+    month: 8,
+  })
+
+  assert.equal(movimientos.totales.gruposActivos, 2)
+})
+
 test('el mes abierto se crea desde los movimientos aunque aun no tenga fila KPI', () => {
   const filas = resumenConCuadroVivo([], {
     centroId: 2,
