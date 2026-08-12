@@ -218,3 +218,25 @@ test('as-of: la venta cancelada pre-inicio sigue fuera del cuadro (retirosActivo
   assert.equal(cuadroDeserciones(agosto, evAgosto, [g]).length, 0)
   assert.equal(cuadroRoyalties(agosto, evAgosto, 12, new Set()).totales.totalNinos, 0)
 })
+
+test('el cuadro cuenta grupos activos con el mismo criterio operativo del dashboard', () => {
+  const control = cuadroControlGrupos(
+    [
+      grupo({ id: 1 }),
+      grupo({ id: 2, es_online: true }),
+      grupo({ id: 3 }),
+      grupo({ id: 4, estado: 'fusionado' }),
+      grupo({ id: 5 }),
+      grupo({ id: 6 }),
+    ],
+    [
+      estudiante({ id: 1, grupo_id: 1 }),
+      estudiante({ id: 2, grupo_id: 2 }),
+      estudiante({ id: 3, grupo_id: 5, estado: 'retirado' }),
+      estudiante({ id: 4, grupo_id: 6, estado: 'baja_potencial' }),
+    ],
+    [],
+  )
+
+  assert.equal(control.totales.gruposActivos, 2)
+})

@@ -53,7 +53,7 @@ async function aplicarMesesAbiertosVivos(rows, prevRows, lo, hi, centroIds = [])
 
     const [estudiantes, grupos, eventos] = await Promise.all([
       sql`SELECT id, centro_id, grupo_id, nombre, estado, fecha_inscripcion FROM estudiantes`,
-      sql`SELECT id, centro_id, numero, estado, fecha_inicio_clases FROM grupos`,
+      sql`SELECT id, centro_id, numero, estado, es_online, fecha_inicio_clases FROM grupos`,
       sql`
         SELECT id, centro_id, estudiante_id, tipo, motivo, fecha, year, month, a_grupo_id
         FROM estudiante_eventos
