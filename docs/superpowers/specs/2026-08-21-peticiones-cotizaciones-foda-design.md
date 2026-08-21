@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-21
 
-**Estado:** diseño aprobado en conversación; pendiente de revisión del documento
+**Estado:** diseño y controles técnicos aprobados por Fernando el 2026-08-21
 
 **Aplicación:** ALOHA KPI (`/centro/[id]/foda`)
 
@@ -34,11 +34,11 @@ La entrega captura datos aptos para un reporte posterior. No construye el tabler
 9. Los registros existentes conservan sus datos y visibilidad, aparecen como anteriores y no reciben requisitos documentales retroactivos.
 10. El sistema registra cada cambio de estado para medir tiempos y transiciones en el futuro.
 
-## Controles técnicos propuestos para esta revisión
+## Controles técnicos aprobados
 
-Estos controles surgieron de la revisión de seguridad. Fernando puede aprobarlos o cambiarlos al revisar este documento:
+Estos controles surgieron de la revisión de seguridad y forman parte del alcance aprobado:
 
-- Pedir país y RUC, RIF o identificación fiscal equivalente para hacer exigible la regla de proveedores distintos. La aplicación detecta duplicados, pero no consulta registros públicos.
+- Pedir país desde un catálogo ISO 3166-1 real y RUC, RIF o identificación fiscal equivalente para hacer exigible la regla de proveedores distintos. La aplicación rechaza códigos ficticios y detecta duplicados, pero no consulta registros públicos ni puede impedir una declaración deliberadamente falsa.
 - Limitar cada petición a diez proveedores y cada cotización a cinco intentos de carga para proteger la cuota.
 - Vencer borradores después de 30 días sin actividad, con aviso visible.
 - Usar un cron y una cola durable para limpiar cargas inválidas, callbacks obsoletos y borradores vencidos.
@@ -86,7 +86,7 @@ La carga directa evita enviar tres archivos a través de una función de Vercel.
 La emisión y la confirmación de una carga tienen autoridades distintas:
 
 - `onBeforeGenerateToken` recibe la cookie, relee el usuario y el borrador desde Neon, crea un `upload_nonce` de un solo uso y autoriza el `pathname` esperado.
-- `onUploadCompleted` es un callback servidor-a-servidor de Vercel y no recibe la cookie. Usa el `tokenPayload` firmado, relee usuario, borrador y cotización, compara `nonce` y `pathname`, y aplica una actualización condicional e idempotente. Si el usuario perdió acceso después de recibir el token, encola el blob para limpieza.
+- `onUploadCompleted` es un callback servidor-a-servidor de Vercel y no recibe la cookie. Usa el `tokenPayload` firmado, relee usuario, borrador y cotización, compara `nonce` y `pathname`, y aplica una actualización condicional e idempotente. Justo antes de marcar el PDF como válido vuelve a bloquear petición y actor para ordenar carreras contra cambios de estado, rol o centro. Si el usuario perdió acceso después de recibir el token, encola el blob para limpieza.
 
 La respuesta del navegador nunca valida una carga ni finaliza una petición.
 
@@ -140,6 +140,7 @@ Las filas actuales reciben `tipo = 'legado'` y `submitted_at = COALESCE(created_
 | `expected_pathname` | Ruta fijada por el servidor antes de emitir el token |
 | `upload_status` | `pending`, `validating`, `valid`, `invalid` o `cleanup_pending` |
 | `upload_attempts` | Contador; máximo cinco tokens por cotización |
+| `validation_error` | Causa legible de la última validación fallida; nula al reintentar |
 | `uploaded_by` | FK al usuario que cargó el archivo |
 | `uploaded_by_snapshot` | Nombre, correo y rol del actor |
 | `validada_at` | Nulo hasta completar la validación |
@@ -149,8 +150,9 @@ Restricciones:
 
 - `proveedor_clave` aplica Unicode NFKD, elimina marcas diacríticas y puntuación, convierte a minúsculas y colapsa espacios. Sirve como señal adicional, no como prueba de identidad.
 - `proveedor_id_fiscal_clave` elimina espacios, guiones y puntuación, y convierte letras a mayúsculas. `UNIQUE (peticion_id, proveedor_pais, proveedor_id_fiscal_clave)` exige identificaciones fiscales distintas.
+- `proveedor_pais` referencia una tabla canónica de códigos ISO 3166-1 alfa-2 sembrada por la migración; valores inventados como `ZZ` fallan también en la base.
 - `UNIQUE (peticion_id, archivo_sha256)` impide presentar el mismo PDF con otro proveedor.
-- `blob_pathname` y `expected_pathname` son únicos globalmente; una limpieza nunca puede borrar un objeto compartido.
+- `expected_pathname` es único globalmente y, cuando existe `blob_pathname`, ambos valores deben coincidir; una limpieza nunca puede borrar un objeto compartido.
 - Los dos campos de certificación deben ser verdaderos para que la fila cuente como válida.
 - Una petición enviada conserva sus cotizaciones. Solo admite filas nuevas.
 
@@ -177,13 +179,15 @@ El borrador conserva técnicamente el estado `Próximo trimestre` para mantener 
 
 ### Nueva tabla `peticion_blob_cleanup`
 
-La cola durable guarda `blob_pathname` único, motivo, intentos, próximo intento, último error, fecha de creación y fecha de terminación. El descarte de borradores, los PDF inválidos y los callbacks obsoletos registran la ruta en esta tabla dentro de la misma transacción que retira sus metadatos activos.
+La cola durable guarda `blob_pathname` único, motivo, intentos, próximo intento, último error, fecha de creación y fecha de terminación. También conserva generación, `locked_at`, `lock_token` y generación reclamada para cercar workers obsoletos, reclamar lotes con `FOR UPDATE SKIP LOCKED` y reabrir de forma segura una ruta que reciba una nueva obligación después de agotar reintentos. Una tabla singleton conserva el cursor del barrido paginado del store. El descarte de borradores, los PDF inválidos y los callbacks obsoletos registran la ruta en esta tabla dentro de la misma transacción que retira sus metadatos activos.
 
 Un cron diario, protegido por `CRON_SECRET` y con secreto ausente rechazado, realiza tres tareas:
 
 1. descarta borradores sin actividad durante 30 días;
 2. borra blobs pendientes mediante operaciones idempotentes y reintentos limitados;
 3. reconcilia por prefijo los intentos vencidos que no completaron su callback.
+
+La reconciliación cambia primero los intentos vencidos de `pending` o `validating` a `cleanup_pending` dentro de la misma transacción que encola sus rutas. Un callback tardío ya no puede validar un objeto que el worker esté por borrar. Cada ejecución procesa primero la cola existente y después lee un número acotado de páginas del store; guarda el cursor para continuar en el siguiente cron y libera cualquier claim que no alcance a procesar dentro del presupuesto.
 
 La interfaz limita cada petición a diez cotizaciones y cada cotización a cinco intentos de carga. Estos límites protegen la cuota sin impedir cotizaciones adicionales razonables.
 
@@ -257,7 +261,7 @@ Un archivo que falle la validación no cuenta como cotización. El servidor inte
 
 La ruta que emite tokens y cada descarga autentican dentro del handler. El callback de Vercel no tiene cookie: se autoriza mediante el `tokenPayload` firmado y la comprobación idempotente descrita antes. El middleware actual no protege `/api`, por lo que ninguna ruta nueva depende de él. La descarga busca la cotización mediante un `JOIN` con `peticiones` y usa el `centro_id` obtenido de la base; no confía en un centro enviado por el navegador. Un usuario autenticado sin acceso y un identificador inexistente reciben el mismo `404`.
 
-Las operaciones nuevas releen `usuarios` por el `uid` del JWT. Usan rol y centro actuales de Neon, no las copias que pueden permanecer siete días dentro de la cookie. Un usuario borrado, reasignado o degradado pierde acceso de inmediato.
+Las operaciones nuevas releen `usuarios` por el `uid` del JWT y exigen que la cuenta conserve `password_hash`. Usan rol y centro actuales de Neon, no las copias que pueden permanecer siete días dentro de la cookie. Un usuario borrado, no activado, reasignado o degradado pierde acceso de inmediato.
 
 La autenticación falla cerrada en producción cuando falta `SESSION_SECRET`. El valor inseguro de desarrollo solo puede existir fuera de producción; una clave ausente nunca permite forjar acceso a documentos privados.
 
@@ -276,7 +280,7 @@ Muestra:
 1. selector de categoría;
 2. descripción;
 3. tres tarjetas iniciales de cotización;
-4. razón social, país, RUC/RIF/identificación fiscal y dos certificaciones por tarjeta;
+4. razón social, país elegido de un selector ISO, RUC/RIF/identificación fiscal y dos certificaciones por tarjeta;
 5. zona de carga PDF con progreso, éxito, reintento y error;
 6. contador `N de 3 cotizaciones válidas`;
 7. botón `Agregar otra cotización`;
@@ -294,6 +298,7 @@ La interfaz conserva los estilos, el tema claro/oscuro y el comportamiento móvi
 
 - Un error de red mantiene el borrador y permite reintentar el archivo afectado.
 - Un archivo inválido muestra la causa: tipo, tamaño, firma o duplicado.
+- Un intento pendiente o inválido puede retirarse después de encolar sus rutas; una cotización válida nunca se retira después del envío.
 - Un proveedor repetido identifica ambas tarjetas.
 - Una sesión vencida detiene la carga y solicita iniciar sesión de nuevo.
 - Una carrera al finalizar usa `SELECT ... FOR UPDATE`, `UPDATE ... WHERE submitted_at IS NULL`, una clave idempotente para el evento inicial y reintentos acotados de SQLSTATE `40001` y `40P01`. Una segunda petición de envío devuelve el resultado ya enviado sin duplicar eventos.
@@ -305,7 +310,7 @@ La interfaz conserva los estilos, el tema claro/oscuro y el comportamiento móvi
 
 `db/schema.sql` describe el estado final para bases nuevas. Una migración versionada aparte modifica producción con transacción, advisory lock y consultas de catálogo; el migrador general actual divide por `;` y no garantiza atomicidad para este cambio.
 
-La migración versionada ofrece `--dry-run` por defecto y exige `--apply`. Su preflight cuenta filas, enumera estados inesperados y aborta ante valores que no pueda mapear. La fase expansiva agrega columnas y tablas, rellena filas `legado`, crea índices y sustituye la FK de centros por `ON DELETE RESTRICT`. La fase de cierre, ejecutada después del despliegue estable, elimina el `DEFAULT 'legado'` temporal y aplica `NOT NULL` y restricciones cruzadas.
+La migración versionada ofrece `--dry-run` por defecto y exige `--apply`. Su preflight cuenta filas, enumera estados inesperados y aborta ante valores que no pueda mapear. Al aplicar, toma advisory lock y un `ACCESS EXCLUSIVE` explícito con `lock_timeout` corto dentro de la ventana de mantenimiento; si no puede bloquear, revierte para reintentar en vez de escalar locks y quedar en deadlock. La fase expansiva agrega columnas y tablas, rellena filas `legado`, crea índices y sustituye únicamente la FK de `peticiones.centro_id` por `ON DELETE RESTRICT`. La fase de cierre, ejecutada después del despliegue estable, elimina el `DEFAULT 'legado'` temporal y aplica `NOT NULL` y restricciones cruzadas.
 
 Las restricciones cruzadas exigen:
 
@@ -320,8 +325,8 @@ Orden de despliegue:
 1. contar y respaldar metadatos de `peticiones`;
 2. ejecutar el dry-run y después la migración expansiva;
 3. verificar filas, tipos, índices y ausencia de pérdida;
-4. crear y conectar un Blob Store privado; configurar `BLOB_READ_WRITE_TOKEN` y `CRON_SECRET`;
-5. agregar `@vercel/blob` versión 2.3 o superior y desplegar código compatible con filas `legado`;
+4. crear y conectar un Blob Store privado; configurar `BLOB_READ_WRITE_TOKEN` y `CRON_SECRET`, comprobar hostname privado y rechazo de lectura directa anónima;
+5. agregar `@vercel/blob` versión `2.8.0` y desplegar código compatible con filas `legado`;
 6. probar un comentario, un borrador, tres cargas, una descarga, una limpieza y un cambio de estado;
 7. comprobar que los registros anteriores siguen visibles;
 8. ejecutar la migración de cierre después de retirar las instancias viejas.
