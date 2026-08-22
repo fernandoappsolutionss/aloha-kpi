@@ -228,3 +228,18 @@ test('un estado terminal posterior al token invalida y limpia la carga', async (
   assert.equal(result.invalid, true)
   assert.deepEqual(events, ['invalid', 'terminal_state'])
 })
+
+test('prepare rechaza adjuntar cotizaciones a un comentario o registro legado', async () => {
+  let prepared = false
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, created_by: 8, tipo: 'comentario', submitted_at: '2026-08-20T12:00:00Z', estado: 'Próximo trimestre' }),
+    prepareQuote: async () => { prepared = true },
+  }
+  const service = createPeticionUploadService({ repo })
+  await assert.rejects(() => service.prepare(actor, {
+    centroId: 10, peticionId: 4, archivoNombre: 'cotizacion.pdf', proveedorRazonSocial: 'Proveedor Uno',
+    proveedorPais: 'PA', proveedorIdFiscal: '155-1', empresaConstituida: true, emiteFacturaFiscal: true,
+  }), /petición formal/)
+  assert.equal(prepared, false)
+})

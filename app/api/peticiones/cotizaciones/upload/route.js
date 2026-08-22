@@ -30,6 +30,7 @@ export async function POST(request) {
     // onBeforeGenerateToken (autorización) sigue siendo 400: ahí sí es un
     // error del cliente que no se arregla reintentando igual.
     const status = body?.type === 'blob.upload-completed' ? 500 : 400
-    return Response.json({ error: error?.message || 'No se pudo procesar la carga.' }, { status })
+    const message = /^[0-9A-Z]{5}$/.test(String(error?.code || '')) ? 'No se pudo procesar la carga.' : (error?.message || 'No se pudo procesar la carga.')
+    return Response.json({ error: message }, { status })
   }
 }
