@@ -69,6 +69,15 @@ export async function runMigration({ client, phase, ddl, apply = false, schema =
 }
 
 async function main() {
+  // Carga .env.local si existe (sin dependencias externas).
+  try {
+    const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
+    for (const line of env.split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    }
+  } catch { /* opcional */ }
+
   const args = process.argv.slice(2)
   const apply = args.includes('--apply')
   const phaseArg = args.find((arg) => arg.startsWith('--phase=')) || '--phase=expand'
