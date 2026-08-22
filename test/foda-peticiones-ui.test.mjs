@@ -51,6 +51,17 @@ test('aprobar exige elegir la cotización ganadora y muestra la ya aprobada', ()
   assert.match(list, /Selecciona la cotización aprobada/)
 })
 
+test('gerencia elimina definitivamente con confirmación, y una petición formal exige estar Anulada', () => {
+  const list = read('../components/foda/PeticionesList.js')
+  assert.match(list, /eliminarPeticion/)
+  assert.match(list, /Eliminar definitivamente/)
+  assert.match(list, /confirm\(/)
+  assert.match(
+    list,
+    /estado === 'Anulada'[\s\S]{0,400}Eliminar definitivamente|Eliminar definitivamente[\s\S]{0,400}estado === 'Anulada'/
+  )
+})
+
 test('página FODA delega el panel y retira CRUD anterior', () => {
   const page = read('../app/centro/[id]/foda/page.js')
   assert.match(page, /<PeticionesPanel/)

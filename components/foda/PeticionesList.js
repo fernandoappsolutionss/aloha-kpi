@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { updateComentario, changePeticionStatus } from '../../app/actions/peticiones'
+import { updateComentario, changePeticionStatus, eliminarPeticion } from '../../app/actions/peticiones'
 import { PETICION_CATEGORIAS, PETICION_ESTADOS } from '../../lib/peticiones-domain.mjs'
 import CotizacionCard from './CotizacionCard'
 
@@ -20,9 +20,10 @@ function quoteLabel(quote) {
   return `${quote.proveedor_razon_social} — ${quote.archivo_nombre}`
 }
 
-// Historial de comentarios y peticiones ya registrados. Sin botón de borrado
-// físico: lo que existe se anula (cambio de estado), nunca se elimina —
-// necesitamos el rastro para auditoría de proveedores/PDFs.
+// Historial de comentarios y peticiones ya registrados. Gerencia puede
+// borrar físicamente desde aquí: comentario/legado se eliminan directo;
+// una petición formal enviada exige anularla primero (dos pasos deliberados
+// para no perder por error el rastro de compras/proveedores).
 export default function PeticionesList({ items, permissions, uploadsAvailable, centroId, onRefresh, onStatus }) {
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
@@ -61,6 +62,19 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
       await onRefresh?.()
     } catch (e) {
       onStatus?.(`Error al cambiar el estado: ${e?.message || ''}`)
+    }
+    setBusyId(null)
+  }
+
+  async function eliminar(row) {
+    if (!confirm('¿Eliminar definitivamente este registro? Esta acción no se puede deshacer y borrará también sus PDFs.')) return
+    setBusyId(row.id)
+    try {
+      const res = await eliminarPeticion(centroId, row.id)
+      if (res?.error) throw new Error(res.error)
+      await onRefresh?.()
+    } catch (e) {
+      onStatus?.(`Error al eliminar: ${e?.message || ''}`)
     }
     setBusyId(null)
   }
@@ -148,6 +162,24 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                   </select>
                 )}
               </div>
+            )}
+
+            {permissions?.canChangeStatus && (
+              row.tipo === 'peticion' ? (
+                row.estado === 'Anulada' && (
+                  <button type="button" className="btn" disabled={busyId === row.id}
+                    style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: '#FCA5A5' }}
+                    onClick={() => eliminar(row)}>
+                    Eliminar definitivamente
+                  </button>
+                )
+              ) : (
+                <button type="button" className="btn" disabled={busyId === row.id}
+                  style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: '#FCA5A5' }}
+                  onClick={() => eliminar(row)}>
+                  Eliminar
+                </button>
+              )
             )}
 
             {validQuotes.length > 0 && (
