@@ -23,7 +23,9 @@ test('comentario se envía sin categoría ni archivos y crea evento inicial', as
 test('lista enviados y solo borradores de la autora', async () => {
   const repo = {
     listSubmitted: async () => [{
-      id: 1, tipo: 'legado', texto: 'Anterior', cotizaciones: [{
+      id: 1, tipo: 'legado', texto: 'Anterior',
+      created_by_snapshot: { id: 1, nombre: 'Gerencia', email: 'gerencia@aloha.com', rol: 'admin_general' },
+      cotizaciones: [{
         id: 9, proveedor_razon_social: 'Proveedor', proveedor_pais: 'PA', proveedor_id_fiscal: '155',
         archivo_nombre: 'oferta.pdf', upload_status: 'valid', blob_pathname: 'privado/a.pdf',
         expected_pathname: 'privado/a.pdf', upload_nonce: 'secreto', archivo_sha256: 'a'.repeat(64),
@@ -38,7 +40,7 @@ test('lista enviados y solo borradores de la autora', async () => {
   assert.equal(panel.items[0].legacy, true)
   assert.equal(panel.permissions.canChangeStatus, false)
   assert.equal(panel.items[0].cotizaciones[0].archivo_nombre, 'oferta.pdf')
-  assert.doesNotMatch(JSON.stringify(panel), /blob_pathname|expected_pathname|upload_nonce|archivo_sha256|privado\/a\.pdf|secreto/)
+  assert.doesNotMatch(JSON.stringify(panel), /blob_pathname|expected_pathname|upload_nonce|archivo_sha256|privado\/a\.pdf|secreto|created_by_snapshot|gerencia@aloha\.com/)
 })
 
 test('un registro legado no se edita ni se borra', async () => {

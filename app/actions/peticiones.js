@@ -6,7 +6,13 @@ import { createPeticionesService } from '../../lib/peticiones-service.mjs'
 
 const service = createPeticionesService({ repo: peticionesRepository })
 async function runAction(name, work) {
-  try { return await work() } catch (error) { return fallo(name, error) }
+  try { return await work() } catch (error) {
+    const result = fallo(name, error)
+    if (/^[0-9A-Z]{5}$/.test(String(error?.code || ''))) {
+      return { error: 'No se pudo completar la operación. Intenta de nuevo.' }
+    }
+    return result
+  }
 }
 
 export async function listPeticiones(centroId, anio, trimestre) {
