@@ -23,6 +23,7 @@ function Icon({ name }) {
     case 'search': return <svg viewBox="0 0 24 24" {...P}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
     case 'user': return <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
     case 'groups': return <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="7" r="3" /><path d="M7 21v-1a5 5 0 0 1 10 0v1" /><circle cx="4.5" cy="9.5" r="2" /><path d="M1 19v-.5A3.5 3.5 0 0 1 4.5 15" /><circle cx="19.5" cy="9.5" r="2" /><path d="M23 19v-.5a3.5 3.5 0 0 0-3.5-3.5" /></svg>
+    case 'bank': return <svg viewBox="0 0 24 24" {...P}><path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18M12 3 3 8h18Z" /></svg>
     case 'sheet': return <svg viewBox="0 0 24 24" {...P}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M4 9h16M4 15h16M12 9v12" /></svg>
     case 'logout': return <svg viewBox="0 0 24 24" {...P}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
     case 'shield': return <svg viewBox="0 0 24 24" {...P}><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5Z" /></svg>
@@ -52,6 +53,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
     { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
+    { label: 'Conciliación', icon: 'bank', href: '/dashboard/conciliacion' },
   ]
   const adminConfig = [
     { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
@@ -66,6 +68,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos` },
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
+    { label: 'Conciliación', icon: 'bank', href: `/centro/${centroId}/conciliacion` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
   ]
   const items = isAdmin ? adminItems : centroItems
