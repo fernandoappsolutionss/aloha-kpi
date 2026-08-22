@@ -198,6 +198,10 @@ CREATE TABLE IF NOT EXISTS peticiones (
   submitted_at          TIMESTAMPTZ,
   anulada_at            TIMESTAMPTZ,
   draft_expires_at      TIMESTAMPTZ,
+  -- Cotización ganadora elegida por gerencia al aprobar (ver
+  -- peticiones_cotizacion_aprobada_fkey más abajo: la FK no puede ir inline
+  -- porque peticion_cotizaciones aún no existe en este punto del archivo).
+  cotizacion_aprobada_id INTEGER,
   created_at            TIMESTAMPTZ DEFAULT now(),
   updated_at            TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT peticiones_tipo_check CHECK (tipo IN ('legado', 'comentario', 'peticion')),
@@ -264,6 +268,17 @@ CREATE TABLE IF NOT EXISTS peticion_cotizaciones (
   CONSTRAINT uq_peticion_proveedor_fiscal UNIQUE (peticion_id, proveedor_pais, proveedor_id_fiscal_clave),
   CONSTRAINT uq_peticion_pdf_sha UNIQUE (peticion_id, archivo_sha256)
 );
+
+-- FK de peticiones.cotizacion_aprobada_id: va aquí (no inline arriba) porque
+-- peticion_cotizaciones se declara después de peticiones en este archivo.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'peticiones'::regclass AND conname = 'peticiones_cotizacion_aprobada_fkey') THEN
+    ALTER TABLE peticiones
+      ADD CONSTRAINT peticiones_cotizacion_aprobada_fkey
+      FOREIGN KEY (cotizacion_aprobada_id) REFERENCES peticion_cotizaciones(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- Auditoría de cambios de estado de una petición. La primera fila de cada
 -- petición debe nacer sin estado_anterior y en 'Próximo trimestre' (índice

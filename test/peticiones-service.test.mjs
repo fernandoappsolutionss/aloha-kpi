@@ -203,6 +203,124 @@ test('solo gerencia cambia estado y cada cambio conserva transición', async () 
   assert.deepEqual(events.map((event) => [event.estado_anterior, event.estado_nuevo]), [['Aprobado', 'Cumplido']])
 })
 
+test('Aprobado en una petición exige seleccionar la cotización ganadora', async () => {
+  let changeStatusCalled = false
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    changeStatus: async () => { changeStatusCalled = true },
+    insertHistory: async () => { changeStatusCalled = true },
+  }
+  const service = createPeticionesService({ repo })
+  await assert.rejects(
+    () => service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado' }),
+    /Selecciona la cotización aprobada/
+  )
+  assert.equal(changeStatusCalled, false)
+})
+
+test('Aprobado rechaza una cotización que no pertenece o no es válida en la petición', async () => {
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    listQuotes: async () => [{ id: 91, upload_status: 'valid' }, { id: 92, upload_status: 'invalid' }],
+    changeStatus: async () => { throw new Error('no debe llamarse') },
+  }
+  const service = createPeticionesService({ repo })
+  await assert.rejects(
+    () => service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 92 }),
+    /no es válida/
+  )
+  await assert.rejects(
+    () => service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 999 }),
+    /no es válida/
+  )
+})
+
+test('Aprobado con cotización válida guarda el id y notifica al centro', async () => {
+  const quote = { id: 91, upload_status: 'valid', proveedor_razon_social: 'Proveedor Uno' }
+  let changeStatusArgs = null
+  const notifyCalls = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    listQuotes: async () => [quote, { id: 92, upload_status: 'invalid' }],
+    changeStatus: async (_query, row) => { changeStatusArgs = row; return { ...row, id: 4 } },
+    insertHistory: async () => {},
+  }
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 91 })
+  assert.equal(result.ok, true)
+  assert.equal(changeStatusArgs.cotizacion_aprobada_id, 91)
+  assert.equal(notifyCalls.length, 1)
+  assert.equal(notifyCalls[0].estado, 'Aprobado')
+  assert.equal(notifyCalls[0].cotizacionAprobada.id, 91)
+})
+
+test('Negado notifica al centro sin exigir selección de cotización', async () => {
+  const notifyCalls = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    changeStatus: async (_query, row) => ({ ...row, id: 4 }),
+    insertHistory: async () => {},
+  }
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
+  await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Negado' })
+  assert.equal(notifyCalls.length, 1)
+  assert.equal(notifyCalls[0].estado, 'Negado')
+  assert.equal(notifyCalls[0].cotizacionAprobada, null)
+})
+
+test('un estado que no cambia no dispara notificación', async () => {
+  const notifyCalls = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', submitted_at: '2026-08-21T12:00:00Z' }),
+  }
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 91 })
+  assert.equal(result.unchanged, true)
+  assert.equal(notifyCalls.length, 0)
+})
+
+test('si notifyDecision falla el resultado igual es exitoso', async () => {
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'comentario', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    changeStatus: async (_query, row) => ({ ...row, id: 4 }),
+    insertHistory: async () => {},
+  }
+  const originalError = console.error
+  const errors = []
+  console.error = (...args) => errors.push(args)
+  try {
+    const service = createPeticionesService({ repo, notifyDecision: async () => { throw new Error('smtp caído') } })
+    const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Negado' })
+    assert.equal(result.ok, true)
+    assert.equal(errors.length, 1)
+    assert.equal(errors[0][0], '[peticiones-notify]')
+  } finally {
+    console.error = originalError
+  }
+})
+
+test('un registro legado puede aprobarse sin seleccionar cotización', async () => {
+  const notifyCalls = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({ id: 5, centro_id: 10, tipo: 'legado', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
+    changeStatus: async (_query, row) => ({ ...row, id: 5 }),
+    insertHistory: async () => {},
+    listQuotes: async () => { throw new Error('no debe leer cotizaciones para un registro que no es petición') },
+  }
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 5, estado: 'Aprobado' })
+  assert.equal(result.ok, true)
+  assert.equal(notifyCalls.length, 1)
+  assert.equal(notifyCalls[0].cotizacionAprobada, null)
+})
+
 test('descartar borrador encola cada ruta antes de borrar filas', async () => {
   const order = []
   const repo = {
