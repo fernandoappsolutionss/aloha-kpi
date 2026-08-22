@@ -401,3 +401,102 @@ test('descartar borrador encola cada ruta antes de borrar filas', async () => {
   await createPeticionesService({ repo }).discardDraft(centerUser, { centroId: 10, id: 4 })
   assert.deepEqual(order, ['queue:peticiones/4/a.pdf', 'queue:peticiones/4/b.pdf', 'delete:quotes', 'delete:draft'])
 })
+
+test('eliminarPeticion rechaza a quien no es gerencia y no toca el repo', async () => {
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => { throw new Error('no debe bloquear la fila') },
+    listQuotes: async () => { throw new Error('no debe leer cotizaciones') },
+    enqueueCleanup: async () => { throw new Error('no debe encolar limpieza') },
+    deleteDraftQuotes: async () => { throw new Error('no debe borrar cotizaciones') },
+    deleteHistorial: async () => { throw new Error('no debe borrar historial') },
+    deletePeticionRow: async () => { throw new Error('no debe borrar la fila') },
+  }
+  const service = createPeticionesService({ repo })
+  await assert.rejects(
+    () => service.eliminarPeticion(centerUser, { centroId: 10, id: 4 }),
+    /No autorizado/
+  )
+})
+
+test('una petición formal enviada y no anulada no puede eliminarse', async () => {
+  let writes = 0
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 4, centro_id: 10, tipo: 'peticion', estado: 'En proceso', submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => { writes++; return [] },
+    enqueueCleanup: async () => { writes++ },
+    deleteDraftQuotes: async () => { writes++ },
+    deleteHistorial: async () => { writes++ },
+    deletePeticionRow: async () => { writes++ },
+  }
+  const service = createPeticionesService({ repo })
+  await assert.rejects(
+    () => service.eliminarPeticion(admin, { centroId: 10, id: 4 }),
+    /Anula la petición antes de eliminarla/
+  )
+  assert.equal(writes, 0)
+})
+
+test('una petición formal Anulada se elimina encolando ambos blobs antes de borrar', async () => {
+  const order = []
+  const quotes = [
+    { id: 91, blob_pathname: 'peticiones/4/a.pdf', expected_pathname: 'peticiones/4/a.pdf' },
+    { id: 92, blob_pathname: 'peticiones/4/b.pdf', expected_pathname: 'peticiones/4/b.pdf' },
+  ]
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 4, centro_id: 10, tipo: 'peticion', estado: 'Anulada', submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => quotes,
+    enqueueCleanup: async (_query, row) => { order.push(`queue:${row.blob_pathname}`) },
+    deleteDraftQuotes: async () => { order.push('delete:quotes') },
+    deleteHistorial: async () => { order.push('delete:historial') },
+    deletePeticionRow: async () => { order.push('delete:row') },
+  }
+  const result = await createPeticionesService({ repo }).eliminarPeticion(admin, { centroId: 10, id: 4 })
+  assert.equal(result.ok, true)
+  assert.deepEqual(order, [
+    'queue:peticiones/4/a.pdf', 'queue:peticiones/4/b.pdf',
+    'delete:quotes', 'delete:historial', 'delete:row',
+  ])
+})
+
+test('un comentario se elimina directo, sin exigir anulación, historial antes que la fila', async () => {
+  const order = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 6, centro_id: 10, tipo: 'comentario', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => [],
+    enqueueCleanup: async () => { throw new Error('no hay cotizaciones que encolar') },
+    deleteDraftQuotes: async () => { order.push('delete:quotes') },
+    deleteHistorial: async () => { order.push('delete:historial') },
+    deletePeticionRow: async () => { order.push('delete:row') },
+  }
+  const result = await createPeticionesService({ repo }).eliminarPeticion(admin, { centroId: 10, id: 6 })
+  assert.equal(result.ok, true)
+  assert.deepEqual(order, ['delete:quotes', 'delete:historial', 'delete:row'])
+})
+
+test('un registro legado se elimina directo, sin cotizaciones que encolar', async () => {
+  const order = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 7, centro_id: 10, tipo: 'legado', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => [],
+    enqueueCleanup: async () => { throw new Error('no hay cotizaciones que encolar') },
+    deleteDraftQuotes: async () => { order.push('delete:quotes') },
+    deleteHistorial: async () => { order.push('delete:historial') },
+    deletePeticionRow: async () => { order.push('delete:row') },
+  }
+  const result = await createPeticionesService({ repo }).eliminarPeticion(admin, { centroId: 10, id: 7 })
+  assert.equal(result.ok, true)
+  assert.deepEqual(order, ['delete:quotes', 'delete:historial', 'delete:row'])
+})

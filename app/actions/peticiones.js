@@ -64,6 +64,11 @@ export async function discardPeticionDraft(centroId, id) {
     service.discardDraft(await requireCurrentCentroAccess(centroId), { centroId, id }))
 }
 
+export async function eliminarPeticion(centroId, id) {
+  return runAction('eliminarPeticion', async () =>
+    service.eliminarPeticion(await requireCurrentAdmin(), { centroId, id }))
+}
+
 export async function prepareCotizacionUpload(centroId, input) {
   return runAction('prepareCotizacionUpload', async () => {
     requireBlobToken()

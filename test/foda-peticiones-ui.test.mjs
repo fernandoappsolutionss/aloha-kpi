@@ -37,7 +37,7 @@ test('sin Blob se bloquea solo la creación documental y se explica la causa', (
   assert.match(list, /uploadsAvailable/)
 })
 
-test('lista marca legacy, descarga por id y no muestra borrado físico', () => {
+test('lista marca legacy, descarga por id y el borrado exige anulación previa', () => {
   const list = read('../components/foda/PeticionesList.js')
   assert.match(list, /Anterior · sin requisitos documentales/)
   assert.match(list, /\/api\/peticiones\/cotizaciones\/\$\{quote\.id\}\/download/)
@@ -49,6 +49,17 @@ test('aprobar exige elegir la cotización ganadora y muestra la ya aprobada', ()
   assert.match(list, /cotizacionAprobada/)
   assert.match(list, /Cotización aprobada:/)
   assert.match(list, /Selecciona la cotización aprobada/)
+})
+
+test('gerencia elimina definitivamente con confirmación, y una petición formal exige estar Anulada', () => {
+  const list = read('../components/foda/PeticionesList.js')
+  assert.match(list, /eliminarPeticion/)
+  assert.match(list, /Eliminar definitivamente/)
+  assert.match(list, /confirm\(/)
+  assert.match(
+    list,
+    /estado === 'Anulada'[\s\S]{0,400}Eliminar definitivamente|Eliminar definitivamente[\s\S]{0,400}estado === 'Anulada'/
+  )
 })
 
 test('página FODA delega el panel y retira CRUD anterior', () => {
