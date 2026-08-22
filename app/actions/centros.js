@@ -1,6 +1,7 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireSession, requireAdmin, requireCentroAccess } from '../../lib/auth'
+import { requireSession, requireAdmin, requireCentroAccess, requireCurrentAdmin } from '../../lib/auth'
+import { fallo } from '../../lib/errores'
 
 const PAISES = ['PA', 'VE']
 
@@ -44,8 +45,16 @@ export async function updateCentro(id, { nombre, region, pais }) {
 }
 
 export async function deleteCentro(id) {
-  await requireAdmin()
-  // usuarios.centro_id -> ON DELETE SET NULL; resumen/kpi/mes/trimestres -> ON DELETE CASCADE.
-  await sql`DELETE FROM centros WHERE id = ${id}`
-  return { ok: true }
+  try {
+    await requireCurrentAdmin()
+    // usuarios.centro_id -> ON DELETE SET NULL; resumen/kpi/mes/trimestres -> ON DELETE CASCADE.
+    // peticiones.centro_id -> ON DELETE RESTRICT: un centro con historial no se borra en silencio.
+    await sql`DELETE FROM centros WHERE id = ${id}`
+    return { ok: true }
+  } catch (error) {
+    if (error?.code === '23503') {
+      return { error: 'Este centro tiene historial operativo o peticiones y no puede eliminarse.' }
+    }
+    return fallo('deleteCentro', error)
+  }
 }

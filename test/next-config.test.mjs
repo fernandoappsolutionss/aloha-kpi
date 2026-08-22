@@ -8,3 +8,9 @@ const nextConfig = require('../next.config.js')
 test('ws queda externo al bundle del servidor', () => {
   assert.ok(nextConfig.serverExternalPackages?.includes('ws'))
 })
+
+test('no publica CORS wildcard sobre descargas autenticadas', async () => {
+  const rules = typeof nextConfig.headers === 'function' ? await nextConfig.headers() : []
+  const values = rules.flatMap((rule) => rule.headers || []).filter((header) => header.key.toLowerCase() === 'access-control-allow-origin')
+  assert.equal(values.some((header) => header.value === '*'), false)
+})

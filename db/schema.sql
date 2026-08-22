@@ -179,17 +179,140 @@ ALTER TABLE foda ADD COLUMN IF NOT EXISTS comentarios       TEXT;
 ALTER TABLE foda ADD COLUMN IF NOT EXISTS comentario_estado TEXT;
 ALTER TABLE foda ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMPTZ DEFAULT now();
 
--- Peticiones / comentarios del administrador (varios por trimestre, cada uno con su estado)
+-- Peticiones / comentarios del administrador (varios por trimestre, cada uno con su estado).
+-- centro_id es ON DELETE RESTRICT: un centro con historial de peticiones no se
+-- borra en silencio (ver app/actions/centros.js:deleteCentro). tipo distingue
+-- lo legado (sin cotizaciones) de comentario/petición formal con cotizaciones
+-- de proveedores (peticion_cotizaciones); categoria solo aplica a 'peticion'.
 CREATE TABLE IF NOT EXISTS peticiones (
-  id          SERIAL PRIMARY KEY,
-  centro_id   INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
-  anio        INTEGER NOT NULL,
-  trimestre   INTEGER NOT NULL,
-  texto       TEXT NOT NULL,
-  estado      TEXT NOT NULL DEFAULT 'Próximo trimestre',
-  created_at  TIMESTAMPTZ DEFAULT now(),
-  updated_at  TIMESTAMPTZ DEFAULT now()
+  id                    SERIAL PRIMARY KEY,
+  centro_id             INTEGER NOT NULL REFERENCES centros(id) ON DELETE RESTRICT,
+  anio                  INTEGER NOT NULL,
+  trimestre             INTEGER NOT NULL,
+  texto                 TEXT NOT NULL,
+  estado                TEXT NOT NULL DEFAULT 'Próximo trimestre',
+  tipo                  TEXT NOT NULL,
+  categoria             TEXT,
+  created_by            INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  created_by_snapshot   JSONB,
+  submitted_at          TIMESTAMPTZ,
+  anulada_at            TIMESTAMPTZ,
+  draft_expires_at      TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ DEFAULT now(),
+  updated_at            TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT peticiones_tipo_check CHECK (tipo IN ('legado', 'comentario', 'peticion')),
+  CONSTRAINT peticiones_estado_check CHECK (estado IN ('Próximo trimestre', 'Negado', 'Aprobado', 'En proceso', 'Cumplido', 'Anulada')),
+  CONSTRAINT peticiones_tipo_categoria_check CHECK (
+    (tipo = 'peticion' AND categoria IN ('reparacion', 'activaciones_mercadeo', 'contratacion', 'capacitacion', 'otros'))
+    OR (tipo IN ('legado', 'comentario') AND categoria IS NULL)
+  ),
+  CONSTRAINT peticiones_anulada_at_check CHECK ((estado = 'Anulada') = (anulada_at IS NOT NULL))
 );
+
+-- Catálogo ISO-3166-1 alpha-2 de países, usado como referencia del país fiscal
+-- de cada proveedor en peticion_cotizaciones (evita país inventado en el FK).
+CREATE TABLE IF NOT EXISTS iso_paises (
+  codigo CHAR(2) PRIMARY KEY
+);
+INSERT INTO iso_paises (codigo)
+SELECT codigo::CHAR(2)
+FROM regexp_split_to_table('AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW', ' ') AS codes(codigo)
+ON CONFLICT (codigo) DO NOTHING;
+
+-- Cotizaciones de proveedores adjuntas a una petición formal (mínimo 3 válidas
+-- para poder enviarla; ver lib/peticiones-domain.mjs). El PDF vive en Blob
+-- storage; blob_pathname solo se fija cuando el archivo terminó de subirse y
+-- coincide con expected_pathname (contrato firmado por upload_nonce).
+CREATE TABLE IF NOT EXISTS peticion_cotizaciones (
+  id SERIAL PRIMARY KEY,
+  peticion_id INTEGER NOT NULL REFERENCES peticiones(id) ON DELETE RESTRICT,
+  proveedor_razon_social TEXT NOT NULL,
+  proveedor_clave TEXT NOT NULL,
+  proveedor_pais CHAR(2) NOT NULL REFERENCES iso_paises(codigo) ON DELETE RESTRICT,
+  proveedor_id_fiscal TEXT NOT NULL,
+  proveedor_id_fiscal_clave TEXT NOT NULL,
+  empresa_constituida BOOLEAN NOT NULL,
+  emite_factura_fiscal BOOLEAN NOT NULL,
+  blob_pathname TEXT UNIQUE,
+  archivo_nombre TEXT,
+  archivo_mime TEXT,
+  archivo_bytes INTEGER,
+  archivo_sha256 CHAR(64),
+  upload_nonce TEXT,
+  expected_pathname TEXT UNIQUE,
+  upload_status TEXT NOT NULL DEFAULT 'pending',
+  upload_attempts INTEGER NOT NULL DEFAULT 0,
+  validation_error TEXT,
+  uploaded_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  uploaded_by_snapshot JSONB,
+  validada_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT peticion_cotizaciones_status_check CHECK (upload_status IN ('pending', 'validating', 'valid', 'invalid', 'cleanup_pending')),
+  CONSTRAINT peticion_cotizaciones_attempts_check CHECK (upload_attempts BETWEEN 0 AND 5),
+  CONSTRAINT peticion_cotizaciones_pdf_check CHECK (archivo_bytes IS NULL OR archivo_bytes BETWEEN 1 AND 10485760),
+  CONSTRAINT peticion_cotizaciones_sha_check CHECK (archivo_sha256 IS NULL OR archivo_sha256 ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT peticion_cotizaciones_path_check CHECK (blob_pathname IS NULL OR (expected_pathname IS NOT NULL AND blob_pathname = expected_pathname)),
+  CONSTRAINT peticion_cotizaciones_valid_check CHECK (
+    upload_status <> 'valid' OR (
+      empresa_constituida AND emite_factura_fiscal AND blob_pathname IS NOT NULL AND expected_pathname IS NOT NULL AND
+      archivo_nombre IS NOT NULL AND archivo_mime = 'application/pdf' AND
+      archivo_bytes BETWEEN 1 AND 10485760 AND archivo_sha256 IS NOT NULL AND
+      uploaded_by_snapshot IS NOT NULL AND validada_at IS NOT NULL
+    )
+  ),
+  CONSTRAINT uq_peticion_proveedor_fiscal UNIQUE (peticion_id, proveedor_pais, proveedor_id_fiscal_clave),
+  CONSTRAINT uq_peticion_pdf_sha UNIQUE (peticion_id, archivo_sha256)
+);
+
+-- Auditoría de cambios de estado de una petición. La primera fila de cada
+-- petición debe nacer sin estado_anterior y en 'Próximo trimestre' (índice
+-- único parcial garantiza una sola fila inicial por petición).
+CREATE TABLE IF NOT EXISTS peticion_estado_historial (
+  id SERIAL PRIMARY KEY,
+  peticion_id INTEGER NOT NULL REFERENCES peticiones(id) ON DELETE RESTRICT,
+  estado_anterior TEXT,
+  estado_nuevo TEXT NOT NULL,
+  changed_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  changed_by_snapshot JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT peticion_historial_inicial_check CHECK (estado_anterior IS NOT NULL OR estado_nuevo = 'Próximo trimestre'),
+  CONSTRAINT peticion_historial_anterior_check CHECK (estado_anterior IS NULL OR estado_anterior IN ('Próximo trimestre', 'Negado', 'Aprobado', 'En proceso', 'Cumplido', 'Anulada')),
+  CONSTRAINT peticion_historial_nuevo_check CHECK (estado_nuevo IN ('Próximo trimestre', 'Negado', 'Aprobado', 'En proceso', 'Cumplido', 'Anulada'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_peticion_historial_inicial
+  ON peticion_estado_historial (peticion_id) WHERE estado_anterior IS NULL;
+
+-- Cola de borrado diferido de blobs (PDFs reemplazados/inválidos que ya no
+-- deben vivir en storage). lock_token + lock_generation dan fencing: un
+-- worker viejo con lock obsoleto no puede completar una fila que ya fue
+-- reabierta (generation incrementado) por otro proceso.
+CREATE TABLE IF NOT EXISTS peticion_blob_cleanup (
+  id SERIAL PRIMARY KEY,
+  blob_pathname TEXT NOT NULL UNIQUE,
+  motivo TEXT NOT NULL,
+  intentos INTEGER NOT NULL DEFAULT 0,
+  proximo_intento_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ultimo_error TEXT,
+  generation INTEGER NOT NULL DEFAULT 1,
+  locked_at TIMESTAMPTZ,
+  lock_token TEXT,
+  lock_generation INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+
+-- Cursor único del reconciliador blob↔DB (una sola fila 'peticiones'): evita
+-- que dos workers concurrentes avancen el mismo cursor de listado dos veces
+-- (reconcileBlobPage compara contra el valor guardado antes de escribir).
+CREATE TABLE IF NOT EXISTS peticion_cleanup_checkpoint (
+  checkpoint_key TEXT PRIMARY KEY,
+  cursor TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO peticion_cleanup_checkpoint (checkpoint_key, cursor)
+VALUES ('peticiones', NULL)
+ON CONFLICT (checkpoint_key) DO NOTHING;
 
 -- Espejo de eventos creados desde ALOHA KPI hacia el CRM (Team Solutionss).
 -- Solo guarda qué evento del CRM creó cada centro, para listar "los suyos".
@@ -212,6 +335,10 @@ CREATE INDEX IF NOT EXISTS idx_resumen_centro_year ON resumen_mes (centro_id, ye
 CREATE INDEX IF NOT EXISTS idx_kpi_centro_year      ON kpi_semanas (centro_id, year);
 CREATE INDEX IF NOT EXISTS idx_mes_kpi_centro       ON mes_kpi (centro_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_centro      ON usuarios (centro_id);
+CREATE INDEX IF NOT EXISTS idx_peticiones_medicion
+  ON peticiones (centro_id, anio, trimestre, tipo, categoria, estado);
+CREATE INDEX IF NOT EXISTS idx_peticion_cleanup_pendiente
+  ON peticion_blob_cleanup (proximo_intento_at, id) WHERE completed_at IS NULL;
 
 -- ══ MÓDULO DE OPERACIONES (grupos, estudiantes, cuadro de negocio) ══
 

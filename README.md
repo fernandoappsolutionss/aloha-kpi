@@ -63,6 +63,21 @@ Configura en el proyecto de Vercel (Settings → Environment Variables):
 El esquema (`db/schema.sql`) y el seed se ejecutan una sola vez contra Neon;
 no forman parte del build.
 
+## Peticiones y cotizaciones privadas
+
+Requisitos: Node 20+, Neon y un Vercel Blob Store privado conectado al proyecto.
+
+Variables: `DATABASE_URL`, `SESSION_SECRET`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`; para probar callbacks locales mediante túnel, `VERCEL_BLOB_CALLBACK_URL`.
+
+La migración de este módulo no usa `npm run db:migrate`. Primero corre el dry-run dedicado; solo una ventana de despliegue autorizada usa `--apply`:
+
+    npm run db:migrate:peticiones -- --phase=expand
+    npm run db:migrate:peticiones -- --phase=expand --apply
+    npm run db:migrate:peticiones -- --phase=contract
+    npm run db:migrate:peticiones -- --phase=contract --apply
+
+Orden: respaldo de metadatos, dry-run, expansión, variables/Blob privado, despliegue, smoke de comentario/petición/descarga/estado/limpieza/legacy y, tras retirar instancias antiguas, contracción.
+
 ## Esquema de datos
 
 | Tabla | Descripción |

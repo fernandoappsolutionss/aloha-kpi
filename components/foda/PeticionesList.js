@@ -1,0 +1,154 @@
+'use client'
+import { useState } from 'react'
+import { updateComentario, changePeticionStatus } from '../../app/actions/peticiones'
+import { PETICION_CATEGORIAS, PETICION_ESTADOS } from '../../lib/peticiones-domain.mjs'
+import CotizacionCard from './CotizacionCard'
+
+function categoriaLabel(value) {
+  return PETICION_CATEGORIAS.find((c) => c.value === value)?.label || value || '—'
+}
+function tipoLabel(row) {
+  if (row.legacy || row.tipo === 'legado') return 'Anterior · sin requisitos documentales'
+  if (row.tipo === 'comentario') return 'Comentario'
+  return categoriaLabel(row.categoria)
+}
+function formatFecha(value) {
+  if (!value) return '—'
+  try { return new Date(value).toLocaleDateString('es-PA') } catch { return '—' }
+}
+
+// Historial de comentarios y peticiones ya registrados. Sin botón de borrado
+// físico: lo que existe se anula (cambio de estado), nunca se elimina —
+// necesitamos el rastro para auditoría de proveedores/PDFs.
+export default function PeticionesList({ items, permissions, uploadsAvailable, centroId, onRefresh, onStatus }) {
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [busyId, setBusyId] = useState(null)
+  const [addingFor, setAddingFor] = useState(null)
+
+  function startEdit(row) { setEditingId(row.id); setEditText(row.texto) }
+  function cancelEdit() { setEditingId(null); setEditText('') }
+
+  async function saveEdit(row) {
+    const texto = editText.trim()
+    if (!texto) return
+    setBusyId(row.id)
+    try {
+      const res = await updateComentario(centroId, row.id, texto)
+      if (res?.error) throw new Error(res.error)
+      setEditingId(null)
+      setEditText('')
+      await onRefresh?.()
+    } catch (e) {
+      onStatus?.(`Error al guardar el comentario: ${e?.message || ''}`)
+    }
+    setBusyId(null)
+  }
+
+  async function setEstado(row, estado) {
+    setBusyId(row.id)
+    try {
+      const res = await changePeticionStatus(centroId, row.id, estado)
+      if (res?.error) throw new Error(res.error)
+      await onRefresh?.()
+    } catch (e) {
+      onStatus?.(`Error al cambiar el estado: ${e?.message || ''}`)
+    }
+    setBusyId(null)
+  }
+
+  if (!items || items.length === 0) {
+    return <p className="h-sub" style={{ textAlign: 'center', padding: '16px 0 4px', color: 'var(--text-dim)' }}>Aún no hay comentarios ni peticiones.</p>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+      {items.map((row) => {
+        const cotizaciones = row.cotizaciones || []
+        const validQuotes = cotizaciones.filter((quote) => quote.upload_status === 'valid')
+        const retryQuotes = cotizaciones.filter((quote) => quote.upload_status === 'pending' || quote.upload_status === 'invalid')
+        const showAdding = addingFor === row.id
+        return (
+          <div key={row.id} className="foda-request-row">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <span className="label" style={{ color: 'var(--text-muted)' }}>{tipoLabel(row)}</span>
+                {editingId === row.id ? (
+                  <textarea className="input" value={editText} onChange={(e) => setEditText(e.target.value)}
+                    style={{ marginTop: 6, minHeight: 50, resize: 'vertical' }} />
+                ) : (
+                  <p style={{ marginTop: 6, fontSize: 13 }}>{row.texto}</p>
+                )}
+                <p className="h-sub" style={{ marginTop: 6 }}>
+                  {formatFecha(row.submitted_at)} · {cotizaciones.length} proveedor{cotizaciones.length === 1 ? '' : 'es'}
+                </p>
+              </div>
+              {row.canEditText && (
+                <div style={{ display: 'flex', flexShrink: 0, gap: 6 }}>
+                  {editingId === row.id ? (
+                    <>
+                      <button type="button" className="btn btn--primary" disabled={busyId === row.id} onClick={() => saveEdit(row)}>Guardar</button>
+                      <button type="button" className="btn" onClick={cancelEdit}>Cancelar</button>
+                    </>
+                  ) : (
+                    <button type="button" className="btn" onClick={() => startEdit(row)}>Editar</button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {permissions?.canChangeStatus && !row.legacy && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <span className="label" style={{ color: 'var(--text-muted)', marginRight: 2 }}>Estado:</span>
+                {PETICION_ESTADOS.map((estado) => (
+                  <button key={estado} type="button" disabled={busyId === row.id} onClick={() => setEstado(row, estado)}
+                    className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
+                    {estado}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {validQuotes.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {validQuotes.map((quote) => (
+                  <a key={quote.id} className="btn" href={`/api/peticiones/cotizaciones/${quote.id}/download`}>
+                    Descargar {quote.archivo_nombre}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {retryQuotes.length > 0 && (
+              <div className="foda-quote-grid" style={{ marginTop: 10 }}>
+                {retryQuotes.map((quote, i) => (
+                  <CotizacionCard key={quote.id} centroId={centroId} peticionId={row.id} quote={quote} index={i}
+                    onValidated={onRefresh} onStatus={onStatus} />
+                ))}
+              </div>
+            )}
+
+            {row.canAddQuote && (
+              uploadsAvailable ? (
+                showAdding ? (
+                  <div className="foda-quote-grid" style={{ marginTop: 10 }}>
+                    <CotizacionCard centroId={centroId} peticionId={row.id} quote={null} index={cotizaciones.length}
+                      onValidated={async () => { setAddingFor(null); await onRefresh?.() }} onStatus={onStatus} />
+                  </div>
+                ) : (
+                  <button type="button" className="btn" style={{ marginTop: 10 }} onClick={() => setAddingFor(row.id)}>
+                    Agregar cotización
+                  </button>
+                )
+              ) : (
+                <p className="h-sub" style={{ marginTop: 10, color: 'var(--warn)' }}>
+                  Carga de cotizaciones no disponible. Configura el almacenamiento privado para agregar otra.
+                </p>
+              )
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}

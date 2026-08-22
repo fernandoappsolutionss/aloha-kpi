@@ -1,16 +1,22 @@
 {
   "name": "aloha-kpi",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "test": "node --test test/*.test.mjs",
     "build": "next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:seed": "node scripts/seed.mjs"
+    "db:seed": "node scripts/seed.mjs",
+    "db:migrate:peticiones": "node scripts/migrate-peticiones-cotizaciones-2026-08-21.mjs",
+    "test:peticiones:db": "node --test --test-concurrency=1 test/integration/peticiones-*.integration.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "0.10.4",
+    "@vercel/blob": "2.8.0",
     "bcryptjs": "2.4.3",
     "exceljs": "4.4.0",
     "jose": "5.9.6",
