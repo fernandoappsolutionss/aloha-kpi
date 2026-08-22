@@ -37,7 +37,7 @@ test('sin Blob se bloquea solo la creación documental y se explica la causa', (
   assert.match(list, /uploadsAvailable/)
 })
 
-test('lista marca legacy, descarga por id y no muestra borrado físico', () => {
+test('lista marca legacy, descarga por id y el borrado exige anulación previa', () => {
   const list = read('../components/foda/PeticionesList.js')
   assert.match(list, /Anterior · sin requisitos documentales/)
   assert.match(list, /\/api\/peticiones\/cotizaciones\/\$\{quote\.id\}\/download/)
