@@ -3,8 +3,10 @@ import { requireCurrentCentroAccess, requireCurrentAdmin } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { peticionesRepository } from '../../lib/peticiones-repository'
 import { createPeticionesService } from '../../lib/peticiones-service.mjs'
+import { peticionUploadService, verifyStoredQuote } from '../../lib/peticion-upload-runtime'
+import { requireBlobToken } from '../../lib/peticion-blob'
 
-const service = createPeticionesService({ repo: peticionesRepository })
+const service = createPeticionesService({ repo: peticionesRepository, verifyQuote: verifyStoredQuote })
 async function runAction(name, work) {
   try { return await work() } catch (error) {
     const result = fallo(name, error)
@@ -55,4 +57,21 @@ export async function changePeticionStatus(centroId, id, estado) {
 export async function discardPeticionDraft(centroId, id) {
   return runAction('discardPeticionDraft', async () =>
     service.discardDraft(await requireCurrentCentroAccess(centroId), { centroId, id }))
+}
+
+export async function prepareCotizacionUpload(centroId, input) {
+  return runAction('prepareCotizacionUpload', async () => {
+    requireBlobToken()
+    return await peticionUploadService.prepare(await requireCurrentCentroAccess(centroId), { ...input, centroId })
+  })
+}
+
+export async function getCotizacionUploadStatus(centroId, peticionId, cotizacionId) {
+  return runAction('getCotizacionUploadStatus', async () =>
+    peticionUploadService.status(await requireCurrentCentroAccess(centroId), { centroId, peticionId, cotizacionId }))
+}
+
+export async function discardCotizacionAttempt(centroId, peticionId, cotizacionId) {
+  return runAction('discardCotizacionAttempt', async () =>
+    peticionUploadService.discardAttempt(await requireCurrentCentroAccess(centroId), { centroId, peticionId, cotizacionId }))
 }
