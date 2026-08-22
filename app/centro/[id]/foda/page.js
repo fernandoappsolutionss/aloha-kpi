@@ -126,12 +126,14 @@ export default function FodaPage() {
           ))}
         </div>
 
-        <PeticionesPanel
-          centroId={params.id}
-          anio={year}
-          trimestre={quarter}
-          onStatus={setStatus}
-        />
+        {params.id !== 'demo' && (
+          <PeticionesPanel
+            centroId={params.id}
+            anio={year}
+            trimestre={quarter}
+            onStatus={setStatus}
+          />
+        )}
       </main>
     </div>
   )

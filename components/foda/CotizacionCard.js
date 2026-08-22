@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { upload } from '@vercel/blob/client'
 import { prepareCotizacionUpload, getCotizacionUploadStatus, discardCotizacionAttempt } from '../../app/actions/peticiones'
 import { ISO_COUNTRY_CODES } from '../../lib/iso-countries.mjs'
@@ -37,8 +37,20 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
   const [values, setValues] = useState(fieldsFromQuote(quote))
   const [progress, setProgress] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(quote?.validation_error || null)
   const [replacing, setReplacing] = useState(false)
+
+  // Defensa contra la reutilización de instancia: si por lo que sea esta misma
+  // tarjeta terminara representando otra cotización (identidad de `quote`
+  // cambiada), se limpia el estado local para que no arrastre un
+  // cotizacionId/valores de la cotización anterior.
+  useEffect(() => {
+    setCotizacionId(quote?.id || null)
+    setValues(fieldsFromQuote(quote))
+    setError(quote?.validation_error || null)
+    setReplacing(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote?.id])
 
   const isValid = quote?.upload_status === 'valid'
   const isInvalid = quote?.upload_status === 'invalid'

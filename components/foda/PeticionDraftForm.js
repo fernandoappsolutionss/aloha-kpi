@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPeticionDraft, updatePeticionDraft, submitPeticion, discardPeticionDraft } from '../../app/actions/peticiones'
 import { PETICION_CATEGORIAS } from '../../lib/peticiones-domain.mjs'
 import CotizacionCard from './CotizacionCard'
@@ -16,12 +16,33 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
   const [selectedDraftId, setSelectedDraftId] = useState(null)
   const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
-  const [extraSlots, setExtraSlots] = useState(0)
   const [busy, setBusy] = useState(false)
+  // Claves estables de slot "vacío" (sin cotización real todavía). Nunca se
+  // reindexan por posición: cada slot conserva su clave desde que se crea
+  // hasta que su carga valida (momento en el que se retira). Esto evita que
+  // React reasocie una instancia de CotizacionCard —con su cotizacionId ya en
+  // memoria— a un slot lógico distinto cuando una carga fuera de orden hace
+  // que el arreglo de cotizaciones cambie de tamaño; esa reasociación era la
+  // causa de que un segundo archivo sobrescribiera silenciosamente una
+  // cotización ya validada.
+  const slotCounter = useRef(0)
+  const [emptySlotKeys, setEmptySlotKeys] = useState([])
 
   const activeDraft = (drafts || []).find((d) => d.id === selectedDraftId) || null
 
-  useEffect(() => { setExtraSlots(0) }, [selectedDraftId])
+  function nextSlotKey() {
+    slotCounter.current += 1
+    return `slot-${slotCounter.current}`
+  }
+
+  useEffect(() => {
+    if (!activeDraft) { setEmptySlotKeys([]); return }
+    const needed = Math.max(3 - (activeDraft.cotizaciones?.length || 0), 0)
+    setEmptySlotKeys(Array.from({ length: needed }, () => nextSlotKey()))
+    // Solo al cambiar de borrador activo: un refresh de `drafts` en el mismo
+    // borrador NO debe reiniciar los slots vacíos a mitad de una carga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDraftId])
 
   function handleContinuar(draft) {
     setSelectedDraftId(draft.id)
@@ -29,14 +50,20 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
     setDescription(draft.texto || '')
   }
 
-  async function handleUpdateMeta(next) {
-    if (!activeDraft || activeDraft.expired || busy) return
+  async function persistDraftMeta(id, next) {
     try {
-      const res = await updatePeticionDraft(centroId, activeDraft.id, next)
+      const res = await updatePeticionDraft(centroId, id, next)
       if (res?.error) throw new Error(res.error)
+      return true
     } catch (e) {
       onStatus?.(`Error al guardar el borrador: ${e?.message || ''}`)
+      return false
     }
+  }
+
+  async function handleUpdateMeta(next) {
+    if (!activeDraft || activeDraft.expired || busy) return
+    await persistDraftMeta(activeDraft.id, next)
   }
 
   function onCategoryChange(e) {
@@ -83,6 +110,12 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
     if (!activeDraft || busy) return
     setBusy(true)
     try {
+      // El blur de la descripción guarda "al vuelo" (fire-and-forget) y puede
+      // perder la carrera contra este envío — si el clic llega primero, el
+      // servidor enviaría con texto viejo y el guardado tardío luego fallaría
+      // con "Borrador no encontrado" porque ya se envió. Se espera aquí la
+      // sincronización de categoría/descripción antes de enviar.
+      await persistDraftMeta(activeDraft.id, { texto: description, categoria: category })
       const res = await submitPeticion(centroId, activeDraft.id)
       if (res?.error) throw new Error(res.error)
       setSelectedDraftId(null)
@@ -99,8 +132,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
   }
 
   const quotes = activeDraft?.cotizaciones || []
-  const totalSlots = Math.min(10, Math.max(3, quotes.length) + extraSlots)
-  const slots = Array.from({ length: totalSlots }, (_, i) => quotes[i] || null)
+  const totalCount = quotes.length + emptySlotKeys.length
 
   const documentFormDisabled = !uploadsAvailable || busy
   const validCount = quotes.filter((quote) => quote.upload_status === 'valid').length
@@ -116,27 +148,33 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
           Carga de cotizaciones no disponible. Configura el almacenamiento privado antes de registrar una petición.
         </p>
       )}
-      <fieldset disabled={documentFormDisabled} aria-describedby="peticion-storage-status" style={{ border: 'none', padding: 0, margin: 0 }}>
-        {!activeDraft && (drafts || []).length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <p className="label" style={{ marginBottom: 6 }}>Borradores existentes</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {drafts.map((draft) => (
-                <div key={draft.id} className="foda-request-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <div>
-                    <p style={{ fontSize: 13 }}>{categoriaLabel(draft.categoria)}</p>
-                    {draft.expired && <p style={{ color: 'var(--bad)', fontSize: 12 }}>Borrador vencido</p>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" className="btn" onClick={() => handleContinuar(draft)}>Continuar</button>
-                    <button type="button" className="btn" onClick={() => handleDiscard(draft.id)}>Descartar borrador</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
+      {/* Fuera del fieldset a propósito: si falta o rota el token de Blob, la
+          creación documental se bloquea (fieldset abajo) pero "Continuar" y
+          "Descartar borrador" de los borradores existentes deben seguir
+          funcionando — si no, un borrador queda atrapado hasta que venza (30
+          días) sin forma de soltarlo. */}
+      {!activeDraft && (drafts || []).length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <p className="label" style={{ marginBottom: 6 }}>Borradores existentes</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {drafts.map((draft) => (
+              <div key={draft.id} className="foda-request-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div>
+                  <p style={{ fontSize: 13 }}>{categoriaLabel(draft.categoria)}</p>
+                  {draft.expired && <p style={{ color: 'var(--bad)', fontSize: 12 }}>Borrador vencido</p>}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn" onClick={() => handleContinuar(draft)}>Continuar</button>
+                  <button type="button" className="btn" disabled={busy} onClick={() => handleDiscard(draft.id)}>Descartar borrador</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <fieldset disabled={documentFormDisabled} aria-describedby="peticion-storage-status" style={{ border: 'none', padding: 0, margin: 0 }}>
         {!activeDraft && (
           <div style={{ marginTop: 14 }}>
             <div className="foda-quote-fields">
@@ -191,13 +229,27 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
             {!activeDraft.expired && (
               <>
                 <div className="foda-quote-grid" style={{ marginTop: 12 }}>
-                  {slots.map((quote, i) => (
-                    <CotizacionCard key={quote?.id || `slot-${i}`} centroId={centroId} peticionId={activeDraft.id}
+                  {quotes.map((quote, i) => (
+                    <CotizacionCard key={quote.id} centroId={centroId} peticionId={activeDraft.id}
                       quote={quote} index={i} onValidated={onRefresh} onStatus={onStatus} />
                   ))}
+                  {emptySlotKeys.map((slotKey, i) => (
+                    <CotizacionCard key={slotKey} centroId={centroId} peticionId={activeDraft.id}
+                      quote={null} index={quotes.length + i}
+                      onValidated={async () => {
+                        // Este slot ya cumplió su propósito: se retira aquí
+                        // (nunca se reindexa/reutiliza) y el refresh trae la
+                        // cotización real, que a partir de ahora se dibuja
+                        // por su propio quote.id.
+                        setEmptySlotKeys((keys) => keys.filter((k) => k !== slotKey))
+                        await onRefresh?.()
+                      }}
+                      onStatus={onStatus} />
+                  ))}
                 </div>
-                {totalSlots < 10 && (
-                  <button type="button" className="btn" style={{ marginTop: 10 }} onClick={() => setExtraSlots((n) => n + 1)}>
+                {totalCount < 10 && (
+                  <button type="button" className="btn" style={{ marginTop: 10 }}
+                    onClick={() => setEmptySlotKeys((keys) => [...keys, nextSlotKey()])}>
                     Agregar otra cotización
                   </button>
                 )}

@@ -11,10 +11,17 @@ export default function PeticionesPanel({ centroId, anio, trimestre, onStatus })
   const [loading, setLoading] = useState(true)
   const refresh = useCallback(async () => {
     setLoading(true)
-    const result = await listPeticiones(centroId, anio, trimestre)
-    if (result?.error) onStatus(`Error: ${result.error}`)
-    else setData(result)
-    setLoading(false)
+    try {
+      const result = await listPeticiones(centroId, anio, trimestre)
+      if (result?.error) onStatus(`Error: ${result.error}`)
+      else setData(result)
+    } catch {
+      // Un rechazo a nivel de transporte (red caída, sesión vencida) no debe
+      // dejar el panel cargando para siempre sin ninguna señal.
+      onStatus('Error: no se pudo cargar el panel de peticiones.')
+    } finally {
+      setLoading(false)
+    }
   }, [centroId, anio, trimestre, onStatus])
   useEffect(() => { refresh() }, [refresh])
   return (
