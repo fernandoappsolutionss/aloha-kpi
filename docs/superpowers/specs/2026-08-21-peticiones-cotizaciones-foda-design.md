@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-21
 
-**Estado:** diseño y controles técnicos aprobados por Fernando el 2026-08-21
+**Estado:** Implementado en rama codex/aloha-peticiones-cotizaciones; pendiente: migración expand en producción, Blob Store privado, variables Vercel, smoke de preview y fase contract.
 
 **Aplicación:** ALOHA KPI (`/centro/[id]/foda`)
 

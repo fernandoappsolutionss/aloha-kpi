@@ -72,7 +72,7 @@
 - Produces: `assertCentroAccess(user, centroId): CurrentUser` and `assertAdmin(user): CurrentUser`.
 - Produces from `lib/auth.js`: `requireCurrentUser()`, `requireCurrentCentroAccess(centroId)`, `requireCurrentAdmin()`.
 
-- [ ] **Step 1: Write the failing secret and current-user tests**
+- [x] **Step 1: Write the failing secret and current-user tests**
 
 ```js
 // test/session-secret.test.mjs
@@ -132,7 +132,7 @@ test('administradora solo entra a su centro y no cambia estados', () => {
 })
 ```
 
-- [ ] **Step 2: Install the locked baseline dependencies and run the tests to verify they fail**
+- [x] **Step 2: Install the locked baseline dependencies and run the tests to verify they fail**
 
 Run: `npm ci`
 
@@ -142,7 +142,7 @@ Run: `node --test test/session-secret.test.mjs test/current-user.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `lib/session-secret.mjs` and `lib/current-user.mjs`.
 
-- [ ] **Step 3: Implement the pure authentication helpers**
+- [x] **Step 3: Implement the pure authentication helpers**
 
 ```js
 // lib/session-secret.mjs
@@ -188,7 +188,7 @@ export function assertAdmin(user) {
 }
 ```
 
-- [ ] **Step 4: Wire the helpers into server auth and middleware**
+- [x] **Step 4: Wire the helpers into server auth and middleware**
 
 ```js
 // additions/replacements in lib/auth.js
@@ -224,7 +224,7 @@ function getSecret() {
 
 Keep `requireSession`, `requireAdmin` and `requireCentroAccess` exported for unchanged modules; every new petition/file operation must use the `requireCurrent*` variants.
 
-- [ ] **Step 5: Run auth tests and the full regression suite**
+- [x] **Step 5: Run auth tests and the full regression suite**
 
 Run: `node --test test/session-secret.test.mjs test/current-user.test.mjs`
 
@@ -234,7 +234,7 @@ Run: `npm test`
 
 Expected: all pre-existing tests PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/session-secret.mjs lib/current-user.mjs lib/auth.js middleware.js test/session-secret.test.mjs test/current-user.test.mjs
@@ -257,7 +257,7 @@ git commit -m "fix: endurecer autenticacion de peticiones"
 - Produces: `validateSupplier(cotizacion)`, `validateSubmission({ texto, categoria, cotizaciones })`, `submissionErrorMessage(codes)`, `canAddQuote(estado)`.
 - Later tasks consume the exact error codes returned by `validateSubmission`: `texto_requerido`, `categoria_invalida`, `minimo_tres`, `proveedor_invalido`, `proveedor_duplicado`, `pdf_duplicado`, `maximo_diez`.
 
-- [ ] **Step 1: Write failing domain tests**
+- [x] **Step 1: Write failing domain tests**
 
 ```js
 // test/peticiones-domain.test.mjs
@@ -338,13 +338,13 @@ test('traduce códigos internos a un mensaje operativo', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test test/peticiones-domain.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
-- [ ] **Step 3: Implement the domain module**
+- [x] **Step 3: Implement the domain module**
 
 ```js
 // lib/iso-countries.mjs
@@ -437,7 +437,7 @@ export function canAddQuote(estado) {
 }
 ```
 
-- [ ] **Step 4: Run the focused and full tests**
+- [x] **Step 4: Run the focused and full tests**
 
 Run: `node --test test/peticiones-domain.test.mjs`
 
@@ -447,7 +447,7 @@ Run: `npm test`
 
 Expected: all tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/iso-countries.mjs lib/peticiones-domain.mjs test/peticiones-domain.test.mjs
@@ -474,7 +474,7 @@ git commit -m "feat: definir reglas de peticiones y proveedores"
 - The default command performs reads only; `--apply` runs the selected SQL file inside one transaction after `pg_advisory_xact_lock(2026082101)`.
 - `peticiones.centro_id` and `peticion_cotizaciones.peticion_id` use `ON DELETE RESTRICT`; actor FKs use `ON DELETE SET NULL`.
 
-- [ ] **Step 1: Write the failing schema contract test**
+- [x] **Step 1: Write the failing schema contract test**
 
 ```js
 // test/peticiones-schema.test.mjs
@@ -524,13 +524,13 @@ test('el runner es dry-run por defecto y usa transacción con advisory lock', ()
 })
 ```
 
-- [ ] **Step 2: Run the contract test to verify it fails**
+- [x] **Step 2: Run the contract test to verify it fails**
 
 Run: `node --test test/peticiones-schema.test.mjs`
 
 Expected: FAIL because the migration files do not exist.
 
-- [ ] **Step 3: Write the expand migration and mirror it in the final schema**
+- [x] **Step 3: Write the expand migration and mirror it in the final schema**
 
 The expand SQL must contain these named structures and checks; use catalog checks before replacing the existing center FK so a differently named production constraint is handled safely.
 
@@ -688,7 +688,7 @@ CREATE INDEX IF NOT EXISTS idx_peticion_cleanup_pendiente
 
 In `db/schema.sql`, define the same final columns/tables directly and omit the temporary `DEFAULT 'legado'`.
 
-- [ ] **Step 4: Write the contract migration**
+- [x] **Step 4: Write the contract migration**
 
 ```sql
 ALTER TABLE peticiones ALTER COLUMN tipo DROP DEFAULT;
@@ -699,7 +699,7 @@ ALTER TABLE peticiones VALIDATE CONSTRAINT peticiones_tipo_categoria_check;
 ALTER TABLE peticiones VALIDATE CONSTRAINT peticiones_anulada_at_check;
 ```
 
-- [ ] **Step 5: Implement the dry-run/apply runner**
+- [x] **Step 5: Implement the dry-run/apply runner**
 
 ```js
 // scripts/migrate-peticiones-cotizaciones-2026-08-21.mjs
@@ -802,7 +802,7 @@ Add to `package.json`:
 "test:peticiones:db": "node --test --test-concurrency=1 test/integration/peticiones-*.integration.mjs"
 ```
 
-- [ ] **Step 6: Add the isolated PostgreSQL integration test**
+- [x] **Step 6: Add the isolated PostgreSQL integration test**
 
 `test/integration/peticiones-db.integration.mjs` uses only `PETICIONES_TEST_DATABASE_URL`, creates a unique temporary schema and invokes the exported production runner—not raw DDL—to prove dry-run read-only behavior, rollback of a fault injected after the real expand DDL, idempotent expand and successful contract. It also asserts legacy backfill; catálogo ISO idéntico al módulo compartido y rechazo de `ZZ`; duplicate `(peticion_id, pais, id_fiscal_clave)` rejected; duplicate SHA rejected; actor deletion sets FK to null while snapshots remain; center deletion with a petition returns SQLSTATE `23503`; and validated contract constraints. Drop only the explicit temporary schema in `after()`.
 
@@ -972,7 +972,7 @@ test('migración y restricciones en PostgreSQL real', async (t) => {
 })
 ```
 
-- [ ] **Step 7: Return a clear center-deletion error**
+- [x] **Step 7: Return a clear center-deletion error**
 
 Import `requireCurrentAdmin` from `lib/auth` in place of the stale-JWT `requireAdmin` used by this action, and import `fallo` from `lib/errores` so authentication and unexpected database failures remain legible Server Action results.
 
@@ -992,7 +992,7 @@ export async function deleteCentro(id) {
 }
 ```
 
-- [ ] **Step 8: Run schema tests without touching production**
+- [x] **Step 8: Run schema tests without touching production**
 
 Run: `node --test test/peticiones-schema.test.mjs`
 
@@ -1010,7 +1010,7 @@ test -z "$PETICIONES_TEST_DATABASE_URL" || npm run test:peticiones:db
 
 Expected: the real production runner dry-run/rollback/expand/contract, constraint/idempotence/FK and concurrency tests pass, or the command exits 0 without opening a connection when the dedicated variable is absent. Record the latter as `SKIPPED`, not `PASS`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add db/schema.sql db/migrations scripts/migrate-peticiones-cotizaciones-2026-08-21.mjs package.json app/actions/centros.js test/peticiones-schema.test.mjs test/integration/peticiones-db.integration.mjs
@@ -1037,7 +1037,7 @@ git commit -m "feat: preparar esquema auditable de peticiones"
 - `app/actions/peticiones.js` exports: `listPeticiones`, `createComentario`, `updateComentario`, `createPeticionDraft`, `updatePeticionDraft`, `submitPeticion`, `changePeticionStatus`, `discardPeticionDraft`.
 - All action results use `{ ok: true, ... }` or `{ error: string }`; no expected user error escapes as a thrown Server Action exception.
 
-- [ ] **Step 1: Write failing service tests for comments, drafts and legacy visibility**
+- [x] **Step 1: Write failing service tests for comments, drafts and legacy visibility**
 
 ```js
 // first section of test/peticiones-service.test.mjs
@@ -1115,13 +1115,13 @@ test('un comentario no se puede vaciar al editar', async () => {
 })
 ```
 
-- [ ] **Step 2: Run the focused test to verify it fails**
+- [x] **Step 2: Run the focused test to verify it fails**
 
 Run: `node --test test/peticiones-service.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `lib/peticiones-service.mjs`.
 
-- [ ] **Step 3: Implement actor snapshots, retry serializable and basic cases**
+- [x] **Step 3: Implement actor snapshots, retry serializable and basic cases**
 
 ```js
 // core of lib/peticiones-service.mjs
@@ -1230,7 +1230,7 @@ export function createPeticionesService({
 
 The final returned object must also expose the five methods implemented in the next steps; do not create a second service factory.
 
-- [ ] **Step 4: Add failing tests for submit, status, edit and discard**
+- [x] **Step 4: Add failing tests for submit, status, edit and discard**
 
 ```js
 // append to test/peticiones-service.test.mjs
@@ -1379,7 +1379,7 @@ test('descartar borrador encola cada ruta antes de borrar filas', async () => {
 })
 ```
 
-- [ ] **Step 5: Implement submit, edit, status and discard inside the same factory**
+- [x] **Step 5: Implement submit, edit, status and discard inside the same factory**
 
 ```js
 async submitPeticion(actor, input) {
@@ -1484,7 +1484,7 @@ async updateDraft(actor, input) {
 },
 ```
 
-- [ ] **Step 6: Implement the SQL repository**
+- [x] **Step 6: Implement the SQL repository**
 
 `lib/peticiones-repository.js` must parameterize values, aggregate cotizaciones for list display and hide `submitted_at IS NULL` in `listSubmitted`. Both list queries aggregate safe metadata for every attempt so failed post-submit uploads can resume by the same `cotizacionId`; the UI counts and downloads only rows with `upload_status = 'valid'`. `listDrafts` filters by `created_by` for an `administradora`, while `admin_general` and `supervisor` receive all drafts for the requested center/period. Neither query selects Blob URLs. The service presenter additionally strips `blob_pathname`, `expected_pathname`, `upload_nonce` and `archivo_sha256` before any action response. Use these exact concurrency clauses:
 
@@ -1517,7 +1517,7 @@ SET motivo = EXCLUDED.motivo,
 
 The adapter's `transaction` method delegates to `withTransaction`; all other methods accept either the transaction tag or the shared `sql` tag.
 
-- [ ] **Step 7: Wire fresh-auth Server Actions and retire destructive exports**
+- [x] **Step 7: Wire fresh-auth Server Actions and retire destructive exports**
 
 ```js
 // app/actions/peticiones.js
@@ -1577,7 +1577,7 @@ export async function discardPeticionDraft(centroId, id) {
 
 Remove `listPeticiones`, `addPeticion`, `updatePeticion` and `deletePeticion` from `app/actions/foda.js`; that file retains only quadrants and compliance-derived FODA.
 
-- [ ] **Step 8: Add the static Server Action contract test**
+- [x] **Step 8: Add the static Server Action contract test**
 
 ```js
 // test/peticiones-actions.test.mjs
@@ -1597,7 +1597,7 @@ test('acciones usan auth fresca y no exponen borrado físico', () => {
 })
 ```
 
-- [ ] **Step 9: Run service/action tests and regression suite**
+- [x] **Step 9: Run service/action tests and regression suite**
 
 Run: `node --test test/peticiones-service.test.mjs test/peticiones-actions.test.mjs`
 
@@ -1622,7 +1622,7 @@ test -z "$PETICIONES_TEST_DATABASE_URL" || node --test test/integration/peticion
 
 Expected: PASS with two independent PostgreSQL connections, or `SKIPPED` when the dedicated URL is absent.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add lib/peticiones-service.mjs lib/peticiones-repository.js app/actions/peticiones.js app/actions/foda.js test/peticiones-service.test.mjs test/peticiones-actions.test.mjs test/integration/peticiones-submit.integration.mjs
@@ -1655,7 +1655,7 @@ git commit -m "feat: agregar flujo transaccional de peticiones"
 - `prepare` returns only `{ cotizacionId, pathname, nonce, attempt }`; it never returns a Blob URL.
 - `authorizeToken` returns `{ allowedContentTypes, maximumSizeInBytes, validUntil, addRandomSuffix, allowOverwrite, tokenPayload }`.
 
-- [ ] **Step 1: Install the private Blob SDK version and record the runtime floor**
+- [x] **Step 1: Install the private Blob SDK version and record the runtime floor**
 
 Run: `npm install @vercel/blob@2.8.0 --save-exact`
 
@@ -1667,7 +1667,7 @@ Add to `package.json`:
 "engines": { "node": ">=20" }
 ```
 
-- [ ] **Step 2: Write failing PDF stream tests**
+- [x] **Step 2: Write failing PDF stream tests**
 
 ```js
 // test/peticion-pdf.test.mjs
@@ -1700,13 +1700,13 @@ test('sanea el nombre sin usarlo como pathname', () => {
 })
 ```
 
-- [ ] **Step 3: Run the PDF test to verify it fails**
+- [x] **Step 3: Run the PDF test to verify it fails**
 
 Run: `node --test test/peticion-pdf.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
-- [ ] **Step 4: Implement streaming validation**
+- [x] **Step 4: Implement streaming validation**
 
 ```js
 // lib/peticion-pdf.mjs
@@ -1746,7 +1746,7 @@ export async function inspectPdfStream(readable) {
 }
 ```
 
-- [ ] **Step 5: Write failing upload lifecycle tests**
+- [x] **Step 5: Write failing upload lifecycle tests**
 
 ```js
 // core cases in test/peticion-upload.test.mjs
@@ -1982,7 +1982,7 @@ test('un estado terminal posterior al token invalida y limpia la carga', async (
 })
 ```
 
-- [ ] **Step 6: Implement the private Blob adapter and upload service**
+- [x] **Step 6: Implement the private Blob adapter and upload service**
 
 ```js
 // lib/peticion-blob.js
@@ -2270,7 +2270,7 @@ export function createPeticionUploadService({ repo, blob, now = () => new Date()
 }
 ```
 
-- [ ] **Step 7: Add repository methods and upload actions**
+- [x] **Step 7: Add repository methods and upload actions**
 
 Add parameterized repository methods `prepareQuote`, `touchDraft`, `getUploadAttempt`, `getCallbackContext`, `markValidating`, `markValid`, `markInvalid`, `countQuotes`, `getUploadStatus`, and `deleteQuoteAttempt`. The delete uses both quote and petition ids plus `upload_status <> 'valid'`. `touchDraft` executes the following guarded update; every quote state change uses `WHERE upload_nonce = $nonce AND expected_pathname = $pathname`.
 
@@ -2315,7 +2315,7 @@ export async function discardCotizacionAttempt(centroId, peticionId, cotizacionI
 }
 ```
 
-- [ ] **Step 8: Implement the `handleUpload` route**
+- [x] **Step 8: Implement the `handleUpload` route**
 
 ```js
 // app/api/peticiones/cotizaciones/upload/route.js
@@ -2368,7 +2368,7 @@ export async function verifyStoredQuote(quote) {
 export const peticionUploadService = createPeticionUploadService({ repo: peticionesRepository, blob: peticionBlob })
 ```
 
-- [ ] **Step 9: Run upload tests and build**
+- [x] **Step 9: Run upload tests and build**
 
 Run: `node --test test/peticion-pdf.test.mjs test/peticion-upload.test.mjs`
 
@@ -2388,7 +2388,7 @@ test -z "$PETICIONES_TEST_DATABASE_URL" || node --test test/integration/peticion
 
 Expected: PASS with two independent PostgreSQL connections, or `SKIPPED` when absent.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add package.json package-lock.json lib/peticion-pdf.mjs lib/peticion-upload-service.mjs lib/peticion-upload-runtime.js lib/peticion-blob.js lib/peticiones-repository.js app/actions/peticiones.js app/api/peticiones/cotizaciones/upload/route.js test/peticion-pdf.test.mjs test/peticion-upload.test.mjs test/integration/peticiones-callback.integration.mjs
@@ -2414,7 +2414,7 @@ git commit -m "feat: validar cotizaciones en blob privado"
 - Repository method: `findDownloadableQuote(id)` returns `{ id, centro_id, archivo_nombre, blob_pathname }` only when `upload_status = 'valid'`.
 - Unauthenticated returns `401`; nonexistent and unauthorized return the same `404`; success streams a PDF attachment with `private, no-store` and `nosniff`.
 
-- [ ] **Step 1: Write the failing download tests**
+- [x] **Step 1: Write the failing download tests**
 
 ```js
 // test/peticion-download.test.mjs
@@ -2465,13 +2465,13 @@ test('sesión ausente devuelve 401', async () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test test/peticion-download.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
-- [ ] **Step 3: Implement the handler factory and access predicate**
+- [x] **Step 3: Implement the handler factory and access predicate**
 
 ```js
 // addition to lib/current-user.mjs
@@ -2514,7 +2514,7 @@ export function createPeticionDownloadHandler({ authenticate, findQuote, getBlob
 }
 ```
 
-- [ ] **Step 4: Wire the repository and route**
+- [x] **Step 4: Wire the repository and route**
 
 ```js
 // app/api/peticiones/cotizaciones/[id]/download/route.js
@@ -2540,7 +2540,7 @@ export async function GET(_request, { params }) {
 
 The repository query receives only `cotizacionId` and derives `centro_id` with `JOIN peticiones p ON p.id = c.peticion_id`; it never accepts `centroId` or `pathname` from the URL.
 
-- [ ] **Step 5: Remove the global wildcard CORS header**
+- [x] **Step 5: Remove the global wildcard CORS header**
 
 Delete `next.config.js`'s `headers()` block that applies `Access-Control-Allow-Origin: *` to every route. Extend `test/next-config.test.mjs`:
 
@@ -2552,7 +2552,7 @@ test('no publica CORS wildcard sobre descargas autenticadas', async () => {
 })
 ```
 
-- [ ] **Step 6: Run focused tests and build**
+- [x] **Step 6: Run focused tests and build**
 
 Run: `node --test test/peticion-download.test.mjs test/next-config.test.mjs`
 
@@ -2562,7 +2562,7 @@ Run: `npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/current-user.mjs lib/peticion-download.mjs lib/peticiones-repository.js 'app/api/peticiones/cotizaciones/[id]/download/route.js' next.config.js test/peticion-download.test.mjs test/next-config.test.mjs
@@ -2593,7 +2593,7 @@ git commit -m "feat: servir cotizaciones con autorizacion privada"
 - Produces: `createPeticionCleanupService({ repo, blob, now, uuid }): CleanupService` with `run({ budgetMs })`.
 - `run` returns only counters: `{ expiredDrafts, reconciled, processed, skippedActive, failed, pending }`.
 
-- [ ] **Step 1: Extend schema tests for recoverable queue locks**
+- [x] **Step 1: Extend schema tests for recoverable queue locks**
 
 ```js
 // append assertion in test/peticiones-schema.test.mjs
@@ -2607,7 +2607,7 @@ test('la cola tiene claim recuperable para cron concurrente', () => {
 })
 ```
 
-- [ ] **Step 2: Write failing cleanup tests**
+- [x] **Step 2: Write failing cleanup tests**
 
 ```js
 // test/peticion-cleanup.test.mjs
@@ -2698,7 +2698,7 @@ test('reencolar una ruta agotada reinicia intentos y libera locks viejos', () =>
 })
 ```
 
-- [ ] **Step 3: Implement cleanup policy and service**
+- [x] **Step 3: Implement cleanup policy and service**
 
 ```js
 // lib/peticion-cleanup.mjs
@@ -2782,7 +2782,7 @@ export function createPeticionCleanupService({ repo, blob, now = () => new Date(
 }
 ```
 
-- [ ] **Step 4: Implement transactional expiry, reconciliation and claim SQL**
+- [x] **Step 4: Implement transactional expiry, reconciliation and claim SQL**
 
 Add `locked_at` and `lock_token` to both the expand migration and final schema. Add and seed the bounded-scan checkpoint:
 
@@ -2847,7 +2847,7 @@ Después de procesar la cola existente, el servicio lee como máximo tres págin
 
 Re-enqueuing an existing pathname is a new cleanup obligation, not a continuation of a dead letter: the `ON CONFLICT` clause increments `generation`, sets `intentos = 0`, clears error and lock fields, reopens `completed_at` and schedules `proximo_intento_at = now()`. The generation fence makes a worker from the previous obligation unable to complete or fail the reopened row. Add the corresponding SQL to the repository method and retain the static test above.
 
-- [ ] **Step 5: Compose the runtime and protected cron route**
+- [x] **Step 5: Compose the runtime and protected cron route**
 
 ```js
 // lib/peticion-cleanup-runtime.js
@@ -2882,7 +2882,7 @@ export async function GET(request) {
 }
 ```
 
-- [ ] **Step 6: Configure schedule and environment documentation**
+- [x] **Step 6: Configure schedule and environment documentation**
 
 ```json
 {
@@ -2905,7 +2905,7 @@ BLOB_READ_WRITE_TOKEN=""
 VERCEL_BLOB_CALLBACK_URL=""
 ```
 
-- [ ] **Step 7: Run cleanup/schema/cron tests**
+- [x] **Step 7: Run cleanup/schema/cron tests**
 
 Run: `node --test test/peticion-cleanup.test.mjs test/peticiones-schema.test.mjs test/cron-auth.test.mjs`
 
@@ -2923,7 +2923,7 @@ test -z "$PETICIONES_TEST_DATABASE_URL" || node --test test/integration/peticion
 
 Expected: PASS with two independent PostgreSQL connections, or `SKIPPED` when absent.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add lib/peticion-cleanup.mjs lib/peticion-cleanup-runtime.js lib/peticiones-repository.js app/api/cron/peticiones-cleanup/route.js db/schema.sql db/migrations/2026-08-21-peticiones-cotizaciones-expand.sql test/peticion-cleanup.test.mjs test/peticiones-schema.test.mjs test/integration/peticiones-cleanup-race.integration.mjs vercel.json .env.example
@@ -2951,7 +2951,7 @@ git commit -m "feat: limpiar blobs y borradores con cola durable"
 - `CotizacionCard({ centroId, peticionId, quote, index, onValidated, onStatus })` prepares and uploads one PDF; it discards the returned Blob URL.
 - `PeticionesList({ items, permissions, uploadsAvailable, onRefresh, onStatus })` renders legacy, comments and petitions; status controls depend on `permissions.canChangeStatus` and post-submit uploads fail closed with the same capability.
 
-- [ ] **Step 1: Write the failing static UI contract test**
+- [x] **Step 1: Write the failing static UI contract test**
 
 ```js
 // test/foda-peticiones-ui.test.mjs
@@ -3008,13 +3008,13 @@ test('página FODA delega el panel y retira CRUD anterior', () => {
 })
 ```
 
-- [ ] **Step 2: Run the UI contract test to verify it fails**
+- [x] **Step 2: Run the UI contract test to verify it fails**
 
 Run: `node --test test/foda-peticiones-ui.test.mjs`
 
 Expected: FAIL because `components/foda/PeticionesPanel.js` does not exist.
 
-- [ ] **Step 3: Implement panel loading and the two-mode composer**
+- [x] **Step 3: Implement panel loading and the two-mode composer**
 
 ```js
 // essential state/flow in components/foda/PeticionesPanel.js
@@ -3055,7 +3055,7 @@ export default function PeticionesPanel({ centroId, anio, trimestre, onStatus })
 
 `ComentarioForm` calls `createComentario`, clears text only after `{ ok: true }`, supports Ctrl/Cmd+Enter, and keeps the text after an error.
 
-- [ ] **Step 4: Implement provider cards and direct client upload**
+- [x] **Step 4: Implement provider cards and direct client upload**
 
 ```js
 // upload function inside components/foda/CotizacionCard.js
@@ -3100,7 +3100,7 @@ async function uploadQuote(file, values) {
 
 The JSX in `CotizacionCard` renders labeled controls for `proveedorRazonSocial`, `proveedorPais`, `proveedorIdFiscal`, `empresaConstituida`, `emiteFacturaFiscal`, `<input type="file" accept="application/pdf,.pdf">`, progress, success, retry and the specific error. `proveedorPais` is a required `<select name="proveedorPais">` populated only from `ISO_COUNTRY_CODES`; use `new Intl.DisplayNames(['es'], { type: 'region' })` for labels and keep `PA`/`VE` at the top. Never accept a free-text country. Disable upload until all supplier fields and both certifications are complete. Persist `prepared.cotizacionId` in component state before starting the network upload, so a failure retries that same row and consumes its next attempt instead of creating an orphan. A reloaded draft receives the same id through `quote.id` from the safe list projection. A `pending` or `invalid` row renders `Quitar intento`; it calls `discardCotizacionAttempt`, refreshes after `{ ok: true }`, and never appears on a valid row. A valid draft card may offer `Reemplazar antes de enviar`; a valid submitted card remains immutable.
 
-- [ ] **Step 5: Implement the draft form and final requirement gate**
+- [x] **Step 5: Implement the draft form and final requirement gate**
 
 `PeticionDraftForm` renders category codes through `PETICION_CATEGORIAS`, description, three initial `CotizacionCard` instances, `Agregar otra cotización` up to ten, `N de 3 cotizaciones válidas`, draft expiry and `Descartar borrador`. Before a draft exists, `createPeticionDraft` persists category/description. Existing active drafts show `Continuar`; a row returned with `expired: true` shows `Borrador vencido`, disables edit/upload/submit and leaves only `Descartar borrador`. The submit button calls `submitPeticion` and remains disabled until three distinct rows report `upload_status === 'valid'`. If `uploadsAvailable` is false, keep the Petición tab visible, show the operational message below, and disable the entire document form; the Comentario form and submitted list continue working.
 
@@ -3124,7 +3124,7 @@ const requirementText = validCount < 3
 
 Do not infer distinctness only in the browser: the server's `submitPeticion` remains authoritative and returns the duplicate-provider/PDF error if data changed concurrently.
 
-- [ ] **Step 6: Implement submitted list, permissions and downloads**
+- [x] **Step 6: Implement submitted list, permissions and downloads**
 
 `PeticionesList` renders type, category label, status, date, provider count, and each valid filename as:
 
@@ -3136,7 +3136,7 @@ Do not infer distinctness only in the browser: the server's `submitPeticion` rem
 
 Rows with `tipo === 'legado'` display `Anterior · sin requisitos documentales` and a read-only description. Comments display editable text only when the row says `canEditText`. Status buttons render only when `permissions.canChangeStatus`; include `Anulada`. Submitted rows never render an `×` delete button. Open formal petitions render `Agregar cotización` only when the server returns `canAddQuote` and `uploadsAvailable` is true; when storage is unavailable, show the same operational warning without hiding downloads or history. Clicking it opens one blank `CotizacionCard` under that row, uploads through the same `prepareCotizacionUpload` flow with `cotizacionId: null`, and refreshes the row after validation. Valid cotizaciones already submitted never render replace/remove controls; pending or invalid post-submit attempts may retry the same `cotizacionId`.
 
-- [ ] **Step 7: Replace the monolithic FODA block and add responsive styles**
+- [x] **Step 7: Replace the monolithic FODA block and add responsive styles**
 
 In `app/centro/[id]/foda/page.js`, remove peticiones state/CRUD functions and import/render:
 
@@ -3168,7 +3168,7 @@ Append focused classes to `app/globals.css`:
 }
 ```
 
-- [ ] **Step 8: Run UI contracts, complete suite and build**
+- [x] **Step 8: Run UI contracts, complete suite and build**
 
 Run: `node --test test/foda-peticiones-ui.test.mjs`
 
@@ -3182,7 +3182,7 @@ Run: `npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add components/foda 'app/centro/[id]/foda/page.js' app/globals.css test/foda-peticiones-ui.test.mjs
@@ -3202,7 +3202,7 @@ git commit -m "feat: agregar interfaz guiada de cotizaciones"
 - Produces a documented rollout: test database → expand → env/store → deploy → smoke → contract.
 - Does not execute migrations, create the Blob Store, change Vercel env or deploy production without Fernando's explicit approval.
 
-- [ ] **Step 1: Document local and preview setup**
+- [x] **Step 1: Document local and preview setup**
 
 Add to `README.md`:
 
@@ -3223,7 +3223,7 @@ La migración de este módulo no usa `npm run db:migrate`. Primero corre el dry-
 Orden: respaldo de metadatos, dry-run, expansión, variables/Blob privado, despliegue, smoke de comentario/petición/descarga/estado/limpieza/legacy y, tras retirar instancias antiguas, contracción.
 ```
 
-- [ ] **Step 2: Run every deterministic local check**
+- [x] **Step 2: Run every deterministic local check**
 
 Run: `node --version`
 
@@ -3245,7 +3245,7 @@ Run: `git diff --check`
 
 Expected: no output.
 
-- [ ] **Step 3: Run the disposable-database integration gate when its explicit URL exists**
+- [ ] **Step 3: Run the disposable-database integration gate when its explicit URL exists** — SKIPPED (sin PETICIONES_TEST_DATABASE_URL)
 
 Run only with a disposable branch/database:
 
@@ -3255,7 +3255,7 @@ test -n "$PETICIONES_TEST_DATABASE_URL" && npm run test:peticiones:db
 
 Expected: production-runner dry-run/rollback/expand/contract, FK, named constraints, two-submit serialization, callback-versus-terminal locking, cleanup claims and generation fencing all PASS on PostgreSQL real. Never substitute production `DATABASE_URL` into this command.
 
-- [ ] **Step 4: Run browser smoke on a local/preview environment with test storage**
+- [ ] **Step 4: Run browser smoke on a local/preview environment with test storage** — PENDIENTE (requiere preview con expand aplicado y Blob privado)
 
 Start: `npm run dev`
 
@@ -3274,7 +3274,7 @@ Verify with the browser harness at desktop and 390px width, in light and dark th
 
 Record screenshots or browser logs for each failed criterion. Treat criterion 10 as a production gate: a store with a public hostname or a successful anonymous direct GET blocks deploy/contract even if the application hides the URL. Do not mark the feature complete until every item passes.
 
-- [ ] **Step 5: Review spec coverage and static red flags**
+- [x] **Step 5: Review spec coverage and static red flags**
 
 Run:
 
@@ -3286,7 +3286,7 @@ Expected: no output.
 
 Cross-check every spec acceptance criterion against Tasks 1–9: criteria 1–3 map to Tasks 2, 4, 5, 8; criterion 4 to Tasks 5–6; criteria 5–8 to Tasks 3–4 and 8; criteria 9–10 to Tasks 1, 5 and 7; criterion 11 to Tasks 3–4.
 
-- [ ] **Step 6: Commit documentation and verified plan state**
+- [x] **Step 6: Commit documentation and verified plan state**
 
 ```bash
 git add README.md package.json package-lock.json docs/superpowers/specs/2026-08-21-peticiones-cotizaciones-foda-design.md docs/superpowers/plans/2026-08-21-peticiones-cotizaciones-foda.md
