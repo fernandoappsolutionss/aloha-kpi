@@ -91,6 +91,58 @@ Orden: respaldo de metadatos, dry-run, expansión, variables/Blob privado, despl
 | `trimestres` | Agrupador para el checklist de cumplimiento |
 | `cumplimiento` | Checklist mensual (sí/no) |
 | `foda` | FODA trimestral por centro (oportunidades, amenazas, comentarios, estado) |
+| `conciliacion_cuentas` | Mapeo centro ↔ organización y cuenta bancaria de Zoho |
+| `conciliacion_reglas` | Reglas de auto-clasificación por descripción |
+| `conciliacion_lotes` | Cada extracto bancario cargado |
+| `conciliacion_movimientos` | Línea del extracto, su estado y su asiento en Zoho |
+
+## Conciliación bancaria con Zoho Books
+
+Permite adjuntar el CSV de movimientos que exporta la banca en línea y
+registrarlos en la cuenta bancaria de Zoho Books del centro. Vive en
+`/dashboard/conciliacion` (admin, todas las cuentas) y en
+`/centro/{id}/conciliacion` (cada centro, solo la suya).
+
+Variables: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` y
+`ZOHO_DC` (ver `.env.example` para cómo generarlas). Sin ellas el módulo lee el
+archivo pero no compara ni registra nada.
+
+Migración (dry-run primero; `--apply` solo en una ventana autorizada):
+
+    npm run db:migrate:conciliacion
+    npm run db:migrate:conciliacion -- --apply
+
+Puesta en marcha, una vez por cuenta bancaria:
+
+1. **Conciliación → Cuentas y centros** (admin): elige la organización de Zoho,
+   la cuenta bancaria y el centro al que pertenece. Una cuenta sin centro es
+   corporativa y solo la ve un admin. Cada cuenta de Zoho se asigna una sola vez.
+2. Define las **cuentas puente** de entradas y salidas: ahí cae lo que ninguna
+   regla clasifique. Sin puente, esos movimientos quedan "sin cuenta" y no se
+   pueden registrar hasta asignárselas a mano.
+3. **Reglas de clasificación**: `ACH NOMINA` → *Sueldos*, `COLEGIATURA` →
+   *Ingresos por colegiatura*… Gana la de mayor prioridad y, a igualdad, la más
+   específica. Un usuario de centro crea reglas para su cuenta; solo un admin
+   crea reglas para toda la organización.
+4. **Conciliar**: se adjunta el CSV, se revisa la tabla y se pulsa *Registrar en
+   Zoho*.
+
+Cómo evita registrar dos veces lo mismo:
+
+- Cada línea del extracto lleva una **huella** (fecha, monto, dirección,
+  referencia y descripción, más el número de ocurrencia). Volver a subir el
+  mismo archivo marca todo como *ya importado* — pero dos pagos idénticos del
+  mismo día siguen siendo dos movimientos distintos.
+- Antes de registrar se consulta **qué tiene ya Zoho** en esa cuenta y ese
+  rango de fechas (± la tolerancia de la cuenta, 3 días por defecto). Lo que ya
+  está se marca *Ya en Zoho* y no se vuelve a crear.
+- Un índice único parcial impide que la misma línea quede publicada dos veces
+  en la misma cuenta, y el candado se cierra **antes** de llamar a Zoho.
+
+Si una tanda se corta (Zoho limita a ~100 llamadas por minuto, y la función
+serverless tiene su propio tope), el botón informa cuántos quedaron pendientes
+y se continúa pulsando de nuevo. *Volver a conciliar* es además la vía de
+recuperación: vuelve a mirar Zoho y resuelve las filas que quedaron a medias.
 
 ## Notas
 
