@@ -3,16 +3,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
-import { loadFoda, saveFoda, listPeticiones, addPeticion, updatePeticion, deletePeticion } from '../../../actions/foda'
+import { loadFoda, saveFoda } from '../../../actions/foda'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../../lib/period'
 import PeriodSelector from '../../../../components/PeriodSelector'
-
-const ESTADOS = ['Próximo trimestre', 'Negado', 'Aprobado', 'En proceso', 'Cumplido']
-const estadoColor = (s) =>
-  (s === 'Aprobado' || s === 'Cumplido') ? { bg: 'var(--ok-bg)', line: 'var(--ok-line)', fg: 'var(--ok)' }
-  : s === 'En proceso' ? { bg: 'var(--ts-green-soft)', line: 'var(--ts-green-line)', fg: 'var(--ts-green)' }
-  : s === 'Negado' ? { bg: 'var(--bad-bg)', line: 'var(--bad-line)', fg: 'var(--bad)' }
-  : { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' }
+import PeticionesPanel from '../../../../components/foda/PeticionesPanel'
 
 export default function FodaPage() {
   const params = useParams()
@@ -32,9 +26,6 @@ export default function FodaPage() {
   const [vinculado, setVinculado] = useState({ fortalezas: [], debilidades: [] })
   const [estado, setEstado] = useState('')
   const [status, setStatus] = useState('')
-  const [peticiones, setPeticiones] = useState([])
-  const [nueva, setNueva] = useState('')
-  const [pBusy, setPBusy] = useState(false)
   // Período seleccionable (trimestre/año) — compartido con el resto del panel.
   // Permite editar el FODA de trimestres anteriores (p. ej. Junio en Q2).
   const [period, setPeriod] = useState(getCurrentPeriod())
@@ -60,45 +51,12 @@ export default function FodaPage() {
       })
       setEstado(row?.comentario_estado || '')
     }).catch(() => {})
-    listPeticiones(params.id, year, quarter).then((d) => setPeticiones(d || [])).catch(() => {})
   }, [params.id, year, quarter])
 
   // Regenera Fortalezas/Debilidades desde el cumplimiento actual del trimestre.
   function actualizarDesdeCumplimiento(k) {
     const list = k === 'fortalezas' ? vinculado.fortalezas : vinculado.debilidades
     setFoda((f) => ({ ...f, [k]: (list || []).join('\n') }))
-  }
-
-  async function agregarPeticion() {
-    const t = nueva.trim()
-    if (!t || params.id === 'demo') return
-    setPBusy(true)
-    try {
-      const res = await addPeticion(params.id, year, quarter, t)
-      if (res?.error) throw new Error(res.error)
-      setPeticiones(p => [...p, res.peticion]); setNueva('')
-    } catch (e) { setStatus('Error: ' + (e?.message || '')) }
-    setPBusy(false)
-  }
-  async function cambiarEstadoPeticion(id, est) {
-    setPeticiones(p => p.map(x => x.id === id ? { ...x, estado: est } : x))
-    try {
-      const res = await updatePeticion(params.id, id, { estado: est })
-      if (res?.error) throw new Error(res.error)
-    } catch (e) { setStatus('Error al actualizar estado: ' + (e?.message || '')) }
-  }
-  async function guardarTextoPeticion(id, texto) {
-    try {
-      const res = await updatePeticion(params.id, id, { texto })
-      if (res?.error) throw new Error(res.error)
-    } catch (e) { setStatus('Error al guardar el texto: ' + (e?.message || '')) }
-  }
-  async function eliminarPeticion(id) {
-    setPeticiones(p => p.filter(x => x.id !== id))
-    try {
-      const res = await deletePeticion(params.id, id)
-      if (res?.error) throw new Error(res.error)
-    } catch (e) { setStatus('Error al eliminar: ' + (e?.message || '')) }
   }
 
   async function save() {
@@ -168,52 +126,12 @@ export default function FodaPage() {
           ))}
         </div>
 
-        <div className="card" style={{ padding: 18, marginTop: 16 }}>
-          <h3 className="panel__title" style={{ fontSize: 16, marginBottom: 4 }}>Comentarios y peticiones del administrador</h3>
-          <p className="h-sub" style={{ marginTop: 0, marginBottom: 14 }}>Solicitudes de presupuesto, sugerencias, notas para la gerencia. Agrega cada una y asígnale su estado.</p>
-
-          {/* Agregar nueva petición */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: peticiones.length ? 16 : 4, alignItems: 'flex-start' }}>
-            <textarea value={nueva} onChange={e=>setNueva(e.target.value)}
-              onKeyDown={e=>{ if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) agregarPeticion() }}
-              placeholder="Escribe una solicitud o comentario… (⌘/Ctrl+Enter para agregar)"
-              style={{ ...taStyle, marginTop: 0, minHeight: 60, flex: 1 }} />
-            <button onClick={agregarPeticion} disabled={pBusy || !nueva.trim()} className="btn btn--primary" style={{ whiteSpace: 'nowrap' }}>+ Agregar</button>
-          </div>
-
-          {/* Lista de peticiones */}
-          {peticiones.length === 0 ? (
-            <p className="h-sub" style={{ textAlign: 'center', padding: '16px 0 4px', color: 'var(--text-dim)' }}>Aún no hay peticiones. Agrega la primera arriba.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {peticiones.map(p => (
-                <div key={p.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', background: 'var(--surface-2)' }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <textarea value={p.texto}
-                      onChange={e=>setPeticiones(ps=>ps.map(x=>x.id===p.id?{...x,texto:e.target.value}:x))}
-                      onBlur={e=>guardarTextoPeticion(p.id, e.target.value)}
-                      style={{ ...taStyle, marginTop: 0, minHeight: 42, flex: 1 }} />
-                    <button onClick={()=>eliminarPeticion(p.id)} title="Eliminar"
-                      style={{ flexShrink: 0, width: 32, height: 32, border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                    <span className="label" style={{ color: 'var(--text-muted)', marginRight: 2 }}>Estado:</span>
-                    {ESTADOS.map(s => {
-                      const on = p.estado === s
-                      const col = estadoColor(s)
-                      return (
-                        <button key={s} onClick={()=>cambiarEstadoPeticion(p.id, s)}
-                          style={{ padding: '4px 11px', border: `1px solid ${on ? col.line : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', background: on ? col.bg : 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.02em', color: on ? col.fg : 'var(--text-dim)', cursor: 'pointer', fontWeight: on ? 600 : 500, transition: 'all 0.15s' }}>
-                          {s}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <PeticionesPanel
+          centroId={params.id}
+          anio={year}
+          trimestre={quarter}
+          onStatus={setStatus}
+        />
       </main>
     </div>
   )

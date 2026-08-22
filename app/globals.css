@@ -891,3 +891,24 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .growth-model-band__metrics span { padding: 8px 10px; border-bottom: 1px solid var(--border); }
   .growth-admin-controls .select { flex: 1 1 calc(50% - 8px); min-width: 0; }
 }
+
+/* ---------------------------------------------------------------- */
+/*  FODA — peticiones y cotizaciones                                 */
+/* ---------------------------------------------------------------- */
+.form-error { padding: 11px 14px; margin-top: 14px; border-radius: var(--r-sm); background: var(--bad-bg); border: 1px solid var(--bad-line); color: #FCA5A5; font-size: 13px; font-weight: 500; }
+.foda-requests { padding: 18px; margin-top: 16px; }
+.foda-request-tabs { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-2); }
+.foda-request-tabs button { min-height: 32px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600; cursor: pointer; }
+.foda-request-tabs button:hover { color: var(--text); }
+.foda-request-tabs button[aria-selected="true"] { color: var(--text); background: var(--surface-1); border-color: var(--ts-green-line); }
+.foda-quote-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.foda-quote-card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+.foda-quote-fields { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+.foda-request-row { padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+@media (max-width: 960px) { .foda-quote-grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .foda-requests { padding: 14px; }
+  .foda-request-tabs { display: flex; width: 100%; }
+  .foda-request-tabs button { flex: 1; min-height: 44px; }
+  .foda-quote-fields { grid-template-columns: 1fr; }
+}
