@@ -6,8 +6,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
+  let body
+  try { body = await request.json() } catch { return Response.json({ error: 'No se pudo procesar la carga.' }, { status: 400 }) }
   try {
-    const body = await request.json()
     const response = await handleUpload({
       body,
       request,
@@ -23,6 +24,12 @@ export async function POST(request) {
     return Response.json(response)
   } catch (error) {
     console.error('[peticion-upload]', error)
-    return Response.json({ error: error?.message || 'No se pudo procesar la carga.' }, { status: 400 })
+    // Un fallo en onUploadCompleted (callback) debe responder 500: los
+    // emisores de webhooks tratan 4xx como "no reintentar", lo que mataría
+    // la autocuración de complete() (idempotente por diseño). Un fallo en
+    // onBeforeGenerateToken (autorización) sigue siendo 400: ahí sí es un
+    // error del cliente que no se arregla reintentando igual.
+    const status = body?.type === 'blob.upload-completed' ? 500 : 400
+    return Response.json({ error: error?.message || 'No se pudo procesar la carga.' }, { status })
   }
 }

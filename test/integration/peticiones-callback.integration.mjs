@@ -86,7 +86,10 @@ function buildAdapter(pool, schema) {
     // lectura (como el `sql` compartido de producción); con `query` (dentro
     // de una transacción) y `{ lockUser: true }`, bloquea la fila de
     // usuarios con FOR SHARE antes de que la transacción final decida
-        // markValid/markInvalid.
+    // markValid/markInvalid. Postgres rechaza un locking clause sobre el
+    // lado nullable de un LEFT JOIN (0A000), así que el lock se toma con una
+    // sentencia SEPARADA sobre usuarios (misma conexión) antes del JOIN sin
+    // locking clause — igual que lib/peticiones-repository.js.
     async getCallbackContext(payload, query, { lockUser = false } = {}) {
       const text = `
         SELECT c.*, p.centro_id AS centro_id, p.created_by AS created_by, p.submitted_at AS submitted_at, p.estado AS estado,
@@ -95,9 +98,9 @@ function buildAdapter(pool, schema) {
         JOIN peticiones p ON p.id = c.peticion_id
         LEFT JOIN usuarios u ON u.id = $2
         WHERE c.id = $1
-        ${lockUser ? 'FOR SHARE OF u' : ''}
       `
       if (query) {
+        if (lockUser) await query('SELECT id FROM usuarios WHERE id = $1 FOR SHARE', [payload.uid])
         const [row] = await query(text, [payload.cotizacionId, payload.uid])
         return row
       }
