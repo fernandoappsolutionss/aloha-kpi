@@ -43,3 +43,12 @@ test('sesión ausente devuelve 401', async () => {
   const outage = createPeticionDownloadHandler({ authenticate: async () => { throw new Error('Neon no disponible') }, findQuote: async () => null, getBlob: async () => null })
   await assert.rejects(() => outage(9), /Neon no disponible/)
 })
+
+test('un PDF de borrador ajeno no se descarga aunque sea del mismo centro', async () => {
+  const handler = createPeticionDownloadHandler({
+    authenticate: async () => actor,
+    findQuote: async () => ({ id: 9, centro_id: 10, created_by: 7, submitted_at: null, archivo_nombre: 'x.pdf', blob_pathname: 'x' }),
+    getBlob: async () => { throw new Error('no debe leer Blob') },
+  })
+  assert.equal((await handler(9)).status, 404)
+})
