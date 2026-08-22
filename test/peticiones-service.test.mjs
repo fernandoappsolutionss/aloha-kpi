@@ -257,30 +257,97 @@ test('Aprobado con cotización válida guarda el id y notifica al centro', async
   assert.equal(notifyCalls[0].cotizacionAprobada.id, 91)
 })
 
-test('Negado notifica al centro sin exigir selección de cotización', async () => {
+test('Negado notifica al centro sin exigir selección de cotización y limpia la ganadora guardada', async () => {
   const notifyCalls = []
+  let changeStatusArgs = null
   const repo = {
     transaction: async (work) => work(repo),
-    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: '2026-08-21T12:00:00Z' }),
-    changeStatus: async (_query, row) => ({ ...row, id: 4 }),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', cotizacion_aprobada_id: 91, submitted_at: '2026-08-21T12:00:00Z' }),
+    changeStatus: async (_query, row) => { changeStatusArgs = row; return { ...row, id: 4 } },
     insertHistory: async () => {},
   }
   const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
   await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Negado' })
+  assert.equal(changeStatusArgs.cotizacion_aprobada_id, null)
   assert.equal(notifyCalls.length, 1)
   assert.equal(notifyCalls[0].estado, 'Negado')
   assert.equal(notifyCalls[0].cotizacionAprobada, null)
 })
 
-test('un estado que no cambia no dispara notificación', async () => {
+test('un estado que no cambia no dispara notificación (fuera de Aprobado)', async () => {
   const notifyCalls = []
   const repo = {
     transaction: async (work) => work(repo),
-    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', submitted_at: '2026-08-21T12:00:00Z' }),
+    lockPeticion: async () => ({ id: 4, centro_id: 10, tipo: 'peticion', estado: 'Cumplido', submitted_at: '2026-08-21T12:00:00Z' }),
   }
   const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
-  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 91 })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Cumplido' })
   assert.equal(result.unchanged, true)
+  assert.equal(notifyCalls.length, 0)
+})
+
+test('Aprobado sobre una petición ya aprobada permite corregir/backfillear la cotización ganadora', async () => {
+  const newQuote = { id: 95, upload_status: 'valid', proveedor_razon_social: 'Proveedor Nuevo' }
+  let setApprovedArgs = null
+  let historyInserted = false
+  const notifyCalls = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', cotizacion_aprobada_id: 91,
+      submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => [{ id: 91, upload_status: 'valid' }, newQuote],
+    setApprovedQuote: async (_query, args) => { setApprovedArgs = args; return { id: 4, cotizacion_aprobada_id: args.cotizacionAprobadaId } },
+    insertHistory: async () => { historyInserted = true },
+  }
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => { notifyCalls.push(payload) } })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 95 })
+  assert.equal(result.ok, true)
+  assert.equal(setApprovedArgs.cotizacionAprobadaId, 95)
+  assert.equal(historyInserted, false)
+  assert.equal(notifyCalls.length, 1)
+  assert.equal(notifyCalls[0].estado, 'Aprobado')
+  assert.equal(notifyCalls[0].cotizacionAprobada.id, 95)
+})
+
+test('backfillear una petición Aprobada sin ganadora guardada también corrige', async () => {
+  const newQuote = { id: 95, upload_status: 'valid', proveedor_razon_social: 'Proveedor Nuevo' }
+  let setApprovedArgs = null
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', cotizacion_aprobada_id: null,
+      submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    listQuotes: async () => [newQuote],
+    setApprovedQuote: async (_query, args) => { setApprovedArgs = args; return { id: 4, cotizacion_aprobada_id: args.cotizacionAprobadaId } },
+  }
+  const service = createPeticionesService({ repo })
+  const result = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 95 })
+  assert.equal(result.ok, true)
+  assert.equal(setApprovedArgs.cotizacionAprobadaId, 95)
+})
+
+test('reelegir la misma cotización o no enviar ninguna deja una petición Aprobada intacta', async () => {
+  let touched = false
+  const repo = {
+    transaction: async (work) => work(repo),
+    lockPeticion: async () => ({
+      id: 4, centro_id: 10, tipo: 'peticion', estado: 'Aprobado', cotizacion_aprobada_id: 91,
+      submitted_at: '2026-08-21T12:00:00Z',
+    }),
+    setApprovedQuote: async () => { touched = true },
+    changeStatus: async () => { touched = true },
+    insertHistory: async () => { touched = true },
+  }
+  const notifyCalls = []
+  const service = createPeticionesService({ repo, notifyDecision: async (payload) => notifyCalls.push(payload) })
+  const sameId = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado', cotizacionAprobadaId: 91 })
+  assert.equal(sameId.unchanged, true)
+  const noneProvided = await service.changeStatus(admin, { centroId: 10, id: 4, estado: 'Aprobado' })
+  assert.equal(noneProvided.unchanged, true)
+  assert.equal(touched, false)
   assert.equal(notifyCalls.length, 0)
 })
 

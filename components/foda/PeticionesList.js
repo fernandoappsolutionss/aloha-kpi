@@ -107,7 +107,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               )}
             </div>
 
-            {cotizacionAprobada && (
+            {row.estado === 'Aprobado' && cotizacionAprobada && (
               <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
                 Cotización aprobada: {cotizacionAprobada.proveedor_razon_social} — {cotizacionAprobada.archivo_nombre}
               </p>

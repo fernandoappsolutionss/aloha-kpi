@@ -271,14 +271,14 @@ CREATE TABLE IF NOT EXISTS peticion_cotizaciones (
 
 -- FK de peticiones.cotizacion_aprobada_id: va aquí (no inline arriba) porque
 -- peticion_cotizaciones se declara después de peticiones en este archivo.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'peticiones'::regclass AND conname = 'peticiones_cotizacion_aprobada_fkey') THEN
-    ALTER TABLE peticiones
-      ADD CONSTRAINT peticiones_cotizacion_aprobada_fkey
-      FOREIGN KEY (cotizacion_aprobada_id) REFERENCES peticion_cotizaciones(id) ON DELETE SET NULL;
-  END IF;
-END $$;
+-- Sentencia simple, sin bloque anónimo PL/pgSQL: scripts/migrate.mjs separa
+-- este archivo por ';' (invariante declarado ahí mismo: "sin funciones
+-- plpgsql"), y schema.sql solo corre una vez sobre una base nueva, así que
+-- no hace falta el guard IF NOT EXISTS que sí usa la migración dedicada
+-- (esa envía el archivo completo en una sola consulta).
+ALTER TABLE peticiones
+  ADD CONSTRAINT peticiones_cotizacion_aprobada_fkey
+  FOREIGN KEY (cotizacion_aprobada_id) REFERENCES peticion_cotizaciones(id) ON DELETE SET NULL;
 
 -- Auditoría de cambios de estado de una petición. La primera fila de cada
 -- petición debe nacer sin estado_anterior y en 'Próximo trimestre' (índice

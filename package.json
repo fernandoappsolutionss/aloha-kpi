@@ -12,6 +12,7 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
     "db:migrate:peticiones": "node scripts/migrate-peticiones-cotizaciones-2026-08-21.mjs",
+    "db:migrate:peticion-aprobacion": "node scripts/migrate-peticion-aprobacion-2026-08-22.mjs",
     "test:peticiones:db": "node --test --test-concurrency=1 test/integration/peticiones-*.integration.mjs"
   },
   "dependencies": {

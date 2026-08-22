@@ -67,3 +67,18 @@ test('categoría desconocida cae al código crudo sin romper', () => {
   })
   assert.match(html, /otra_cosa/)
 })
+
+test('un texto con HTML/enlace inyectado sale escapado, no ejecutable', () => {
+  const { html } = decisionEmail({
+    peticion: { ...basePeticion, texto: 'Revisar esto <a href="https://evil.example/robar">click aquí</a>' },
+    estado: 'Aprobado',
+    actor: { ...actor, nombre: '<img src=x onerror=alert(1)>' },
+    cotizacionAprobada: { ...cotizacion, proveedor_razon_social: '<script>alert(1)</script>' },
+    centroNombre: 'Costa del Este',
+    baseUrl: 'https://aloha-kpi.vercel.app',
+  })
+  assert.match(html, /&lt;a href=/)
+  assert.doesNotMatch(html, /<a href="https:\/\/evil\.example/)
+  assert.doesNotMatch(html, /<script>alert/)
+  assert.doesNotMatch(html, /<img src=x onerror=/)
+})
