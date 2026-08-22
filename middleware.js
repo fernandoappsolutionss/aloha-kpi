@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
+import { resolveSessionSecret } from './lib/session-secret.mjs'
 
 // El middleware corre en el Edge Runtime: solo verifica el JWT de la cookie
 // (no toca la base de datos). Esto protege las rutas en el servidor, de modo
 // que manipular localStorage en el navegador ya no da acceso.
 
 function getSecret() {
-  return new TextEncoder().encode(process.env.SESSION_SECRET || 'dev-insecure-secret-change-me-please')
+  return resolveSessionSecret(process.env)
 }
 
 async function getPayload(req) {
