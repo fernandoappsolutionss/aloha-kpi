@@ -143,6 +143,15 @@ CREATE TABLE IF NOT EXISTS peticion_blob_cleanup (
   completed_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS peticion_cleanup_checkpoint (
+  checkpoint_key TEXT PRIMARY KEY,
+  cursor TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO peticion_cleanup_checkpoint (checkpoint_key, cursor)
+VALUES ('peticiones', NULL)
+ON CONFLICT (checkpoint_key) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_peticiones_medicion
   ON peticiones (centro_id, anio, trimestre, tipo, categoria, estado);
 CREATE INDEX IF NOT EXISTS idx_peticion_cleanup_pendiente

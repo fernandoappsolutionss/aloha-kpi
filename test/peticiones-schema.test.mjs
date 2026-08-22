@@ -42,3 +42,12 @@ test('el runner es dry-run por defecto y usa transacción con advisory lock', ()
   assert.ok(source.indexOf('LOCK TABLE peticiones IN ACCESS EXCLUSIVE MODE') < source.indexOf('const lockedPreflight'))
   assert.ok(source.indexOf('const lockedPreflight') < source.indexOf('client.query(ddl)'))
 })
+
+test('la cola tiene claim recuperable para cron concurrente', () => {
+  const sql = read('../db/migrations/2026-08-21-peticiones-cotizaciones-expand.sql')
+  assert.match(sql, /locked_at TIMESTAMPTZ/)
+  assert.match(sql, /lock_token TEXT/)
+  assert.match(sql, /generation INTEGER NOT NULL DEFAULT 1/)
+  assert.match(sql, /lock_generation INTEGER/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS peticion_cleanup_checkpoint/)
+})

@@ -2,5 +2,8 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "crons": [{ "path": "/api/cron/llenado", "schedule": "0 10 * * *" }]
+  "crons": [
+    { "path": "/api/cron/llenado", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/peticiones-cleanup", "schedule": "15 11 * * *" }
+  ]
 }

@@ -302,6 +302,18 @@ CREATE TABLE IF NOT EXISTS peticion_blob_cleanup (
   completed_at TIMESTAMPTZ
 );
 
+-- Cursor único del reconciliador blob↔DB (una sola fila 'peticiones'): evita
+-- que dos workers concurrentes avancen el mismo cursor de listado dos veces
+-- (reconcileBlobPage compara contra el valor guardado antes de escribir).
+CREATE TABLE IF NOT EXISTS peticion_cleanup_checkpoint (
+  checkpoint_key TEXT PRIMARY KEY,
+  cursor TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO peticion_cleanup_checkpoint (checkpoint_key, cursor)
+VALUES ('peticiones', NULL)
+ON CONFLICT (checkpoint_key) DO NOTHING;
+
 -- Espejo de eventos creados desde ALOHA KPI hacia el CRM (Team Solutionss).
 -- Solo guarda qué evento del CRM creó cada centro, para listar "los suyos".
 -- Los datos vivos (registros, asistencia) se leen del CRM en tiempo real.
