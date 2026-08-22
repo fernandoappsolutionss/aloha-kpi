@@ -44,6 +44,13 @@ test('lista marca legacy, descarga por id y no muestra borrado físico', () => {
   assert.doesNotMatch(list, /deletePeticion/)
 })
 
+test('aprobar exige elegir la cotización ganadora y muestra la ya aprobada', () => {
+  const list = read('../components/foda/PeticionesList.js')
+  assert.match(list, /cotizacionAprobada/)
+  assert.match(list, /Cotización aprobada:/)
+  assert.match(list, /Selecciona la cotización aprobada/)
+})
+
 test('página FODA delega el panel y retira CRUD anterior', () => {
   const page = read('../app/centro/[id]/foda/page.js')
   assert.match(page, /<PeticionesPanel/)

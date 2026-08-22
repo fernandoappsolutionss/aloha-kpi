@@ -5,8 +5,13 @@ import { peticionesRepository } from '../../lib/peticiones-repository'
 import { createPeticionesService } from '../../lib/peticiones-service.mjs'
 import { peticionUploadService, verifyStoredQuote } from '../../lib/peticion-upload-runtime'
 import { requireBlobToken } from '../../lib/peticion-blob'
+import { notifyPeticionDecision } from '../../lib/peticion-notificaciones-runtime'
 
-const service = createPeticionesService({ repo: peticionesRepository, verifyQuote: verifyStoredQuote })
+const service = createPeticionesService({
+  repo: peticionesRepository,
+  verifyQuote: verifyStoredQuote,
+  notifyDecision: notifyPeticionDecision,
+})
 async function runAction(name, work) {
   try { return await work() } catch (error) {
     const result = fallo(name, error)
@@ -49,9 +54,9 @@ export async function submitPeticion(centroId, id) {
     service.submitPeticion(await requireCurrentCentroAccess(centroId), { centroId, id }))
 }
 
-export async function changePeticionStatus(centroId, id, estado) {
+export async function changePeticionStatus(centroId, id, estado, cotizacionAprobadaId = null) {
   return runAction('changePeticionStatus', async () =>
-    service.changeStatus(await requireCurrentAdmin(), { centroId, id, estado }))
+    service.changeStatus(await requireCurrentAdmin(), { centroId, id, estado, cotizacionAprobadaId }))
 }
 
 export async function discardPeticionDraft(centroId, id) {

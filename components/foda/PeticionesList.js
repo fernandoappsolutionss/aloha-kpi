@@ -16,6 +16,9 @@ function formatFecha(value) {
   if (!value) return '—'
   try { return new Date(value).toLocaleDateString('es-PA') } catch { return '—' }
 }
+function quoteLabel(quote) {
+  return `${quote.proveedor_razon_social} — ${quote.archivo_nombre}`
+}
 
 // Historial de comentarios y peticiones ya registrados. Sin botón de borrado
 // físico: lo que existe se anula (cambio de estado), nunca se elimina —
@@ -25,6 +28,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
   const [editText, setEditText] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [addingFor, setAddingFor] = useState(null)
+  const [cotizacionAprobadaByRow, setCotizacionAprobadaByRow] = useState({})
 
   function startEdit(row) { setEditingId(row.id); setEditText(row.texto) }
   function cancelEdit() { setEditingId(null); setEditText('') }
@@ -45,10 +49,14 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
     setBusyId(null)
   }
 
-  async function setEstado(row, estado) {
+  async function setEstado(row, estado, cotizacionAprobadaId = null) {
+    if (estado === 'Aprobado' && row.tipo === 'peticion' && !cotizacionAprobadaId) {
+      onStatus?.('Selecciona la cotización aprobada.')
+      return
+    }
     setBusyId(row.id)
     try {
-      const res = await changePeticionStatus(centroId, row.id, estado)
+      const res = await changePeticionStatus(centroId, row.id, estado, cotizacionAprobadaId)
       if (res?.error) throw new Error(res.error)
       await onRefresh?.()
     } catch (e) {
@@ -68,6 +76,8 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
         const validQuotes = cotizaciones.filter((quote) => quote.upload_status === 'valid')
         const retryQuotes = cotizaciones.filter((quote) => quote.upload_status === 'pending' || quote.upload_status === 'invalid')
         const showAdding = addingFor === row.id
+        const cotizacionAprobada = validQuotes.find((quote) => String(quote.id) === String(row.cotizacion_aprobada_id))
+        const selectedCotizacionAprobada = cotizacionAprobadaByRow[row.id] || ''
         return (
           <div key={row.id} className="foda-request-row">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -97,15 +107,46 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               )}
             </div>
 
+            {row.estado === 'Aprobado' && cotizacionAprobada && (
+              <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
+                Cotización aprobada: {cotizacionAprobada.proveedor_razon_social} — {cotizacionAprobada.archivo_nombre}
+              </p>
+            )}
+
             {permissions?.canChangeStatus && !row.legacy && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 <span className="label" style={{ color: 'var(--text-muted)', marginRight: 2 }}>Estado:</span>
-                {PETICION_ESTADOS.map((estado) => (
-                  <button key={estado} type="button" disabled={busyId === row.id} onClick={() => setEstado(row, estado)}
-                    className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
-                    {estado}
-                  </button>
-                ))}
+                {PETICION_ESTADOS.map((estado) => {
+                  if (estado === 'Aprobado' && row.tipo === 'peticion') {
+                    return (
+                      <button key={estado} type="button" disabled={busyId === row.id || !selectedCotizacionAprobada}
+                        onClick={() => setEstado(row, estado, selectedCotizacionAprobada)}
+                        className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
+                        {estado}
+                      </button>
+                    )
+                  }
+                  return (
+                    <button key={estado} type="button" disabled={busyId === row.id} onClick={() => setEstado(row, estado)}
+                      className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
+                      {estado}
+                    </button>
+                  )
+                })}
+                {row.tipo === 'peticion' && (
+                  <select
+                    name="cotizacionAprobada"
+                    className="input"
+                    value={selectedCotizacionAprobada}
+                    onChange={(e) => setCotizacionAprobadaByRow((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                    style={{ marginLeft: 4 }}
+                  >
+                    <option value="">Cotización ganadora…</option>
+                    {validQuotes.map((quote) => (
+                      <option key={quote.id} value={quote.id}>{quoteLabel(quote)}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
 

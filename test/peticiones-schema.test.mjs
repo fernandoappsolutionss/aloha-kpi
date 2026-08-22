@@ -51,3 +51,29 @@ test('la cola tiene claim recuperable para cron concurrente', () => {
   assert.match(sql, /lock_generation INTEGER/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS peticion_cleanup_checkpoint/)
 })
+
+test('la migración de aprobación agrega la columna y la FK nombrada', () => {
+  const sql = read('../db/migrations/2026-08-22-peticion-aprobacion.sql')
+  assert.match(sql, /ALTER TABLE peticiones ADD COLUMN IF NOT EXISTS cotizacion_aprobada_id INTEGER/)
+  assert.match(sql, /peticiones_cotizacion_aprobada_fkey/)
+  assert.match(sql, /FOREIGN KEY \(cotizacion_aprobada_id\) REFERENCES peticion_cotizaciones\(id\) ON DELETE SET NULL/)
+})
+
+test('schema.sql declara cotizacion_aprobada_id en peticiones sin bloques DO $$', () => {
+  const schema = read('../db/schema.sql')
+  assert.match(schema, /cotizacion_aprobada_id\s+INTEGER/)
+  assert.match(schema, /ALTER TABLE peticiones\s+ADD CONSTRAINT peticiones_cotizacion_aprobada_fkey/)
+  // scripts/migrate.mjs separa schema.sql por ';' (invariante "sin funciones
+  // plpgsql" declarado ahí mismo): un DO $$ aquí rompería un `npm run
+  // db:migrate` sobre una base nueva con 42601.
+  assert.doesNotMatch(schema, /DO \$\$/)
+})
+
+test('el runner de aprobación es dry-run por defecto y usa advisory lock', () => {
+  const source = read('../scripts/migrate-peticion-aprobacion-2026-08-22.mjs')
+  assert.match(source, /const apply = args\.includes\('--apply'\)/)
+  assert.match(source, /if \(!apply\)/)
+  assert.match(source, /pg_advisory_xact_lock/)
+  assert.match(source, /SET LOCAL lock_timeout/)
+  assert.match(source, /ROLLBACK/)
+})
