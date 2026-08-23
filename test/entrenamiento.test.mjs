@@ -1,6 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { completado, porcentaje, siguienteModulo, corregirQuiz, rutaDePaso } from '../lib/entrenamiento/progreso.js'
+import { MODULOS, ERRORES_GLOBALES, FAQ } from '../lib/entrenamiento/modulos.js'
+import { RESPUESTAS } from '../lib/entrenamiento/respuestas.js'
+
+// Raíz del repo, independiente del cwd desde el que se corra `node --test`.
+const ROOT = fileURLToPath(new URL('../', import.meta.url))
 
 const MODS = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 
@@ -19,6 +27,8 @@ test('porcentaje cuenta módulos completados sobre el total', () => {
   assert.deepEqual(porcentaje({ a: done, b: done, c: done }, MODS), { completados: 3, total: 3, pct: 100 })
   // un módulo con tour visto pero sin quiz NO cuenta
   assert.deepEqual(porcentaje({ a: { tourVistoAt: 'x' } }, MODS), { completados: 0, total: 3, pct: 0 })
+  // sin módulos no hay división por cero
+  assert.deepEqual(porcentaje({}, []), { completados: 0, total: 0, pct: 0 })
 })
 
 test('siguienteModulo devuelve el primer no completado en orden, o null', () => {
@@ -35,6 +45,8 @@ test('rutaDePaso: la página del paso n es la última ruta de los pasos anterior
   assert.equal(rutaDePaso(m, 3), '/a') // el hazlo con ruta vive en la página ORIGEN
   assert.equal(rutaDePaso(m, 4), '/b')
   assert.equal(rutaDePaso(m, 99), '/b') // fuera de rango: la última conocida
+  assert.equal(rutaDePaso(m, 0), '/a') // antes del primer paso: el inicio
+  assert.equal(rutaDePaso(m, NaN), '/a') // ?paso= basura: el inicio
 })
 
 test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
@@ -44,9 +56,6 @@ test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
   assert.deepEqual(corregirQuiz([0], [0, 2, 1]), { puntaje: 1, correctas: [true, false, false], aprobado: false })
   assert.deepEqual(corregirQuiz(null, [0, 2, 1]), { puntaje: 0, correctas: [false, false, false], aprobado: false })
 })
-
-import { MODULOS, ERRORES_GLOBALES, FAQ } from '../lib/entrenamiento/modulos.js'
-import { RESPUESTAS } from '../lib/entrenamiento/respuestas.js'
 
 test('hay 9 módulos con ids únicos y en orden 1..9', () => {
   assert.equal(MODULOS.length, 9)
@@ -73,6 +82,10 @@ test('cada paso tiene id único global, tipo válido, target, título y texto', 
     assert.match(p.target, /^[a-z]+\.[a-z-]+$/, `${p.id}: target ${p.target}`)
     assert.ok(p.titulo && p.texto, `${p.id}: título/texto`)
     if (p.ruta) assert.match(p.ruta, /^\/centro\/\{id\}/, `${p.id}: ruta`)
+    // Spec §3: el tour nunca pide confirmar una acción que escriba datos. Un hazlo
+    // solo puede navegar, abrir un modal, seleccionar un grupo, cambiar de pestaña
+    // o cancelar.
+    if (p.tipo === 'hazlo') assert.match(p.target, /^(nav\.|grupos\.(aperturar|inscribir|tarjeta|tab-fusiones)$|grupo\.tab-|eventos\.nueva$|[a-z]+\.cancelar$)/, `${p.id}: hazlo sobre una acción que escribe (spec §3)`)
   }
   // el último paso de cada módulo es mostrar (Terminar vive en la tarjeta)
   for (const m of MODULOS) assert.equal(m.pasos[m.pasos.length - 1].tipo, 'mostrar', `${m.id}: último paso debe ser mostrar`)
@@ -108,9 +121,6 @@ test('texto de cada paso ≤ 35 palabras (advertencia)', () => {
   }
 })
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
-
 function archivosJs(dir) {
   const out = []
   for (const n of readdirSync(dir)) {
@@ -121,12 +131,15 @@ function archivosJs(dir) {
   return out
 }
 
+const fuentesApp = () => [...archivosJs(join(ROOT, 'app')), ...archivosJs(join(ROOT, 'components'))]
+
 test('cada target del contenido existe como data-tour (o prop tour) en app/ o components/', () => {
-  const fuentes = [...archivosJs('app'), ...archivosJs('components')].map((p) => readFileSync(p, 'utf8')).join('\n')
+  const fuentes = fuentesApp().map((p) => readFileSync(p, 'utf8')).join('\n')
   const presentes = new Set()
   // Casa data-tour="x.y", tour="x.y", tour: 'x.y' y data-tour={cond ? 'x.y' : undefined}:
-  // cualquier literal entrecomillado con forma ns.nombre en la misma línea que la palabra tour.
-  for (const m of fuentes.matchAll(/\btour\b[^\n]*?['"]([a-z]+\.[a-z-]+)['"]/g)) presentes.add(m[1])
+  // un literal entrecomillado con forma ns.nombre justo después de `tour=` / `tour:`
+  // (opcionalmente dentro de llaves). La prosa de un comentario NO cuenta como presencia.
+  for (const m of fuentes.matchAll(/\b(?:data-)?tour\s*[=:]\s*(?:\{[^}\n]*?)?['"]([a-z]+\.[a-z-]+)['"]/g)) presentes.add(m[1])
   const faltan = []
   for (const m of MODULOS) for (const p of m.pasos) if (!presentes.has(p.target)) faltan.push(`${m.id}/${p.id} → ${p.target}`)
   assert.deepEqual(faltan, [], `targets sin data-tour en el código:\n  ${faltan.join('\n  ')}`)
@@ -135,13 +148,13 @@ test('cada target del contenido existe como data-tour (o prop tour) en app/ o co
 // Spec §12.5 — contrato manifest ↔ mp3 que comparten TourHost, la página del
 // módulo y scripts/entrenamiento-audio.mjs. En PR 1 el manifest está vacío y
 // pasa trivialmente; en PR 2 (solo mp3 + manifest, sin código) es el único seguro.
-const manifest = JSON.parse(readFileSync('lib/entrenamiento/audio-manifest.json', 'utf8'))
 test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en public/entrenamiento', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest.json'), 'utf8'))
   const claves = new Set()
   for (const m of MODULOS) { claves.add(`${m.id}/intro`); for (const p of m.pasos) claves.add(`${m.id}/${p.id}`) }
   for (const [k, v] of Object.entries(manifest)) {
     assert.ok(claves.has(k), `clave huérfana en el manifest (paso renombrado o borrado): ${k}`)
-    assert.ok(v?.file && existsSync(join('public/entrenamiento', v.file)), `falta el mp3 de ${k}: public/entrenamiento/${v?.file}`)
+    assert.ok(v?.file && existsSync(join(ROOT, 'public/entrenamiento', v.file)), `falta el mp3 de ${k}: public/entrenamiento/${v?.file}`)
   }
   const sinClip = [...claves].filter((k) => !manifest[k])
   if (sinClip.length) console.warn(`⚠ ${sinClip.length} clips sin audio todavía (llegan en PR 2)`)
@@ -149,7 +162,7 @@ test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en p
 
 // Las respuestas correctas solo pueden importarse desde módulos 'use server'.
 test('respuestas.js solo se importa desde módulos de servidor (use server)', () => {
-  const malos = [...archivosJs('app'), ...archivosJs('components')].filter((p) => {
+  const malos = fuentesApp().filter((p) => {
     const src = readFileSync(p, 'utf8')
     return /entrenamiento\/respuestas/.test(src) && !/^\s*['"]use server['"]/m.test(src)
   })
