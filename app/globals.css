@@ -970,3 +970,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .ent-q--bad .ent-q__text { color: var(--bad); }
 .ent-q__expl { margin-top: 6px; font-size: 13px; color: var(--bad); }
 .ent-q__expl--ok { color: var(--ok); }
+
+/* Badge de progreso del entrenamiento en el menú (n/9) */
+.sb__badge { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--ts-green-soft); color: var(--ts-green); border: 1px solid var(--ts-green-line); }

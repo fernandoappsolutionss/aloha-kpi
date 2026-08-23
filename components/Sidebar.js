@@ -3,6 +3,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
 import { logout as logoutAction } from '../app/actions/auth'
+import { resumenProgreso } from '../app/actions/entrenamiento'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -44,6 +45,16 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     }
   }, [isAdmin])
 
+  const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
+  useEffect(() => {
+    if (isAdmin || !centroId) return
+    // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
+    // leer el rol real. La action devuelve null para gerencia de todas formas.
+    const r = localStorage.getItem('aloha_rol')
+    if (r === 'admin_general' || r === 'supervisor') return
+    resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
+  }, [isAdmin, centroId])
+
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
@@ -67,6 +78,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
+    { label: 'Entrenamiento', icon: 'check', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
   ]
   const items = isAdmin ? adminItems : centroItems
 
@@ -94,6 +106,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
           <button key={item.href} onClick={() => router.push(item.href)} title={item.label} data-tour={item.tour}
             className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
             <Icon name={item.icon} /><span>{item.label}</span>
+            {item.badge && <span className="sb__badge">{item.badge}</span>}
           </button>
         ))}
 
