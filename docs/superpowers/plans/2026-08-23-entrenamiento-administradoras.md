@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 15 App Router (JS, sin TS), React 18, Neon serverless (`lib/db.js` → `sql`), `node --test` para pruebas, CSS plano en `app/globals.css`. Sin dependencias nuevas.
 
-**Spec:** `docs/superpowers/specs/2026-08-23-entrenamiento-administradoras-design.md` — leerlo antes de empezar. Contenido fuente: `docs/sop/sop-aloha-kpi.html`.
+**Spec:** `docs/superpowers/specs/2026-08-23-entrenamiento-administradoras-design.md` — leerlo antes de empezar. (El SOP fuente con capturas vive fuera del repo: es público y las capturas traen nombres reales.)
 
 **Reglas para quien implementa:**
 - Trabajar en `repos/aloha-kpi-entrenamiento` (rama `feat/entrenamiento`). **No correr comandos git** (lo hace Hermes al final de cada tarea).

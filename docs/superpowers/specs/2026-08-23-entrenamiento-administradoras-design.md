@@ -4,7 +4,7 @@ Fecha: 2026-08-23 · Autor: Hermes · Aprobado por Fernando en chat (formato tou
 
 ## 1. Qué se construye y por qué
 
-Un módulo de **entrenamiento dentro de la app** para administradoras (rol `administradora`; incluye a las asistentes, que usan el mismo rol). Reemplaza al PDF `docs/sop/sop-aloha-kpi.html` como forma principal de aprender el sistema.
+Un módulo de **entrenamiento dentro de la app** para administradoras (rol `administradora`; incluye a las asistentes, que usan el mismo rol). Reemplaza al PDF del SOP como forma principal de aprender el sistema. ⚠️ El SOP fuente (HTML + capturas) vive FUERA de este repo — contiene capturas con nombres reales de niños y coaches y este repo es PÚBLICO; nunca commitearlo aquí. Copia de trabajo: la carpeta `docs/sop/` del clon local de la Mac (repos/aloha-kpi, sin commitear).
 
 Tres piezas:
 
