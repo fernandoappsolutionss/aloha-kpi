@@ -241,15 +241,15 @@ export default function KPIPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {locked ? (
-              <button onClick={handleReabrirMes} disabled={cerrando} className="btn">
+              <button onClick={handleReabrirMes} disabled={cerrando} className="btn" data-tour="kpi.reabrir">
                 {cerrando ? 'Reabriendo…' : 'Reabrir mes'}
               </button>
             ) : (
               <>
-                <button onClick={handleSave} disabled={saving} className="btn btn--primary">
+                <button onClick={handleSave} disabled={saving} className="btn btn--primary" data-tour="kpi.guardar">
                   {saving ? 'Guardando…' : 'Guardar'}
                 </button>
-                <button onClick={handleCerrarMes} disabled={cerrando} className="btn">
+                <button onClick={handleCerrarMes} disabled={cerrando} className="btn" data-tour="kpi.cerrar-mes">
                   {cerrando ? 'Cerrando…' : 'Cerrar mes'}
                 </button>
               </>
@@ -292,7 +292,7 @@ export default function KPIPage() {
           </div>
           <button onClick={()=>navMonth(1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>›</button>
           {historial.length > 0 && (
-            <div style={{ marginLeft: 16, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ marginLeft: 16, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} data-tour="kpi.historial">
               <span className="label">Historial cerrado:</span>
               {historial.map(h => {
                 const on = year===h.year && month===h.month
@@ -308,7 +308,7 @@ export default function KPIPage() {
         </div>
 
         {/* Config del mes */}
-        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+        <div className="card" style={{ padding: 18, marginBottom: 16 }} data-tour="kpi.config">
           <h3 className="label" style={{ marginBottom: 14 }}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14 }}>
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual']].map(([lbl,key]) => (

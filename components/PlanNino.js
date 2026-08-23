@@ -68,7 +68,7 @@ export function ProgresoPlan({ it, estado, indice }) {
 // `onFecha` SOLO lo pasa el grupo: suspender una clase corre el plan del aula.
 // En el plan del niño las fechas son texto — las excepciones son del grupo, no
 // suyas, y desde su ficha no se toca el calendario de nadie más.
-export function LineaTiempoPlan({ it, estado, indice, onFecha }) {
+export function LineaTiempoPlan({ it, estado, indice, onFecha, tour }) {
   const semanas = it?.semanas || []
   if (!semanas.length) return null
   // Agrupa las semanas por mes calendario para que el plan se lea como agenda.
@@ -83,7 +83,7 @@ export function LineaTiempoPlan({ it, estado, indice, onFecha }) {
   return (
     <>
       {/* Línea de tiempo: una casilla por semana, con hoy marcado */}
-      <div className="itin-tl">
+      <div className="itin-tl" data-tour={tour}>
         {semanas.map((s, i) => {
           const est = estiloDe(s.tipo)
           const { hoy, pasada } = estadoCasilla(i, pos)

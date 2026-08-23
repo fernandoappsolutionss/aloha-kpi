@@ -58,12 +58,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
   ]
   const centroItems = [
-    { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}` },
-    { label: 'Ruta de Nivel', icon: 'target', href: `/centro/${centroId}/ruta-nivel` },
-    { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi` },
-    { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos` },
-    { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro` },
-    { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos` },
+    { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
+    { label: 'Ruta de Nivel', icon: 'target', href: `/centro/${centroId}/ruta-nivel`, tour: 'nav.ruta' },
+    { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi`, tour: 'nav.kpi' },
+    { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos`, tour: 'nav.grupos' },
+    { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro`, tour: 'nav.cuadro' },
+    { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos`, tour: 'nav.eventos' },
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
@@ -91,7 +91,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       <nav className="sb__nav">
         <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => (
-          <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
+          <button key={item.href} onClick={() => router.push(item.href)} title={item.label} data-tour={item.tour}
             className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
             <Icon name={item.icon} /><span>{item.label}</span>
           </button>

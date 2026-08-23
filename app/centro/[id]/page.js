@@ -255,10 +255,10 @@ export default function CentroPage() {
           </div>
         </div>
 
-        <GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} />
+        <div data-tour="resumen.ruta"><GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} /></div>
 
         {/* KPI Trimestral por rol — cada rol ve sus propios indicadores */}
-        <div className="role-kpi-grid">
+        <div className="role-kpi-grid" data-tour="resumen.metas">
           <RoleKpi
             rol="Administrador"
             sub="Ventas y deserción"
@@ -317,7 +317,7 @@ export default function CentroPage() {
             </table>
           </div>
 
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20 }} data-tour="resumen.embudo">
             <h3 style={sectionTitle}>Clase de prueba</h3>
             <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
               {[

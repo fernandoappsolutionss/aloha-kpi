@@ -107,3 +107,51 @@ test('texto de cada paso ≤ 35 palabras (advertencia)', () => {
     if (n > 35) console.warn(`⚠ ${p.id}: ${n} palabras (el clon lee lento)`)
   }
 })
+
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+function archivosJs(dir) {
+  const out = []
+  for (const n of readdirSync(dir)) {
+    const p = join(dir, n)
+    if (statSync(p).isDirectory()) out.push(...archivosJs(p))
+    else if (/\.(js|jsx)$/.test(n)) out.push(p)
+  }
+  return out
+}
+
+test('cada target del contenido existe como data-tour (o prop tour) en app/ o components/', () => {
+  const fuentes = [...archivosJs('app'), ...archivosJs('components')].map((p) => readFileSync(p, 'utf8')).join('\n')
+  const presentes = new Set()
+  // Casa data-tour="x.y", tour="x.y", tour: 'x.y' y data-tour={cond ? 'x.y' : undefined}:
+  // cualquier literal entrecomillado con forma ns.nombre en la misma línea que la palabra tour.
+  for (const m of fuentes.matchAll(/\btour\b[^\n]*?['"]([a-z]+\.[a-z-]+)['"]/g)) presentes.add(m[1])
+  const faltan = []
+  for (const m of MODULOS) for (const p of m.pasos) if (!presentes.has(p.target)) faltan.push(`${m.id}/${p.id} → ${p.target}`)
+  assert.deepEqual(faltan, [], `targets sin data-tour en el código:\n  ${faltan.join('\n  ')}`)
+})
+
+// Spec §12.5 — contrato manifest ↔ mp3 que comparten TourHost, la página del
+// módulo y scripts/entrenamiento-audio.mjs. En PR 1 el manifest está vacío y
+// pasa trivialmente; en PR 2 (solo mp3 + manifest, sin código) es el único seguro.
+const manifest = JSON.parse(readFileSync('lib/entrenamiento/audio-manifest.json', 'utf8'))
+test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en public/entrenamiento', () => {
+  const claves = new Set()
+  for (const m of MODULOS) { claves.add(`${m.id}/intro`); for (const p of m.pasos) claves.add(`${m.id}/${p.id}`) }
+  for (const [k, v] of Object.entries(manifest)) {
+    assert.ok(claves.has(k), `clave huérfana en el manifest (paso renombrado o borrado): ${k}`)
+    assert.ok(v?.file && existsSync(join('public/entrenamiento', v.file)), `falta el mp3 de ${k}: public/entrenamiento/${v?.file}`)
+  }
+  const sinClip = [...claves].filter((k) => !manifest[k])
+  if (sinClip.length) console.warn(`⚠ ${sinClip.length} clips sin audio todavía (llegan en PR 2)`)
+})
+
+// Las respuestas correctas solo pueden importarse desde módulos 'use server'.
+test('respuestas.js solo se importa desde módulos de servidor (use server)', () => {
+  const malos = [...archivosJs('app'), ...archivosJs('components')].filter((p) => {
+    const src = readFileSync(p, 'utf8')
+    return /entrenamiento\/respuestas/.test(src) && !/^\s*['"]use server['"]/m.test(src)
+  })
+  assert.deepEqual(malos, [], `respuestas.js importado fuera del servidor: ${malos.join(', ')}`)
+})

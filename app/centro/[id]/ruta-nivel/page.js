@@ -195,7 +195,7 @@ export default function GrowthRoutePage() {
               {next ? `Nivel ${next.level}` : 'Nivel máximo'}
               <span className="num">{projection.currentChildren}{next ? ` / ${next.threshold}` : ''}</span>
             </h2>
-            <div className="growth-track growth-track--large" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
+            <div className="growth-track growth-track--large" role="progressbar" data-tour="ruta.barra" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
               <span style={{ width: `${progress}%` }} />
             </div>
             <div className="growth-overview__scale">
@@ -218,7 +218,7 @@ export default function GrowthRoutePage() {
           </div>
         )}
 
-        <section className="growth-section" aria-labelledby="projection-title">
+        <section className="growth-section" aria-labelledby="projection-title" data-tour="ruta.escenarios">
           <div className="growth-section__head">
             <div>
               <div className="label">Trayectoria</div>
