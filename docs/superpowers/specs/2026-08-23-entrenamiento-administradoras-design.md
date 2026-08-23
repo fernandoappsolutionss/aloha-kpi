@@ -26,7 +26,7 @@ Meta pedagógica explícita (módulo 1): el fin de la administradora es **subir 
 | Verificación | Quiz 3 preguntas, exige 3/3, intentos ilimitados | Solo "visto" (no distingue ver de entender). Detectar acción real (obliga a modo práctica con datos). |
 | Gate | Suave: banner en Resumen + contador en menú. **No** bloquea el sistema | Bloqueo duro. Queda como flag futuro si Fernando lo pide. |
 | Contenido | Como código en `lib/entrenamiento/modulos.js` | CMS o tabla en BD: el contenido cambia con la UI, debe ir en el mismo PR que el botón. |
-| Audio | mp3 en `public/entrenamiento/`, generados por script con manifest de hashes | Vercel Blob: una indirección más sin necesidad a ~10 MB. |
+| Audio | mp3 en `public/entrenamiento/`, generados por script con manifest de hashes en `lib/entrenamiento/audio-manifest.json` | Vercel Blob: una indirección más sin necesidad a ~10 MB. |
 | Respuestas del quiz | Archivo solo-servidor `lib/entrenamiento/respuestas.js`, corrección en server action | Mandar la correcta al cliente. |
 
 ## 3. Regla de seguridad del tour
@@ -47,7 +47,7 @@ lib/entrenamiento/modulos.js              ← contenido (módulos, pasos, quiz s
 lib/entrenamiento/respuestas.js           ← { modulo: [idx, idx, idx] } — solo servidor
 lib/entrenamiento/progreso.js             ← cálculo puro: completado, porcentaje, siguiente módulo
 scripts/entrenamiento-audio.mjs           ← genera mp3 con ElevenLabs, manifest de hashes
-public/entrenamiento/<modulo>/<paso>.mp3 + public/entrenamiento/manifest.json
+public/entrenamiento/<modulo>/<paso>.mp3 + lib/entrenamiento/audio-manifest.json (importable desde el cliente)
 db/schema.sql                             ← tabla entrenamiento_progreso
 test/entrenamiento.test.mjs               ← seguro de mantenimiento (sección 10)
 ```
@@ -144,7 +144,7 @@ Un `data-tour` apunta a **un** elemento por pantalla. Si el elemento es condicio
 - A los 2,5 s sin encontrarlo → la tarjeta avisa (*"Todavía no veo este elemento. Si la pantalla sigue cargando, espera; si tu centro no tiene datos para mostrarlo, puedes omitir el paso."*) con **Omitir →**, pero **sigue buscando** cada 400 ms hasta que cambie el paso: el aviso no es terminal. Nunca se traba.
 - Navegación entre pasos: `irA(n)` resuelve la página del paso con `rutaDePaso(modulo, n)` (la última `ruta` de los pasos anteriores, o `inicio.ruta`): Omitir, Anterior y deep-links caen siempre donde vive el target. Misma página → `history.pushState` (Next actualiza `useSearchParams` sin fetch RSC ni salto de scroll); otra página → `router.push`.
 - `mostrar`: botones **Siguiente** y **Anterior** (Anterior desactivado en el paso 1 del módulo). `hazlo`: sin Siguiente; listener `click` en el target (captura, `once`); enlace discreto **Omitir este paso**. Si el paso trae `ruta`, el listener hace `preventDefault`+`stopPropagation` y navega con `irA(paso+1)`.
-- **Audio**: `<audio>` con `src=/entrenamiento/<modulo>/<paso>.mp3` si existe en `manifest.json` (el manifest se importa; si el paso no está, no hay reproductor y la tarjeta es solo texto). Autoplay al cambiar de paso; botón ▶/❚❚ y botón **silenciar** (persistido en `localStorage.tour_mute`). Si el navegador bloquea el autoplay, se muestra ▶ y no pasa nada más.
+- **Audio**: `<audio>` con `src=/entrenamiento/<file>` si la clave `<modulo>/<paso>` existe en `lib/entrenamiento/audio-manifest.json` (importado; si el paso no está, no hay reproductor y la tarjeta es solo texto). Autoplay al cambiar de paso; botón ▶/❚❚ y botón **silenciar** (persistido en `localStorage.tour_mute`). Si el navegador bloquea el autoplay, se muestra ▶ y no pasa nada más.
 - Controles fijos: **Salir del recorrido** (quita `?tour` de la URL con `pushState`; no marca nada) y contador `paso 3 de 7`.
 - Último paso → botón **Terminar**: llama `marcarTourVisto(modulo)` y navega a `/centro/{id}/entrenamiento/<modulo>#quiz`. Si la action falla, muestra el error en la tarjeta y deja volver a pulsar.
 - Teclado: `Esc` sale, `→` siguiente (solo en `mostrar`).
@@ -177,7 +177,7 @@ Errores: mensajes en español, mismo patrón `{ error }` que el resto de actions
 
 ## 11. Audio (`scripts/entrenamiento-audio.mjs`)
 
-- Lee `MODULOS`; para cada `intro` y cada `paso` calcula `sha1(vozOTexto + JSON(settings))`; compara con `public/entrenamiento/manifest.json` (`{ "<modulo>/<paso>": { hash, file, seg } }`); genera solo los que faltan o cambiaron vía `POST https://api.elevenlabs.io/v1/text-to-speech/I0uPgrx2Hf3g0QzMYLnq` con `model_id: eleven_multilingual_v2`, `voice_settings` de §2, `output_format: mp3_44100_64`; guarda mp3 y actualiza el manifest. API key de `ELEVENLABS_API_KEY` o de `~/.studio-reels-assembler/credentials.env`.
+- Lee `MODULOS`; para cada `intro` y cada `paso` calcula `sha1(vozOTexto + JSON(settings))`; compara con `lib/entrenamiento/audio-manifest.json` (`{ "<modulo>/<paso>": { hash, file, seg } }`; vive en `lib/` para importarse desde TourHost y la página del módulo); genera solo los que faltan o cambiaron vía `POST https://api.elevenlabs.io/v1/text-to-speech/I0uPgrx2Hf3g0QzMYLnq` con `model_id: eleven_multilingual_v2`, `voice_settings` de §2, `output_format: mp3_44100_64`; guarda mp3 y actualiza el manifest. API key de `ELEVENLABS_API_KEY` o de `~/.studio-reels-assembler/credentials.env`.
 - Flags: `--solo <modulo>`, `--muestra` (genera solo 3 clips de audición: intro de `meta`, un paso `hazlo` de `aperturar`, el paso del botón gris de `llenado`).
 - **Gate humano**: Fernando escucha las 3 muestras y aprueba timbre/ritmo **antes** de generar el lote. Hermes no puede oír audio.
 - Se corre en la Mac; los mp3 se commitean. Tamaño esperado: ~65 clips × ~150 KB ≈ 10 MB.
