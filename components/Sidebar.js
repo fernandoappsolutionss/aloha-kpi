@@ -63,6 +63,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
     { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
+    { label: 'Entrenamiento', icon: 'check', href: '/dashboard/entrenamiento' },
   ]
   const adminConfig = [
     { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
