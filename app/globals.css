@@ -949,7 +949,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .ent-ring span { width: 50px; height: 50px; border-radius: 50%; background: var(--surface-1); display: grid; place-items: center; }
 .ent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
 .ent-card { padding: 18px; cursor: pointer; border-left: 4px solid var(--border); transition: transform .12s ease, border-color .12s ease; }
-.ent-card:hover { transform: translateY(-1px); border-color: var(--ts-green-line); }
+/* Solo los bordes no-izquierdos: el border-left-color es el estado (ok/mid/pend). */
+.ent-card:hover { transform: translateY(-1px); border-top-color: var(--ts-green-line); border-right-color: var(--ts-green-line); border-bottom-color: var(--ts-green-line); }
 .ent-card--ok { border-left-color: var(--ok); }
 .ent-card--mid { border-left-color: var(--warn); }
 .ent-card__title { font-family: var(--font-serif); font-size: 18px; margin: 6px 0 10px; }

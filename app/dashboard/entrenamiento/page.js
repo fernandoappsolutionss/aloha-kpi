@@ -12,11 +12,16 @@ export default function EntrenamientoAdminPage() {
   const [centros, setCentros] = useState([])
   const [centroId, setCentroId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => { listCentros().then((c) => setCentros(c || [])).catch(() => {}) }, [])
   useEffect(() => {
     setLoading(true)
-    matrizProgreso(centroId ? Number(centroId) : null).then(setData).catch(() => setData(null)).finally(() => setLoading(false))
+    setError(null)
+    matrizProgreso(centroId ? Number(centroId) : null)
+      .then((d) => { if (d?.error) { setError(d.error); setData(null) } else setData(d) })
+      .catch(() => { setError('No se pudo cargar el progreso. Recarga la página.'); setData(null) })
+      .finally(() => setLoading(false))
   }, [centroId])
 
   return (
@@ -29,12 +34,14 @@ export default function EntrenamientoAdminPage() {
             <h1 className="h-title">Quién completó el entrenamiento</h1>
             <p className="h-sub">Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
           </div>
-          <select className="input" style={{ width: 240 }} value={centroId} onChange={(e) => setCentroId(e.target.value)}>
+          <select className="input" style={{ width: 240 }} value={centroId} onChange={(e) => setCentroId(e.target.value)} aria-label="Filtrar por centro">
             <option value="">Todos los centros</option>
             {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </div>
-        {loading || !data ? <div className="h-sub">Cargando…</div> : (
+        {loading ? <div className="h-sub">Cargando…</div> : error || !data ? (
+          <div className="alert alert--error">{error || 'No se pudo cargar el progreso. Recarga la página.'}</div>
+        ) : (
           <div className="panel" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>

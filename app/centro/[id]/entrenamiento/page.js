@@ -15,11 +15,16 @@ export default function EntrenamientoPage() {
   const [nombre, setNombre] = useState('Centro')
   const [progreso, setProgreso] = useState({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!id) return
     getCentroNombre(id).then((n) => { if (n) setNombre(n) }).catch(() => {})
-    cargarProgreso().then((p) => setProgreso(p || {})).catch(() => {}).finally(() => setLoading(false))
+    // Éxito = mapa por id de módulo; { error } = fallo de la action (auth/SQL).
+    cargarProgreso()
+      .then((r) => { if (r?.error) setError(r.error); else setProgreso(r || {}) })
+      .catch(() => setError('No se pudo cargar tu progreso. Recarga la página.'))
+      .finally(() => setLoading(false))
   }, [id])
 
   const resumen = useMemo(() => porcentaje(progreso, MODULOS), [progreso])
@@ -43,24 +48,28 @@ export default function EntrenamientoPage() {
             <h1 className="h-title">Cómo se usa el sistema</h1>
             <p className="h-sub">{nombre} — recorridos sobre la app real, con tu meta al frente: subir de nivel</p>
           </div>
-          <div className="ent-progress">
-            <div className="ent-ring" style={{ '--pct': resumen.pct }}><span>{resumen.completados}/{resumen.total}</span></div>
-            <div>
-              <div style={{ fontWeight: 600 }}>{resumen.pct}% completado</div>
-              {siguiente
-                ? <button className="btn btn--primary" style={{ marginTop: 6 }} onClick={() => router.push(`/centro/${id}/entrenamiento/${siguiente}`)}>Continuar →</button>
-                : <div className="h-sub" style={{ color: 'var(--ok)' }}>Entrenamiento completo</div>}
+          {!error && (
+            <div className="ent-progress">
+              <div className="ent-ring" style={{ '--pct': resumen.pct }}><span>{resumen.completados}/{resumen.total}</span></div>
+              <div>
+                <div style={{ fontWeight: 600 }}>{resumen.pct}% completado</div>
+                {siguiente
+                  ? <button className="btn btn--primary" style={{ marginTop: 6 }} onClick={() => router.push(`/centro/${id}/entrenamiento/${siguiente}`)}>Continuar →</button>
+                  : <div className="h-sub" style={{ color: 'var(--ok)' }}>Entrenamiento completo</div>}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {loading ? <div className="h-sub">Cargando…</div> : (
+        {loading ? <div className="h-sub">Cargando…</div> : error ? (
+          <div className="alert alert--error">{error}</div>
+        ) : (
           <div className="ent-grid">
             {MODULOS.map((m) => {
               const e = estadoDe(m)
               return (
                 <div key={m.id} className={`card ent-card ent-card--${e.k}`} onClick={() => router.push(`/centro/${id}/entrenamiento/${m.id}`)} role="button" tabIndex={0}
-                  onKeyDown={(ev) => { if (ev.key === 'Enter') router.push(`/centro/${id}/entrenamiento/${m.id}`) }}>
+                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); router.push(`/centro/${id}/entrenamiento/${m.id}`) } }}>
                   <div className="label">Módulo {m.orden} · {m.duracionMin} min</div>
                   <h3 className="ent-card__title">{m.titulo}</h3>
                   <div className={`ent-pill ent-pill--${e.k}`}>{e.label}</div>

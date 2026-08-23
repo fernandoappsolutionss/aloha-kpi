@@ -178,3 +178,22 @@ test('matrizProgreso usa auth fresca (requireCurrentAdmin), no el rol del JWT', 
   assert.match(body, /requireCurrentAdmin\(\)/)
   assert.doesNotMatch(body, /\brequireAdmin\(\)/)
 })
+
+test('resumenProgreso excluye a gerencia con isAdminRole (spec §14)', () => {
+  const src = readFileSync(join(ROOT, 'app/actions/entrenamiento.js'), 'utf8')
+  const start = src.indexOf('export async function resumenProgreso')
+  assert.ok(start >= 0, 'no se encontró resumenProgreso')
+  const next = src.indexOf('export ', start + 1)
+  const body = src.slice(start, next === -1 ? src.length : next)
+  assert.match(body, /isAdminRole\(/)
+})
+
+test('responderQuiz valida forma estricta: 3 respuestas y todas enteras', () => {
+  const src = readFileSync(join(ROOT, 'app/actions/entrenamiento.js'), 'utf8')
+  const start = src.indexOf('export async function responderQuiz')
+  assert.ok(start >= 0, 'no se encontró responderQuiz')
+  const next = src.indexOf('export ', start + 1)
+  const body = src.slice(start, next === -1 ? src.length : next)
+  assert.match(body, /r\.length !== 3|length !== 3/)
+  assert.match(body, /Number\.isInteger/)
+})

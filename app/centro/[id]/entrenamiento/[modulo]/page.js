@@ -23,7 +23,8 @@ export default function ModuloPage() {
   useEffect(() => {
     if (!id) return
     getCentroNombre(id).then((n) => { if (n) setNombre(n) }).catch(() => {})
-    cargarProgreso().then((p) => setProgreso(p || {})).catch(() => {})
+    // { error } se ignora aquí: el quiz funciona igual sin el progreso previo.
+    cargarProgreso().then((p) => { if (p && !p.error) setProgreso(p) }).catch(() => {})
   }, [id])
 
   if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main className="main"><div className="alert alert--error">Este módulo no existe.</div></main></div>
@@ -42,10 +43,14 @@ export default function ModuloPage() {
       const r = await responderQuiz(modulo.id, sel)
       if (r?.error) { setResultado({ error: r.error }); return }
       setResultado(r)
-      const np = await cargarProgreso(); setProgreso(np || {})
     } catch {
       setResultado({ error: 'No se pudo corregir. Recarga la página e intenta de nuevo.' })
+      return
     } finally { setEnviando(false) }
+    // El quiz ya quedó corregido: si el refresco del progreso falla, no es un
+    // error de corrección — se ignora y el resultado en pantalla manda.
+    const np = await cargarProgreso().catch(() => null)
+    if (np && !np.error) setProgreso(np)
   }
   const reintentar = () => { setSel([null, null, null]); setResultado(null) }
 
@@ -103,7 +108,7 @@ export default function ModuloPage() {
             )
           })}
           {resultado?.error && <div className="alert alert--error">{resultado.error}</div>}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+          <div aria-live="polite" style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
             {!resultado || resultado.error ? (
               <button className="btn btn--primary" onClick={corregir} disabled={enviando || sel.some((v) => v === null)}>{enviando ? 'Corrigiendo…' : 'Corregir'}</button>
             ) : resultado.aprobado ? (
