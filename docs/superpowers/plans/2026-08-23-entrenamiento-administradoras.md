@@ -1569,6 +1569,7 @@ git commit -m "feat(entrenamiento): índice de módulos, página de módulo con 
 **Files:**
 - Modify: `components/Sidebar.js`
 - Modify: `app/centro/[id]/page.js`
+- Modify: `components/growth/GrowthBriefing.js` (guarda: no abrir con `?tour=`)
 
 - [ ] **Step 1: Sidebar** — importar la action y cargar el resumen cuando no es admin
 
@@ -1619,12 +1620,18 @@ Justo antes de `<div data-tour="resumen.ruta">…` (la banda de crecimiento):
         )}
 ```
 
+- [ ] **Step 2b: La Guía semanal no se abre encima del tour** (`components/growth/GrowthBriefing.js`, primer `useEffect`, línea ~33). El briefing semanal de crecimiento se abre solo en Resumen, bloquea el scroll del body y atrapa el foco: encima de un recorrido activo lo tapa. Guarda de una línea al inicio del efecto, ANTES de `loadBriefing` (así tampoco consume el recibo semanal):
+```js
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tour')) return undefined
+```
+Agregar `components/growth/GrowthBriefing.js` a Files y al `git add` del Step 4.
+
 - [ ] **Step 3: Comprobar** — como administradora: menú muestra `Entrenamiento 0/9`; Resumen muestra el banner; completar un módulo y recargar → `1/9`. Como admin_general entrando a un centro: el ítem Entrenamiento se ve (sirve para previsualizar) pero **sin badge**, y Resumen **sin banner**.
 
 - [ ] **Step 4: Commit** (Hermes)
 
 ```bash
-git add components/Sidebar.js app/centro/\[id\]/page.js app/globals.css
+git add components/Sidebar.js components/growth/GrowthBriefing.js app/centro/\[id\]/page.js app/globals.css
 git commit -m "feat(entrenamiento): ítem de menú con progreso y banner en Resumen"
 ```
 
