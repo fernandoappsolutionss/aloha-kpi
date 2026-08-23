@@ -879,6 +879,8 @@ function TourActivo({ tourId }) {
   const [errorGuardar, setErrorGuardar] = useState('')
   const audioRef = useRef(null)
   const targetRef = useRef(null)
+  const cardRef = useRef(null)   // para medir la altura real de la tarjeta al posicionarla
+  const avanceRef = useRef(null) // timeout del avance tras un clic "hazlo" local
 
   useEffect(() => { try { setMute(localStorage.getItem('tour_mute') === '1') } catch {} }, [])
 
@@ -887,14 +889,15 @@ function TourActivo({ tourId }) {
   // Ir al paso n EN LA PÁGINA QUE LE CORRESPONDE (rutaDePaso): Omitir, Anterior
   // y deep-links caen siempre donde vive el target. Misma página → pushState
   // nativo (Next lo intercepta: actualiza useSearchParams sin fetch RSC ni salto
-  // de scroll). Otra página → navegación real.
+  // de scroll). Otra página → navegación real. n se acota a [1, total].
   const irA = useCallback((n) => {
     if (!modulo) return
-    const destino = conCentro(rutaDePaso(modulo, n))
-    const url = `${destino}?tour=${encodeURIComponent(tourId)}&paso=${n}`
+    const destinoPaso = Math.min(Math.max(1, n), total || 1)
+    const destino = conCentro(rutaDePaso(modulo, destinoPaso))
+    const url = `${destino}?tour=${encodeURIComponent(tourId)}&paso=${destinoPaso}`
     if (destino === pathname) window.history.pushState(null, '', url)
     else router.push(url)
-  }, [modulo, router, pathname, tourId, conCentro])
+  }, [modulo, total, router, pathname, tourId, conCentro])
 
   // Quita ?tour sin fetch ni salto; TourHost deja de renderizar al no haber `tour`.
   const salir = useCallback(() => { window.history.pushState(null, '', pathname) }, [pathname])
@@ -912,12 +915,18 @@ function TourActivo({ tourId }) {
     }
   }, [modulo, terminando, router, centroId])
 
+  // Mide el elemento del paso. Si la página lo re-creó (ya no está conectado),
+  // lo vuelve a buscar por su data-tour para seguirlo; si no está, no toca rect.
   const medir = useCallback(() => {
-    const el = targetRef.current
-    if (!el || !el.isConnected) return
+    let el = targetRef.current
+    if (!el || !el.isConnected) {
+      el = step ? document.querySelector(`[data-tour="${step.target}"]`) : null
+      if (!el) return
+      targetRef.current = el
+    }
     const r = el.getBoundingClientRect()
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-  }, [])
+  }, [step])
 
   // Buscar el elemento del paso. El aviso "todavía no veo…" NO es terminal: las
   // pantallas del centro pintan "Cargando…" hasta que vuelve la server action y
@@ -945,7 +954,8 @@ function TourActivo({ tourId }) {
     return () => { cancelado = true; if (timer) clearTimeout(timer) }
   }, [modulo, step, pathname, medir])
 
-  // Re-medir en scroll/resize (y un par de veces tras el scroll suave).
+  // Re-medir en scroll/resize (y un par de veces tras el scroll suave; esas
+  // re-mediciones también corrigen la posición con la altura real de la tarjeta).
   useEffect(() => {
     if (estado !== 'listo') return
     const on = () => medir()
@@ -953,7 +963,7 @@ function TourActivo({ tourId }) {
     window.addEventListener('resize', on)
     const t1 = setTimeout(on, 250), t2 = setTimeout(on, 600)
     return () => { window.removeEventListener('scroll', on, true); window.removeEventListener('resize', on); clearTimeout(t1); clearTimeout(t2) }
-  }, [estado, medir])
+  }, [estado, step, medir])
 
   // Paso "hazlo": avanzar cuando el usuario hace clic en el elemento real.
   useEffect(() => {
@@ -968,10 +978,13 @@ function TourActivo({ tourId }) {
         return
       }
       // Acción local (abrir modal, seleccionar, pestaña): dejamos pasar el clic y avanzamos.
-      setTimeout(() => irA(paso + 1), 60)
+      avanceRef.current = setTimeout(() => irA(paso + 1), 60)
     }
     el.addEventListener('click', onClick, { capture: true, once: true })
-    return () => el.removeEventListener('click', onClick, { capture: true })
+    return () => {
+      el.removeEventListener('click', onClick, { capture: true })
+      if (avanceRef.current) { clearTimeout(avanceRef.current); avanceRef.current = null }
+    }
   }, [estado, step, paso, irA])
 
   // Audio del paso.
@@ -986,11 +999,14 @@ function TourActivo({ tourId }) {
     a.play().then(() => setReproduciendo(true)).catch(() => setReproduciendo(false))
   }, [modulo, step, mute])
 
-  // Teclado: Esc sale, → siguiente (solo en mostrar).
+  // Teclado: Esc sale, → siguiente (solo en mostrar y nunca mientras se escribe
+  // en un campo: en los pasos sobre un modal el foco suele estar en un input).
   useEffect(() => {
     if (!modulo) return
     const onKey = (e) => {
-      if (e.key === 'Escape') salir()
+      if (e.key === 'Escape') { salir(); return }
+      const t = e.target
+      if (e.defaultPrevented || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))) return
       if (e.key === 'ArrowRight' && step?.tipo === 'mostrar' && !esUltimo) irA(paso + 1)
     }
     window.addEventListener('keydown', onKey)
@@ -1006,14 +1022,23 @@ function TourActivo({ tourId }) {
     if (a.paused) a.play().then(() => setReproduciendo(true)).catch(() => {}); else { a.pause(); setReproduciendo(false) }
   }
 
-  // Posición de la tarjeta: debajo del elemento si cabe, si no encima; centrada si no hay rect.
+  // Posición de la tarjeta: debajo del elemento si cabe; si no, encima; si el
+  // elemento es tan alto que tampoco cabe encima, al lado derecho. Siempre con
+  // `top` acotado al viewport (nunca fuera de pantalla, ni con targets sticky de
+  // 100vh). Centrada si aún no hay rect. La altura se mide en la tarjeta real;
+  // el primer frame usa 260 y las re-mediciones de `medir` la corrigen.
   let cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }
   if (rect && estado === 'listo') {
     const vw = window.innerWidth, vh = window.innerHeight
-    const left = Math.min(Math.max(MARGEN, rect.left), vw - ANCHO_TARJETA - MARGEN)
-    const abajo = rect.top + rect.height + MARGEN
-    const cabeAbajo = abajo + 220 < vh
-    cardStyle = cabeAbajo ? { left, top: abajo } : { left, bottom: vh - rect.top + MARGEN }
+    const ancho = Math.min(ANCHO_TARJETA, vw - 2 * MARGEN)
+    const alto = cardRef.current?.offsetHeight || 260
+    const cabeDerecha = rect.left + rect.width + MARGEN + ancho <= vw - MARGEN
+    let left = Math.max(MARGEN, Math.min(rect.left, vw - ancho - MARGEN))
+    let top = rect.top + rect.height + MARGEN                       // debajo
+    if (top + alto > vh - MARGEN) top = rect.top - MARGEN - alto    // si no cabe, encima
+    if (top < MARGEN && cabeDerecha) { left = rect.left + rect.width + MARGEN; top = rect.top } // target alto: al lado
+    top = Math.max(MARGEN, Math.min(top, vh - alto - MARGEN))       // nunca fuera del viewport
+    cardStyle = { left, top }
   }
 
   return (
@@ -1021,19 +1046,19 @@ function TourActivo({ tourId }) {
       {rect && estado === 'listo' && (
         <div className="tour-spot" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }} aria-hidden="true" />
       )}
-      <div className="tour-card" style={cardStyle} role="dialog" aria-live="polite" aria-label={`Recorrido: ${modulo.titulo}`}>
+      <div ref={cardRef} className="tour-card" style={cardStyle} role="dialog" aria-label={`Recorrido: ${modulo.titulo}`}>
         <div className="tour-card__head">
           <span className="label">Paso {paso} de {total} · {modulo.titulo}</span>
-          <button className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)">×</button>
+          <button className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)" aria-label="Salir del recorrido">×</button>
         </div>
         <h4 className="tour-card__title">{step.titulo}</h4>
-        <p className="tour-card__text">{estado === 'ausente'
+        <p className="tour-card__text" aria-live="polite">{estado === 'ausente'
           ? 'Todavía no veo este elemento. Si la pantalla sigue cargando, espera un momento; si tu centro no tiene datos para mostrarlo, puedes omitir el paso.'
           : step.texto}</p>
         {clip && estado !== 'ausente' && (
           <div className="tour-card__audio">
-            <button className="btn" onClick={togglePlay} title={reproduciendo ? 'Pausar' : 'Escuchar'}>{reproduciendo ? '❚❚' : '▶'}</button>
-            <button className="btn" onClick={toggleMute} title={mute ? 'Activar voz' : 'Silenciar'}>{mute ? '🔇' : '🔊'}</button>
+            <button className="btn" onClick={togglePlay} title={reproduciendo ? 'Pausar' : 'Escuchar'} aria-label={reproduciendo ? 'Pausar' : 'Escuchar'}>{reproduciendo ? '❚❚' : '▶'}</button>
+            <button className="btn" onClick={toggleMute} title={mute ? 'Activar voz' : 'Silenciar'} aria-label={mute ? 'Activar voz' : 'Silenciar'}>{mute ? '🔇' : '🔊'}</button>
             <span className="h-sub" style={{ margin: 0 }}>{mute ? 'Voz silenciada' : 'Con la voz de Fernando'}</span>
           </div>
         )}
@@ -1068,17 +1093,19 @@ function TourActivo({ tourId }) {
 - [ ] **Step 2: Crear `app/centro/[id]/layout.js`**
 
 ```js
-import { Suspense } from 'react'
 import TourHost from '../../../components/tour/TourHost'
 
 // Layout del centro: no cambia las páginas (cada una sigue pintando su
 // Sidebar); solo monta el motor del tour, que lee ?tour= de la URL y no
-// renderiza nada si no hay recorrido activo. useSearchParams exige Suspense.
+// renderiza nada si no hay recorrido activo. Sin <Suspense>: todas las rutas
+// /centro/[id]/* son dinámicas (la exigencia de Suspense con useSearchParams
+// solo aplica al prerender estático) y así TourHost hidrata junto con la
+// página, no después de su primera server action.
 export default function CentroLayout({ children }) {
   return (
     <>
       {children}
-      <Suspense fallback={null}><TourHost /></Suspense>
+      <TourHost />
     </>
   )
 }
@@ -1100,6 +1127,7 @@ export default function CentroLayout({ children }) {
   position: fixed; z-index: 9001; width: min(360px, calc(100vw - 24px));
   background: var(--surface-1); color: var(--text); border: 1px solid var(--ts-green-line);
   border-radius: var(--r-lg); padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  max-height: calc(100vh - 24px); overflow-y: auto;
   animation: fadeIn .18s both;
 }
 .tour-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
