@@ -52,7 +52,7 @@ db/schema.sql                             ← tabla entrenamiento_progreso
 test/entrenamiento.test.mjs               ← seguro de mantenimiento (sección 10)
 ```
 
-Atributos `data-tour="<id>"` en ~45 elementos reales de las páginas existentes (sección 7). Es el único cambio en páginas actuales, más el ítem de menú en `components/Sidebar.js`.
+Atributos `data-tour="<id>"` en 64 elementos reales de las páginas existentes (sección 7; 50 los usa algún paso, el resto queda como contrato). Es el único cambio en páginas actuales, más el ítem de menú en `components/Sidebar.js` y una prop `tour` en `components/PlanNino.js` (`LineaTiempoPlan`, la línea de chips del itinerario).
 
 ## 5. Modelo de datos
 
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
   updated_at       TIMESTAMPTZ DEFAULT now(),
   UNIQUE (usuario_id, modulo)
 );
-CREATE INDEX IF NOT EXISTS idx_entrenamiento_usuario ON entrenamiento_progreso(usuario_id);
 ```
+(El UNIQUE ya indexa `usuario_id` como primera columna; no hace falta índice aparte.)
 
 Completado = `tour_visto_at IS NOT NULL AND quiz_aprobado_at IS NOT NULL`. El progreso es **por usuario**, no por centro: dos administradoras del mismo centro llevan cada una el suyo.
 
@@ -139,13 +139,14 @@ Un `data-tour` apunta a **un** elemento por pantalla. Si el elemento es condicio
 
 ## 8. Motor del tour (`TourHost`)
 
-- Montado en `app/centro/[id]/layout.js` (layout de servidor que devuelve `{children}` + `<Suspense><TourHost/></Suspense>`; `useSearchParams` exige el Suspense en Next 15). Lee `?tour=<modulo>&paso=<n>`. Sin `tour` en la URL, no renderiza nada.
-- Por paso: busca `[data-tour="<target>"]` con reintentos cada 150 ms hasta 2,5 s (el elemento puede aparecer tras un clic o un fetch). Encontrado → `scrollIntoView({block:'center'})`, mide `getBoundingClientRect()`, pinta el **spotlight** (un `div` fijo con `box-shadow: 0 0 0 9999px rgba(0,0,0,.55)`, `pointer-events:none`, borde 2 px verde marca) y la **tarjeta** (título, texto, controles) anclada debajo o encima según espacio, con re-medición en `resize` y `scroll`.
-- No encontrado tras 2,5 s → tarjeta centrada: *"No veo este elemento en tu pantalla (puede que tu centro no tenga datos para mostrarlo). Omitir →"*. Nunca se traba.
-- `mostrar`: botones **Siguiente** y **Anterior** (Anterior desactivado en el paso 1 del módulo). `hazlo`: sin Siguiente; listener `click` en el target (captura, `once`); enlace discreto **Omitir este paso**. Si el paso trae `ruta`, el listener hace `preventDefault` y navega con el tour en la URL.
+- Montado en `app/centro/[id]/layout.js` (layout de servidor que devuelve `{children}` + `<Suspense><TourHost/></Suspense>`; `useSearchParams` exige el Suspense en Next 15). Lee `?tour=<modulo>&paso=<n>`. Sin `tour` en la URL, no renderiza nada. Como el layout **no se desmonta** al navegar dentro del centro, el estado del tour vive en un hijo `<TourActivo key={tourId}>`: cambiar de módulo monta una instancia limpia; los pasos con `ruta` conservan la key y el tour sobrevive a la navegación.
+- Por paso: busca `[data-tour="<target>"]` con reintentos cada 150 ms (el elemento puede aparecer tras un clic o un fetch; las páginas pintan "Cargando…" en frío). Encontrado → `scrollIntoView({block:'center'})`, mide `getBoundingClientRect()`, pinta el **spotlight** (un `div` fijo con `box-shadow: 0 0 0 9999px rgba(0,0,0,.55)`, `pointer-events:none`, borde 2 px verde marca) y la **tarjeta** (título, texto, controles) anclada debajo o encima según espacio, con re-medición en `resize` y `scroll`.
+- A los 2,5 s sin encontrarlo → la tarjeta avisa (*"Todavía no veo este elemento. Si la pantalla sigue cargando, espera; si tu centro no tiene datos para mostrarlo, puedes omitir el paso."*) con **Omitir →**, pero **sigue buscando** cada 400 ms hasta que cambie el paso: el aviso no es terminal. Nunca se traba.
+- Navegación entre pasos: `irA(n)` resuelve la página del paso con `rutaDePaso(modulo, n)` (la última `ruta` de los pasos anteriores, o `inicio.ruta`): Omitir, Anterior y deep-links caen siempre donde vive el target. Misma página → `history.pushState` (Next actualiza `useSearchParams` sin fetch RSC ni salto de scroll); otra página → `router.push`.
+- `mostrar`: botones **Siguiente** y **Anterior** (Anterior desactivado en el paso 1 del módulo). `hazlo`: sin Siguiente; listener `click` en el target (captura, `once`); enlace discreto **Omitir este paso**. Si el paso trae `ruta`, el listener hace `preventDefault`+`stopPropagation` y navega con `irA(paso+1)`.
 - **Audio**: `<audio>` con `src=/entrenamiento/<modulo>/<paso>.mp3` si existe en `manifest.json` (el manifest se importa; si el paso no está, no hay reproductor y la tarjeta es solo texto). Autoplay al cambiar de paso; botón ▶/❚❚ y botón **silenciar** (persistido en `localStorage.tour_mute`). Si el navegador bloquea el autoplay, se muestra ▶ y no pasa nada más.
-- Controles fijos: **Salir del recorrido** (quita `?tour` de la URL; no marca nada) y contador `paso 3 de 7`.
-- Último paso → botón **Terminar**: llama `marcarTourVisto(modulo)` y navega a `/centro/{id}/entrenamiento/<modulo>#quiz`.
+- Controles fijos: **Salir del recorrido** (quita `?tour` de la URL con `pushState`; no marca nada) y contador `paso 3 de 7`.
+- Último paso → botón **Terminar**: llama `marcarTourVisto(modulo)` y navega a `/centro/{id}/entrenamiento/<modulo>#quiz`. Si la action falla, muestra el error en la tarjeta y deja volver a pulsar.
 - Teclado: `Esc` sale, `→` siguiente (solo en `mostrar`).
 - El motor no conoce el contenido: recibe `MODULOS` y trabaja con ids.
 
@@ -163,13 +164,14 @@ Un `data-tour` apunta a **un** elemento por pantalla. Si el elemento es condicio
 
 ## 10. Server actions (`app/actions/entrenamiento.js`)
 
-Todas con `requireSession()`; escriben siempre sobre `usuario_id = session.uid` (el JWT firma `{ uid, rol, centro_id }` en `lib/auth.js`); nunca un id recibido del cliente.
+Lecturas personales con `requireSession()`; **escrituras** (`marcarTourVisto`, `responderQuiz`) con `requireCurrentUser()` (relee el usuario en BD: una cookie de 7 días de un usuario borrado o revocado no escribe). Siempre sobre `usuario_id` de la sesión, nunca un id recibido del cliente.
 
 - `cargarProgreso()` → `{ [modulo]: { tourVistoAt, quizAprobadoAt, intentos, ultimoPuntaje } }`
 - `marcarTourVisto(modulo)` → upsert `tour_visto_at = COALESCE(tour_visto_at, now())`; valida que `modulo` exista en `MODULOS`.
 - `responderQuiz(modulo, respuestas:[idx,idx,idx])` → valida módulo y forma; corrige contra `respuestas.js`; `intentos = intentos + 1`, `ultimo_puntaje`, y `quiz_aprobado_at = COALESCE(quiz_aprobado_at, now())` solo si 3/3. Devuelve `{ puntaje, correctas, explicaciones }`.
-- `resumenProgreso()` → `{ completados, total }` para el badge y el banner.
-- `matrizProgreso(centroId?)` → `requireAdmin()`; usuarios `administradora` (+centro) × módulos.
+- `resumenProgreso()` → `{ completados, total, pct }` para el badge y el banner; **`null` para admin_general/supervisor** (gerencia no se entrena, §14; así no ven `0/9`).
+- `responderQuiz` valida forma estricta (array de 3 enteros); un payload malformado devuelve `{ error }` y no cuenta como intento.
+- `matrizProgreso(centroId?)` → `requireCurrentAdmin()` (relee el rol desde la BD, como `peticiones.js` y `deleteCentro`); valida `centroId` entero; usuarios `administradora` (+centro) × módulos.
 
 Errores: mensajes en español, mismo patrón `{ error }` que el resto de actions; nunca lanzar al cliente.
 
@@ -186,7 +188,8 @@ Errores: mensajes en español, mismo patrón `{ error }` que el resto de actions
 2. Cada módulo tiene exactamente 3 preguntas con 2-4 opciones; `respuestas.js` tiene exactamente 3 índices válidos por módulo; ids de módulo únicos y en `respuestas.js`.
 3. Cada `inicio.ruta` y cada `paso.ruta` empieza por `/centro/{id}`.
 4. `texto` de cada paso ≤ 35 palabras (advertencia, no fallo: `console.warn`).
-5. Para cada clave del manifest existe el mp3; para cada paso sin clip, advertencia (no fallo — PR 1 sale sin audio).
+5. Para cada clave del manifest existe el mp3 y la clave corresponde a un módulo/paso real; para cada paso sin clip, advertencia (no fallo — PR 1 sale sin audio). Existe desde PR 1 (con manifest vacío pasa trivialmente) porque PR 2 no trae código.
+5b. `respuestas.js` solo se importa desde módulos `'use server'`; `matrizProgreso` usa `requireCurrentAdmin()` (tests que leen el fuente).
 6. `lib/entrenamiento/progreso.js`: `completado()`, `porcentaje()`, `siguienteModulo()` con casos borde (0/9, 9/9, tour sin quiz).
 7. Corrección del quiz (función pura extraída): 3/3 aprueba, 2/3 no, respuestas fuera de rango no aprueban.
 

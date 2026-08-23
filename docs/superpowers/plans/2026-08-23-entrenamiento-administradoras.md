@@ -30,6 +30,7 @@
 | `test/entrenamiento.test.mjs` | seguro de mantenimiento + pruebas de progreso/quiz | 1, 2, 3 |
 | `components/Sidebar.js` | ítem Entrenamiento con badge `n/9`; `data-tour` en ítems del centro | 4, 8 |
 | `app/centro/[id]/grupos/page.js`, `eventos/page.js`, `kpi/page.js`, `cuadro/page.js`, `page.js`, `ruta-nivel/page.js` | atributos `data-tour` | 4 |
+| `components/PlanNino.js` | prop `tour` en `LineaTiempoPlan` (línea de chips del itinerario) | 4 |
 | `components/tour/TourHost.js` | motor del tour | 5 |
 | `app/globals.css` | estilos `.tour-*`, `.ent-*` | 5, 7 |
 | `app/centro/[id]/layout.js` | monta `TourHost` | 5 |
@@ -57,7 +58,7 @@ Crear `test/entrenamiento.test.mjs`:
 ```js
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { completado, porcentaje, siguienteModulo, corregirQuiz } from '../lib/entrenamiento/progreso.js'
+import { completado, porcentaje, siguienteModulo, corregirQuiz, rutaDePaso } from '../lib/entrenamiento/progreso.js'
 
 const MODS = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
 
@@ -84,6 +85,14 @@ test('siguienteModulo devuelve el primer no completado en orden, o null', () => 
   assert.equal(siguienteModulo({ a: done }, MODS), 'b')
   assert.equal(siguienteModulo({ a: done, c: done }, MODS), 'b')
   assert.equal(siguienteModulo({ a: done, b: done, c: done }, MODS), null)
+})
+
+test('rutaDePaso: la página del paso n es la última ruta de los pasos anteriores, o inicio.ruta', () => {
+  const m = { inicio: { ruta: '/a' }, pasos: [{}, {}, { ruta: '/b' }, {}] }
+  assert.equal(rutaDePaso(m, 1), '/a')
+  assert.equal(rutaDePaso(m, 3), '/a') // el hazlo con ruta vive en la página ORIGEN
+  assert.equal(rutaDePaso(m, 4), '/b')
+  assert.equal(rutaDePaso(m, 99), '/b') // fuera de rango: la última conocida
 })
 
 test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
@@ -123,6 +132,17 @@ export function siguienteModulo(progreso, modulos) {
   return m ? m.id : null
 }
 
+// Página en la que vive el paso n (1-based): la última `ruta` de los pasos
+// ANTERIORES a n, o inicio.ruta. Un paso hazlo con `ruta` vive en la página
+// origen (el clic navega); el siguiente ya vive en el destino. El motor usa
+// esto para que Omitir/Anterior/deep-link caigan en la página correcta.
+export function rutaDePaso(modulo, n) {
+  let r = modulo.inicio.ruta
+  const tope = Math.min(Math.max(0, n - 1), modulo.pasos.length)
+  for (let i = 0; i < tope; i++) if (modulo.pasos[i].ruta) r = modulo.pasos[i].ruta
+  return r
+}
+
 // respuestas: índices elegidos por el usuario (puede venir corto, nulo o con basura).
 // correctas: índices correctos del módulo (siempre 3).
 export function corregirQuiz(respuestas, correctas) {
@@ -136,7 +156,7 @@ export function corregirQuiz(respuestas, correctas) {
 - [ ] **Step 4: Correr y ver que pasa**
 
 Run: `node --test test/entrenamiento.test.mjs`
-Expected: `# pass 4`
+Expected: `# pass 5`
 
 - [ ] **Step 5: Tabla en `db/schema.sql`** (agregar al final, antes de cualquier comentario de cierre si lo hay)
 
@@ -156,7 +176,7 @@ CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
   updated_at       TIMESTAMPTZ DEFAULT now(),
   UNIQUE (usuario_id, modulo)
 );
-CREATE INDEX IF NOT EXISTS idx_entrenamiento_usuario ON entrenamiento_progreso(usuario_id);
+-- (sin índice extra: el UNIQUE ya indexa usuario_id como primera columna)
 ```
 
 - [ ] **Step 6: Aplicar el esquema a Neon** (Hermes lo corre; usa `.env.local`)
@@ -478,7 +498,7 @@ export const MODULOS = [
       { id: 'fu-2', tipo: 'mostrar', target: 'fusiones.reglas', titulo: 'Las reglas del manual', texto: 'Solo desde nivel 3. Kinder nunca. Online y base 1-2 exentos. Un niño TINY no entra a un grupo Kids; un KIDS de nivel 3 o más sí puede cruzar.' },
       { id: 'fu-3', tipo: 'mostrar', target: 'fusiones.bajo-meta', titulo: 'Grupos bajo meta', texto: 'Tienen menos niños que el mínimo del manual. "Ver destinos" te muestra con cuál conviene unirlos.' },
       { id: 'fu-4', tipo: 'mostrar', target: 'fusiones.sugeridas', titulo: 'El puntaje', texto: 'Mismo día y misma hora suma 50 porque el papá ni se entera. Días distintos suma cero: vas a perder niños. Las advertencias con triángulo no bloquean, te avisan.' },
-      { id: 'fu-5', tipo: 'mostrar', target: 'fusiones.aplicar', titulo: 'Aplicar fusión', texto: 'Mueve a los niños. Habla con la coach y los representantes ANTES. Tres cosas lo bloquean: destino base 1-2 recibiendo niveles 3 o más, coach sin certificación, o pasarse del cupo.' },
+      { id: 'fu-5', tipo: 'mostrar', target: 'fusiones.aplicar', titulo: 'Aplicar fusión', texto: 'Mueve a los niños. Habla con la coach y los representantes ANTES. Lo bloquean: destino base 1-2 recibiendo niveles 3 o más, cruces Tiny↔Kids prohibidos, coach sin certificación o pasarse del cupo.' },
     ],
     quiz: [
       { pregunta: '¿Qué niños NO se fusionan nunca?', opciones: ['Los de nivel 3 o más', 'Los Kinder y los de nivel 1-2', 'Los de grupos de sábado', 'Todos se fusionan'], explicacion: 'Nivel 1-2 está aprendiendo la base; Kinder queda fuera de toda fusión.' },
@@ -579,7 +599,7 @@ export const RESPUESTAS = {
 - [ ] **Step 6: Correr y ver que pasa**
 
 Run: `node --test test/entrenamiento.test.mjs`
-Expected: `# pass 10` (las 4 de Task 1 + 6 nuevas). Si falla "índice N fuera de rango" en algún módulo, corregir `respuestas.js` contra el texto de las opciones (la respuesta correcta está descrita en cada `explicacion`).
+Expected: `# pass 11` (las 5 de Task 1 + 6 nuevas). Si falla "índice N fuera de rango" en algún módulo, corregir `respuestas.js` contra el texto de las opciones (la respuesta correcta está descrita en cada `explicacion`).
 
 - [ ] **Step 7: Commit** (Hermes)
 
@@ -598,7 +618,7 @@ git commit -m "feat(entrenamiento): contenido de los 9 módulos, quiz, errores y
 - [ ] **Step 1: Agregar la prueba que lee el fuente** (falla ahora: todavía no hay `data-tour` en las páginas)
 
 ```js
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 function archivosJs(dir) {
@@ -614,17 +634,43 @@ function archivosJs(dir) {
 test('cada target del contenido existe como data-tour (o prop tour) en app/ o components/', () => {
   const fuentes = [...archivosJs('app'), ...archivosJs('components')].map((p) => readFileSync(p, 'utf8')).join('\n')
   const presentes = new Set()
-  for (const m of fuentes.matchAll(/(?:data-)?tour="([a-z0-9.-]+)"/g)) presentes.add(m[1])
+  // Casa data-tour="x.y", tour="x.y", tour: 'x.y' y data-tour={cond ? 'x.y' : undefined}:
+  // cualquier literal entrecomillado con forma ns.nombre en la misma línea que la palabra tour.
+  for (const m of fuentes.matchAll(/\btour\b[^\n]*?['"]([a-z]+\.[a-z-]+)['"]/g)) presentes.add(m[1])
   const faltan = []
   for (const m of MODULOS) for (const p of m.pasos) if (!presentes.has(p.target)) faltan.push(`${m.id}/${p.id} → ${p.target}`)
   assert.deepEqual(faltan, [], `targets sin data-tour en el código:\n  ${faltan.join('\n  ')}`)
+})
+
+// Spec §12.5 — contrato manifest ↔ mp3 que comparten TourHost, la página del
+// módulo y scripts/entrenamiento-audio.mjs. En PR 1 el manifest está vacío y
+// pasa trivialmente; en PR 2 (solo mp3 + manifest, sin código) es el único seguro.
+const manifest = JSON.parse(readFileSync('lib/entrenamiento/audio-manifest.json', 'utf8'))
+test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en public/entrenamiento', () => {
+  const claves = new Set()
+  for (const m of MODULOS) { claves.add(`${m.id}/intro`); for (const p of m.pasos) claves.add(`${m.id}/${p.id}`) }
+  for (const [k, v] of Object.entries(manifest)) {
+    assert.ok(claves.has(k), `clave huérfana en el manifest (paso renombrado o borrado): ${k}`)
+    assert.ok(v?.file && existsSync(join('public/entrenamiento', v.file)), `falta el mp3 de ${k}: public/entrenamiento/${v?.file}`)
+  }
+  const sinClip = [...claves].filter((k) => !manifest[k])
+  if (sinClip.length) console.warn(`⚠ ${sinClip.length} clips sin audio todavía (llegan en PR 2)`)
+})
+
+// Las respuestas correctas solo pueden importarse desde módulos 'use server'.
+test('respuestas.js solo se importa desde módulos de servidor (use server)', () => {
+  const malos = [...archivosJs('app'), ...archivosJs('components')].filter((p) => {
+    const src = readFileSync(p, 'utf8')
+    return /entrenamiento\/respuestas/.test(src) && !/^\s*['"]use server['"]/m.test(src)
+  })
+  assert.deepEqual(malos, [], `respuestas.js importado fuera del servidor: ${malos.join(', ')}`)
 })
 ```
 
 - [ ] **Step 2: Correr y ver que falla con la lista completa de targets**
 
 Run: `node --test test/entrenamiento.test.mjs`
-Expected: FAIL — lista de ~45 targets faltantes. Esa lista es la guía de la Task 4.
+Expected: FAIL solo en el test de targets — lista de 50 targets faltantes (esa lista es la guía de la Task 4). El test del manifest pasa (manifest vacío) y el de respuestas.js pasa (nada lo importa aún).
 
 ---
 
@@ -632,6 +678,7 @@ Expected: FAIL — lista de ~45 targets faltantes. Esa lista es la guía de la T
 
 **Files:**
 - Modify: `components/Sidebar.js` (centroItems + render)
+- Modify: `components/PlanNino.js` (prop `tour` en `LineaTiempoPlan`)
 - Modify: `app/centro/[id]/page.js`
 - Modify: `app/centro/[id]/ruta-nivel/page.js`
 - Modify: `app/centro/[id]/grupos/page.js`
@@ -639,11 +686,11 @@ Expected: FAIL — lista de ~45 targets faltantes. Esa lista es la guía de la T
 - Modify: `app/centro/[id]/cuadro/page.js`
 - Modify: `app/centro/[id]/kpi/page.js`
 
-Regla: **solo agregar atributos**; no cambiar lógica ni estilos. Un `data-tour` por elemento y por pantalla.
+Regla: **solo agregar atributos**; no cambiar lógica ni estilos. Un `data-tour` por elemento y por pantalla. **El id literal `'x.y'` va en la MISMA línea que la palabra `tour`/`data-tour`** (ternarios en una sola línea; en Sidebar el literal vive en `centroItems`, que ya lo cumple): el seguro de la Task 3 lee línea por línea.
 
 - [ ] **Step 1: Sidebar** — agregar `tour` a cada ítem del centro y renderizarlo
 
-En `centroItems` (líneas ~66-76):
+En `centroItems` (líneas ~60-70):
 
 ```js
   const centroItems = [
@@ -695,23 +742,23 @@ b) Botones de cabecera (líneas ~575-576):
             <button className="btn" data-tour="grupos.inscribir" onClick={() => { setStatus(''); setInscribir({}) }}>Inscribir niño</button>
             <button className="btn btn--primary" data-tour="grupos.aperturar" onClick={() => abrirNuevoGrupo()}>➕ Aperturar grupo</button>
 ```
-c) Pestañas: localizar donde se renderiza `TABS.map` (buscar `TABS.map(`); al contenedor de los botones agregar `data-tour="grupos.tabs"`, y al botón cuya clave es `'fusiones'` agregar `data-tour={key === 'fusiones' ? 'grupos.tab-fusiones' : undefined}`. Ejemplo (adaptar a la forma real del map):
+c) Pestañas (líneas ~597-601): el contenedor es `<div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>` sin className y el map destructura `[k, l]`. Queda así:
 ```js
-          <div className="…" data-tour="grupos.tabs">
-            {TABS.map(([key, label]) => (
-              <button key={key} className={…} data-tour={key === 'fusiones' ? 'grupos.tab-fusiones' : undefined} onClick={() => setTab(key)}>{label}</button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }} data-tour="grupos.tabs">
+            {TABS.map(([k, l]) => (
+              <button key={k} onClick={() => setTab(k)} className={`btn${tab === k ? ' btn--primary' : ''}`} style={{ padding: '8px 16px', fontSize: 13 }} data-tour={k === 'fusiones' ? 'grupos.tab-fusiones' : undefined}>{l}</button>
             ))}
           </div>
 ```
-d) Lista de grupos: el contenedor que envuelve las secciones EN LLENADO / LOS DEMÁS (el padre de los `GrupoCard`, línea ~630) → `data-tour="grupos.lista"`. Primera tarjeta: en `GrupoCard` aceptar `tour` y pasarlo al `div.grp-card`:
+d) Lista de grupos: el padre de las `GrupoCard` es `<div className="grp-list">` (línea ~628) → `<div className="grp-list" data-tour="grupos.lista">`. Los arrays reales son `enLlenado` y `resto` (líneas ~329-332) y ya existe `visibles = [...enLlenado, ...resto]`. Tras esa línea agregar `const primeraTarjetaId = visibles[0]?.id`. En `GrupoCard` (línea ~825) aceptar `tour` y ponerlo en la raíz, que ya tiene `data-grupo`:
 ```js
 function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
   return (
-    <div data-tour={tour}
+    <div data-grupo={g.id} data-tour={tour} role="button"
       className={`grp-card${activo ? ' grp-card--on' : ''}`}
 ```
-y en el render de la lista (línea ~645 y ~654), pasar `tour={idx === 0 ? 'grupos.tarjeta' : undefined}` **solo en la primera lista que se renderiza** (EN LLENADO si existe; si está vacía, en LOS DEMÁS). Implementación: calcular antes del return `const primeraTarjetaId = (enLlenado[0] || losDemas[0])?.id` (usar los nombres reales de esos arrays) y en ambos map: `tour={g.id === primeraTarjetaId ? 'grupos.tarjeta' : undefined}`.
-e) Panel del grupo (el contenedor del detalle, clase `grp-detail` o similar, línea ~960) → `data-tour="grupo.panel"`. Botones (líneas ~979-987):
+y en AMBOS map (líneas ~644-648 y ~653-656): `tour={g.id === primeraTarjetaId ? 'grupos.tarjeta' : undefined}`.
+e) Panel del grupo: la raíz de `GrupoDetalle` es `<section className={`panel grp-detail${sheet ? ' grp-detail--sheet' : ''}`} aria-label=…>` (línea ~952; se renderiza inline o como sheet, nunca ambos) → agregar `data-tour="grupo.panel"` a ese `<section>`. Botones (líneas ~979-987):
 ```js
               data-tour="grupo.inscribir-aqui"   // en "+ Inscribir niño aquí"
               data-tour="grupo.cerrar-inscripciones"  // en el botón Abrir/Cerrar inscripciones
@@ -719,9 +766,9 @@ e) Panel del grupo (el contenedor del detalle, clase `grp-detail` o similar, lí
               data-tour="grupo.buscar-fusion"    // en "Buscar fusión"
 ```
 Pestañas del panel (líneas ~996-999): `data-tour="grupo.tab-ninos"` en la de `vista === 'ninos'` y `data-tour="grupo.tab-itinerario"` en la de `'itinerario'`.
-f) Bloque LLENADO: el `div` contenedor del bloque que muestra "LLENADO" (alrededor de la línea ~1150, componente del llenado) → `data-tour="grupo.llenado"`. Botón "Extender ventana" (línea ~1195) → `data-tour="grupo.extender-ventana"`.
-g) Itinerario: botón "✎ Ajustar itinerario" (línea ~1433) → `data-tour="grupo.ajustar-itinerario"`; el contenedor de la línea de chips INT/1/2/…/C (buscar donde se mapean `semanas` a chips `corto`, cerca de la línea 1440-1470) → `data-tour="grupo.itinerario-linea"`.
-h) Fusiones: el `div` que contiene "Reglas del manual:" (línea ~1510) → `data-tour="fusiones.reglas"`; el panel "Grupos bajo meta" (línea ~1534, el `div.panel` padre) → `data-tour="fusiones.bajo-meta"`; el panel "Fusiones sugeridas del mes" (línea ~1556, `div.panel` padre) → `data-tour="fusiones.sugeridas"`; el botón "Aplicar fusión" (línea ~1654) → `data-tour="fusiones.aplicar"` **solo en la primera sugerencia** (si se renderiza en un map, usar `data-tour={i === 0 ? 'fusiones.aplicar' : undefined}`).
+f) Bloque LLENADO: es el componente `BloqueLlenado` (línea ~1131); su raíz es `<div style={{ padding: '12px 18px', borderBottom: …, display: 'grid', gap: 8 }}>` (línea ~1152) → agregar `data-tour="grupo.llenado"` a ese div. Botón "Extender ventana" (línea ~1195, solo existe si `extensible && !extiendo`) → `data-tour="grupo.extender-ventana"`.
+g) Itinerario: botón "✎ Ajustar itinerario" (línea ~1433) → `data-tour="grupo.ajustar-itinerario"`. La línea de chips INT/1/2/…/C **NO está en grupos/page.js**: vive en `components/PlanNino.js:86` (`<div className="itin-tl">` dentro de `LineaTiempoPlan`, línea ~71), que es compartida por varios sitios. Hacer: en `components/PlanNino.js` línea ~71 `export function LineaTiempoPlan({ it, estado, indice, onFecha, tour }) {` y línea ~86 `<div className="itin-tl" data-tour={tour}>`; pasar la prop SOLO desde `grupos/page.js` línea ~1414 (`planDelAula`): `<LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={(f) => onAjustar(f)} tour="grupo.itinerario-linea" />`. NO pasarla desde la línea ~1371 (`MontonPlan`) ni desde `PlanNino.js:319` (`PlanNinoModal`): así hay una sola línea con data-tour por pantalla.
+h) Fusiones: el `div` que contiene "Reglas del manual:" (línea ~1510) → `data-tour="fusiones.reglas"`; el panel "Grupos bajo meta" (línea ~1534, el `div.panel` padre) → `data-tour="fusiones.bajo-meta"`; el panel "Fusiones sugeridas del mes" (línea ~1556, `div.panel` padre) → `data-tour="fusiones.sugeridas"`. El botón "Aplicar fusión" (línea ~1653) vive dentro de `FusionCard` (línea ~1606), que se renderiza en DOS maps (destinos ~1523 y sugeridas ~1560). Hacer: `function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour })`; en el botón `data-tour={tour}`; y SOLO en el map de sugeridas (~1560): `fus.sugerencias.map((p, i) => (<FusionCard key={`${p.from.id}-${p.to.id}`} … tour={i === 0 ? 'fusiones.aplicar' : undefined} />))`. NO pasar `tour` en el map de destinos.
 i) Modal Aperturar (líneas ~2385-2470):
 ```js
           <button className="btn" data-tour="aperturar.cancelar" onClick={onClose}>Cancelar</button>
@@ -756,7 +803,7 @@ j) Modal Inscribir (líneas ~2634-2680): `tour="inscribir.nombre"`, `tour="inscr
 - [ ] **Step 8: Correr la prueba del seguro**
 
 Run: `node --test test/entrenamiento.test.mjs`
-Expected: `# pass 11` — todos los targets presentes. Si falta alguno, el mensaje dice cuál.
+Expected: `# pass 14` — todos los targets presentes. Si falta alguno, el mensaje dice cuál.
 
 - [ ] **Step 9: Comprobar que la app arranca y las pantallas no cambiaron**
 
@@ -766,7 +813,7 @@ Expected: build OK; visualmente idéntico (solo hay atributos nuevos).
 - [ ] **Step 10: Commit** (Hermes)
 
 ```bash
-git add components/Sidebar.js app/centro test/entrenamiento.test.mjs
+git add components/Sidebar.js components/PlanNino.js app/centro test/entrenamiento.test.mjs
 git commit -m "feat(entrenamiento): atributos data-tour en las pantallas del centro"
 ```
 
@@ -787,23 +834,36 @@ git commit -m "feat(entrenamiento): atributos data-tour en las pantallas del cen
 // elemento [data-tour="<target>"] del paso, lo resalta con un spotlight y
 // muestra la tarjeta con texto, audio y controles. No conoce el contenido:
 // todo sale de lib/entrenamiento/modulos.js. Montado en app/centro/[id]/layout.js.
+//
+// TourHost vive en el layout del centro, que NO se desmonta al navegar entre
+// páginas del mismo centro. Por eso el estado del tour vive en <TourActivo
+// key={tourId}>: al cambiar de módulo React monta una instancia nueva (estado a
+// cero) y sin ?tour se desmonta. Dentro de un módulo, los pasos con `ruta`
+// conservan la key → el tour sobrevive a la navegación entre páginas.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
+import { rutaDePaso } from '../../lib/entrenamiento/progreso'
 import manifest from '../../lib/entrenamiento/audio-manifest.json'
 import { marcarTourVisto } from '../../app/actions/entrenamiento'
 
 const ANCHO_TARJETA = 360
 const MARGEN = 12
-const INTENTOS_MAX = 17 // 17 × 150 ms ≈ 2,5 s
+const AVISO_MS = 2500 // a los 2,5 s se avisa "todavía no veo…", pero se sigue buscando
 
 export default function TourHost() {
+  const sp = useSearchParams()
+  const tourId = sp.get('tour')
+  if (!tourId) return null
+  return <TourActivo key={tourId} tourId={tourId} />
+}
+
+function TourActivo({ tourId }) {
   const params = useParams()
   const centroId = params?.id
   const pathname = usePathname()
   const router = useRouter()
   const sp = useSearchParams()
-  const tourId = sp.get('tour')
   const paso = Math.max(1, parseInt(sp.get('paso') || '1', 10) || 1)
 
   const modulo = useMemo(() => MODULOS.find((m) => m.id === tourId) || null, [tourId])
@@ -812,10 +872,11 @@ export default function TourHost() {
   const esUltimo = paso === total
 
   const [rect, setRect] = useState(null)
-  const [estado, setEstado] = useState('buscando') // buscando | listo | ausente
+  const [estado, setEstado] = useState('buscando') // buscando | listo | ausente (aviso, no terminal)
   const [mute, setMute] = useState(false)
   const [reproduciendo, setReproduciendo] = useState(false)
   const [terminando, setTerminando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState('')
   const audioRef = useRef(null)
   const targetRef = useRef(null)
 
@@ -823,18 +884,32 @@ export default function TourHost() {
 
   const conCentro = useCallback((ruta) => String(ruta || '').replace('{id}', String(centroId)), [centroId])
 
-  const irA = useCallback((n, ruta) => {
-    const base = ruta ? conCentro(ruta) : pathname
-    router.push(`${base}?tour=${encodeURIComponent(tourId)}&paso=${n}`)
-  }, [router, pathname, tourId, conCentro])
+  // Ir al paso n EN LA PÁGINA QUE LE CORRESPONDE (rutaDePaso): Omitir, Anterior
+  // y deep-links caen siempre donde vive el target. Misma página → pushState
+  // nativo (Next lo intercepta: actualiza useSearchParams sin fetch RSC ni salto
+  // de scroll). Otra página → navegación real.
+  const irA = useCallback((n) => {
+    if (!modulo) return
+    const destino = conCentro(rutaDePaso(modulo, n))
+    const url = `${destino}?tour=${encodeURIComponent(tourId)}&paso=${n}`
+    if (destino === pathname) window.history.pushState(null, '', url)
+    else router.push(url)
+  }, [modulo, router, pathname, tourId, conCentro])
 
-  const salir = useCallback(() => { router.push(pathname) }, [router, pathname])
+  // Quita ?tour sin fetch ni salto; TourHost deja de renderizar al no haber `tour`.
+  const salir = useCallback(() => { window.history.pushState(null, '', pathname) }, [pathname])
 
   const terminar = useCallback(async () => {
     if (!modulo || terminando) return
-    setTerminando(true)
-    try { await marcarTourVisto(modulo.id) } catch {}
-    router.push(`/centro/${centroId}/entrenamiento/${modulo.id}#quiz`)
+    setTerminando(true); setErrorGuardar('')
+    try {
+      const r = await marcarTourVisto(modulo.id)
+      if (r?.error) throw new Error(r.error)
+      router.push(`/centro/${centroId}/entrenamiento/${modulo.id}#quiz`)
+    } catch {
+      setErrorGuardar('No se pudo guardar el recorrido. Revisa tu conexión y vuelve a pulsar Terminar.')
+      setTerminando(false)
+    }
   }, [modulo, terminando, router, centroId])
 
   const medir = useCallback(() => {
@@ -844,11 +919,13 @@ export default function TourHost() {
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
   }, [])
 
-  // Buscar el elemento del paso (con reintentos: puede aparecer tras un clic o un fetch).
+  // Buscar el elemento del paso. El aviso "todavía no veo…" NO es terminal: las
+  // pantallas del centro pintan "Cargando…" hasta que vuelve la server action y
+  // en frío eso pasa de 2,5 s; cuando el elemento aparece, el paso pasa a 'listo'.
   useEffect(() => {
     if (!modulo || !step) return
-    let cancelado = false
-    let intentos = 0
+    let cancelado = false, avisado = false, timer = null
+    const t0 = Date.now()
     setEstado('buscando'); setRect(null); targetRef.current = null
     const buscar = () => {
       if (cancelado) return
@@ -860,11 +937,12 @@ export default function TourHost() {
         setEstado('listo')
         return
       }
-      if (++intentos < INTENTOS_MAX) setTimeout(buscar, 150)
-      else setEstado('ausente')
+      const t = Date.now() - t0
+      if (t >= AVISO_MS && !avisado) { avisado = true; setEstado('ausente') }
+      timer = setTimeout(buscar, t < AVISO_MS ? 150 : 400)
     }
     buscar()
-    return () => { cancelado = true }
+    return () => { cancelado = true; if (timer) clearTimeout(timer) }
   }, [modulo, step, pathname, medir])
 
   // Re-medir en scroll/resize (y un par de veces tras el scroll suave).
@@ -884,9 +962,9 @@ export default function TourHost() {
     if (!el) return
     const onClick = (e) => {
       if (step.ruta) {
-        // Navegación: la hacemos nosotros para llevar el tour en la URL.
+        // Navegación: la hacemos nosotros (irA resuelve la página del paso siguiente).
         e.preventDefault(); e.stopPropagation()
-        irA(paso + 1, step.ruta)
+        irA(paso + 1)
         return
       }
       // Acción local (abrir modal, seleccionar, pestaña): dejamos pasar el clic y avanzamos.
@@ -919,7 +997,7 @@ export default function TourHost() {
     return () => window.removeEventListener('keydown', onKey)
   }, [modulo, step, paso, esUltimo, irA, salir])
 
-  if (!modulo || !step) return null
+  if (!modulo || !step) return null // módulo desconocido o paso fuera de rango
 
   const clip = manifest[`${modulo.id}/${step.id}`]
   const toggleMute = () => { const v = !mute; setMute(v); try { localStorage.setItem('tour_mute', v ? '1' : '0') } catch {} }
@@ -950,7 +1028,7 @@ export default function TourHost() {
         </div>
         <h4 className="tour-card__title">{step.titulo}</h4>
         <p className="tour-card__text">{estado === 'ausente'
-          ? 'No veo este elemento en tu pantalla (puede que tu centro no tenga datos para mostrarlo). Puedes omitir este paso.'
+          ? 'Todavía no veo este elemento. Si la pantalla sigue cargando, espera un momento; si tu centro no tiene datos para mostrarlo, puedes omitir el paso.'
           : step.texto}</p>
         {clip && estado !== 'ausente' && (
           <div className="tour-card__audio">
@@ -959,6 +1037,7 @@ export default function TourHost() {
             <span className="h-sub" style={{ margin: 0 }}>{mute ? 'Voz silenciada' : 'Con la voz de Fernando'}</span>
           </div>
         )}
+        {errorGuardar && <div className="alert alert--error" style={{ marginBottom: 10, fontSize: 12.5 }}>{errorGuardar}</div>}
         <div className="tour-card__actions">
           {estado === 'ausente' ? (
             <>
@@ -1041,7 +1120,7 @@ export default function CentroLayout({ children }) {
 
 - [ ] **Step 4: Comprobar a mano** — `npm run dev`, entrar como administradora, abrir `http://localhost:3000/centro/6/grupos?tour=aperturar&paso=1`.
 
-Expected: spotlight sobre "➕ Aperturar grupo", tarjeta "Paso 1 de 8 · Aperturar un grupo" con el texto y el aviso "Haz clic en el elemento resaltado"; al hacer clic se abre el modal y la URL pasa a `paso=2` con spotlight sobre "Número de grupo"; "Siguiente" avanza; en el paso 7 el clic en Cancelar cierra el modal y avanza; el paso 8 muestra "Terminar ✓". (`Terminar` fallará hasta la Task 6 — es esperado.) Sin `?tour` en la URL no se ve nada.
+Expected: spotlight sobre "➕ Aperturar grupo", tarjeta "Paso 1 de 8 · Aperturar un grupo" con el texto y el aviso "Haz clic en el elemento resaltado"; al hacer clic se abre el modal y la URL pasa a `paso=2` con spotlight sobre "Número de grupo"; "Siguiente" avanza **sin que la página salte arriba** y sin fetch `?_rsc=` en la pestaña Network; en el paso 7 el clic en Cancelar cierra el modal y avanza; el paso 8 muestra "Terminar ✓". (`Terminar` fallará con el aviso de "No se pudo guardar" hasta la Task 6 — es esperado.) En frío (recargar la página con `?tour=`), mientras la página dice "Cargando…" la tarjeta muestra "Todavía no veo este elemento…" y al cargar pasa sola al spotlight. Sin `?tour` en la URL no se ve nada. `Esc` quita el `?tour` sin recargar.
 
 - [ ] **Step 5: Commit** (Hermes)
 
@@ -1066,7 +1145,7 @@ git commit -m "feat(entrenamiento): motor del tour guiado sobre la UI real"
 // venga del cliente. Las respuestas del quiz viven en respuestas.js (solo
 // servidor): el cliente recibe opciones y explicaciones, nunca el índice.
 import { sql } from '../../lib/db'
-import { requireSession, requireAdmin } from '../../lib/auth'
+import { requireSession, requireCurrentUser, requireCurrentAdmin, isAdminRole } from '../../lib/auth'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas'
 import { corregirQuiz, porcentaje } from '../../lib/entrenamiento/progreso'
@@ -1091,18 +1170,22 @@ export async function cargarProgreso() {
   return out
 }
 
-// → { completados, total, pct } (badge del menú y banner de Resumen)
+// → { completados, total, pct } (badge del menú y banner de Resumen).
+// null para gerencia: admin_general/supervisor no se entrenan (spec §14).
 export async function resumenProgreso() {
-  const progreso = await cargarProgreso()
-  return porcentaje(progreso, MODULOS)
+  const s = await requireSession()
+  if (isAdminRole(s.rol)) return null
+  return porcentaje(await cargarProgreso(), MODULOS)
 }
 
+// Las escrituras releen el usuario en BD (requireCurrentUser): una cookie de 7
+// días de un usuario borrado o con acceso revocado no debe poder escribir.
 export async function marcarTourVisto(modulo) {
-  const s = await requireSession()
+  const u = await requireCurrentUser()
   if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
   await sql`
     INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
-    VALUES (${s.uid}, ${modulo}, now(), now())
+    VALUES (${u.id}, ${modulo}, now(), now())
     ON CONFLICT (usuario_id, modulo) DO UPDATE
       SET tour_visto_at = COALESCE(entrenamiento_progreso.tour_visto_at, now()), updated_at = now()
   `
@@ -1112,15 +1195,17 @@ export async function marcarTourVisto(modulo) {
 // respuestas: [idx, idx, idx] elegidos por el usuario.
 // → { puntaje, correctas:[bool×3], explicaciones:[string×3], aprobado }
 export async function responderQuiz(modulo, respuestas) {
-  const s = await requireSession()
+  const u = await requireCurrentUser()
   if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
+  // Forma estricta: 3 enteros. Un payload malformado no cuenta como intento.
+  const r = Array.isArray(respuestas) ? respuestas : null
+  if (!r || r.length !== 3 || !r.every(Number.isInteger)) return { error: 'Respuestas inválidas.' }
   const correctas = RESPUESTAS[modulo]
   const m = MODULOS.find((x) => x.id === modulo)
-  const r = Array.isArray(respuestas) ? respuestas.slice(0, 3).map((v) => (Number.isInteger(v) ? v : -1)) : []
-  const res = corregirQuiz(r, correctas)
+  const res = corregirQuiz(r, correctas) // fuera de rango → incorrecta
   await sql`
     INSERT INTO entrenamiento_progreso (usuario_id, modulo, intentos, ultimo_puntaje, quiz_aprobado_at, updated_at)
-    VALUES (${s.uid}, ${modulo}, 1, ${res.puntaje}, ${res.aprobado ? new Date().toISOString() : null}, now())
+    VALUES (${u.id}, ${modulo}, 1, ${res.puntaje}, ${res.aprobado ? new Date().toISOString() : null}, now())
     ON CONFLICT (usuario_id, modulo) DO UPDATE SET
       intentos = entrenamiento_progreso.intentos + 1,
       ultimo_puntaje = EXCLUDED.ultimo_puntaje,
@@ -1130,14 +1215,18 @@ export async function responderQuiz(modulo, respuestas) {
   return { puntaje: res.puntaje, correctas: res.correctas, aprobado: res.aprobado, explicaciones: m.quiz.map((q) => q.explicacion) }
 }
 
-// Gerencia: usuarios administradora (+centro) × módulos.
+// Gerencia: usuarios administradora (+centro) × módulos. requireCurrentAdmin
+// relee el rol desde la BD (como peticiones.js y deleteCentro): un JWT de 7
+// días de alguien degradado o borrado no debe leer nombres/emails/progreso.
 // → { modulos:[{id,titulo}], usuarios:[{ id, nombre, email, centro, centroId, progreso:{[modulo]:{…}}, completados, pct }] }
 export async function matrizProgreso(centroId = null) {
-  await requireAdmin()
-  const usuarios = centroId
-    ? await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' AND u.centro_id = ${centroId} ORDER BY c.nombre, u.nombre`
+  await requireCurrentAdmin()
+  const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
+  const usuarios = cid
+    ? await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
     : await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' ORDER BY c.nombre, u.nombre`
-  const rows = await sql`SELECT * FROM entrenamiento_progreso`
+  const ids = usuarios.map((x) => x.id)
+  const rows = ids.length ? await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id = ANY(${ids})` : []
   const porUsuario = {}
   for (const r of rows) (porUsuario[r.usuario_id] ||= {})[r.modulo] = aCamel(r)
   return {
@@ -1151,7 +1240,22 @@ export async function matrizProgreso(centroId = null) {
 }
 ```
 
-- [ ] **Step 2: Prueba rápida manual** (con la app corriendo, desde la consola del navegador no se puede llamar server actions; se verifica en la Task 7 al usar el quiz). Alternativa inmediata: `node -e` contra Neon para confirmar que la tabla acepta el upsert:
+- [ ] **Step 2: Seguro de auth fresca** — agregar al final de `test/entrenamiento.test.mjs` (mismo patrón que `test/peticiones-actions.test.mjs`):
+
+```js
+test('matrizProgreso usa auth fresca (requireCurrentAdmin), no el rol del JWT', () => {
+  const src = readFileSync('app/actions/entrenamiento.js', 'utf8')
+  const start = src.indexOf('export async function matrizProgreso')
+  assert.ok(start >= 0, 'no se encontró matrizProgreso')
+  const next = src.indexOf('export ', start + 1)
+  const body = src.slice(start, next === -1 ? src.length : next)
+  assert.match(body, /requireCurrentAdmin\(\)/)
+  assert.doesNotMatch(body, /\brequireAdmin\(\)/)
+})
+```
+Run: `node --test test/entrenamiento.test.mjs` → `# pass 15`.
+
+- [ ] **Step 3: Prueba rápida manual** (con la app corriendo, desde la consola del navegador no se puede llamar server actions; se verifica en la Task 7 al usar el quiz). Alternativa inmediata: `node -e` contra Neon para confirmar que la tabla acepta el upsert:
 
 Run (Hermes, con `.env.local`):
 ```bash
@@ -1159,10 +1263,10 @@ node -e "const {readFileSync}=require('fs');for(const l of readFileSync('.env.lo
 ```
 Expected: `[ { count: '0' } ]`
 
-- [ ] **Step 3: Commit** (Hermes)
+- [ ] **Step 4: Commit** (Hermes)
 
 ```bash
-git add app/actions/entrenamiento.js
+git add app/actions/entrenamiento.js test/entrenamiento.test.mjs
 git commit -m "feat(entrenamiento): server actions de progreso, tour visto y quiz"
 ```
 
@@ -1208,7 +1312,8 @@ export default function EntrenamientoPage() {
   const estadoDe = (m) => {
     const p = progreso[m.id]
     if (completado(p)) return { k: 'ok', label: `✓ Completado · ${fmtFecha(p.quizAprobadoAt)}` }
-    if (p?.tourVistoAt) return { k: 'mid', label: 'Tour visto · falta el quiz' }
+    if (p?.tourVistoAt) return { k: 'mid', label: 'Recorrido visto · falta el quiz' }
+    if (p?.quizAprobadoAt) return { k: 'mid', label: 'Quiz aprobado · falta el recorrido' }
     return { k: 'pend', label: 'Pendiente' }
   }
 
@@ -1331,6 +1436,8 @@ export default function ModuloPage() {
       if (r?.error) { setResultado({ error: r.error }); return }
       setResultado(r)
       const np = await cargarProgreso(); setProgreso(np || {})
+    } catch {
+      setResultado({ error: 'No se pudo corregir. Recarga la página e intenta de nuevo.' })
     } finally { setEnviando(false) }
   }
   const reintentar = () => { setSel([null, null, null]); setResultado(null) }
@@ -1470,9 +1577,14 @@ import { resumenProgreso } from '../app/actions/entrenamiento'
 ```
 Dentro del componente:
 ```js
-  const [ent, setEnt] = useState(null) // { completados, total }
+  const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
-    if (!isAdmin && centroId) resumenProgreso().then((r) => { if (r && !r.error) setEnt(r) }).catch(() => {})
+    if (isAdmin || !centroId) return
+    // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
+    // leer el rol real. La action devuelve null para gerencia de todas formas.
+    const r = localStorage.getItem('aloha_rol')
+    if (r === 'admin_general' || r === 'supervisor') return
+    resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
   }, [isAdmin, centroId])
 ```
 Agregar el ítem al final de `centroItems`:
@@ -1491,14 +1603,15 @@ Estilo (agregar a `app/globals.css`, junto a los `.sb__*` existentes o al final)
 
 - [ ] **Step 2: Banner en Resumen** (`app/centro/[id]/page.js`)
 
-Importar `resumenProgreso` y en el componente:
+Importar `resumenProgreso`. La página ya lee el rol en su efecto de montaje (líneas ~108-111: `localStorage.getItem('aloha_rol')` → `setIsAdmin`). Agregar el estado y meter la carga en ESE mismo efecto (no crear otro):
 ```js
   const [ent, setEnt] = useState(null)
-  useEffect(() => { resumenProgreso().then((r) => { if (r && !r.error) setEnt(r) }).catch(() => {}) }, [])
+  // dentro del useEffect de montaje existente, después de setIsAdmin(admin):
+  if (!admin) resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
 ```
 Justo antes de `<div data-tour="resumen.ruta">…` (la banda de crecimiento):
 ```js
-        {ent && ent.completados < ent.total && (
+        {!isAdmin && ent && ent.completados < ent.total && (
           <div className="alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)' }}>
             <span>Tu entrenamiento: <b>{ent.completados} de {ent.total}</b> módulos completados.</span>
             <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => router.push(`/centro/${id}/entrenamiento`)}>Continuar →</button>
@@ -1506,7 +1619,7 @@ Justo antes de `<div data-tour="resumen.ruta">…` (la banda de crecimiento):
         )}
 ```
 
-- [ ] **Step 3: Comprobar** — menú muestra `Entrenamiento 0/9`; Resumen muestra el banner; completar un módulo y recargar → `1/9`.
+- [ ] **Step 3: Comprobar** — como administradora: menú muestra `Entrenamiento 0/9`; Resumen muestra el banner; completar un módulo y recargar → `1/9`. Como admin_general entrando a un centro: el ítem Entrenamiento se ve (sirve para previsualizar) pero **sin badge**, y Resumen **sin banner**.
 
 - [ ] **Step 4: Commit** (Hermes)
 
@@ -1555,7 +1668,7 @@ export default function EntrenamientoAdminPage() {
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento</div>
             <h1 className="h-title">Quién completó el entrenamiento</h1>
-            <p className="h-sub">Por usuario y módulo. ✓ = tour visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz</p>
+            <p className="h-sub">Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
           </div>
           <select className="input" style={{ width: 240 }} value={centroId} onChange={(e) => setCentroId(e.target.value)}>
             <option value="">Todos los centros</option>
@@ -1582,6 +1695,7 @@ export default function EntrenamientoAdminPage() {
                       const p = u.progreso[m.id]
                       if (completado(p)) return <td key={m.id} style={{ textAlign: 'center', color: 'var(--ok)' }} title={`Quiz aprobado ${fmt(p.quizAprobadoAt)} · ${p.intentos} intento(s)`}>✓ {fmt(p.quizAprobadoAt)}</td>
                       if (p?.tourVistoAt) return <td key={m.id} style={{ textAlign: 'center', color: 'var(--warn)' }} title={`Tour visto ${fmt(p.tourVistoAt)} · ${p.intentos} intento(s) de quiz`}>tour</td>
+                      if (p?.quizAprobadoAt) return <td key={m.id} style={{ textAlign: 'center', color: 'var(--warn)' }} title={`Quiz 3/3 ${fmt(p.quizAprobadoAt)} · falta el recorrido`}>quiz</td>
                       return <td key={m.id} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>—</td>
                     })}
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.pct === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.pct}%</td>
@@ -1727,12 +1841,16 @@ Expected: todas las pruebas existentes + las de `entrenamiento` en verde. `npm r
 - [ ] **Step 2: Smoke E2E en navegador** (Sonnet 5 o Playwright, sobre el worktree con `npm run dev` o sobre el preview de Vercel):
   1. Login como administradora de Condado del Rey (usuario temporal creado por Hermes).
   2. `/centro/6/entrenamiento` → 9 tarjetas Pendiente, anillo 0/9.
-  3. Módulo `aperturar` → Iniciar recorrido → spotlight sobre "➕ Aperturar grupo" → clic → modal abierto, paso 2 sobre "Número de grupo" → Siguiente × 4 → paso 7 "Haz clic en Cancelar" → clic → paso 8 → Terminar ✓ → vuelve a la página del módulo con "Recorrido visto".
+  3. Módulo `aperturar` → Iniciar recorrido → spotlight sobre "➕ Aperturar grupo" → clic → modal abierto, paso 2 sobre "Número de grupo" → Siguiente × 5 → paso 7 "Haz clic en Cancelar" → clic → paso 8 → Terminar ✓ → vuelve a la página del módulo con "Recorrido visto".
+  3b. **Sin recargar**, ir a `clase-prueba` → Iniciar recorrido → llegar al último paso → el botón dice "Terminar ✓" y está habilitado → Terminar funciona (el estado del tour anterior no contamina). Volver a `aperturar` → Repetir recorrido → arranca en el paso 1 sin spotlight residual.
+  3c. Con la página desplazada (p. ej. pestaña Fusiones), pulsar Siguiente: la página NO salta arriba y Network no muestra `?_rsc=` por clic.
   4. Quiz: responder mal una → "2 de 3" con explicación; Intentar de nuevo; 3/3 → "✓ Módulo completado".
   5. Índice: tarjeta `aperturar` verde con fecha; menú muestra `1/9`; Resumen muestra banner "1 de 9".
   6. Módulo `meta` → paso 4 (hazlo sobre "Ruta de Nivel" del menú) → el clic navega a `/centro/6/ruta-nivel?tour=meta&paso=5` y el tour continúa.
+  6b. Módulo `meta` → paso 4 → clic en **Omitir este paso** (sin tocar el menú) → la URL pasa igualmente a `/centro/6/ruta-nivel?tour=meta&paso=5` y el spotlight cae sobre la barra de nivel. Luego **← Anterior** vuelve a `/centro/6?tour=meta&paso=4` (la página origen).
+  6c. Recargar en frío `/centro/6/grupos?tour=llenado&paso=1`: mientras dice "Cargando…" la tarjeta avisa "Todavía no veo…" y al cargar pasa sola al spotlight.
   7. Módulo `cierre` → el paso 3 navega a KPI y sigue; Esc sale y quita `?tour`.
-  8. Login como admin_general → `/dashboard/entrenamiento` → fila del usuario con `✓ dd/mm` en módulo 3.
+  8. Login como admin_general → `/dashboard/entrenamiento` → fila del usuario con `✓ dd/mm` en módulo 3. Ir a un centro (`/centro/6`): el ítem Entrenamiento existe pero **sin badge** y Resumen **sin banner**.
   9. `?tour=aperturar&paso=99` → no revienta (paso fuera de rango: `step` es null → no renderiza).
   10. Borrar el usuario temporal.
 
