@@ -168,3 +168,13 @@ test('respuestas.js solo se importa desde módulos de servidor (use server)', ()
   })
   assert.deepEqual(malos, [], `respuestas.js importado fuera del servidor: ${malos.join(', ')}`)
 })
+
+test('matrizProgreso usa auth fresca (requireCurrentAdmin), no el rol del JWT', () => {
+  const src = readFileSync(join(ROOT, 'app/actions/entrenamiento.js'), 'utf8')
+  const start = src.indexOf('export async function matrizProgreso')
+  assert.ok(start >= 0, 'no se encontró matrizProgreso')
+  const next = src.indexOf('export ', start + 1)
+  const body = src.slice(start, next === -1 ? src.length : next)
+  assert.match(body, /requireCurrentAdmin\(\)/)
+  assert.doesNotMatch(body, /\brequireAdmin\(\)/)
+})
