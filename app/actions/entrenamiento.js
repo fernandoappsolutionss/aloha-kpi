@@ -127,3 +127,17 @@ export async function matrizProgreso(centroId = null) {
     }
   })
 }
+
+// Gerencia: vuelve a 0/9 el entrenamiento de un usuario. Para el cambio de
+// administradora que hereda el mismo correo/login del centro: el sistema no
+// puede saber que hay una persona nueva, alguien de gerencia lo declara aquí.
+// (Si además se va la persona, lo correcto sigue siendo borrar y recrear el
+// usuario: eso rota la contraseña; este botón solo borra el progreso.)
+export async function reiniciarProgreso(usuarioId) {
+  return runAction('reiniciarProgreso', async () => {
+    await requireCurrentAdmin()
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
+    await sql`DELETE FROM entrenamiento_progreso WHERE usuario_id = ${usuarioId}`
+    return { ok: true }
+  })
+}

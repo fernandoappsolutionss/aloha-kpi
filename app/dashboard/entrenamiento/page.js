@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Sidebar from '../../../components/Sidebar'
-import { matrizProgreso } from '../../actions/entrenamiento'
+import { matrizProgreso, reiniciarProgreso } from '../../actions/entrenamiento'
 import { listCentros } from '../../actions/centros'
 import { completado } from '../../../lib/entrenamiento/progreso'
 
@@ -13,6 +13,7 @@ export default function EntrenamientoAdminPage() {
   const [centroId, setCentroId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [recarga, setRecarga] = useState(0)
 
   useEffect(() => { listCentros().then((c) => setCentros(c || [])).catch(() => {}) }, [])
   useEffect(() => {
@@ -22,7 +23,15 @@ export default function EntrenamientoAdminPage() {
       .then((d) => { if (d?.error) { setError(d.error); setData(null) } else setData(d) })
       .catch(() => { setError('No se pudo cargar el progreso. Recarga la página.'); setData(null) })
       .finally(() => setLoading(false))
-  }, [centroId])
+  }, [centroId, recarga])
+
+  async function reiniciar(u) {
+    const ok = window.confirm(`¿Borrar todo el progreso de ${u.nombre}?\n\nVuelve a 0 de ${data.modulos.length} módulos. Úsalo cuando entra una administradora nueva que usa el mismo correo del centro.`)
+    if (!ok) return
+    const r = await reiniciarProgreso(u.id)
+    if (r?.error) { setError(r.error); return }
+    setRecarga((n) => n + 1)
+  }
 
   return (
     <div className="shell">
@@ -49,10 +58,11 @@ export default function EntrenamientoAdminPage() {
                   <th>Usuario</th><th>Centro</th>
                   {data.modulos.map((m, i) => <th key={m.id} title={m.titulo} style={{ textAlign: 'center' }}>{i + 1}</th>)}
                   <th style={{ textAlign: 'right' }}>%</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
-                {data.usuarios.length === 0 && <tr><td colSpan={data.modulos.length + 3} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>Sin usuarios administradora.</td></tr>}
+                {data.usuarios.length === 0 && <tr><td colSpan={data.modulos.length + 4} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>Sin usuarios administradora.</td></tr>}
                 {data.usuarios.map((u) => (
                   <tr key={u.id}>
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
@@ -65,6 +75,13 @@ export default function EntrenamientoAdminPage() {
                       return <td key={m.id} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>—</td>
                     })}
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.pct === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.pct}%</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {Object.keys(u.progreso).length > 0 && (
+                        <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando entra una administradora nueva con el mismo correo.">
+                          Reiniciar
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
