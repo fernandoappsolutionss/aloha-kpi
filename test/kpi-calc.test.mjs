@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { quarterMetrics } from '../lib/kpi-calc.js'
+import { ninosDeclarados, quarterMetrics } from '../lib/kpi-calc.js'
 
 test('un balance vivo de cero sigue siendo un cierre valido', () => {
   const result = quarterMetrics([
@@ -33,4 +33,26 @@ test('un mes cerrado conserva un cierre declarado de cero', () => {
   ], [], 2, [8], 5)
 
   assert.equal(result.ninos, 0)
+})
+
+test('el panel muestra el cierre declarado, no la proyeccion viva del mes abierto', () => {
+  const months = [
+    { declarado: true, ninosFinal: 830 },   // julio cerrado
+    { declarado: false, ninosFinal: 849 },  // agosto abierto (balance vivo)
+  ]
+  assert.equal(ninosDeclarados(months, 810), 830)
+})
+
+test('sin meses declarados en el rango, el panel usa la semilla del mes anterior', () => {
+  const months = [{ declarado: false, ninosFinal: 120 }]
+  assert.equal(ninosDeclarados(months, 115), 115)
+  assert.equal(ninosDeclarados(months), 0)
+})
+
+test('entre varios meses declarados manda el ultimo, aunque cierre en cero', () => {
+  const months = [
+    { declarado: true, ninosFinal: 90 },
+    { declarado: true, ninosFinal: 0 },
+  ]
+  assert.equal(ninosDeclarados(months, 80), 0)
 })
