@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
 import { getCentroResumen } from '../../actions/centro'
 import { getCentroGrowth } from '../../actions/growth'
+import { resumenProgreso } from '../../actions/entrenamiento'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import PeriodSelector from '../../../components/PeriodSelector'
 import GrowthSummaryBand from '../../../components/growth/GrowthSummaryBand'
@@ -104,11 +105,14 @@ export default function CentroPage() {
   const [cumplReal, setCumplReal] = useState(null)
   const [graduacion, setGraduacion] = useState(null)
   const [growth, setGrowth] = useState(null)
+  const [ent, setEnt] = useState(null)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
     const r = localStorage.getItem('aloha_rol')
-    setIsAdmin(r === 'admin_general' || r === 'supervisor')
+    const admin = r === 'admin_general' || r === 'supervisor'
+    setIsAdmin(admin)
+    if (!admin) resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
   }, [])
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -255,10 +259,16 @@ export default function CentroPage() {
           </div>
         </div>
 
-        <GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} />
+        {!isAdmin && ent && ent.completados < ent.total && (
+          <div className="alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)' }}>
+            <span>Tu entrenamiento: <b>{ent.completados} de {ent.total}</b> módulos completados.</span>
+            <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => router.push(`/centro/${id}/entrenamiento`)}>Continuar →</button>
+          </div>
+        )}
+        <div data-tour="resumen.ruta"><GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} /></div>
 
         {/* KPI Trimestral por rol — cada rol ve sus propios indicadores */}
-        <div className="role-kpi-grid">
+        <div className="role-kpi-grid" data-tour="resumen.metas">
           <RoleKpi
             rol="Administrador"
             sub="Ventas y deserción"
@@ -317,7 +327,7 @@ export default function CentroPage() {
             </table>
           </div>
 
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20 }} data-tour="resumen.embudo">
             <h3 style={sectionTitle}>Clase de prueba</h3>
             <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
               {[

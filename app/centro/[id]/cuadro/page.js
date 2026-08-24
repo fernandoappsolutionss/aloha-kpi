@@ -170,7 +170,7 @@ export default function CuadroPage() {
                 <span className="dot" />{congelado ? '🔒 Mes cerrado · foto congelada' : (cerrado ? 'Mes KPI cerrado' : 'Mes KPI abierto')}
               </span>
             )}
-            <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download>⬇ Descargar Excel</a>
+            <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download data-tour="cuadro.excel">⬇ Descargar Excel</a>
             <button onClick={handleSincronizar} disabled={syncing || cerrado} className="btn"
               style={cerrado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               title={cerrado ? 'Este mes está cerrado en KPI Semanal. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
@@ -198,7 +198,7 @@ export default function CuadroPage() {
             </div>
 
             {/* Comparación con el KPI semanal capturado */}
-            <div className="panel" style={{ marginBottom: 20 }}>
+            <div className="panel" style={{ marginBottom: 20 }} data-tour="cuadro.comparacion">
               <div className="panel__head">
                 <h3 className="panel__title">Comparación con KPI semanal</h3>
                 <span className="label">Detecta descuadres antes de entregar a la Junta</span>
@@ -239,7 +239,7 @@ export default function CuadroPage() {
             </div>
 
             {/* Royalties por nivel */}
-            <div className="panel" style={{ marginBottom: 20 }}>
+            <div className="panel" style={{ marginBottom: 20 }} data-tour="cuadro.royalties">
               <div className="panel__head">
                 <h3 className="panel__title">Royalties</h3>
                 <span className="label">× {money(data.royaltyRate)} por niño activo</span>

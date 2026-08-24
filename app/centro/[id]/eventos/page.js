@@ -175,7 +175,7 @@ export default function EventosPage() {
             <h1 className="h-title">Clases de Prueba</h1>
             <p className="h-sub">Clases de prueba sincronizadas con el CRM</p>
           </div>
-          <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" disabled={!config.configured}>+ Nueva clase de prueba</button>
+          <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" data-tour="eventos.nueva" disabled={!config.configured}>+ Nueva clase de prueba</button>
         </div>
 
         {!config.configured && (
@@ -189,7 +189,7 @@ export default function EventosPage() {
         )}
 
         {/* Tarjetas de stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 20 }} data-tour="eventos.metricas">
           {CARDS.map((c, i) => (
             <div key={i} className="kpi" style={{ padding: '14px 16px' }}>
               <div className="kpi__top"><span className="label">{c.l}</span></div>
@@ -215,7 +215,7 @@ export default function EventosPage() {
           </select>
         </div>
 
-        <div className="panel">
+        <div className="panel" data-tour="eventos.lista">
           <div style={{ overflowX: 'visible' }}>
             <table className="table">
               <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
@@ -369,7 +369,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Field full label="Nombre de la clase de prueba *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
               <Field full label="Descripción"><textarea className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
-              <Field full label="Grupo que se va a aperturar">
+              <Field full label="Grupo que se va a aperturar" tour="evento.grupo">
                 <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
                   <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
                   {vinculoCerrado && (
@@ -395,7 +395,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                   <option value="in_person">Presencial</option><option value="online">Online</option>
                 </select>
               </Field>
-              <Field label="Inicio *"><input type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
+              <Field label="Inicio *" tour="evento.inicio"><input type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
               <Field label="Fin"><input type="datetime-local" className="input" value={f.endLocal} onChange={(e) => set('endLocal', e.target.value)} /></Field>
               {f.event_type === 'online'
                 ? <Field full label="Link de la reunión"><input className="input" value={f.meeting_url} onChange={(e) => set('meeting_url', e.target.value)} placeholder="https://zoom.us/…" /></Field>
@@ -462,16 +462,16 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear clase de prueba')}</button>
+          <button className="btn" data-tour="evento.cancelar" onClick={onClose}>Cancelar</button>
+          <button className="btn btn--primary" data-tour="evento.crear" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear clase de prueba')}</button>
         </div>
       </div>
     </div>
   )
 }
 
-function Field({ label, full, children }) {
-  return <div className="field" style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
+function Field({ label, full, tour, children }) {
+  return <div className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
 }
 
 function Registrations({ centroId, eventId, grupoId, onChange }) {

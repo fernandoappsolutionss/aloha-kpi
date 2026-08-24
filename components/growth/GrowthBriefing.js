@@ -31,6 +31,9 @@ export default function GrowthBriefing({ centroId }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // Guarda: con un recorrido del entrenamiento activo (?tour=) no abrimos la
+    // Guía semanal encima (bloquea scroll y atrapa el foco) ni consumimos el recibo.
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tour')) return undefined
     let active = true
     loadBriefing(centroId)
       .then((result) => {

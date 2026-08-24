@@ -777,3 +777,20 @@ ALTER TABLE estudiantes ADD CONSTRAINT chk_retiro_programado_estado
 --   ON estudiante_eventos (estudiante_id) WHERE tipo = 'inscripcion';
 -- CREATE UNIQUE INDEX IF NOT EXISTS idx_estudiantes_centro_crm_reg
 --   ON estudiantes (centro_id, crm_registration_id) WHERE crm_registration_id IS NOT NULL;
+
+-- ══ ENTRENAMIENTO EN-APP (2026-08-23) ══
+-- Progreso del entrenamiento por USUARIO (no por centro): dos administradoras
+-- del mismo centro llevan cada una el suyo. Completado = tour_visto_at AND
+-- quiz_aprobado_at. El contenido de los módulos vive en lib/entrenamiento/modulos.js.
+CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
+  id               SERIAL PRIMARY KEY,
+  usuario_id       INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  modulo           TEXT NOT NULL,
+  tour_visto_at    TIMESTAMPTZ,
+  quiz_aprobado_at TIMESTAMPTZ,
+  intentos         INTEGER NOT NULL DEFAULT 0,
+  ultimo_puntaje   INTEGER,
+  updated_at       TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (usuario_id, modulo)
+);
+-- (sin índice extra: el UNIQUE ya indexa usuario_id como primera columna)

@@ -3,6 +3,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
 import { logout as logoutAction } from '../app/actions/auth'
+import { resumenProgreso } from '../app/actions/entrenamiento'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -26,6 +27,7 @@ function Icon({ name }) {
     case 'sheet': return <svg viewBox="0 0 24 24" {...P}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M4 9h16M4 15h16M12 9v12" /></svg>
     case 'logout': return <svg viewBox="0 0 24 24" {...P}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
     case 'shield': return <svg viewBox="0 0 24 24" {...P}><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5Z" /></svg>
+    case 'book': return <svg viewBox="0 0 24 24" {...P}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
     case 'chevron': return <svg viewBox="0 0 24 24" {...P}><polyline points="6 9 12 15 18 9" /></svg>
     default: return null
   }
@@ -44,6 +46,16 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     }
   }, [isAdmin])
 
+  const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
+  useEffect(() => {
+    if (isAdmin || !centroId) return
+    // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
+    // leer el rol real. La action devuelve null para gerencia de todas formas.
+    const r = localStorage.getItem('aloha_rol')
+    if (r === 'admin_general' || r === 'supervisor') return
+    resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
+  }, [isAdmin, centroId])
+
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
@@ -52,21 +64,23 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
     { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
+    { label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' },
   ]
   const adminConfig = [
     { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
     { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
   ]
   const centroItems = [
-    { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}` },
-    { label: 'Ruta de Nivel', icon: 'target', href: `/centro/${centroId}/ruta-nivel` },
-    { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi` },
-    { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos` },
-    { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro` },
-    { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos` },
+    { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
+    { label: 'Ruta de Nivel', icon: 'target', href: `/centro/${centroId}/ruta-nivel`, tour: 'nav.ruta' },
+    { label: 'KPI Semanal', icon: 'edit', href: `/centro/${centroId}/kpi`, tour: 'nav.kpi' },
+    { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos`, tour: 'nav.grupos' },
+    { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro`, tour: 'nav.cuadro' },
+    { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos`, tour: 'nav.eventos' },
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
+    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
   ]
   const items = isAdmin ? adminItems : centroItems
 
@@ -91,9 +105,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       <nav className="sb__nav">
         <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => (
-          <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
+          <button key={item.href} onClick={() => router.push(item.href)} title={item.label} data-tour={item.tour}
             className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
             <Icon name={item.icon} /><span>{item.label}</span>
+            {item.badge && <span className="sb__badge">{item.badge}</span>}
           </button>
         ))}
 
