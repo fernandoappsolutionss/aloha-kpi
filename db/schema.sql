@@ -271,11 +271,12 @@ CREATE TABLE IF NOT EXISTS peticion_cotizaciones (
 
 -- FK de peticiones.cotizacion_aprobada_id: va aquí (no inline arriba) porque
 -- peticion_cotizaciones se declara después de peticiones en este archivo.
--- Sentencia simple, sin bloque anónimo PL/pgSQL: scripts/migrate.mjs separa
--- este archivo por ';' (invariante declarado ahí mismo: "sin funciones
--- plpgsql"), y schema.sql solo corre una vez sobre una base nueva, así que
--- no hace falta el guard IF NOT EXISTS que sí usa la migración dedicada
--- (esa envía el archivo completo en una sola consulta).
+-- DROP + ADD porque Postgres no tiene ADD CONSTRAINT IF NOT EXISTS: el par es
+-- re-ejecutable sobre una base existente (sin él, 42710 aborta migrate.mjs y
+-- nada posterior se aplica) y va en sentencias planas, compatibles con el
+-- split por ';' de scripts/migrate.mjs — mismo patrón que
+-- chk_retiro_programado_estado más abajo.
+ALTER TABLE peticiones DROP CONSTRAINT IF EXISTS peticiones_cotizacion_aprobada_fkey;
 ALTER TABLE peticiones
   ADD CONSTRAINT peticiones_cotizacion_aprobada_fkey
   FOREIGN KEY (cotizacion_aprobada_id) REFERENCES peticion_cotizaciones(id) ON DELETE SET NULL;
