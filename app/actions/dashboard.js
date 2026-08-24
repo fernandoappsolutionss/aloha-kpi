@@ -7,6 +7,7 @@ import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
 import { hoyISO } from '../../lib/operaciones'
 import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
+import { ninosDeclarados } from '../../lib/kpi-calc'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
@@ -195,7 +196,10 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       if (has) { cadena = ninosFinal; if ((r?.grupos_activos || 0) > 0) cadenaGrupos = r.grupos_activos }
       const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
       const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
-      return { nuevos, desercion, desPct, cob, ok, has, ninosInicio: ninosIni, ninosFinal, nuevosActivos, grupos: (r?.grupos_activos || 0) > 0 ? r.grupos_activos : cadenaGrupos }
+      // Declarado = fila real del KPI (cierre o captura), NO la proyección viva
+      // del mes abierto: esa no cuenta para los niños del panel.
+      const declarado = !!r && r.balance_vivo !== true
+      return { nuevos, desercion, desPct, cob, ok, has, declarado, ninosInicio: ninosIni, ninosFinal, nuevosActivos, grupos: (r?.grupos_activos || 0) > 0 ? r.grupos_activos : cadenaGrupos }
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
@@ -203,9 +207,10 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const desercionReal = Math.max(0, totDes - graduados)
     const conDatos = months.filter((m) => m.has)
     const last = conDatos.length ? conDatos[conDatos.length - 1] : months[months.length - 1]
-    // ninosFinal ya viene encadenado: cierre real del mes si existe, o el
-    // eslabón anterior + nuevos − deserción para meses aún en curso.
-    const ninos = last.ninosFinal
+    // Los niños del panel son los DECLARADOS en el KPI semanal: el mes abierto
+    // no proyecta aquí; se muestran los niños con los que TERMINÓ el último
+    // mes declarado (o la semilla previa al rango si no hay ninguno).
+    const ninos = ninosDeclarados(months, prev?.ninos_final_mes)
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     const ag = cumpAgg[c.id]
@@ -350,11 +355,15 @@ export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
     let ninos = 0, nuevos = 0
     for (const r of mrs) {
       const des = r.retiros_operativos_mes ?? (desMes.find((d) => d.centro_id === r.centro_id && d.year === year && d.month === month)?.des || 0)
-      const balanceDeclarado = r.balance_vivo === true || r.estado_mes === 'cerrado'
-      const ini = balanceDeclarado && r.ninos_inicio_mes != null
+      const cerrado = r.estado_mes === 'cerrado'
+      const ini = cerrado && r.ninos_inicio_mes != null
         ? Number(r.ninos_inicio_mes)
         : (r.ninos_inicio_mes || 0) > 0 ? r.ninos_inicio_mes : (cadena.get(r.centro_id) || 0)
-      const fin = balanceDeclarado && r.ninos_final_mes != null
+      // Serie DECLARADA: el mes abierto (balance vivo) no proyecta; arrastra el
+      // último cierre declarado del centro.
+      const fin = r.balance_vivo === true
+        ? (cadena.get(r.centro_id) || 0)
+        : cerrado && r.ninos_final_mes != null
         ? Number(r.ninos_final_mes)
         : (r.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ini + (r.nuevos_activos_mes || 0) - des)
       cadena.set(r.centro_id, fin)
