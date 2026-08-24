@@ -563,7 +563,12 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                       </button>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {/* Cancelado conserva su etiqueta (cuenta como no asistió en las stats);
+                            los botones quedan por si el niño igual se presentó. */}
+                        {r.attendance_status === 'cancelled' && (
+                          <span className="pill pill--bad" style={{ fontSize: 10 }}>Cancelado</span>
+                        )}
                         <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
                         <button onClick={() => setAsist(r, false)} disabled={busy === r.id + 'a'}
