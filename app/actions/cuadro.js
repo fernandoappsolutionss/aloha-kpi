@@ -1,6 +1,6 @@
 'use server'
 import { sql, upsertWith, withTransaction } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { calcularCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
@@ -99,7 +99,7 @@ export async function savePedido(centroId, data) {
 }
 
 export async function deletePedido(centroId, id) {
-  await requireCentroAccess(centroId)
+  await requireCurrentPuedeEliminar(centroId)
   const r = await sql`DELETE FROM pedidos_material WHERE id = ${id} AND centro_id = ${centroId} RETURNING id`
   if (!r.length) return { error: 'Pedido no encontrado.' }
   return { ok: true }

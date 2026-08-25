@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { tienePanel, ETIQUETA_ROL } from '../../components/useRol'
 import { useRouter } from 'next/navigation'
 import { changePassword } from '../actions/auth'
 import Sidebar from '../../components/Sidebar'
@@ -37,7 +38,7 @@ export default function PerfilPage() {
     setLoading(false)
   }
 
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
+  const isAdmin = tienePanel(rol)
   const coinciden = form.nueva && form.confirmar && form.nueva === form.confirmar
   const isError = status.includes('❌')
 
@@ -65,7 +66,7 @@ export default function PerfilPage() {
               <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-serif)' }}>{nombre}</div>
               <div className="num" style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>{email}</div>
               <span className={`pill ${isAdmin ? 'pill--ok' : 'pill--ok'}`} style={{ marginTop: 9 }}>
-                <span className="dot" />{isAdmin ? 'Administrador General' : 'Administradora de Centro'}
+                <span className="dot" />{ETIQUETA_ROL[rol] || 'Usuario'}
               </span>
             </div>
           </div>

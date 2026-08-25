@@ -55,7 +55,7 @@ export async function cargarProgreso() {
 export async function resumenProgreso() {
   return runAction('resumenProgreso', async () => {
     const s = await requireSession()
-    if (isAdminRole(s.rol)) return null
+    if (isAdminRole(s.rol) || s.rol === 'coordinador') return null
     return porcentaje(await progresoDeSesion(), MODULOS)
   })
 }

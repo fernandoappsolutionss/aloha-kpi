@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useEsAsistente, tienePanel } from '../../../../components/useRol'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
@@ -245,7 +246,7 @@ export default function GruposPage() {
   const { id } = useParams()
   const router = useRouter()
   const [rol, setRol] = useState('usuario')
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
+  const isAdmin = tienePanel(rol)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
@@ -1717,6 +1718,8 @@ function liberacionDe(grupo) {
 }
 
 function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, onAbrirGrupo, onChanged, setStatus }) {
+  // El asistente aparta la sala de la clase de prueba, pero no la quita.
+  const esAsistente = useEsAsistente()
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
     return d >= 1 && d <= 6 ? d : 1
@@ -1893,7 +1896,9 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span className="pill pill--warn" style={{ whiteSpace: 'nowrap' }}>🎯 Clase de prueba {aHora12(aMinutos(reservaDia.hora_inicio))}–{aHora12(aMinutos(reservaDia.hora_fin))}</span>
             <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReservaModal(reservaDia) }}>Editar</button>
-            <button className="btn" style={BTN_XS} disabled={borrando} onClick={quitarReserva}>{borrando ? 'Quitando…' : 'Quitar'}</button>
+            {!esAsistente && (
+              <button className="btn" style={BTN_XS} disabled={borrando} onClick={quitarReserva}>{borrando ? 'Quitando…' : 'Quitar'}</button>
+            )}
           </div>
         ) : (
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => { setStatus(''); setReservaModal({ dia }) }}>
