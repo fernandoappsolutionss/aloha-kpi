@@ -33,7 +33,7 @@ function SetPasswordInner() {
       localStorage.setItem('aloha_centro_id', res.centro_id || '')
       localStorage.setItem('aloha_nombre', res.nombre || '')
       localStorage.setItem('aloha_email', res.email || '')
-      if (res.rol === 'admin_general' || res.rol === 'supervisor') router.push('/dashboard')
+      if (res.rol === 'admin_general' || res.rol === 'supervisor' || res.rol === 'coordinador') router.push('/dashboard')
       else router.push('/centro/' + res.centro_id)
     } catch (err) { setError(err.message); setLoading(false) }
   }

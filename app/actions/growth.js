@@ -1,6 +1,7 @@
 'use server'
 
-import { requireAdmin, requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess } from '../../lib/auth'
+import { alcancePanel, soloDeMisCentros } from '../../lib/alcance'
 import { sql } from '../../lib/db'
 import { evaluateGrowthForecasts } from '../../lib/growth/backtest.mjs'
 import {
@@ -187,8 +188,7 @@ const adminGrowthRow = (growth, backtest) => {
 }
 
 export async function getGrowthAdminOverview() {
-  await requireAdmin()
-  const centers = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
+  const { centros: centers, centroIds } = await alcancePanel()
   const calculated = []
 
   for (let index = 0; index < centers.length; index += 3) {
@@ -221,12 +221,16 @@ export async function getGrowthAdminOverview() {
     `,
   ])
 
-  const model = evaluateGrowthForecasts({ snapshots, actuals: closedActuals })
+  // El backtest del modelo se calcula sobre los centros del alcance: al
+  // coordinador no le sirve (ni le corresponde) el promedio de los demás.
+  const misSnapshots = soloDeMisCentros(snapshots, centroIds)
+  const misActuals = soloDeMisCentros(closedActuals, centroIds)
+  const model = evaluateGrowthForecasts({ snapshots: misSnapshots, actuals: misActuals })
   const rows = calculated.map(({ center, growth, error }) => {
     if (error || !growth) return { id: center.id, name: center.nombre, error: true }
     const centerBacktest = evaluateGrowthForecasts({
-      snapshots: snapshots.filter((item) => String(item.centro_id) === String(center.id)),
-      actuals: closedActuals.filter((item) => String(item.centro_id) === String(center.id)),
+      snapshots: misSnapshots.filter((item) => String(item.centro_id) === String(center.id)),
+      actuals: misActuals.filter((item) => String(item.centro_id) === String(center.id)),
     })
     return adminGrowthRow(growth, centerBacktest)
   })

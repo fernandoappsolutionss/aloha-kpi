@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
@@ -26,6 +27,8 @@ const emptyW = () => ({ cob:['','','','',''], des:['','','','',''], ing:['','','
 export default function KPIPage() {
   const { id } = useParams()
   const now = new Date()
+  // El asistente registra el KPI, pero no cierra ni reabre el mes.
+  const esAsistente = useEsAsistente()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [centroNombre, setCentroNombre] = useState('')
@@ -241,17 +244,23 @@ export default function KPIPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {locked ? (
-              <button onClick={handleReabrirMes} disabled={cerrando} className="btn" data-tour="kpi.reabrir">
-                {cerrando ? 'Reabriendo…' : 'Reabrir mes'}
-              </button>
+              esAsistente
+                ? <span className="label" style={{ color: 'var(--text-faint)' }}>Mes cerrado — lo reabre el administrador del centro</span>
+                : (
+                  <button onClick={handleReabrirMes} disabled={cerrando} className="btn" data-tour="kpi.reabrir">
+                    {cerrando ? 'Reabriendo…' : 'Reabrir mes'}
+                  </button>
+                )
             ) : (
               <>
                 <button onClick={handleSave} disabled={saving} className="btn btn--primary" data-tour="kpi.guardar">
                   {saving ? 'Guardando…' : 'Guardar'}
                 </button>
-                <button onClick={handleCerrarMes} disabled={cerrando} className="btn" data-tour="kpi.cerrar-mes">
-                  {cerrando ? 'Cerrando…' : 'Cerrar mes'}
-                </button>
+                {!esAsistente && (
+                  <button onClick={handleCerrarMes} disabled={cerrando} className="btn" data-tour="kpi.cerrar-mes">
+                    {cerrando ? 'Cerrando…' : 'Cerrar mes'}
+                  </button>
+                )}
               </>
             )}
           </div>

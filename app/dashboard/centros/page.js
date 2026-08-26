@@ -7,6 +7,13 @@ import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from
 // El país del centro define las FECHAS PATRIAS que salta su calendario de
 // itinerarios (Panamá o Venezuela).
 const PAISES = { PA: 'Panamá', VE: 'Venezuela' }
+// Miembros del centro: Administrador y Asistente. El coordinador operativo no
+// es del centro, pero manda en él, y por eso también aparece en el equipo.
+const ROL_MIEMBRO = {
+  administradora: { label: 'Administrador', pill: 'pill--ok' },
+  asistente:      { label: 'Asistente',     pill: 'pill--warn' },
+  coordinador:    { label: 'Coordinador',   pill: '' },
+}
 const REGIONES = {
   PA: ['Ciudad de Panamá','Chiriquí','Coclé','Veraguas','Herrera','Los Santos','Colón','Darién','Panamá Oeste'],
   VE: ['Distrito Capital','Amazonas','Anzoátegui','Apure','Aragua','Barinas','Bolívar','Carabobo','Cojedes','Delta Amacuro','Falcón','Guárico','La Guaira','Lara','Mérida','Miranda','Monagas','Nueva Esparta','Portuguesa','Sucre','Táchira','Trujillo','Yaracuy','Zulia'],
@@ -146,7 +153,7 @@ export default function CentrosPage() {
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
-                <tr>{['Centro','País','Región','Usuarios','Acciones'].map(h=>
+                <tr>{['Centro','País','Región','Equipo','Acciones'].map(h=>
                   <th key={h}>{h}</th>
                 )}</tr>
               </thead>
@@ -161,7 +168,25 @@ export default function CentrosPage() {
                       <td style={{ color: 'var(--text-dim)' }}>{PAISES[c.pais] || 'Panamá'}</td>
                       <td style={{ color: 'var(--text-dim)' }}>{c.region || '—'}</td>
                       <td>
-                        <span className="pill pill--ok"><span className="dot" />{userCount} usuario{userCount!==1?'s':''}</span>
+                        {(c.miembros || []).length === 0
+                          ? <span style={{ color: 'var(--text-faint)', fontStyle: 'italic', fontSize: 12 }}>Sin miembros</span>
+                          : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {c.miembros.map(m => {
+                                const meta = ROL_MIEMBRO[m.rol] || { label: m.rol, pill: '' }
+                                return (
+                                  <div key={`${m.rol}-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className={`pill ${meta.pill}`} style={{ minWidth: 104, justifyContent: 'center' }}>
+                                      <span className="dot" />{meta.label}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: m.activo ? 'var(--text)' : 'var(--text-faint)' }} title={m.email}>
+                                      {m.nombre}{m.activo ? '' : ' (pendiente)'}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>

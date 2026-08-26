@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { tienePanel } from '../../../../components/useRol'
 import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
@@ -70,7 +71,9 @@ export default function EventosPage() {
   const router = useRouter()
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
   const [rol, setRol] = useState('usuario')
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
+  const isAdmin = tienePanel(rol)
+  // El asistente registra clases de prueba, pero no las elimina.
+  const esAsistente = rol === 'asistente'
   const [config, setConfig] = useState({ configured: true, baseUrl: '' })
   const [opts, setOpts] = useState({ sales_teams: [], pipeline_stages: [] })
   const [events, setEvents] = useState([])
@@ -272,7 +275,7 @@ export default function EventosPage() {
             ['✏️ Editar', () => { setMenuId(null); openEdit(menuEvent, setEditing) }],
             ['⧉ Duplicar', () => onDuplicate(menuEvent)],
             ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
-            ['🗑 Eliminar', () => onDelete(menuEvent), true],
+            !esAsistente && ['🗑 Eliminar', () => onDelete(menuEvent), true],
           ].filter(Boolean).map(([txt, fn, danger], k) => (
             <button key={k} onClick={fn}
               style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>

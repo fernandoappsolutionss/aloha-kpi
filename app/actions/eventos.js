@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
 import { crmCall, crmAccountForCentro, crmConfigured, crmBaseUrl } from '../../lib/crm'
 import { armarAlohaGroup } from '../../lib/cupos-sync'
 import { encolarSyncCrm } from '../../lib/llenado-service'
@@ -180,7 +180,7 @@ export async function actualizarEvento(centroId, eventId, data) {
 }
 
 export async function eliminarEvento(centroId, eventId) {
-  await requireCentroAccess(centroId)
+  await requireCurrentPuedeEliminar(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('delete_event', { event_id: eventId })
   if (res.error) return { error: res.error }

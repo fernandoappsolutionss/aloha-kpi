@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireAdmin } from '../../lib/auth'
+import { alcancePanel, soloDeMisCentros } from '../../lib/alcance'
 import { getCurrentPeriod } from '../../lib/period'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
@@ -120,13 +120,12 @@ async function aplicarMesesAbiertosVivos(rows, prevRows, lo, hi, centroIds = [])
 // Es la base del panel: sirve igual para un trimestre (3 meses) que para un
 // rango mensual (ej. últimos 12 meses). Calcula todo en el servidor.
 export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
-  await requireAdmin()
+  const { centros } = await alcancePanel()
   const lo = fromY * 100 + fromM, hi = toY * 100 + toM
   const mlist = monthList(fromY, fromM, toY, toM)
   const nMeses = mlist.length || 1
   const toQ = Q_OF(toM) // metas/objetivos = los del trimestre del mes final del rango
 
-  const centros = await sql`SELECT id, nombre FROM centros ORDER BY nombre`
   const [metas] = await sql`SELECT * FROM metas WHERE anio = ${toY} AND trimestre = ${toQ}`
   let rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   let ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
@@ -138,7 +137,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     desde: lo,
     hasta: hi,
   }))
-  const usuarios = await sql`SELECT nombre, centro_id FROM usuarios`
+  const usuarios = await sql`SELECT nombre, centro_id, rol FROM usuarios`
   // Semilla del ENCADENAMIENTO: cierre del mes anterior al rango. Un mes
   // recién abierto (sin cierre) hereda los niños del eslabón anterior en vez
   // de mostrar 0 en el panel.
@@ -171,7 +170,10 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   return centros.map((c) => {
     const crs = rs.filter((r) => r.centro_id === c.id)
     const cks = ks.filter((k) => k.centro_id === c.id)
-    const admin = usuarios.find((u) => u.centro_id === c.id)?.nombre || '—'
+    // El centro puede tener administradora y asistente: el panel muestra a la
+    // administradora; si no hay, a quien esté asignado.
+    const admin = (usuarios.find((u) => u.centro_id === c.id && u.rol === 'administradora')
+      || usuarios.find((u) => u.centro_id === c.id))?.nombre || '—'
     const prev = prevRows.find((r) => r.centro_id === c.id)
     let cadena = prev?.ninos_final_mes || 0
     let cadenaGrupos = prev?.grupos_activos || 0
@@ -253,11 +255,12 @@ export async function getCentrosKpi(year, quarter) {
 // Historial admin: agrupado por (centro, trimestre), calculado desde el
 // esquema coherente (centro_id/year/month). Devuelve solo trimestres con datos.
 export async function getHistorialAdmin(anio, centroSel, trimSel) {
-  await requireAdmin()
+  const { centros: visibles } = await alcancePanel()
 
+  // Un centro seleccionado fuera del alcance no devuelve nada (no "todos").
   const centros = (centroSel && centroSel !== 'todos')
-    ? await sql`SELECT id, nombre FROM centros WHERE id = ${centroSel}`
-    : await sql`SELECT id, nombre FROM centros ORDER BY nombre`
+    ? visibles.filter((centro) => String(centro.id) === String(centroSel))
+    : visibles
 
   const trimestres = (trimSel && trimSel !== 'todos') ? [parseInt(trimSel)] : [1, 2, 3, 4]
   const centroIds = new Set(centros.map((centro) => Number(centro.id)))
@@ -312,24 +315,26 @@ export async function getHistorialAdmin(anio, centroSel, trimSel) {
 // hasta], ENCADENADA: un mes en curso sin cierre hereda el eslabón anterior
 // del centro (+ nuevos − deserción) en vez de hundir la curva a 0.
 export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
-  await requireAdmin()
+  const { centros, centroIds } = await alcancePanel()
   const lo = desdeY * 100 + desdeM
   const hi = hastaY * 100 + hastaM
   const py = desdeM === 1 ? desdeY - 1 : desdeY
   const pm = desdeM === 1 ? 12 : desdeM - 1
-  const centros = await sql`SELECT id FROM centros`
-  let rows = await sql`
+  // Esta serie SUMA los centros: hay que recortar las filas, no solo la lista.
+  let rows = soloDeMisCentros(await sql`
     SELECT centro_id, year, month, ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
-    FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
-  const prev = await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`
+    FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`, centroIds)
+  const prev = soloDeMisCentros(
+    await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`,
+    centroIds)
   rows = await aplicarMesesAbiertosVivos(rows, prev, lo, hi, centros.map((centro) => centro.id))
   // (g1-16) Filas crudas + agregado en JS: la superposición del cálculo vivo
   // (meses abiertos >= gate) entra a la serie con el helper compartido.
-  let ksSerie = await sql`
+  let ksSerie = soloDeMisCentros(await sql`
     SELECT centro_id, year, month, semana,
            ing_d1, ing_d2, ing_d3, ing_d4, ing_d5,
            des_d1, des_d2, des_d3, des_d4, des_d5
-    FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+    FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`, centroIds)
   ;({ filas: ksSerie } = await superponerKpiAbiertos({
     filas: ksSerie,
     centroIds: centros.map((centro) => centro.id),

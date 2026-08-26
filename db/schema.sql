@@ -22,10 +22,20 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre         TEXT NOT NULL,
   email          TEXT NOT NULL UNIQUE,
   password_hash  TEXT,
-  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_general | supervisor | administradora
+  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_general | supervisor | coordinador | administradora | asistente
   centro_id      INTEGER REFERENCES centros(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ DEFAULT now()
 );
+
+-- Centros de un coordinador operativo (N:N). Los demás roles usan
+-- usuarios.centro_id; el coordinador manda como administrador en varios.
+CREATE TABLE IF NOT EXISTS usuario_centros (
+  usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  centro_id   INTEGER NOT NULL REFERENCES centros(id)  ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (usuario_id, centro_id)
+);
+CREATE INDEX IF NOT EXISTS idx_usuario_centros_centro ON usuario_centros (centro_id);
 
 -- Tokens de invitación / restablecimiento de contraseña (un solo uso, con vencimiento).
 -- Se generan al crear un usuario (purpose='invite') o al pedir restablecer (purpose='reset').

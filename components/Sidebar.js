@@ -2,6 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
+import { tienePanel } from './useRol'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import Logo from './Logo'
@@ -39,6 +40,11 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const isAdmin = rol === 'admin_general' || rol === 'supervisor'
   const [centros, setCentros] = useState([])
   const [centrosOpen, setCentrosOpen] = useState(false)
+  // Las páginas del panel pasan rol="admin_general" fijo: el rol real (para
+  // distinguir al coordinador operativo) sale de la sesión guardada.
+  const [rolReal, setRolReal] = useState(null)
+  useEffect(() => { setRolReal(localStorage.getItem('aloha_rol')) }, [])
+  const esCoordinador = rolReal === 'coordinador'
 
   useEffect(() => {
     if (isAdmin) {
@@ -52,7 +58,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
     // leer el rol real. La action devuelve null para gerencia de todas formas.
     const r = localStorage.getItem('aloha_rol')
-    if (r === 'admin_general' || r === 'supervisor') return
+    if (tienePanel(r)) return
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
   }, [isAdmin, centroId])
 
@@ -63,8 +69,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
-    { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
-    { label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' },
+    // Metas y Entrenamiento son de gerencia: fijan objetivos globales y la
+    // matriz de todas las administradoras. El coordinador no los ve.
+    ...(esCoordinador ? [] : [
+      { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
+      { label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' },
+    ]),
   ]
   const adminConfig = [
     { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
@@ -98,7 +108,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
         <Logo size={28} wordmark={false} />
         <div className="sb__role">
           <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isAdmin ? 'shield' : 'building'} /></span>
-          <span className="label">{isAdmin ? 'Administrador' : (centroNombre || 'Centro')}</span>
+          <span className="label">{isAdmin ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador') : (centroNombre || 'Centro')}</span>
         </div>
       </div>
 
@@ -132,7 +142,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
           </>
         )}
 
-        {isAdmin && (
+        {isAdmin && !esCoordinador && (
           <>
             <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
             {adminConfig.map(item => (

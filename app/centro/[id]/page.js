@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
+import { tienePanel } from '../../../components/useRol'
 import { getCentroResumen } from '../../actions/centro'
 import { getCentroGrowth } from '../../actions/growth'
 import { resumenProgreso } from '../../actions/entrenamiento'
@@ -110,7 +111,7 @@ export default function CentroPage() {
   useEffect(() => {
     setPeriod(readStoredPeriod())
     const r = localStorage.getItem('aloha_rol')
-    const admin = r === 'admin_general' || r === 'supervisor'
+    const admin = tienePanel(r)
     setIsAdmin(admin)
     if (!admin) resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
   }, [])

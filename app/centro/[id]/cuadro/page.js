@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { tienePanel } from '../../../../components/useRol'
 import Sidebar from '../../../../components/Sidebar'
 import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../../actions/cuadro'
 import { listarGruposActivos } from '../../../actions/grupos'
@@ -32,7 +33,7 @@ export default function CuadroPage() {
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [rol, setRol] = useState('usuario')
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
+  const isAdmin = tienePanel(rol)
   const [data, setData] = useState(null)
   const [gruposActivos, setGruposActivos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -468,7 +469,9 @@ export default function CuadroPage() {
                             {!congelado && (
                               <>
                                 <button className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
-                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                                {rol !== 'asistente' && (
+                                  <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                                )}
                               </>
                             )}
                           </td>

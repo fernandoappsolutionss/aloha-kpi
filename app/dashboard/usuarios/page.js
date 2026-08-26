@@ -4,7 +4,16 @@ import Sidebar from '../../../components/Sidebar'
 import { listUsuarios, createUsuario, updateUsuario, deleteUsuario, reenviarInvitacion } from '../../actions/usuarios'
 import { listCentros } from '../../actions/centros'
 
-const ROLES = [ { val:'admin_general', label:'Administrador General' }, { val:'administradora', label:'Usuario Centro' } ]
+// Gerencia manda en todo; el coordinador operativo solo en los centros que se
+// le asignen; Administrador y Asistente son los dos miembros de un centro.
+const ROLES = [
+  { val:'admin_general',  label:'Administrador General', pill:'pill--ok',   ayuda:'Todos los centros y la configuración del sistema.' },
+  { val:'coordinador',    label:'Coordinador Operativo', pill:'',           ayuda:'Entra al panel y a los centros que le asignes, con permisos de administrador en ellos. No toca centros ni usuarios.' },
+  { val:'administradora', label:'Administrador',         pill:'pill--warn', ayuda:'Miembro del centro. Opera todo su centro, incluido cerrar y reabrir el mes.' },
+  { val:'asistente',      label:'Asistente',             pill:'pill--warn', ayuda:'Miembro del centro. Registra la operación del día, pero no cierra ni reabre el mes ni elimina registros.' },
+]
+const ROL = (val) => ROLES.find((r) => r.val === val) || { label: val, pill: 'pill--warn' }
+const UN_CENTRO = ['administradora', 'asistente']
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
@@ -18,7 +27,7 @@ export default function UsuariosPage() {
   const [sending, setSending] = useState(null)
   const [invite, setInvite] = useState(null) // { nombre, email, link, emailSent, emailReason, purpose }
   const [copied, setCopied] = useState(false)
-  const [form, setForm] = useState({ nombre:'', email:'', rol:'administradora', centro_id:'' })
+  const [form, setForm] = useState({ nombre:'', email:'', rol:'administradora', centro_id:'', centros:[] })
 
   useEffect(() => { loadData() }, [])
 
@@ -38,18 +47,18 @@ export default function UsuariosPage() {
     setSaving(true); setStatus('')
     try {
       if (editing) {
-        const res = await updateUsuario(editing, { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id })
+        const res = await updateUsuario(editing, { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id, centros: form.centros })
         if (res.error) throw new Error(res.error)
         setStatus('✅ Usuario actualizado.')
       } else {
-        const res = await createUsuario({ nombre: form.nombre, email: form.email, rol: form.rol, centro_id: form.centro_id })
+        const res = await createUsuario({ nombre: form.nombre, email: form.email, rol: form.rol, centro_id: form.centro_id, centros: form.centros })
         if (res.error) throw new Error(res.error)
         setStatus('✅ Usuario creado.')
         setInvite({ nombre: form.nombre, email: form.email.trim().toLowerCase(), link: res.link, emailSent: res.emailSent, emailReason: res.emailReason, purpose: 'invite' })
         setCopied(false)
       }
       setShowForm(false); setEditing(null)
-      setForm({ nombre:'', email:'', rol:'administradora', centro_id:'' })
+      setForm({ nombre:'', email:'', rol:'administradora', centro_id:'', centros:[] })
       loadData()
     } catch(e) { setStatus('❌ Error: ' + e.message) }
     setSaving(false)
@@ -85,7 +94,7 @@ export default function UsuariosPage() {
 
   function editUser(u) {
     setEditing(u.id)
-    setForm({ nombre: u.nombre, email: u.email, rol: u.rol, centro_id: u.centro_id || '' })
+    setForm({ nombre: u.nombre, email: u.email, rol: u.rol, centro_id: u.centro_id || '', centros: (u.centros || []).map(String) })
     setShowForm(true)
   }
 
@@ -104,7 +113,7 @@ export default function UsuariosPage() {
             <h1 className="h-title">Gestión de usuarios</h1>
             <p className="h-sub">{usuarios.length} usuarios registrados</p>
           </div>
-          <button onClick={()=>{ setEditing(null); setForm({nombre:'',email:'',rol:'administradora',centro_id:''}); setShowForm(!showForm) }}
+          <button onClick={()=>{ setEditing(null); setForm({nombre:'',email:'',rol:'administradora',centro_id:'',centros:[]}); setShowForm(!showForm) }}
             className={`btn${showForm ? '' : ' btn--primary'}`}>
             {showForm ? '✕ Cancelar' : '+ Nuevo usuario'}
           </button>
@@ -161,17 +170,37 @@ export default function UsuariosPage() {
                 ))}
                 <div className="field">
                   <label className="label">Rol</label>
-                  <select value={form.rol} onChange={e=>setForm({...form,rol:e.target.value,centro_id:''})} className="input">
+                  <select value={form.rol} onChange={e=>setForm({...form,rol:e.target.value,centro_id:'',centros:[]})} className="input">
                     {ROLES.map(r=><option key={r.val} value={r.val}>{r.label}</option>)}
                   </select>
+                  <p className="label" style={{ marginTop: 8, color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>{ROL(form.rol).ayuda}</p>
                 </div>
-                {form.rol !== 'admin_general' && (
+                {UN_CENTRO.includes(form.rol) && (
                   <div className="field">
                     <label className="label">Centro asignado</label>
                     <select value={form.centro_id} onChange={e=>setForm({...form,centro_id:e.target.value})} className="input">
                       <option value="">— Sin asignar —</option>
                       {centros.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
                     </select>
+                  </div>
+                )}
+                {form.rol === 'coordinador' && (
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label className="label">Centros asignados * <span style={{ color: 'var(--text-faint)' }}>({form.centros.length} de {centros.length})</span></label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, marginTop: 6 }}>
+                      {centros.map(c=>{
+                        const on = form.centros.includes(String(c.id))
+                        return (
+                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                            border: `1px solid ${on ? 'var(--ok-line)' : 'var(--border)'}`, background: on ? 'var(--ok-bg)' : 'transparent' }}>
+                            <input type="checkbox" checked={on} onChange={()=>setForm({...form, centros: on
+                              ? form.centros.filter(id=>id!==String(c.id))
+                              : [...form.centros, String(c.id)] })} />
+                            <span style={{ fontSize: 13, color: 'var(--text)' }}>{c.nombre}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -201,12 +230,18 @@ export default function UsuariosPage() {
                     <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{u.nombre}</td>
                     <td className="num" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{u.email}</td>
                     <td>
-                      <span className={`pill ${u.rol==='admin_general' ? 'pill--ok' : 'pill--warn'}`}>
-                        <span className="dot" />{u.rol==='admin_general'?'Administrador':'Usuario Centro'}
+                      <span className={`pill ${ROL(u.rol).pill}`}>
+                        <span className="dot" />{ROL(u.rol).label}
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                      {u.centro_nombre || (u.rol==='admin_general' ? <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Todos los centros</span> : <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Sin asignar</span>)}
+                      {u.rol === 'coordinador'
+                        ? (u.centros_nombres?.length
+                            ? <span title={u.centros_nombres.join(', ')}>{u.centros_nombres.length} centro{u.centros_nombres.length===1?'':'s'}: {u.centros_nombres.join(' · ')}</span>
+                            : <span style={{ color: 'var(--bad, #FCA5A5)', fontStyle: 'italic' }}>Sin centros asignados</span>)
+                        : u.centro_nombre || (u.rol==='admin_general' || u.rol==='supervisor'
+                            ? <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Todos los centros</span>
+                            : <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Sin asignar</span>)}
                     </td>
                     <td>
                       {u.activo

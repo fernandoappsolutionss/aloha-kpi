@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { aMinutos, aHora, aperturaDe, CIERRE_MIN } from '../../lib/inventario'
 import { ROLES_RESERVA, DURACION_CLASE_PRUEBA_MIN, franjaSugerida } from '../../lib/reservas'
@@ -108,7 +108,7 @@ export async function guardarReserva(centroId, data) {
 
 export async function eliminarReserva(centroId, id) {
   try {
-    await requireCentroAccess(centroId)
+    await requireCurrentPuedeEliminar(centroId)
     const r = await sql`DELETE FROM centro_reservas WHERE id = ${id} AND centro_id = ${centroId} RETURNING id`
     if (!r.length) return { error: 'La reserva no pertenece a este centro.' }
     return { ok: true }

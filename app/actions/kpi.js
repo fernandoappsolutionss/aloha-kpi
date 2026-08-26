@@ -1,6 +1,6 @@
 'use server'
 import { sql, upsertWith, withTransaction } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeCerrarMes } from '../../lib/auth'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { balanceMensual, cierreKpiDeclarado, cuadroConBalanceDeclarado, ESTADO_MES_CERRANDO, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
@@ -257,7 +257,7 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
   const y = intOr(year)
   const m = intOr(month)
   try {
-    await requireCentroAccess(centroId)
+    await requireCurrentPuedeCerrarMes(centroId)
     if (!config || !Array.isArray(semanas)) {
       return { error: 'Recarga el KPI antes de cerrar para tomar una fotografía completa.' }
     }
@@ -423,7 +423,7 @@ export async function reabrirMes(centroId, year, month) {
   const y = intOr(year)
   const m = intOr(month)
   try {
-    await requireCentroAccess(centroId)
+    await requireCurrentPuedeCerrarMes(centroId)
     return await withTransaction(async (query) => {
       const [mes] = await query`
         SELECT estado FROM mes_kpi
