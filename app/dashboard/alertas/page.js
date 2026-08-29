@@ -6,9 +6,9 @@ import { getCentrosKpi } from '../../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
 const COLORS = {
-  critico: { bg:'var(--bad-bg)', border:'var(--bad-line)', title:'#FCA5A5', dot:'var(--bad)' },
-  advertencia: { bg:'var(--warn-bg)', border:'var(--warn-line)', title:'#FCD34D', dot:'var(--warn)' },
-  info: { bg:'var(--ok-bg)', border:'var(--ok-line)', title:'#6EE7B7', dot:'var(--ok)' },
+  critico: { bg:'var(--bad-bg)', border:'var(--bad-line)', title:'var(--bad-text)', dot:'var(--bad)' },
+  advertencia: { bg:'var(--warn-bg)', border:'var(--warn-line)', title:'var(--warn-text)', dot:'var(--warn)' },
+  info: { bg:'var(--ok-bg)', border:'var(--ok-line)', title:'var(--ok-text)', dot:'var(--ok)' },
 }
 
 const nivelTxt = (n) => (n ? `Nivel ${n}` : 'Sin nivel')

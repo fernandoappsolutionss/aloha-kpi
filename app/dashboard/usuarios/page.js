@@ -121,7 +121,7 @@ export default function UsuariosPage() {
 
         {status && (
           <div className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
             {statusText}
           </div>
         )}
@@ -238,7 +238,7 @@ export default function UsuariosPage() {
                       {u.rol === 'coordinador'
                         ? (u.centros_nombres?.length
                             ? <span title={u.centros_nombres.join(', ')}>{u.centros_nombres.length} centro{u.centros_nombres.length===1?'':'s'}: {u.centros_nombres.join(' · ')}</span>
-                            : <span style={{ color: 'var(--bad, #FCA5A5)', fontStyle: 'italic' }}>Sin centros asignados</span>)
+                            : <span style={{ color: 'var(--bad)', fontStyle: 'italic' }}>Sin centros asignados</span>)
                         : u.centro_nombre || (u.rol==='admin_general' || u.rol==='supervisor'
                             ? <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Todos los centros</span>
                             : <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}>Sin asignar</span>)}
@@ -246,7 +246,7 @@ export default function UsuariosPage() {
                     <td>
                       {u.activo
                         ? <span style={{ color: 'var(--ok)', fontSize: 12, fontWeight: 600 }}>● Activo</span>
-                        : <span style={{ color: 'var(--warn, #F59E0B)', fontSize: 12, fontWeight: 600 }}>○ Pendiente</span>}
+                        : <span style={{ color: 'var(--warn)', fontSize: 12, fontWeight: 600 }}>○ Pendiente</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -261,7 +261,7 @@ export default function UsuariosPage() {
                         </button>
                         {u.rol !== 'admin_general' && (
                           <button onClick={()=>deleteUser(u.id, u.nombre)} disabled={deleting===u.id}
-                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: '#FCA5A5', fontSize: 12, cursor: deleting===u.id?'wait':'pointer', opacity: deleting===u.id?0.6:1 }}>
+                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--bad-text)', fontSize: 12, cursor: deleting===u.id?'wait':'pointer', opacity: deleting===u.id?0.6:1 }}>
                             {deleting===u.id ? 'Eliminando...' : 'Eliminar'}
                           </button>
                         )}

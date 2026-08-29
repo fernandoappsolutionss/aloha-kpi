@@ -76,10 +76,10 @@ export default function FodaPage() {
   // Las 4 cuadrantes son editables. Fortalezas/Debilidades quedan vinculadas al
   // cumplimiento (se pre-cargan desde el checklist y pueden regenerarse).
   const cuads = [
-    {t:'Fortalezas',      accent:'var(--ok)',       tone:'#6EE7B7', k:'fortalezas', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “Sí”.']},
-    {t:'Debilidades',     accent:'var(--bad)',      tone:'#FCA5A5', k:'debilidades', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “No”.']},
+    {t:'Fortalezas',      accent:'var(--ok)',       tone:'var(--ok-text)', k:'fortalezas', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “Sí”.']},
+    {t:'Debilidades',     accent:'var(--bad)',      tone:'var(--bad-text)', k:'debilidades', linked:true, prompts:['Se pre-cargan desde los criterios de cumplimiento marcados en “No”.']},
     {t:'Oportunidades',   accent:'var(--ts-green)', tone:'var(--text)', k:'oportunidades', prompts:['Tendencias educativas: ¿nuevas demandas?','Alianzas locales: colegios, empresas','Eventos y actividades comunitarias']},
-    {t:'Amenazas',        accent:'var(--warn)',     tone:'#FCD34D', k:'amenazas', prompts:['Competencia directa e indirecta','Factores económicos locales','Cambios en regulaciones']},
+    {t:'Amenazas',        accent:'var(--warn)',     tone:'var(--warn-text)', k:'amenazas', prompts:['Competencia directa e indirecta','Factores económicos locales','Cambios en regulaciones']},
   ]
 
   const taStyle = { width:'100%', padding:'10px 12px', background:'var(--bg)', border:'1px solid var(--border-strong)', borderRadius:'var(--r-sm)', fontSize:13, resize:'vertical', marginTop:10, outline:'none', lineHeight:1.6, color:'var(--text)', minHeight:100, fontFamily:'var(--font-sans)' }

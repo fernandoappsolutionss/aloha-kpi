@@ -602,7 +602,7 @@ export default function HistorialPage() {
             {vistaActiva === 'cuadro' && (() => {
               const conCuadro = visibleMeses.filter(m => m.cuadro && !m.cuadro.vivo)
               if (conCuadro.length === 0) return (
-                <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
+                <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
                   Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Semanal, su Cuadro de Negocio queda congelado y aparece aquí como historial.
                 </div>
               )
@@ -674,7 +674,7 @@ export default function HistorialPage() {
             })()}
 
             {chartData.length === 0 && (
-              <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
+              <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
                 Los meses tienen datos de configuración pero aún no hay suficiente información para graficar. Ingresa los datos en el KPI Semanal y guarda.
               </div>
             )}

@@ -45,7 +45,7 @@ function SetPasswordInner() {
       <main className="login__panel" style={{ width: '100%' }}>
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
 
             {info === null && <p className="login__cardsub">Verificando enlace…</p>}
 
@@ -104,7 +104,7 @@ function SetPasswordInner() {
 
           <p className="login__help">
             <Link href="/login" style={{ color: 'var(--ts-green)', fontWeight: 600 }}>← Volver al inicio de sesión</Link><br />
-            <b>Operado por Team Solutionss</b>
+            <a href="https://www.desarrolloweb.com.pa/" target="_blank" rel="noopener noreferrer" className="login__credit">Desarrollado por Appsolutionss</a>
           </p>
         </div>
       </main>

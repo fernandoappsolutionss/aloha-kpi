@@ -268,7 +268,7 @@ export default function KPIPage() {
 
         {/* Estado del mes */}
         {locked && (
-          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
+          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)', marginBottom: 16 }}>
             Mes cerrado — Solo lectura. Los datos están guardados como historial. Si quedó mal, usa “Reabrir mes”, corrige y vuelve a cerrarlo.
           </div>
         )}
@@ -287,7 +287,7 @@ export default function KPIPage() {
 
         {status && (
           <div className={`alert ${status.includes('❌') ? 'alert--error' : ''}`}
-            style={status.includes('❌') ? { marginBottom: 16 } : { marginBottom: 16, background: status.includes('🔒') ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1px solid ${status.includes('🔒') ? 'var(--warn-line)' : 'var(--ok-line)'}`, color: status.includes('🔒') ? '#FCD34D' : '#6EE7B7' }}>
+            style={status.includes('❌') ? { marginBottom: 16 } : { marginBottom: 16, background: status.includes('🔒') ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1px solid ${status.includes('🔒') ? 'var(--warn-line)' : 'var(--ok-line)'}`, color: status.includes('🔒') ? 'var(--warn-text)' : 'var(--ok-text)' }}>
             {status.replace(/^[❌✅🔒]\s*/, '')}
           </div>
         )}
@@ -378,19 +378,19 @@ export default function KPIPage() {
 
         {/* GPN */}
         <div className="card" style={{ background: gpn>=0 ? 'var(--ok-bg)' : 'var(--bad-bg)', border: `1px solid ${gpn>=0 ? 'var(--ok-line)' : 'var(--bad-line)'}`, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <span className="label" style={{ color: gpn>=0 ? '#6EE7B7' : '#FCA5A5' }}>GPN — Ganancia por Niño:</span>
+          <span className="label" style={{ color: gpn>=0 ? 'var(--ok-text)' : 'var(--bad-text)' }}>GPN — Ganancia por Niño:</span>
           <span className="num" style={{ fontSize: 24, fontWeight: 700, color: gpn>=0 ? 'var(--ok)' : 'var(--bad)', fontFamily: 'var(--font-serif)' }}>${gpn.toFixed(2)}</span>
           <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
         </div>
 
         {/* KPI sin manos: fuente visible y fallback explícito (g1-20) */}
         {!locked && autoIngDes && (
-          <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7', marginBottom: 16 }}>
+          <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)', marginBottom: 16 }}>
             🔗 Ventas y retiros vienen del módulo (inscripciones y retiros registrados; el cero también cuenta). Para cambiarlos, corrige el evento del niño — aquí no se digitan.
           </div>
         )}
         {!locked && kpiAuto?.estado === 'fallo' && (
-          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D', marginBottom: 16 }}>
+          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)', marginBottom: 16 }}>
             ⚠️ El cálculo automático falló: {kpiAuto.mensaje} Mientras se repara el dato, ventas y retiros quedan editables a mano.
           </div>
         )}

@@ -106,7 +106,7 @@ export default function CentrosPage() {
 
         {status && (
           <div className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
             {statusText}
           </div>
         )}
@@ -197,7 +197,7 @@ export default function CentrosPage() {
                           <button
                             onClick={()=>deleteCenter(c.id, c.nombre, userCount)}
                             disabled={deleting===c.id}
-                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: '#FCA5A5', fontSize: 12, cursor: deleting===c.id?'wait':'pointer', opacity: deleting===c.id?0.6:1 }}>
+                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--bad-text)', fontSize: 12, cursor: deleting===c.id?'wait':'pointer', opacity: deleting===c.id?0.6:1 }}>
                             {deleting===c.id ? 'Eliminando...' : 'Eliminar'}
                           </button>
                         </div>
