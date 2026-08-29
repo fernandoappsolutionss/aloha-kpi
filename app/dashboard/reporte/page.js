@@ -34,7 +34,7 @@ export default function ReportePage() {
     const csv = rows.map(r=>r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = `TeamSolutionss_KPI_Q${period.quarter}_${period.year}.csv`
+    a.download = `ALOHA_KPI_Q${period.quarter}_${period.year}.csv`
     a.click()
   }
 

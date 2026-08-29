@@ -109,7 +109,7 @@ export default function CoachPage() {
         </div>
 
         {!fechas.length ? (
-          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: '#FCD34D' }}>
+          <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
             Este grupo aún no tiene itinerario generado. Pídele al administrador que le ponga fecha de inicio y horario.
           </div>
         ) : (

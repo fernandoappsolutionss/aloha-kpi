@@ -93,14 +93,14 @@ export default function PerfilPage() {
 
             {form.nueva && form.confirmar && (
               <div className={`alert ${coinciden ? '' : 'alert--error'}`}
-                style={coinciden ? { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' } : undefined}>
+                style={coinciden ? { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' } : undefined}>
                 {coinciden ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
               </div>
             )}
 
             {status && (
               <div className={`alert ${isError ? 'alert--error' : ''}`}
-                style={isError ? undefined : { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+                style={isError ? undefined : { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
                 {status}
               </div>
             )}

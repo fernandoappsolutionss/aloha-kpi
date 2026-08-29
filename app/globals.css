@@ -1,63 +1,84 @@
 /* =====================================================================
-   TEAM SOLUTIONSS — Design System
-   Dark-first, editorial, instrument-grade.
-   Brand: negro #0A0A0A · verde Tessa #10B981
+   ALOHA MENTAL ARITHMETIC — Design System
+   Claro por defecto, con la estructura visual de promo.alohapanama.com.
+   Manual de marca: petróleo #00556D · verde #49B439 · lima #BBE529 ·
+   azul wordmark #1A3C6A · tipografía Futura Md BT.
    ===================================================================== */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 
 :root {
-  /* ---- Brand ---- */
-  --ts-black:      #0A0A0A;
-  --ts-green:      #10B981;
-  --ts-green-deep: #059669;
-  --ts-green-soft: rgba(16, 185, 129, 0.12);
-  --ts-green-line: rgba(16, 185, 129, 0.30);
-  --off-white:     #FAFAF7;
+  /* ---- Marca ALOHA (manual de marca + look de promo.alohapanama.com) ---- */
+  --aloha-petroleo:      #00556D;   /* banners y texto principal */
+  --aloha-petroleo-deep: #003D4F;
+  --aloha-azul:          #1A3C6A;   /* azul del wordmark, títulos */
+  --aloha-verde:         #49B439;   /* acentos, bordes, estado OK */
+  --aloha-verde-deep:    #2F7A24;   /* verde legible como texto sobre blanco */
+  --aloha-lima:          #BBE529;   /* CTA */
+  --aloha-lima-hover:    #E6FF2B;
+  --aloha-verde-soft:    rgba(73, 180, 57, 0.12);
+  --aloha-verde-line:    rgba(73, 180, 57, 0.32);
 
-  /* ---- Dark surfaces (layered) ---- */
-  --bg:        #0A0A0A;
-  --sidebar:   #0C0C0C;
-  --surface-1: #121212;   /* cards / panels */
-  --surface-2: #181818;   /* elevated / hover */
-  --surface-3: #1F1F1F;   /* table head / insets */
+  /* Alias de compatibilidad: los ~45 archivos de página siguen leyendo
+     --ts-*. Cambia el valor, no el nombre: renombrarlos en todo el repo
+     sería un diff enorme sin ganancia. */
+  --ts-black:      var(--aloha-petroleo);
+  --ts-green:      var(--aloha-verde);
+  --ts-green-deep: var(--aloha-verde-deep);
+  --ts-green-soft: var(--aloha-verde-soft);
+  --ts-green-line: var(--aloha-verde-line);
+  --off-white:     #FBFAF8;
 
-  /* ---- Borders ---- */
-  --border:        rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* ---- Superficies (claras, como la promo) ---- */
+  --bg:        #FBFAF8;
+  --sidebar:   #FFFFFF;
+  --surface-1: #FFFFFF;   /* cards / paneles */
+  --surface-2: #F1F6F5;   /* elevado / hover */
+  --surface-3: #E7EFEE;   /* cabecera de tabla / insets */
 
-  /* ---- Text ---- */
-  --text:       #FAFAF7;
-  --text-muted: #A6A6A6;
-  --text-dim:   #6E6E6E;
-  --text-faint: #4A4A4A;
+  /* ---- Bordes ---- */
+  --border:        rgba(0, 85, 109, 0.12);
+  --border-strong: rgba(0, 85, 109, 0.26);
 
-  /* ---- Functional status (muted, not brand accents) ---- */
-  --ok:   #10B981;  --ok-bg:   rgba(16, 185, 129, 0.13);  --ok-line:   rgba(16,185,129,0.35);
-  --warn: #F5B23B;  --warn-bg: rgba(245, 178, 59, 0.13);  --warn-line: rgba(245,178,59,0.35);
-  --bad:  #EF4444;  --bad-bg:  rgba(239, 68, 68, 0.13);   --bad-line:  rgba(239,68,68,0.35);
+  /* ---- Texto ---- */
+  --text:       #00556D;
+  --text-muted: #3D6E7E;
+  --text-dim:   #4E7684;   /* 4.7:1 sobre --bg: pasa AA */
+  --text-faint: #7E9AA4;   /* solo placeholders y adornos */
 
-  /* ---- Chart ink ---- */
-  --chart-muted: #A6A6A6;
-  --chart-axis: rgba(255, 255, 255, 0.28);
-  --chart-grid: rgba(255, 255, 255, 0.08);
-  --chart-track: #5C5C5C;
-  --chart-cursor: rgba(255, 255, 255, 0.05);
-  --chart-tooltip-bg: #181818;
-  --chart-tooltip-border: rgba(255, 255, 255, 0.10);
-  --chart-tooltip-shadow: 0 8px 28px rgba(0, 0, 0, 0.50);
+  /* ---- Estado funcional ---- */
+  --ok:   #2F7A24;  --ok-bg:   rgba(73, 180, 57, 0.14);  --ok-line:   rgba(47, 122, 36, 0.34);
+  --warn: #B45309;  --warn-bg: rgba(245, 178, 59, 0.18); --warn-line: rgba(180, 83, 9, 0.32);
+  --bad:  #C62828;  --bad-bg:  rgba(228, 0, 20, 0.09);   --bad-line:  rgba(198, 40, 40, 0.28);
+  /* Texto de estado: el color del punto no siempre se lee como texto. */
+  --ok-text:   #2F7A24;
+  --warn-text: #9A4A07;
+  --bad-text:  #B3261E;
+  /* Titular: azul wordmark sobre claro, tinta clara sobre petróleo. */
+  --heading:   var(--aloha-azul);
 
-  /* ---- Type families ---- */
-  --font-fraunces: Georgia, 'Times New Roman', serif;
-  --font-inter: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-jetbrains: ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
-  --font-serif: var(--font-fraunces);
-  --font-sans:  var(--font-inter);
-  --font-mono:  var(--font-jetbrains);
+  /* ---- Tinta de gráficos ---- */
+  --chart-muted: #4E7684;
+  --chart-axis: rgba(0, 85, 109, 0.34);
+  --chart-grid: rgba(0, 85, 109, 0.10);
+  --chart-track: #B8CBD2;
+  --chart-cursor: rgba(0, 85, 109, 0.05);
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-border: rgba(0, 85, 109, 0.14);
+  --chart-tooltip-shadow: 0 10px 26px rgba(0, 85, 109, 0.16);
 
-  /* ---- Radii & motion ---- */
-  --r-sm: 8px; --r: 12px; --r-lg: 18px; --r-pill: 999px;
+  /* ---- Tipografía (--font-aloha lo inyecta next/font en layout.js) ---- */
+  --font-aloha-stack: var(--font-aloha), Futura, 'Century Gothic', Jost, sans-serif;
+  --font-ui:  -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-num: ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+  --font-serif:   var(--font-aloha-stack);  /* títulos y cifras display */
+  --font-display: var(--font-aloha-stack);  /* micro-labels en versalitas */
+  --font-sans:    var(--font-ui);           /* cuerpo y tablas densas */
+  --font-mono:    var(--font-num);          /* cifras tabulares */
+
+  /* ---- Radios y motion (la promo va redondeada: xl en inputs, full en CTA) ---- */
+  --r-sm: 12px; --r: 16px; --r-lg: 24px; --r-pill: 999px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -74,13 +95,13 @@ body {
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; color: inherit; }
 input, select, textarea { font-family: inherit; font-size: 14px; }
-::selection { background: var(--ts-green); color: #04130D; }
+::selection { background: var(--aloha-lima); color: var(--aloha-petroleo); }
 
-/* Custom dark scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #262626; border: 3px solid var(--bg); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #383838; }
+::-webkit-scrollbar-thumb { background: #C9D9DE; border: 3px solid var(--bg); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #AEC4CB; }
 
 :focus-visible {
   outline: 2px solid var(--ts-green);
@@ -111,7 +132,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /*  Primitives                                                       */
 /* ---------------------------------------------------------------- */
 .label {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -139,12 +160,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .btn:hover { background: var(--surface-2); border-color: var(--text-faint); }
 .btn--primary {
-  background: var(--ts-green);
-  border-color: var(--ts-green);
-  color: #04130D;
-  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.22);
+  background: var(--aloha-lima);
+  border-color: var(--aloha-lima);
+  color: var(--aloha-petroleo);
+  border-radius: var(--r-pill);
+  font-weight: 700;
+  box-shadow: 0 6px 22px rgba(73, 180, 57, 0.28);
 }
-.btn--primary:hover { background: var(--ts-green-deep); border-color: var(--ts-green-deep); }
+.btn--primary:hover { background: var(--aloha-lima-hover); border-color: var(--aloha-lima-hover); }
 .btn--primary:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
 .btn--block { width: 100%; }
 
@@ -174,7 +197,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   border-radius: var(--r-sm);
   font-size: 13px; font-weight: 500;
 }
-.alert--error { background: var(--bad-bg); border: 1px solid var(--bad-line); color: #FCA5A5; }
+.alert--error { background: var(--bad-bg); border: 1px solid var(--bad-line); color: var(--bad-text); }
 
 .pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -187,11 +210,11 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   white-space: nowrap;
 }
 .pill .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.pill--ok   { background: var(--ok-bg);   color: #6EE7B7; border: 1px solid var(--ok-line); }
+.pill--ok   { background: var(--ok-bg);   color: var(--ok-text);   border: 1px solid var(--ok-line); }
 .pill--ok   .dot { background: var(--ok); }
-.pill--warn { background: var(--warn-bg); color: #FCD34D; border: 1px solid var(--warn-line); }
+.pill--warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-line); }
 .pill--warn .dot { background: var(--warn); }
-.pill--bad  { background: var(--bad-bg);  color: #FCA5A5; border: 1px solid var(--bad-line); }
+.pill--bad  { background: var(--bad-bg);  color: var(--bad-text);  border: 1px solid var(--bad-line); }
 .pill--bad  .dot { background: var(--bad); }
 /* Pill que ABRE algo (el chip "va por S{x}" → el plan del niño). El realce va
    por box-shadow: el color y el borde del chip vienen en estilo inline según
@@ -200,7 +223,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .pill--link:hover { box-shadow: 0 0 0 2px var(--ts-green-soft); }
 .pill--link:focus-visible { outline: 2px solid var(--ts-green); outline-offset: 2px; }
 
-.bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden; min-width: 64px; flex: 1; }
+.bar { height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; min-width: 64px; flex: 1; }
 .bar__fill { height: 100%; border-radius: 99px; transform-origin: left; animation: barGrow 0.7s var(--ease) both; }
 
 /* ---------------------------------------------------------------- */
@@ -447,7 +470,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   display: flex; flex-direction: column; justify-content: space-between;
   border-right: 1px solid var(--border);
   background:
-    radial-gradient(900px 600px at 18% 8%, rgba(16,185,129,0.10), transparent 60%),
+    radial-gradient(900px 600px at 18% 8%, rgba(73,180,57,0.12), transparent 60%),
     var(--bg);
 }
 /* faint instrument grid */
@@ -463,22 +486,29 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .login__brand > * { position: relative; z-index: 1; }
 .login__kicker { animation: fadeUp 0.6s var(--ease) both; }
 .login__copy { max-width: 460px; animation: fadeUp 0.6s 0.08s var(--ease) both; }
-.login__headline { font-family: var(--font-serif); font-size: 46px; line-height: 1.08; font-weight: 500; letter-spacing: -0.02em; }
-.login__headline em { color: var(--ts-green); font-style: italic; }
+.login__headline { font-family: var(--font-serif); font-size: 46px; line-height: 1.12; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); }
+/* En la promo la frase clave va subrayada en verde, no en itálica:
+   Futura Md BT no trae itálica real y el navegador la falsea. */
+.login__headline em { color: inherit; font-style: normal; border-bottom: 3px solid var(--aloha-verde); }
 .login__lead { color: var(--text-muted); font-size: 15px; line-height: 1.7; margin-top: 20px; max-width: 420px; }
 .login__stats { display: flex; gap: 40px; margin-top: 38px; }
 .stat__num { font-family: var(--font-serif); font-size: 32px; font-weight: 500; color: var(--ts-green); line-height: 1; }
-.stat__label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-top: 8px; }
+.stat__label { font-family: var(--font-display); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-top: 8px; }
 .login__brandfoot { animation: fadeIn 1s 0.4s both; }
 
 .login__panel { display: flex; align-items: center; justify-content: center; padding: 40px; }
 .login__card { width: 100%; max-width: 372px; animation: fadeUp 0.6s 0.14s var(--ease) both; }
 .login__cardhead { margin-bottom: 28px; }
-.login__welcome { font-family: var(--font-serif); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+.login__welcome { font-family: var(--font-serif); font-size: 26px; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); }
 .login__cardsub { color: var(--text-dim); font-size: 13px; margin-top: 6px; }
 .login__form { display: flex; flex-direction: column; gap: 16px; }
-.login__help { text-align: center; font-size: 12px; color: var(--text-faint); margin-top: 22px; line-height: 1.7; }
-.login__help b { color: var(--text-muted); font-weight: 500; }
+.login__help { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 22px; line-height: 1.7; }
+.login__credit {
+  color: var(--text-dim); font-weight: 700; text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.login__credit:hover { color: var(--aloha-verde-deep); border-bottom-color: var(--aloha-verde); }
 
 @media (max-width: 1180px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
@@ -491,55 +521,55 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 
 /* ================================================================ */
-/*  THEME — logo color vars (dark default) + LIGHT theme overrides   */
+/*  TEMA — el claro es la base (marca ALOHA); oscuro es el override  */
 /* ================================================================ */
-:root {
-  --logo-ring: rgba(255, 255, 255, 0.55);
-  --logo-dash: rgba(255, 255, 255, 0.28);
-  --logo-dot:  #FAFAF7;
+[data-theme="dark"] {
+  --bg:        #012B36;
+  --sidebar:   #00212A;
+  --surface-1: #013642;
+  --surface-2: #01424F;
+  --surface-3: #01505F;
+
+  --border:        rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --text:       #EAF4F2;
+  --text-muted: #A9C6CC;
+  --text-dim:   #7FA3AC;
+  --text-faint: #5B7F89;
+
+  /* Sobre petróleo el verde #49B439 se apaga: se aclara para mantener contraste. */
+  --ts-green:      #7FD46B;
+  --ts-green-deep: var(--aloha-verde);
+  --ts-green-soft: rgba(187, 229, 41, 0.14);
+  --ts-green-line: rgba(187, 229, 41, 0.34);
+
+  --ok:   #7FD46B; --ok-bg:   rgba(73, 180, 57, 0.18);  --ok-line:   rgba(73, 180, 57, 0.40);
+  --warn: #F5B23B; --warn-bg: rgba(245, 178, 59, 0.16); --warn-line: rgba(245, 178, 59, 0.38);
+  --bad:  #FF6B6B; --bad-bg:  rgba(239, 68, 68, 0.16);  --bad-line:  rgba(239, 68, 68, 0.38);
+  --ok-text:   #A7E89A;
+  --warn-text: #FCD34D;
+  --bad-text:  #FCA5A5;
+  --heading:   var(--text);
+
+  --chart-muted: #A9C6CC;
+  --chart-axis: rgba(255, 255, 255, 0.30);
+  --chart-grid: rgba(255, 255, 255, 0.10);
+  --chart-track: #4E7A85;
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --chart-tooltip-bg: #01424F;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.12);
+  --chart-tooltip-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
-
-[data-theme="light"] {
-  --bg:        #FAFAF7;
-  --sidebar:   #FFFFFF;
-  --surface-1: #FFFFFF;
-  --surface-2: #F3F3EE;
-  --surface-3: #EEEEE8;
-
-  --border:        rgba(10, 10, 10, 0.10);
-  --border-strong: rgba(10, 10, 10, 0.20);
-
-  --text:       #0A0A0A;
-  --text-muted: #4A4A4A;
-  --text-dim:   #767670;
-  --text-faint: #ABABA4;
-
-  --ts-green-soft: rgba(16, 185, 129, 0.14);
-
-  --ok:   #059669; --ok-bg:   rgba(16, 185, 129, 0.12); --ok-line:   rgba(5, 150, 105, 0.32);
-  --warn: #B45309; --warn-bg: rgba(245, 158, 11, 0.16); --warn-line: rgba(180, 83, 9, 0.32);
-  --bad:  #DC2626; --bad-bg:  rgba(239, 68, 68, 0.10);  --bad-line:  rgba(220, 38, 38, 0.30);
-
-  --chart-muted: #707067;
-  --chart-axis: rgba(10, 10, 10, 0.32);
-  --chart-grid: rgba(10, 10, 10, 0.10);
-  --chart-track: #9A9A92;
-  --chart-cursor: rgba(10, 10, 10, 0.05);
-  --chart-tooltip-bg: #FFFFFF;
-  --chart-tooltip-border: rgba(10, 10, 10, 0.12);
-  --chart-tooltip-shadow: 0 10px 26px rgba(10, 10, 10, 0.16);
-
-  --logo-ring: #2A2A2A;
-  --logo-dash: #B2B2AC;
-  --logo-dot:  #0A0A0A;
+[data-theme="dark"] .bar { background: rgba(255, 255, 255, 0.09); }
+/* El lockup oficial es a color sobre fondo claro: en oscuro va sobre su
+   parche blanco, como manda el manual, en vez de teñirlo o invertirlo. */
+[data-theme="dark"] .brandmark {
+  background: #FFFFFF; border-radius: 10px;
+  padding: 7px 11px; box-sizing: content-box;
 }
-/* readable status text on light surfaces */
-[data-theme="light"] .pill--ok   { color: #047857; }
-[data-theme="light"] .pill--warn { color: #B45309; }
-[data-theme="light"] .pill--bad  { color: #B91C1C; }
-[data-theme="light"] .alert--error { color: #B91C1C; }
-[data-theme="light"] ::-webkit-scrollbar-thumb { background: #D6D6CF; border-color: var(--bg); }
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #C2C2BA; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #2A5561; border-color: var(--bg); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #376C7A; }
 
 /* ---------------- Select / dropdown ---------------- */
 .select {
@@ -895,7 +925,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /* ---------------------------------------------------------------- */
 /*  FODA — peticiones y cotizaciones                                 */
 /* ---------------------------------------------------------------- */
-.form-error { padding: 11px 14px; margin-top: 14px; border-radius: var(--r-sm); background: var(--bad-bg); border: 1px solid var(--bad-line); color: #FCA5A5; font-size: 13px; font-weight: 500; }
+.form-error { padding: 11px 14px; margin-top: 14px; border-radius: var(--r-sm); background: var(--bad-bg); border: 1px solid var(--bad-line); color: var(--bad-text); font-size: 13px; font-weight: 500; }
 .foda-requests { padding: 18px; margin-top: 16px; }
 .foda-request-tabs { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-2); }
 .foda-request-tabs button { min-height: 32px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600; cursor: pointer; }

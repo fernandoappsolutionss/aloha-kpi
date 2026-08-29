@@ -21,13 +21,13 @@ export default function ForgotPasswordPage() {
       <main className="login__panel" style={{ width: '100%' }}>
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
             <h2 className="login__welcome">¿Olvidaste tu contraseña?</h2>
             <p className="login__cardsub">Te enviaremos un enlace para restablecerla.</p>
           </div>
 
           {sent ? (
-            <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7', marginBottom: 8 }}>
+            <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)', marginBottom: 8 }}>
               Si existe una cuenta con ese correo, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada (y spam).
             </div>
           ) : (
@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
 
           <p className="login__help">
             <Link href="/login" style={{ color: 'var(--ts-green)', fontWeight: 600 }}>← Volver al inicio de sesión</Link><br />
-            <b>Operado por Team Solutionss</b>
+            <a href="https://www.desarrolloweb.com.pa/" target="_blank" rel="noopener noreferrer" className="login__credit">Desarrollado por Appsolutionss</a>
           </p>
         </div>
       </main>

@@ -182,7 +182,7 @@ export default function CuadroPage() {
 
         {status && (
           <div className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>{statusText}</div>
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
         {data && (
@@ -339,7 +339,7 @@ export default function CuadroPage() {
                                                 <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
                                                   onClick={() => setAccionNino({ tipo: 'reincorporar', nino: e })}>↩ Reincorporar</button>
                                               ) : (
-                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }}
+                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }}
                                                   onClick={() => setAccionNino({ tipo: 'retirar', nino: e })}>Retirar</button>
                                               )}
                                             </td>
@@ -470,7 +470,7 @@ export default function CuadroPage() {
                               <>
                                 <button className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
                                 {rol !== 'asistente' && (
-                                  <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: '#FCA5A5' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                                  <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
                                 )}
                               </>
                             )}

@@ -220,15 +220,15 @@ export default function DashboardPage() {
                 <AreaChart data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--ts-green)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--ts-green)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: '#8896A9', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
                   <Tooltip content={<NinosTooltip />} />
-                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="#10B981" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 5 }} />
+                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="var(--ts-green)" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: 'var(--ts-green)' }} activeDot={{ r: 5 }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}

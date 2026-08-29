@@ -581,7 +581,7 @@ export default function GruposPage() {
 
         {status && (
           <div className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>{statusText}</div>
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
         {/* KPI cards (siempre visibles) */}

@@ -188,7 +188,7 @@ export default function EventosPage() {
         )}
         {status && (
           <div className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>{statusText}</div>
+            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
         {/* Tarjetas de stats */}
@@ -523,7 +523,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
       </div>
       {status && (
         <div className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
-          style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }}>
+          style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
           {status.replace(/^[❌✅]\s*/, '')}
         </div>
       )}
@@ -575,7 +575,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                         <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
                         <button onClick={() => setAsist(r, false)} disabled={busy === r.id + 'a'}
-                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? '#FCA5A5' : 'var(--text-dim)' }}>No vino</button>
+                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? 'var(--bad-text)' : 'var(--text-dim)' }}>No vino</button>
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>

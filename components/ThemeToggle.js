@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react'
 const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState('dark')
+  const [theme, setTheme] = useState('light')
 
   useEffect(() => {
-    setTheme(document.documentElement.dataset.theme || 'dark')
+    setTheme(document.documentElement.dataset.theme || 'light')
   }, [])
 
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
-    try { localStorage.setItem('ts_theme', next) } catch {}
+    try { localStorage.setItem('aloha_theme', next) } catch {}
     setTheme(next)
   }
 

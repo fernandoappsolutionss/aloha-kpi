@@ -168,14 +168,14 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               row.tipo === 'peticion' ? (
                 row.estado === 'Anulada' && (
                   <button type="button" className="btn" disabled={busyId === row.id}
-                    style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: '#FCA5A5' }}
+                    style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: 'var(--bad-text)' }}
                     onClick={() => eliminar(row)}>
                     Eliminar definitivamente
                   </button>
                 )
               ) : (
                 <button type="button" className="btn" disabled={busyId === row.id}
-                  style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: '#FCA5A5' }}
+                  style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: 'var(--bad-text)' }}
                   onClick={() => eliminar(row)}>
                   Eliminar
                 </button>

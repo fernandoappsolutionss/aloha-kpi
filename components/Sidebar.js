@@ -105,7 +105,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     <aside className="sb">
       {/* Brand */}
       <div className="sb__brand">
-        <Logo size={28} wordmark={false} />
+        <Logo size={40} />
         <div className="sb__role">
           <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isAdmin ? 'shield' : 'building'} /></span>
           <span className="label">{isAdmin ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador') : (centroNombre || 'Centro')}</span>

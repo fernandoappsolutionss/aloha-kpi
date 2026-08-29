@@ -42,7 +42,7 @@ export default function LoginPage() {
       {/* ---- Brand panel ---- */}
       <aside className="login__brand">
         <div className="login__kicker" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Logo size={46} animate wordmark={false} />
+          <Logo size={52} />
           <div className="label" style={{ color: 'var(--text-muted)' }}>Sistema de gestión · KPI</div>
         </div>
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
         </div>
 
         <div className="login__brandfoot">
-          <Logo size={26} wordmark={false} />
+          <Logo size={40} />
           <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
             ALOHA Mental Arithmetic · Panamá · Venezuela
           </p>
@@ -77,7 +77,7 @@ export default function LoginPage() {
       <main className="login__panel">
         <div className="login__card">
           <div className="login__cardhead">
-            <div style={{ marginBottom: 22 }}><Logo size={30} wordmark={false} /></div>
+            <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
             <h2 className="login__welcome">Bienvenido de nuevo</h2>
             <p className="login__cardsub">Ingresa tus credenciales para acceder al panel.</p>
           </div>
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
           <p className="login__help">
             ¿Problemas para acceder? Contacta a tu administrador.<br />
-            <b>Operado por Team Solutionss</b>
+            <a href="https://www.desarrolloweb.com.pa/" target="_blank" rel="noopener noreferrer" className="login__credit">Desarrollado por Appsolutionss</a>
           </p>
         </div>
       </main>
