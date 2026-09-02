@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-09-02
 
-**Estado:** Diseño aprobado por Fernando en chat. Esta especificación requiere su revisión final antes de convertirla en plan de implementación.
+**Estado:** Diseño aprobado por Fernando en chat el 2 de septiembre de 2026; listo para implementación mediante los planes vinculados.
 
 **Aplicación:** KPI ALOHA Panamá
 
