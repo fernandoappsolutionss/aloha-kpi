@@ -20,7 +20,13 @@ function writeFixture({
   duplicateAfterError = null,
   insertError = null,
   insertErrors = null,
+  transactionErrors = [],
+  relationsError = null,
+  tokenError = null,
+  invalidateError = null,
+  deleteError = null,
   deliveryError = null,
+  deliveryResult = null,
 } = {}) {
   const inserted = []
   const updated = []
@@ -37,22 +43,56 @@ function writeFixture({
     [9, { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, centros: [], password_hash: null }],
     [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.com', rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
   ])
+  const centerState = new Map([...targets].map(([id, user]) => [id, [...(user.centros || [])]]))
+  const tokenState = new Map([[8, ['old-8']], [9, ['old-9']]])
   let writeCount = 0
   let duplicateReads = 0
   let actorReads = 0
   let transactions = 0
   let insertAttempts = 0
+  const copyUsers = () => new Map([...targets].map(([id, user]) => [
+    id,
+    { ...user, centros: [...(user.centros || [])] },
+  ]))
+  const copyLists = (source) => new Map([...source].map(([id, values]) => [id, [...values]]))
+  const restoreMap = (destination, snapshot) => {
+    destination.clear()
+    for (const [key, value] of snapshot) destination.set(key, value)
+  }
   const repo = {
     transaction: async (work, options) => {
       transactions++
       transactionOptions.push(options)
       const query = { transaction: transactions }
       events.push(`tx:${transactions}:begin`)
+      const snapshot = {
+        inserted: inserted.length,
+        updated: updated.length,
+        deleted: deleted.length,
+        tokens: tokens.length,
+        invalidated: invalidated.length,
+        coordinatorCenters: coordinatorCenters.length,
+        targets: copyUsers(),
+        centers: copyLists(centerState),
+        tokenState: copyLists(tokenState),
+        writeCount,
+      }
       try {
+        if (transactionErrors[transactions - 1]) throw transactionErrors[transactions - 1]
         const result = await work(query)
         events.push(`tx:${transactions}:commit`)
         return result
       } catch (error) {
+        inserted.length = snapshot.inserted
+        updated.length = snapshot.updated
+        deleted.length = snapshot.deleted
+        tokens.length = snapshot.tokens
+        invalidated.length = snapshot.invalidated
+        coordinatorCenters.length = snapshot.coordinatorCenters
+        restoreMap(targets, snapshot.targets)
+        restoreMap(centerState, snapshot.centers)
+        restoreMap(tokenState, snapshot.tokenState)
+        writeCount = snapshot.writeCount
         events.push(`tx:${transactions}:rollback`)
         throw error
       }
@@ -94,11 +134,16 @@ function writeFixture({
       events.push(`centers:${query.transaction}:${userId}`)
       coordinatorCenters.push({ userId, ids })
       writeCount++
+      centerState.set(Number(userId), [...ids])
+      if (relationsError) throw relationsError
     },
     deleteUser: async (query, id) => {
       events.push(`delete:${query.transaction}:${id}`)
       deleted.push(id)
       writeCount++
+      targets.delete(Number(id))
+      centerState.delete(Number(id))
+      if (deleteError) throw deleteError
     },
   }
   const accessTokens = {
@@ -106,19 +151,23 @@ function writeFixture({
       events.push(`token:${query.transaction}:${row.userId}`)
       tokens.push(row)
       writeCount++
+      tokenState.set(Number(row.userId), ['t-1'])
+      if (tokenError) throw tokenError
       return { token: 't-1', user: targets.get(row.userId) }
     },
     invalidate: async (query, { userId }) => {
       events.push(`invalidate:${query.transaction}:${userId}`)
       invalidated.push(userId)
       writeCount++
+      tokenState.set(Number(userId), [])
+      if (invalidateError) throw invalidateError
     },
   }
   const deliverAccess = async (row) => {
     events.push(`delivery:${row.user.id}`)
     deliveries.push(row)
     if (deliveryError) throw deliveryError
-    return { emailSent: true, link: `https://app/set-password?token=${row.token}` }
+    return deliveryResult || { emailSent: true, link: `https://app/set-password?token=${row.token}` }
   }
   return {
     repo,
@@ -134,6 +183,9 @@ function writeFixture({
     transactionCount: () => transactions,
     actorReadCount: () => actorReads,
     writes: () => writeCount,
+    user: (id) => targets.get(Number(id)),
+    centers: (id) => [...(centerState.get(Number(id)) || [])],
+    activeTokens: (id) => [...(tokenState.get(Number(id)) || [])],
     service: createUsuariosService({ repo, accessTokens, deliverAccess }),
   }
 }
@@ -238,6 +290,21 @@ test('fallo del transporte no revierte la cuenta ni filtra el error', async () =
   const result = await fx.service.create({ uid: 2 }, validInput())
   assert.equal(fx.inserted.length, 1)
   assert.equal(fx.tokens.length, 1)
+  assert.deepEqual(result, {
+    ok: true, kind: 'invitation', emailSent: false, link: null, deliveryError: 'delivery_failed',
+  })
+  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.com|SMTP|t-1/)
+})
+
+test('respuesta fallida resuelta del transporte también elimina razón y enlace', async () => {
+  const fx = writeFixture({
+    deliveryResult: {
+      emailSent: false,
+      emailReason: 'SMTP rechazó laura@aloha.com',
+      link: 'https://app/set-password?token=t-1',
+    },
+  })
+  const result = await fx.service.create({ uid: 2 }, validInput())
   assert.deepEqual(result, {
     ok: true, kind: 'invitation', emailSent: false, link: null, deliveryError: 'delivery_failed',
   })
@@ -351,6 +418,105 @@ test('40001 sin fila ganadora reintenta una vez con actor fresco', async () => {
   assert.equal(fx.tokens.length, 1)
   assert.equal(fx.transactionCount(), 3)
   assert.equal(fx.actorReadCount(), 3)
+})
+
+test('dos 40001 incluido el diagnóstico cierran con error seguro y presupuesto acotado', async () => {
+  const serializations = [
+    Object.assign(new Error('serialization create 40001'), { code: '40001' }),
+    Object.assign(new Error('serialization diagnosis 40001'), { code: '40001' }),
+  ]
+  const fx = writeFixture({ transactionErrors: serializations })
+  await assert.rejects(
+    () => fx.service.create({ uid: 2 }, validInput()),
+    (error) => {
+      assert.equal(error.message, 'No se pudo crear el usuario. Intenta nuevamente.')
+      assert.equal(error.code, undefined)
+      assert.doesNotMatch(error.message, /40001|serialization/i)
+      return true
+    },
+  )
+  assert.equal(fx.transactionCount(), 2)
+  assert.deepEqual(fx.deliveries, [])
+})
+
+test('dos 40001 de escritura permiten solo una repetición completa', async () => {
+  const fx = writeFixture({
+    insertErrors: [
+      Object.assign(new Error('serialization one'), { code: '40001' }),
+      Object.assign(new Error('serialization two'), { code: '40001' }),
+    ],
+  })
+  await assert.rejects(
+    () => fx.service.create({ uid: 2 }, validInput()),
+    (error) => {
+      assert.equal(error.message, 'No se pudo crear el usuario. Intenta nuevamente.')
+      assert.equal(error.code, undefined)
+      assert.doesNotMatch(error.message, /40001|serialization/i)
+      return true
+    },
+  )
+  assert.equal(fx.events.filter((event) => event.startsWith('insert:')).length, 2)
+  assert.equal(fx.transactionCount(), 4)
+  assert.deepEqual(fx.deliveries, [])
+})
+
+test('fallo de relaciones revierte la edición previa y conserva alcance y tokens', async () => {
+  const fx = writeFixture({ relationsError: new Error('relations failed') })
+  const before = { ...fx.user(8) }
+  await assert.rejects(
+    () => fx.service.update({ uid: 2 }, 8, { nombre: 'Nueva', rol: 'administradora', centro_id: 12 }),
+    /relations failed/,
+  )
+  assert.deepEqual(fx.user(8), before)
+  assert.deepEqual(fx.centers(8), [])
+  assert.deepEqual(fx.activeTokens(8), ['old-8'])
+  assert.deepEqual(fx.updated, [])
+  assert.deepEqual(fx.coordinatorCenters, [])
+  assert.equal(fx.writes(), 0)
+  assert.deepEqual(fx.deliveries, [])
+})
+
+test('fallo al emitir token revierte el usuario nuevo y nunca entrega', async () => {
+  const fx = writeFixture({ tokenError: new Error('token failed') })
+  await assert.rejects(() => fx.service.create({ uid: 2 }, validInput()), /token failed/)
+  assert.equal(fx.user(30), undefined)
+  assert.deepEqual(fx.centers(30), [])
+  assert.deepEqual(fx.activeTokens(30), [])
+  assert.deepEqual(fx.inserted, [])
+  assert.deepEqual(fx.tokens, [])
+  assert.equal(fx.writes(), 0)
+  assert.deepEqual(fx.deliveries, [])
+})
+
+test('fallo al invalidar revierte usuario, relaciones y token anterior', async () => {
+  const fx = writeFixture({ invalidateError: new Error('invalidate failed') })
+  const before = { ...fx.user(8) }
+  await assert.rejects(
+    () => fx.service.update({ uid: 2 }, 8, { nombre: 'Nueva', rol: 'administradora', centro_id: 12 }),
+    /invalidate failed/,
+  )
+  assert.deepEqual(fx.user(8), before)
+  assert.deepEqual(fx.centers(8), [])
+  assert.deepEqual(fx.activeTokens(8), ['old-8'])
+  assert.deepEqual(fx.updated, [])
+  assert.deepEqual(fx.coordinatorCenters, [])
+  assert.deepEqual(fx.invalidated, [])
+  assert.equal(fx.writes(), 0)
+  assert.deepEqual(fx.deliveries, [])
+})
+
+test('fallo al borrar revierte la invalidación y conserva la cuenta', async () => {
+  const actor = { id: 1, rol: 'admin_general', centros: [], password_hash: 'x' }
+  const fx = writeFixture({ actor, deleteError: new Error('delete failed') })
+  const before = { ...fx.user(9) }
+  await assert.rejects(() => fx.service.delete({ uid: 1 }, 9), /delete failed/)
+  assert.deepEqual(fx.user(9), before)
+  assert.deepEqual(fx.centers(9), [])
+  assert.deepEqual(fx.activeTokens(9), ['old-9'])
+  assert.deepEqual(fx.invalidated, [])
+  assert.deepEqual(fx.deleted, [])
+  assert.equal(fx.writes(), 0)
+  assert.deepEqual(fx.deliveries, [])
 })
 
 test('cada rol se persiste con una sola forma canónica de centros', async () => {
