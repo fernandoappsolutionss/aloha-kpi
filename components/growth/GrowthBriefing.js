@@ -9,7 +9,7 @@ import {
   snoozeGrowthBriefing,
 } from '../../app/actions/growth'
 import { formatGrowthPeriod } from '../../lib/growth/presenter.mjs'
-import Dialog from '../Dialog'
+import Dialog, { useDialogCallback } from '../Dialog'
 
 const requestCache = new Map()
 
@@ -30,6 +30,13 @@ export default function GrowthBriefing({ centroId }) {
   const [briefing, setBriefing] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const finish = useDialogCallback((command) => {
+    requestCache.delete(String(centroId))
+    setBriefing(null)
+    if (command === 'plan') router.push(`/centro/${centroId}/ruta-nivel`)
+  }, centroId)
+  const fail = useDialogCallback(() => setError('No se pudo guardar tu decisión. Intenta nuevamente.'), centroId)
+  const releaseBusy = useDialogCallback(() => setBusy(''), centroId)
 
   useEffect(() => {
     // Guarda: con un recorrido del entrenamiento activo (?tour=) no abrimos la
@@ -62,14 +69,12 @@ export default function GrowthBriefing({ centroId }) {
     try {
       if (command === 'snooze') await snoozeGrowthBriefing(centroId)
       else await acknowledgeGrowthBriefing(centroId)
-      requestCache.delete(String(centroId))
-      setBriefing(null)
-      if (command === 'plan') router.push(`/centro/${centroId}/ruta-nivel`)
+      finish(command)
     } catch (cause) {
       console.error('[GrowthBriefing action]', cause)
-      setError('No se pudo guardar tu decisión. Intenta nuevamente.')
+      fail()
     } finally {
-      setBusy('')
+      releaseBusy()
     }
   }
 

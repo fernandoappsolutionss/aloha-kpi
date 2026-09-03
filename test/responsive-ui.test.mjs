@@ -5,8 +5,25 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
+import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+test('respuesta tardía de una instancia desmontada no cierra el diálogo nuevo del mismo dueño', async () => {
+  let surface = 'primera'
+  let resolveSave
+  const pending = new Promise((resolve) => { resolveSave = resolve })
+  const oldInstance = createDialogLifetime()
+  const completion = pending.then(oldInstance.guard(() => { surface = null }))
+  oldInstance.dispose()
+  surface = 'segunda'
+  const currentInstance = createDialogLifetime()
+  resolveSave()
+  await completion
+  assert.equal(surface, 'segunda')
+  currentInstance.guard(() => { surface = null })()
+  assert.equal(surface, null)
+})
 
 test('fixture R3 rechaza transporte remoto antes de cualquier consulta', () => {
   const env = { E2E_R3_DIALOGS: '1', E2E_DATABASE_CONFIRM: 'disposable',

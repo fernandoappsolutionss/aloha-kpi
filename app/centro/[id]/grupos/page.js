@@ -37,7 +37,8 @@ import { posicionDeIndice } from '../../../../lib/plan-nino-vista.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
-import Dialog, { ModalPortal, useModalLayer } from '../../../../components/Dialog'
+import TableScroller from '../../../../components/TableScroller'
+import Dialog, { ModalPortal, useModalLayer, useDialogCallback } from '../../../../components/Dialog'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -1269,6 +1270,8 @@ function BloqueLlenado({ g, ll, onExtender }) {
 // varios niños solo se ofrecen las fuentes que TODOS comparten con la MISMA
 // fecha (lib/ancla-lote): el lote no promedia fechas ajenas.
 function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBusyChange }) {
+  const completePlan = useDialogCallback(onFijado, centroId)
+  const notifyBusy = useDialogCallback(onBusyChange, centroId)
   const [sug, setSug] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [err, setErr] = useState('')
@@ -1296,17 +1299,17 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBu
   // Uno o varios, la escritura devuelve el plan YA recalculado por el server:
   // el mensaje puede decir en qué semana quedó el niño sin recargar nada.
   async function fijar({ fecha, origen }) {
-    onBusyChange?.(true)
+    notifyBusy(true)
     try {
       const res = ids.length === 1
         ? await fijarInicioNivel(centroId, ids[0], { fecha, origen })
         : await fijarInicioNivelLote(centroId, { estudianteIds: ids, fecha, origen })
       if (res?.error) return res
       const lista = res.ninos || [{ id: ids[0], nombre: ninos[0]?.nombre, actualizado: res.actualizado, plan: res.plan }]
-      onFijado?.({ fecha, origen, etiqueta, ninos: lista, plan: res.plan || lista[0]?.plan || null })
+      completePlan({ fecha, origen, etiqueta, ninos: lista, plan: res.plan || lista[0]?.plan || null })
       return res
     } finally {
-      onBusyChange?.(false)
+      notifyBusy(false)
     }
   }
 
@@ -1969,7 +1972,8 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
       )}
 
       {/* Calendario del día: columna por salón */}
-      <div className="card" data-horizontal-scroll style={{ padding: 14, overflowX: 'auto' }}>
+      <div className="card" style={{ padding: 14 }}>
+        <TableScroller label="Calendario de salones">
         <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols.length}, minmax(170px, 1fr))`, gap: 8, minWidth: 52 + cols.length * 178 }}>
           <div />
           {cols.map(({ salon }) => (
@@ -2111,6 +2115,8 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
             </div>
           ) })}
         </div>
+
+        </TableScroller>
       </div>
 
       {/* Grupos del día sin salón y grupos sin horario */}
@@ -2142,6 +2148,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
 // sábado va al final, después de la tercera jornada. El sistema propone la
 // franja; el administrador decide el día y los salones.
 function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
   const activos = salones.filter((s) => s.activo)
   const [dia, setDia] = useState(String(initial.dia || 1))
@@ -2189,12 +2196,12 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
         id: initial.id || null, dia: parseInt(dia), hora_inicio: ini, hora_fin: fin, notas,
         salones: ROLES_RESERVA.filter((r) => salonRol[r]).map((r) => ({ rol: r, salon_id: salonRol[r], coach_id: coachRol[r] || null })),
       })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(`Clase de prueba del ${DIAS[parseInt(dia)].toLowerCase()} ${ini}–${fin} apartada en ${usados.length} salón${usados.length === 1 ? '' : 'es'}.`)
+      complete(`Clase de prueba del ${DIAS[parseInt(dia)].toLowerCase()} ${ini}–${fin} apartada en ${usados.length} salón${usados.length === 1 ? '' : 'es'}.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2365,6 +2372,7 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
 // FOR UPDATE con hoy Panamá recalculado, g1-5). Notas se edita pre-inicio;
 // post-inicio se muestra en el panel, no aquí (contrato literal de Fernando).
 function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
   const iniciado = isEdit && grupoIniciado(initial.fecha_inicio_clases || null, hoyISO())
   // Reparación legacy (g1-2): un grupo veterano con fecha NULL cuenta como
@@ -2429,12 +2437,12 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
     setSaving(true)
     try {
       const res = isEdit ? await actualizarGrupo(centroId, initial.id, data) : await crearGrupo(centroId, data)
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(isEdit ? `Grupo ${initial.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
+      complete(isEdit ? `Grupo ${initial.numero} actualizado.` : `Grupo ${data.numero} aperturado.`, res.warn)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2547,6 +2555,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
 // servidor (lib/itinerario es cálculo puro), así se ve el cierre nuevo antes
 // de guardar. El servidor vuelve a generarlo: la UI nunca manda el plan.
 function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const it = g.itinerario_clases
   const topeNivel = NIVEL_MAX[g.itinerario] || 10
   const [nivel, setNivel] = useState(String(it?.nivel || 1))
@@ -2575,12 +2584,12 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
         fecha_inicio: inicio,
         excepciones: exc.filter((e) => e.fecha),
       })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
+      complete(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2652,6 +2661,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
 
 // ── Modal: inscribir niño ────────────────────────────────────────────────────
 function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', origen_venta: '', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
   // (g1-11) El cierre de nivel es un OVERRIDE MANUAL: solo viaja si el usuario
   // lo tocó — sin tocarlo, el cierre efectivo se deriva del plan del niño.
@@ -2677,13 +2687,13 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
       const res = await inscribirEstudiante(centroId, data)
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
       const g = activos.find((x) => String(x.id) === String(f.grupo_id))
-      onSaved(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
+      complete(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2747,6 +2757,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
 
 // ── Modal: editar niño (datos, nivel y grupo) ────────────────────────────────
 function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [f, setF] = useState({
     nombre: est.nombre || '', itinerario: est.itinerario, nivel: Number(est.nivel) || 1, grupo_id: est.grupo_id || '',
     fecha_cierre_nivel: isoDia(est.fecha_cierre_nivel), representante: est.representante || '', correo: est.correo || '',
@@ -2775,12 +2786,12 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
       const res = await actualizarEstudiante(centroId, est.id, data)
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(`${f.nombre.trim()} actualizado.`)
+      complete(`${f.nombre.trim()} actualizado.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2839,6 +2850,8 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
 // detecta presente en el mes (carrera con el coach), la validación dirige al
 // botón correcto y el footer ofrece programar el retiro con el mismo motivo.
 function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
+  const complete = useDialogCallback(onSaved, centroId)
+  const completeProgrammed = useDialogCallback(onProgramado, centroId)
   const [f, setF] = useState({ motivo: 'ECONOMICO', fecha: hoyISO() })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -2849,12 +2862,12 @@ function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
     setSaving(true); setErr('')
     try {
       const res = await retirarEstudiante(centroId, est.id, { motivo: f.motivo, fecha: f.fecha })
-      setSaving(false)
       if (res.error) { setErr(res.error); if (res.requiereProgramacion) setRequiereProg(true); return }
-      onSaved(res)
+      complete(res)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2862,12 +2875,12 @@ function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
     setSaving(true); setErr('')
     try {
       const res = await programarRetiro(centroId, est.id, { motivo: f.motivo })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onProgramado(res)
+      completeProgrammed(res)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2902,6 +2915,7 @@ function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
 // termina su mes. El retiro queda programado para el día 1 del mes siguiente,
 // el sistema lo ejecuta solo, y se puede cancelar mientras tanto.
 function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [motivo, setMotivo] = useState('ECONOMICO')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -2910,12 +2924,12 @@ function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
     setSaving(true); setErr('')
     try {
       const res = await programarRetiro(centroId, est.id, { motivo })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(res)
+      complete(res)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2944,6 +2958,7 @@ function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
 
 // ── Modal: reincorporar retirado ─────────────────────────────────────────────
 function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [grupoId, setGrupoId] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -2954,13 +2969,13 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
     setSaving(true); setErr('')
     try {
       const res = await reincorporarEstudiante(centroId, est.id, { grupoId })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
       const g = activos.find((x) => String(x.id) === String(grupoId))
-      onSaved(`${est.nombre} reincorporado${g ? ` al grupo ${g.numero}` : ''}. Cuenta como reincorporado del mes.`)
+      complete(`${est.nombre} reincorporado${g ? ` al grupo ${g.numero}` : ''}. Cuenta como reincorporado del mes.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2990,6 +3005,7 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
 
 // ── Modal: coach (certificación según manual) ────────────────────────────────
 function CoachModal({ centroId, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
   const [f, setF] = useState({ nombre: initial.nombre || '', nivel_kids: initial.nivel_kids || 0, kinder1: !!initial.kinder1, kinder23: !!initial.kinder23 })
   const [saving, setSaving] = useState(false)
@@ -3002,12 +3018,12 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
     setSaving(true); setErr('')
     try {
       const res = await saveCoach(centroId, { id: initial.id, nombre: f.nombre, nivel_kids: parseInt(f.nivel_kids) || 0, kinder1: f.kinder1, kinder23: f.kinder23 })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(isEdit ? `Coach ${f.nombre.trim()} actualizado.` : `Coach ${f.nombre.trim()} agregado.`)
+      complete(isEdit ? `Coach ${f.nombre.trim()} actualizado.` : `Coach ${f.nombre.trim()} agregado.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -3046,6 +3062,7 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
 
 // ── Modal: salón ─────────────────────────────────────────────────────────────
 function SalonModal({ centroId, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
   const [f, setF] = useState({ nombre: initial.nombre || '', es_hibrido: !!initial.es_hibrido })
   const [saving, setSaving] = useState(false)
@@ -3056,12 +3073,12 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
     setSaving(true); setErr('')
     try {
       const res = await saveSalon(centroId, { id: initial.id, nombre: f.nombre, es_hibrido: f.es_hibrido })
-      setSaving(false)
       if (res.error) { setErr(res.error); return }
-      onSaved(isEdit ? `Salón ${f.nombre.trim()} actualizado.` : `Salón ${f.nombre.trim()} agregado.`)
+      complete(isEdit ? `Salón ${f.nombre.trim()} actualizado.` : `Salón ${f.nombre.trim()} agregado.`)
     } catch (e) {
-      setSaving(false)
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
+    } finally {
+      setSaving(false)
     }
   }
 

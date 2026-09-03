@@ -7,7 +7,8 @@ import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../.
 import { listarGruposActivos } from '../../../actions/grupos'
 import { retirarEstudiante, reincorporarEstudiante } from '../../../actions/estudiantes'
 import { ITINERARIOS, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, PRODUCTOS_MATERIAL, hoyISO } from '../../../../lib/operaciones'
-import Dialog from '../../../../components/Dialog'
+import TableScroller from '../../../../components/TableScroller'
+import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const PRODUCTO_LABELS = { KIT: 'KIT', ABACO: 'ÁBACO', LIBRO: 'LIBRO', SUETER: 'SUÉTER', MOCHILA: 'MOCHILA', OTRO: 'OTRO' }
@@ -205,7 +206,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Comparación con KPI semanal</h3>
                 <span className="label">Detecta descuadres antes de entregar a la Junta</span>
               </div>
-              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+              <TableScroller label="Comparación con KPI semanal">
                 <table className="table">
                   <thead>
                     <tr>
@@ -237,7 +238,7 @@ export default function CuadroPage() {
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </TableScroller>
             </div>
 
             {/* Royalties por nivel */}
@@ -246,7 +247,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Royalties</h3>
                 <span className="label">× {money(data.royaltyRate)} por niño activo</span>
               </div>
-              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+              <TableScroller label="Niños por nivel">
                 <table className="table">
                   <thead><tr>{['Nivel', nuevosLabel, 'Continúan', 'Total niños', 'Royalty'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -274,7 +275,7 @@ export default function CuadroPage() {
                     )}
                   </tbody>
                 </table>
-              </div>
+              </TableScroller>
             </div>
 
             {/* Control de grupos (hoja Cantidad de Niños) */}
@@ -290,7 +291,7 @@ export default function CuadroPage() {
                   <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
                 )}
               </div>
-              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+              <TableScroller label="Grupos del cuadro">
                 <table className="table">
                   <thead><tr>{['Grupo', 'Mes anterior', nuevosLabel, 'Reincorporados', 'Retirados', 'Total del mes'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -366,7 +367,7 @@ export default function CuadroPage() {
                     )}
                   </tbody>
                 </table>
-              </div>
+              </TableScroller>
             </div>
 
             {/* Declaración de inicios operativos del mes */}
@@ -378,7 +379,7 @@ export default function CuadroPage() {
               {!data.iniciosClase?.length ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin inicios de clase en {NOMBRES_MES[month - 1]} {year}.</div>
               ) : (
-                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+                <TableScroller label="Inicios pendientes">
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Fecha de inscripción', 'Inicio del grupo', 'Inicio efectivo', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -401,7 +402,7 @@ export default function CuadroPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableScroller>
               )}
             </div>}
 
@@ -414,7 +415,7 @@ export default function CuadroPage() {
               {data.deserciones.length === 0 ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin retiros en {NOMBRES_MES[month - 1]} {year}. 👏</div>
               ) : (
-                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+                <TableScroller label="Deserciones del mes">
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Motivo', 'Fecha inicio', 'Fecha retiro', 'Última asistencia', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -438,7 +439,7 @@ export default function CuadroPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableScroller>
               )}
             </div>
 
@@ -449,7 +450,7 @@ export default function CuadroPage() {
                 <span className="label">Kits, ábacos y otros del mes (sección de la hoja Royalties)</span>
               </div>
               {data.pedidos.length > 0 && (
-                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
+                <TableScroller label="Pedidos de materiales">
                   <table className="table">
                     <thead><tr>{['Fecha', 'N° O/E', 'Producto', 'Grupo', 'Nivel', 'Cantidad', 'Monto', 'Observaciones', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -486,7 +487,7 @@ export default function CuadroPage() {
                       </tr>
                     </tbody>
                   </table>
-                </div>
+                </TableScroller>
               )}
               {congelado ? (
                 <div style={{ padding: '12px 18px', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
@@ -564,6 +565,7 @@ export default function CuadroPage() {
 
 // ── Modal: retirar niño desde el cuadro ──────────────────────────────────────
 function RetirarModal({ centroId, nino, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [f, setF] = useState({ motivo: '', fecha: hoyISO(), ultimaAsistencia: '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -572,15 +574,20 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
   async function save() {
     if (!f.motivo) { setErr('Selecciona el motivo del retiro.'); return }
     setSaving(true); setErr('')
-    const res = await retirarEstudiante(centroId, nino.id, {
-      motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || undefined,
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    let msg = `${nino.nombre} retirado del cuadro.`
-    if (res.warn) msg += ` ⚠️ ${res.warn}`
-    if (res.grupoVacio) msg += ` El grupo ${res.grupoVacio} quedó sin niños: ciérralo en Grupos y Fusiones si ya no va a operar.`
-    onSaved(msg)
+    try {
+      const res = await retirarEstudiante(centroId, nino.id, {
+        motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || undefined,
+      })
+      if (res.error) { setErr(res.error); return }
+      let msg = `${nino.nombre} retirado del cuadro.`
+      if (res.warn) msg += ` ⚠️ ${res.warn}`
+      if (res.grupoVacio) msg += ` El grupo ${res.grupoVacio} quedó sin niños: ciérralo en Grupos y Fusiones si ya no va a operar.`
+      complete(msg)
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -611,6 +618,7 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
 
 // ── Modal: reincorporar niño desde el cuadro ─────────────────────────────────
 function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   // Por defecto vuelve a su grupo anterior, si sigue activo.
   const anterior = grupos.find((g) => String(g.id) === String(nino.grupo_id))
   const [grupoId, setGrupoId] = useState(anterior ? String(anterior.id) : '')
@@ -620,11 +628,16 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
   async function save() {
     if (!grupoId) { setErr('Selecciona el grupo donde se reincorpora.'); return }
     setSaving(true); setErr('')
-    const res = await reincorporarEstudiante(centroId, nino.id, { grupoId })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    const g = grupos.find((x) => String(x.id) === String(grupoId))
-    onSaved(`${nino.nombre} reincorporado${g ? ` en el grupo ${g.numero}` : ''}.`)
+    try {
+      const res = await reincorporarEstudiante(centroId, nino.id, { grupoId })
+      if (res.error) { setErr(res.error); return }
+      const g = grupos.find((x) => String(x.id) === String(grupoId))
+      complete(`${nino.nombre} reincorporado${g ? ` en el grupo ${g.numero}` : ''}.`)
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

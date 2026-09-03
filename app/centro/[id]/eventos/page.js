@@ -13,7 +13,7 @@ import { origenDeRegistro } from '../../../../lib/registro-origen'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES_VENTA, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
-import Dialog from '../../../../components/Dialog'
+import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
 
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
@@ -368,6 +368,7 @@ function openEdit(ev, setEditing) {
 }
 
 function EventModal({ centroId, opts, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [tab, setTab] = useState('info')
   const [f, setF] = useState(initial)
   const [grupos, setGrupos] = useState(null)
@@ -404,9 +405,14 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
       start_date: localToISO(f.startLocal, f.timezone),
       end_date: f.endLocal ? localToISO(f.endLocal, f.timezone) : null,
     }
-    const res = isEdit ? await actualizarEvento(centroId, f.id, data) : await crearEvento(centroId, data)
-    setSaving(false)
-    if (res.error) setErr(res.error); else onSaved(isEdit ? 'Clase de prueba actualizada.' : 'Clase de prueba creada en el CRM.')
+    try {
+      const res = isEdit ? await actualizarEvento(centroId, f.id, data) : await crearEvento(centroId, data)
+      if (res.error) setErr(res.error); else complete(isEdit ? 'Clase de prueba actualizada.' : 'Clase de prueba creada en el CRM.')
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const stages = opts.pipeline_stages || []
@@ -669,6 +675,7 @@ const desdeGrupo = (g) => {
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
 // de prueba tiene grupo por aperturar, viene preseleccionado en el select.
 function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
     nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
@@ -707,15 +714,20 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
     if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     setSaving(true); setErr('')
-    const res = await inscribirEstudiante(centroId, {
-      nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
-      origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
-      representante: f.representante, telefono: f.telefono, correo: f.correo,
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
-    onSaved(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
+    try {
+      const res = await inscribirEstudiante(centroId, {
+        nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
+        origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
+        representante: f.representante, telefono: f.telefono, correo: f.correo,
+      })
+      if (res.error) { setErr(res.error); return }
+      const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
+      complete(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const niveles = Array.from({ length: NIVEL_MAX[f.itinerario] || 1 }, (_, i) => i + 1)

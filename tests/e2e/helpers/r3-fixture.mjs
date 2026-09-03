@@ -13,6 +13,7 @@ export const R3_IDS = Object.freeze({
   schedule: 930012,
   student: 930022,
   eventMirror: 930032,
+  salon: 930052,
   crmEvent: 'e2e-r3-event-930032',
   crmRegistration: 'e2e-r3-registration-930042',
 })
@@ -156,6 +157,7 @@ export async function prepareR3Fixture() {
     await assertOwnedOrFree(query, 'grupos', R3_IDS.group, 'notas')
     await assertOwnedOrFree(query, 'estudiantes', R3_IDS.student, 'notas')
     await assertOwnedOrFree(query, 'centro_eventos', R3_IDS.eventMirror, 'created_by')
+    await assertOwnedOrFree(query, 'salones', R3_IDS.salon, 'nombre')
     const schedules = await query`
       SELECT gh.id, gh.grupo_id, g.notas AS marker
       FROM grupo_horarios gh
@@ -173,6 +175,7 @@ export async function prepareR3Fixture() {
     await query`DELETE FROM estudiantes WHERE id = ${R3_IDS.student}`
     await query`DELETE FROM grupo_horarios WHERE id = ${R3_IDS.schedule}`
     await query`DELETE FROM grupos WHERE id = ${R3_IDS.group}`
+    await query`DELETE FROM salones WHERE id = ${R3_IDS.salon} AND nombre = ${R3_MARKER}`
 
     for (const [id, name] of [
       [R3_IDS.centerOperations, 'Centro Fixture R3 Operaciones'],
@@ -186,6 +189,10 @@ export async function prepareR3Fixture() {
       `
     }
 
+    await query`
+      INSERT INTO salones (id, centro_id, nombre, activo)
+      VALUES (${R3_IDS.salon}, ${R3_IDS.centerOperations}, ${R3_MARKER}, TRUE)
+    `
     await query`
       INSERT INTO grupos (
         id, centro_id, numero, itinerario, estado, fecha_apertura,
@@ -310,6 +317,7 @@ export async function cleanupR3Fixture() {
         AND grupo_id = ${R3_IDS.group}
     `
     await query`DELETE FROM grupos WHERE id = ${R3_IDS.group} AND notas = ${R3_MARKER}`
+    await query`DELETE FROM salones WHERE id = ${R3_IDS.salon} AND nombre = ${R3_MARKER} AND centro_id = ${R3_IDS.centerOperations}`
     await query`
       DELETE FROM mes_kpi
       WHERE (centro_id, year, month) IN (
@@ -327,7 +335,7 @@ export async function cleanupR3Fixture() {
       snapshotIds,
       recommendationIds,
       receiptIds,
-      fixtureIds: [R3_IDS.eventMirror, R3_IDS.student, R3_IDS.schedule, R3_IDS.group, R3_IDS.centerOperations, R3_IDS.centerGrowth],
+      fixtureIds: [R3_IDS.eventMirror, R3_IDS.student, R3_IDS.schedule, R3_IDS.group, R3_IDS.salon, R3_IDS.centerOperations, R3_IDS.centerGrowth],
     }
   })
 

@@ -1,7 +1,19 @@
 'use client'
 
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { createDialogLifetime } from './dialog-lifetime.mjs'
+
+// Each mounted form owns a scope. A pending completion retains its old scope,
+// so unmounting/replacing it cannot close a later form owned by the same page.
+export function useDialogCallback(callback, instanceKey) {
+  const scope = useMemo(() => createDialogLifetime(), [instanceKey])
+  useEffect(() => {
+    scope.activate()
+    return () => scope.dispose()
+  }, [scope])
+  return scope.guard(callback)
+}
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 const modalLayers = []
@@ -93,10 +105,11 @@ export function useModalLayer({ open, onClose, closeDisabled = false, initialFoc
       }
       const first = nodes[0]
       const last = nodes[nodes.length - 1]
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === surface)) {
+      const outsideTabOrder = !nodes.includes(document.activeElement)
+      if (event.shiftKey && (document.activeElement === first || outsideTabOrder)) {
         event.preventDefault()
         last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && (document.activeElement === last || outsideTabOrder)) {
         event.preventDefault()
         first.focus()
       }

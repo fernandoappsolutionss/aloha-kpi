@@ -379,6 +379,8 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
   await expect(dialog).toBeVisible({ timeout: 60_000 })
   const title = dialog.getByRole('heading')
   await expect(title.locator('[tabindex="-1"]')).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(dialog.getByRole('button', { name: 'Ver plan', exact: true })).toBeFocused()
   await expectDialogContract(page, dialog, 'GrowthBriefing', null, '.growth-briefing')
   expect(await page.locator('main').evaluate((node) => Boolean(node.closest('[inert]')))).toBe(true)
   const backgroundOverflow = await page.locator('main').evaluate((node) => ({
@@ -405,4 +407,54 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
   expect(neutral?.shown_at).toBeTruthy()
   expect(neutral?.acknowledged_at).toBeNull()
   expect(neutral?.snoozed_until).toBeNull()
+})
+
+for (const scenario of [
+  { item: INVENTORY[3], submit: 'Crear clase de prueba', fill: async (dialog) => {
+    await dialog.getByLabel('Nombre de la clase de prueba *').fill('Borrador abortado')
+    await dialog.locator('input[type="datetime-local"]').first().fill('2026-10-01T15:00')
+    return async () => expect(dialog.getByLabel('Nombre de la clase de prueba *')).toHaveValue('Borrador abortado')
+  } },
+  { item: INVENTORY[4], submit: 'Inscribir', fill: async (dialog) => {
+    await dialog.getByLabel('Origen del nuevo ingreso *').selectOption('centro')
+    return async () => expect(dialog.getByLabel('Origen del nuevo ingreso *')).toHaveValue('centro')
+  } },
+  { item: INVENTORY[5], submit: 'Retirar del cuadro', fill: draftFirstNonEmptyOption },
+]) {
+  test(`rechazo de guardado desbloquea ${scenario.item.label} y conserva borrador`, async ({ page }) => {
+    const { trigger } = await loadCase(page, scenario.item)
+    const dialog = await openInventoryDialog(page, scenario.item, trigger)
+    const expectDraft = await scenario.fill(dialog)
+    let intercepted = false
+    await page.route(`**${scenario.item.path}`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      intercepted = true
+      await route.abort('failed')
+    })
+    await dialog.getByRole('button', { name: scenario.submit, exact: true }).click()
+    await expect.poll(() => intercepted).toBe(true)
+    await expect(dialog.getByRole('button', { name: 'Cancelar', exact: true })).toBeEnabled()
+    await expect(dialog.locator('.alert--error')).toContainText(/No se pudo guardar/)
+    await expectDraft()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+}
+
+test('scrollers operativos son regiones semánticas de TableScroller', async ({ page }) => {
+  for (const path of ['/centro/2/cuadro', '/centro/2/grupos']) {
+    await page.setViewportSize({ width: 320, height: 568 })
+    await page.goto(path)
+    await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1)
+    if (path.endsWith('/grupos')) await page.getByRole('button', { name: 'Horarios', exact: true }).click()
+    const scrollers = page.locator('[data-horizontal-scroll]')
+    expect(await scrollers.count()).toBeGreaterThan(0)
+    for (const scroller of await scrollers.all()) {
+      await expect(scroller).toHaveAttribute('role', 'region')
+      await expect(scroller).toHaveAttribute('tabindex', '0')
+      await expect(scroller).toHaveAttribute('aria-label', /.+/)
+      await expect(scroller).toHaveClass(/table-scroller/)
+    }
+  }
 })
