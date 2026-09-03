@@ -8,11 +8,11 @@ const pill = (on) => ({
   border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`,
   borderRadius: 'var(--r-pill)',
   background: on ? 'var(--ts-green-soft)' : 'transparent',
-  fontFamily: 'var(--font-mono)', fontSize: 11,
+  fontFamily: 'var(--font-mono)',
   color: on ? 'var(--ts-green)' : 'var(--text-dim)',
   cursor: 'pointer', fontWeight: on ? 600 : 500,
 })
-const inp = { padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }
+const inp = { padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontFamily: 'var(--font-mono)' }
 
 export default function PanelFilter({ value, onChange }) {
   const f = value || { mode: 'trimestre' }
@@ -22,10 +22,10 @@ export default function PanelFilter({ value, onChange }) {
   const preset = f.preset || '12m'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+    <div className="panel-filter" style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button style={pill(isT)} onClick={() => onChange({ mode: 'trimestre', year: f.year || cy, quarter: f.quarter || (Math.floor(new Date().getMonth() / 3) + 1) })}>Trimestre</button>
-        <button style={pill(!isT)} onClick={() => onChange({ mode: 'mensual', preset, from: f.from || '', to: f.to || '' })}>Mensual</button>
+        <button type="button" style={pill(isT)} onClick={() => onChange({ mode: 'trimestre', year: f.year || cy, quarter: f.quarter || (Math.floor(new Date().getMonth() / 3) + 1) })}>Trimestre</button>
+        <button type="button" style={pill(!isT)} onClick={() => onChange({ mode: 'mensual', preset, from: f.from || '', to: f.to || '' })}>Mensual</button>
       </div>
 
       {isT ? (
@@ -42,7 +42,7 @@ export default function PanelFilter({ value, onChange }) {
       ) : (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {[['12m', 'Últimos 12 meses'], ['36m', 'Últimos 3 años'], ['anio', 'Año completo'], ['ytd', 'Este año'], ['custom', 'Personalizado']].map(([k, l]) => (
-            <button key={k} style={pill(preset === k)} onClick={() => onChange({ ...f, mode: 'mensual', preset: k, year: f.year || cy })}>{l}</button>
+            <button type="button" key={k} style={pill(preset === k)} onClick={() => onChange({ ...f, mode: 'mensual', preset: k, year: f.year || cy })}>{l}</button>
           ))}
           {preset === 'anio' && (
             <select className="select" value={f.year || cy} aria-label="Año"
@@ -52,10 +52,10 @@ export default function PanelFilter({ value, onChange }) {
           )}
           {preset === 'custom' && (
             <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
-              <input type="month" value={f.from || ''} style={inp}
+              <input type="month" name="desde" aria-label="Mes desde" autoComplete="off" value={f.from || ''} style={inp}
                 onChange={e => onChange({ ...f, mode: 'mensual', preset: 'custom', from: e.target.value })} />
               <span style={{ color: 'var(--text-dim)' }}>→</span>
-              <input type="month" value={f.to || ''} style={inp}
+              <input type="month" name="hasta" aria-label="Mes hasta" autoComplete="off" value={f.to || ''} style={inp}
                 onChange={e => onChange({ ...f, mode: 'mensual', preset: 'custom', to: e.target.value })} />
             </span>
           )}

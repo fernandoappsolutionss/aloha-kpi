@@ -38,7 +38,6 @@ function Icon({ name }) {
 export default function Sidebar({ rol, centroNombre, centroId }) {
   const router = useRouter()
   const path = usePathname()
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
   const [centrosOpen, setCentrosOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [context, setContext] = useState(null)
@@ -147,14 +146,17 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     }
   }, [])
 
+  const actorRole = context?.actor?.role
+  const isPanel = actorRole === 'admin_general' || actorRole === 'supervisor' || actorRole === 'coordinador'
+  const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
   const centros = context?.centers || []
-  const esCoordinador = context?.actor.role === 'coordinador'
+  const esCoordinador = actorRole === 'coordinador'
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
-    if (loading || !context || isAdmin || !centroId || context.capabilities.viewUsers) return
+    if (loading || !context || isPanel || !centroId || context.capabilities.viewUsers) return
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
-  }, [loading, context, isAdmin, centroId])
+  }, [loading, context, isPanel, centroId])
 
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
@@ -182,8 +184,8 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
   ]
-  const items = isAdmin ? adminItems : centroItems
-  const roleLabel = isAdmin
+  const items = isPanel ? adminItems : (isCenterActor && centroId ? centroItems : [])
+  const roleLabel = isPanel
     ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador')
     : (centroNombre || 'Centro')
 
@@ -232,17 +234,17 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       <div className="sb__brand">
         <Logo size={40} />
         <div className="sb__role">
-          <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isAdmin ? 'shield' : 'building'} /></span>
+          <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isPanel ? 'shield' : 'building'} /></span>
           <span className="label">{roleLabel}</span>
         </div>
       </div>
 
       <nav className="sb__nav">
-        <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
+        <div className="sb__section label">{isPanel ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => navigationLink(item))}
 
         {/* Centros expandible (admin) */}
-        {isAdmin && centros.length > 0 && (
+        {isPanel && centros.length > 0 && (
           <>
             <button onClick={() => setCentrosOpen(!centrosOpen)} className="sb__item">
               <Icon name="building" /><span>Ir a centro</span>
@@ -263,7 +265,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
           </>
         )}
 
-        {isAdmin && configItems.length > 0 && (
+        {isPanel && configItems.length > 0 && (
           <>
             <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
             {configItems.map(item => navigationLink(item))}

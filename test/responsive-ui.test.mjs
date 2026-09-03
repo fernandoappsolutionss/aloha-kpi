@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -116,4 +118,24 @@ test('el launcher ungated inicia el smoke 404 sin heredar ningún secreto', () =
     NODE_ENV: 'development',
     NEXT_TELEMETRY_DISABLED: '1',
   })
+})
+
+test('el modo de mutaciones excluye todos los proyectos de auditoría read-only', () => {
+  const cwd = fileURLToPath(new URL('../', import.meta.url))
+  const script = "import('./playwright.config.mjs').then(({ default: config }) => console.log(JSON.stringify(config.projects.map(({ name }) => name))))"
+  const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+    cwd,
+    encoding: 'utf8',
+    env: {
+      DATABASE_URL: 'postgres://fixture:fixture@db.invalid:5432/fixture',
+      USUARIOS_TEST_DATABASE_URL: 'postgres://fixture:fixture@db.invalid:5432/fixture',
+      E2E_DATABASE_CONFIRM: 'disposable',
+      E2E_NEON_HTTP: 'http://127.0.0.1:4446/sql',
+      E2E_NEON_WSPROXY: '127.0.0.1:5435',
+      E2E_DELIVERY_MODE: 'stub',
+      SESSION_SECRET: 'fixture-session-secret-with-enough-length',
+      E2E_RUN_MUTATIONS: '1',
+    },
+  })
+  assert.deepEqual(JSON.parse(output), ['setup', 'users-mutations-local'])
 })

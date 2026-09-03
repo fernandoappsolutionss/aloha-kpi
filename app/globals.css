@@ -475,6 +475,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .sb__chev { margin-left: auto; transition: transform 0.2s; opacity: 0.6; }
 .sb__sub { padding-left: 30px; font-size: 12.5px; }
 .sb__foot { border-top: 1px solid var(--border); padding: 8px; }
+.panel-filter button { font-size: 11px; }
+.panel-filter input { font-size: 12px; }
 .mobile-bar, .sb-backdrop, .sb__close { display: none; }
 
 @media (max-width: 1024px) {
@@ -518,6 +520,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .sb__nav { overscroll-behavior: contain; }
   .sb__foot { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .sb__item, .theme-toggle { min-height: var(--touch-target); }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea, .input { min-height: var(--touch-target); }
+  .panel-filter :is(button, .select, input) { min-height: var(--touch-target); }
   .main { width: 100%; overflow: visible; }
 }
 
@@ -1186,10 +1190,12 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   body { font-size: var(--mobile-body); }
   .main { min-width: 0; padding: 18px 14px max(24px, env(safe-area-inset-bottom)); }
   .label { font-size: var(--mobile-label); letter-spacing: .08em; }
-  .table thead th, .pill { font-size: var(--mobile-caption); }
+  .table thead th, .pill { font-size: var(--mobile-caption) !important; }
   .h-sub { font-size: var(--mobile-label); }
   .h-title { font-size: clamp(1.55rem, 8vw, 2.4rem); line-height: 1.12; text-wrap: balance; }
   input, select, textarea, .input { font-size: var(--mobile-input); }
+  .panel-filter button { font-size: var(--mobile-caption); }
+  .panel-filter :is(.select, input) { font-size: var(--mobile-input); }
   .kpi-grid, .responsive-grid, .form-grid, .dialog-form-grid { grid-template-columns: minmax(0, 1fr); }
   .page-actions, .dialog-actions { align-items: stretch; flex-direction: column; }
   .page-actions .btn, .dialog-actions .btn { width: 100%; }

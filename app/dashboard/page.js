@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
 import PanelFilter from '../../components/PanelFilter'
 import NivelBadge from '../../components/NivelBadge'
+import TableScroller from '../../components/TableScroller'
 import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -157,8 +158,8 @@ export default function DashboardPage() {
             <h2 className="panel__title">Estado de todos los centros</h2>
             <span className="label">{label}</span>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
+          <TableScroller label="Estado de todos los centros" stickyFirstColumn>
+            <table className="table" style={{ minWidth: 980 }}>
               <thead>
                 <tr>
                   {['Centro', 'Administradora', 'Niños', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
@@ -203,7 +204,7 @@ export default function DashboardPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableScroller>
         </div>
 
         {/* Gráfico general de niños + filtros rápidos (al final del panel) */}
@@ -225,8 +226,8 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
                   <Tooltip content={<NinosTooltip />} />
                   <Area type="monotone" dataKey="ninos" name="Niños" stroke="var(--ts-green)" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: 'var(--ts-green)' }} activeDot={{ r: 5 }} />
                 </AreaChart>

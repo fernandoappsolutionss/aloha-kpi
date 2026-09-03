@@ -45,6 +45,7 @@ const mutationProjects = process.env.E2E_RUN_MUTATIONS === '1' ? [{
   workers: 1,
   use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/admin.json' },
 }] : []
+const mutationRun = mutationProjects.length > 0
 
 const serverEnv = remoteRun ? undefined : {
   E2E_NEXT_PROFILE: 'authenticated',
@@ -63,6 +64,7 @@ export default defineConfig({
   outputDir: 'test-results',
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   expect: { timeout: 10_000 },
+  workers: mutationRun ? 1 : undefined,
   use: {
     baseURL,
     channel: 'chrome',
@@ -76,7 +78,14 @@ export default defineConfig({
     timeout: 120_000,
     env: serverEnv,
   },
-  projects: [
+  projects: mutationRun ? [
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.js/,
+      use: { trace: 'off', screenshot: 'off' },
+    },
+    ...mutationProjects,
+  ] : [
     {
       name: 'setup',
       testMatch: /auth\.setup\.js/,
@@ -105,6 +114,5 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/center.json' },
     },
-    ...mutationProjects,
   ],
 })
