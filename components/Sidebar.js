@@ -1,8 +1,7 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { listCentros } from '../app/actions/centros'
-import { tienePanel } from './useRol'
+import { getNavigationContext } from '../app/actions/navigation'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import Logo from './Logo'
@@ -38,29 +37,29 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const router = useRouter()
   const path = usePathname()
   const isAdmin = rol === 'admin_general' || rol === 'supervisor'
-  const [centros, setCentros] = useState([])
   const [centrosOpen, setCentrosOpen] = useState(false)
-  // Las páginas del panel pasan rol="admin_general" fijo: el rol real (para
-  // distinguir al coordinador operativo) sale de la sesión guardada.
-  const [rolReal, setRolReal] = useState(null)
-  useEffect(() => { setRolReal(localStorage.getItem('aloha_rol')) }, [])
-  const esCoordinador = rolReal === 'coordinador'
+  const [loading, setLoading] = useState(true)
+  const [context, setContext] = useState(null)
 
   useEffect(() => {
-    if (isAdmin) {
-      listCentros().then((data) => { if (data) setCentros(data) }).catch(() => {})
+    let mounted = true
+    getNavigationContext()
+      .then((data) => { if (mounted) setContext(data) })
+      .catch(() => { if (mounted) setContext(null) })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => {
+      mounted = false
     }
-  }, [isAdmin])
+  }, [])
+
+  const centros = context?.centers || []
+  const esCoordinador = context?.actor.role === 'coordinador'
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
-    if (isAdmin || !centroId) return
-    // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
-    // leer el rol real. La action devuelve null para gerencia de todas formas.
-    const r = localStorage.getItem('aloha_rol')
-    if (tienePanel(r)) return
+    if (loading || !context || isAdmin || !centroId || context.capabilities.viewUsers) return
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
-  }, [isAdmin, centroId])
+  }, [loading, context, isAdmin, centroId])
 
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
@@ -69,16 +68,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
-    // Metas y Entrenamiento son de gerencia: fijan objetivos globales y la
-    // matriz de todas las administradoras. El coordinador no los ve.
-    ...(esCoordinador ? [] : [
-      { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
-      { label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' },
-    ]),
+    ...(context?.capabilities.viewMetas ? [{ label: 'Metas', icon: 'target', href: '/dashboard/metas' }] : []),
+    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
   ]
-  const adminConfig = [
-    { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
-    { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
+  const configItems = [
+    ...(context?.capabilities.viewCenters ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
+    ...(context?.capabilities.viewUsers ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
@@ -142,10 +137,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
           </>
         )}
 
-        {isAdmin && !esCoordinador && (
+        {isAdmin && configItems.length > 0 && (
           <>
             <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
-            {adminConfig.map(item => (
+            {configItems.map(item => (
               <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
                 className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
                 <Icon name={item.icon} /><span>{item.label}</span>

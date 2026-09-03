@@ -1,15 +1,16 @@
 'use server'
-import { requireAdmin } from '../../lib/auth'
+import { requireSession } from '../../lib/auth'
 import { usuariosRepository } from '../../lib/usuarios-repository'
 import { accessTokensRepository } from '../../lib/access-tokens-repository'
 import { createAccessTokenService } from '../../lib/access-tokens.mjs'
 import { createUsuariosService } from '../../lib/usuarios-service.mjs'
 import { deliverAccess } from '../../lib/invitations'
+import { usuariosDeliveryForRuntime } from '../../lib/usuarios-delivery.mjs'
 
 const service = createUsuariosService({
   repo: usuariosRepository,
   accessTokens: createAccessTokenService({ repo: accessTokensRepository }),
-  deliverAccess,
+  deliverAccess: usuariosDeliveryForRuntime({ live: deliverAccess }),
 })
 
 const SAFE_MESSAGES = new Set([
@@ -28,7 +29,8 @@ const SAFE_MESSAGES = new Set([
   'Usuario no encontrado.',
 ])
 
-function sessionRef(session) {
+async function sessionRef() {
+  const session = await requireSession()
   return { uid: Number(session.uid) }
 }
 
@@ -49,40 +51,22 @@ async function runAction(name, work) {
   }
 }
 
-// Compatibilidad temporal con el cliente actual; P6 consumirá pageData completo.
-export async function listUsuarios() {
-  const session = await requireAdmin()
-  const result = await runAction('pageData', async () => service.pageData(sessionRef(session)))
-  if (result?.error) return []
-  return result.users.map((user) => ({
-    id: user.id,
-    nombre: user.nombre,
-    email: user.email,
-    rol: user.role,
-    centro_id: user.centerId,
-    centro_nombre: user.centerNames[0] || null,
-    centros: user.centerIds,
-    centros_nombres: user.centerNames,
-    activo: user.active,
-  }))
+export async function getUsuariosPageData() {
+  return runAction('pageData', async () => service.pageData(await sessionRef()))
 }
 
 export async function createUsuario(input) {
-  const session = await requireAdmin()
-  return runAction('create', async () => service.create(sessionRef(session), input))
+  return runAction('create', async () => service.create(await sessionRef(), input))
 }
 
 export async function updateUsuario(id, input) {
-  const session = await requireAdmin()
-  return runAction('update', async () => service.update(sessionRef(session), id, input))
+  return runAction('update', async () => service.update(await sessionRef(), id, input))
 }
 
 export async function reenviarInvitacion(id) {
-  const session = await requireAdmin()
-  return runAction('resendAccess', async () => service.resendAccess(sessionRef(session), id))
+  return runAction('resendAccess', async () => service.resendAccess(await sessionRef(), id))
 }
 
 export async function deleteUsuario(id) {
-  const session = await requireAdmin()
-  return runAction('delete', async () => service.delete(sessionRef(session), id))
+  return runAction('delete', async () => service.delete(await sessionRef(), id))
 }

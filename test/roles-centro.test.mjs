@@ -43,9 +43,43 @@ test('las eliminaciones del centro exigen un rol que pueda eliminar', () => {
   }
 })
 
-test('gestionar usuarios y centros sigue siendo solo de gerencia', () => {
+test('Gestión de usuarios usa actor fresco y servicio; centros sigue solo en gerencia', () => {
   const usuarios = fuente('../app/actions/usuarios.js')
-  assert.equal((usuarios.match(/await requireAdmin\(\)/g) || []).length, 5)
+  assert.match(usuarios, /requireSession\(\)/)
+  assert.match(usuarios, /createUsuariosService/)
+  assert.doesNotMatch(usuarios, /requireAdmin\(\)/)
+  assert.doesNotMatch(usuarios, /SELECT\s|INSERT\s|UPDATE\s|DELETE\s/i)
+
+  const page = fuente('../app/dashboard/usuarios/page.js')
+  assert.doesNotMatch(page, /['"]use client['"]/)
+  assert.match(page, /getUsuariosPageData/)
+  assert.match(page, /UsuariosClient/)
+
+  const sidebar = fuente('../components/Sidebar.js')
+  assert.doesNotMatch(sidebar, /aloha_rol/)
+  assert.doesNotMatch(sidebar, /localStorage\.getItem\(['"]aloha_rol/)
+  assert.match(sidebar, /viewUsers/)
+  assert.match(sidebar, /viewCenters/)
+
   const centros = fuente('../app/actions/centros.js')
-  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 200), /requireAdmin\(\)/)
+  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 240), /requireAdmin\(\)/)
+})
+
+test('la página conserva props frescas, una sola mutación y la confirmación de acceso', () => {
+  const client = fuente('../app/dashboard/usuarios/UsuariosClient.js')
+  assert.match(client, /const EMPTY_FORM\s*=\s*\{[^}]*centros:\s*\[\]/s)
+  assert.match(client, /function resetEditor\(\)/)
+  assert.match(client, /setAccessResult\(/)
+  assert.match(client, /initialData\.users\.filter/)
+  assert.match(client, /pendingRef\.current/)
+  assert.doesNotMatch(client, /useState\(initialData\.users\)/)
+  assert.doesNotMatch(client, /listCentros/)
+})
+
+test('navegación usa usuario fresco y evita consulta global para alcance vacío', () => {
+  const navigation = fuente('../app/actions/navigation.js')
+  assert.match(navigation, /requireCurrentUser\(\)/)
+  assert.match(navigation, /scope\.length\s*===\s*0\s*\?\s*\[\]/)
+  assert.match(navigation, /viewUsers/)
+  assert.match(navigation, /viewCenters/)
 })
