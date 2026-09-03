@@ -2,7 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { listCentros } from '../app/actions/centros'
-import { tienePanel } from './useRol'
+import { tienePanel, useRol } from './useRol'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import Logo from './Logo'
@@ -29,6 +29,7 @@ function Icon({ name }) {
     case 'logout': return <svg viewBox="0 0 24 24" {...P}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
     case 'shield': return <svg viewBox="0 0 24 24" {...P}><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5Z" /></svg>
     case 'book': return <svg viewBox="0 0 24 24" {...P}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
+    case 'back': return <svg viewBox="0 0 24 24" {...P}><path d="M19 12H5m7-7-7 7 7 7" /></svg>
     case 'chevron': return <svg viewBox="0 0 24 24" {...P}><polyline points="6 9 12 15 18 9" /></svg>
     default: return null
   }
@@ -42,9 +43,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const [centrosOpen, setCentrosOpen] = useState(false)
   // Las páginas del panel pasan rol="admin_general" fijo: el rol real (para
   // distinguir al coordinador operativo) sale de la sesión guardada.
-  const [rolReal, setRolReal] = useState(null)
-  useEffect(() => { setRolReal(localStorage.getItem('aloha_rol')) }, [])
+  const rolReal = useRol()
   const esCoordinador = rolReal === 'coordinador'
+  const mostrarRegreso = !isAdmin && Boolean(centroId) && tienePanel(rolReal)
+  const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
 
   useEffect(() => {
     if (isAdmin) {
@@ -100,7 +102,9 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     localStorage.clear()
     router.push('/login')
   }
-  const isActive = (href) => path === href
+  const isActive = (href) => path === href || (
+    href !== '/dashboard' && href !== `/centro/${centroId}` && path.startsWith(`${href}/`)
+  )
 
   return (
     <aside className="sb">
@@ -158,11 +162,17 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
       {/* Footer */}
       <div className="sb__foot">
+        {mostrarRegreso && (
+          <button onClick={() => router.push('/dashboard')} className="sb__item sb__return"
+            title={etiquetaRegreso} aria-label={etiquetaRegreso}>
+            <Icon name="back" /><span>{etiquetaRegreso}</span>
+          </button>
+        )}
         <ThemeToggle />
-        <button onClick={() => router.push('/perfil')} className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
+        <button onClick={() => router.push('/perfil')} aria-label="Mi perfil" className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
           <Icon name="user" /><span>Mi perfil</span>
         </button>
-        <button onClick={logout} className="sb__item">
+        <button onClick={logout} aria-label="Cerrar sesión" className="sb__item">
           <Icon name="logout" /><span>Cerrar sesión</span>
         </button>
       </div>

@@ -240,12 +240,6 @@ export default function CentroPage() {
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <GrowthBriefing centroId={id} />
       <main className="main">
-        {isAdmin && (
-          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
-            Volver al panel de administrador
-          </button>
-        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · {label}</div>
