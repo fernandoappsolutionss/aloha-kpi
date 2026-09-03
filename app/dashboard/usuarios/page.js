@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import { listUsuarios, createUsuario, updateUsuario, deleteUsuario, reenviarInvitacion } from '../../actions/usuarios'
 import { listCentros } from '../../actions/centros'
+import { presentAccessNotice } from '../../../lib/access-presentation.mjs'
 
 // Gerencia manda en todo; el coordinador operativo solo en los centros que se
 // le asignen; Administrador y Asistente son los dos miembros de un centro.
@@ -25,7 +26,7 @@ export default function UsuariosPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(null)
   const [sending, setSending] = useState(null)
-  const [invite, setInvite] = useState(null) // { nombre, email, link, emailSent, emailReason, purpose }
+  const [invite, setInvite] = useState(null)
   const [copied, setCopied] = useState(false)
   const [form, setForm] = useState({ nombre:'', email:'', rol:'administradora', centro_id:'', centros:[] })
 
@@ -54,7 +55,10 @@ export default function UsuariosPage() {
         const res = await createUsuario({ nombre: form.nombre, email: form.email, rol: form.rol, centro_id: form.centro_id, centros: form.centros })
         if (res.error) throw new Error(res.error)
         setStatus('✅ Usuario creado.')
-        setInvite({ nombre: form.nombre, email: form.email.trim().toLowerCase(), link: res.link, emailSent: res.emailSent, emailReason: res.emailReason, purpose: 'invite' })
+        setInvite(presentAccessNotice({
+          result: res,
+          user: { nombre: form.nombre, email: form.email },
+        }))
         setCopied(false)
       }
       setShowForm(false); setEditing(null)
@@ -69,13 +73,14 @@ export default function UsuariosPage() {
     try {
       const res = await reenviarInvitacion(u.id)
       if (res.error) throw new Error(res.error)
-      setInvite({ nombre: u.nombre, email: u.email, link: res.link, emailSent: res.emailSent, emailReason: res.emailReason, purpose: u.activo ? 'reset' : 'invite' })
+      setInvite(presentAccessNotice({ result: res, user: u }))
       setCopied(false)
     } catch(e) { setStatus('❌ Error: ' + e.message) }
     setSending(null)
   }
 
   async function copyLink() {
+    if (!invite?.canCopy || !invite.link) return
     try { await navigator.clipboard.writeText(invite.link); setCopied(true); setTimeout(()=>setCopied(false), 2500) }
     catch { /* el usuario puede seleccionar el texto manualmente */ }
   }
@@ -132,24 +137,34 @@ export default function UsuariosPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
               <div>
                 <h3 className="panel__title" style={{ marginBottom: 6 }}>
-                  {invite.purpose === 'reset' ? '🔑 Enlace para restablecer contraseña' : '✉️ Enlace de acceso para ' + invite.nombre}
+                  {invite.kind === 'reset' ? '🔑 Restablecimiento de contraseña' : '✉️ Enlace de acceso para ' + invite.nombre}
                 </h3>
                 <p className="h-sub" style={{ margin: 0 }}>
-                  {invite.emailSent
-                    ? <>Correo enviado a <b>{invite.email}</b>. También puedes compartir el enlace directamente:</>
-                    : <>El correo automático no está configurado{invite.emailReason && invite.emailReason !== 'no_api_key' ? ` (${invite.emailReason})` : ''}. Copia este enlace y envíaselo al usuario (WhatsApp, etc.):</>}
+                  {invite.kind === 'reset'
+                    ? (invite.emailSent
+                        ? <>Correo de restablecimiento enviado a <b>{invite.email}</b>.</>
+                        : <>No pudimos enviar el correo de restablecimiento. Intenta nuevamente.</>)
+                    : (invite.emailSent
+                        ? <>Correo enviado a <b>{invite.email}</b>. También puedes compartir el enlace directamente:</>
+                        : (invite.canCopy
+                            ? <>No pudimos enviar el correo. Comparte este enlace directamente con el usuario:</>
+                            : <>No pudimos enviar el correo ni preparar un enlace copiable. Intenta nuevamente.</>))}
                 </p>
               </div>
               <button onClick={()=>setInvite(null)} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>✕</button>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <input readOnly value={invite.link} onFocus={e=>e.target.select()} className="input"
-                style={{ flex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }} />
-              <button onClick={copyLink} className="btn btn--primary" style={{ whiteSpace: 'nowrap' }}>
-                {copied ? '✓ Copiado' : 'Copiar enlace'}
-              </button>
-            </div>
-            <p className="label" style={{ marginTop: 10, color: 'var(--text-faint)' }}>El enlace vence en 48 horas y solo puede usarse una vez.</p>
+            {invite.canCopy && (
+              <>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <input readOnly value={invite.link} onFocus={e=>e.target.select()} className="input"
+                    style={{ flex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }} />
+                  <button onClick={copyLink} className="btn btn--primary" style={{ whiteSpace: 'nowrap' }}>
+                    {copied ? '✓ Copiado' : 'Copiar enlace'}
+                  </button>
+                </div>
+                <p className="label" style={{ marginTop: 10, color: 'var(--text-faint)' }}>El enlace vence en 48 horas y solo puede usarse una vez.</p>
+              </>
+            )}
           </div>
         )}
 
