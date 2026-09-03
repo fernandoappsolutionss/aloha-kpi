@@ -8,6 +8,7 @@ import { sql } from '../../../../lib/db'
 import { hoyISO } from '../../../../lib/operaciones'
 import { rechazoCron } from '../../../../lib/cron-auth.mjs'
 import { contarVencidasHoy, semanaDiaKpi } from '../../../../lib/zoho-cobranza.mjs'
+import { zohoRefreshToken } from '../../../../lib/zoho-conexion'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -20,8 +21,13 @@ export async function GET(request) {
   const casilla = semanaDiaKpi(hoy)
   if (!casilla) return Response.json({ ok: true, fecha: hoy, skip: 'fin de semana' })
 
+  const refreshToken = await zohoRefreshToken()
+  if (!refreshToken) {
+    return Response.json({ ok: false, error: 'Zoho sin conectar: entra a /dashboard/zoho y conecta la cuenta' }, { status: 503 })
+  }
+
   const [y, m] = hoy.split('-').map(Number)
-  const { porCentro, sinClasificar } = await contarVencidasHoy()
+  const { porCentro, sinClasificar } = await contarVencidasHoy(refreshToken)
 
   const escritos = []
   const cerrados = []

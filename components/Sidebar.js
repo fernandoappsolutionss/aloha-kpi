@@ -81,6 +81,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const adminConfig = [
     { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
     { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
+    { label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' },
   ]
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
