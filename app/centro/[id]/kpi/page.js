@@ -220,7 +220,12 @@ export default function KPIPage() {
     )
   }
 
-  if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text-dim)'}}>Cargando…</div>
+  if (loading) return (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
+      <main className="main"><div className="empty">Cargando…</div></main>
+    </div>
+  )
 
   // Estilo input de "Configuración" / cards de categoría
   const cfgInput = (key, full, bloqueado = false) => (

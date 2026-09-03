@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useEsAsistente, tienePanel } from '../../../../components/useRol'
-import { useParams, useRouter } from 'next/navigation'
+import { useEsAsistente } from '../../../../components/useRol'
+import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
   loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, setInscripcionAbierta, extenderVentanaLlenado, linkCoach, siguienteNumero,
@@ -244,9 +244,6 @@ function ChipLlenado({ v, programa, nivel }) {
 
 export default function GruposPage() {
   const { id } = useParams()
-  const router = useRouter()
-  const [rol, setRol] = useState('usuario')
-  const isAdmin = tienePanel(rol)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
@@ -272,8 +269,6 @@ export default function GruposPage() {
   const [reincEst, setReincEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
   const [verPlan, setVerPlan] = useState(null) // { nino, grupo } — plan individual del niño (R3)
-
-  useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
   const load = useCallback(async () => {
     try {
@@ -542,7 +537,12 @@ export default function GruposPage() {
     planFijado: onPlanFijado,
   }
 
-  if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text-dim)' }}>Cargando…</div>
+  if (loading) return (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
+      <main className="main"><div className="empty">Cargando…</div></main>
+    </div>
+  )
 
   const isError = status.includes('❌')
   const statusText = status.replace(/^[❌✅]\s*/, '')
@@ -561,12 +561,6 @@ export default function GruposPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
       <main className="main main--flow">
-        {isAdmin && (
-          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
-            Volver al panel de administrador
-          </button>
-        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Operaciones</div>

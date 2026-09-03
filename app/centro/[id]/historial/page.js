@@ -217,7 +217,12 @@ export default function HistorialPage() {
     })
   }, [meses, periodo, firstMonth, latestMonth])
 
-  if (loading) return <div style={{display:'flex',minHeight:'100vh',alignItems:'center',justifyContent:'center',background:'var(--bg)',color:'var(--text-dim)',fontFamily:'var(--font-mono)'}}>Cargando historial…</div>
+  if (loading) return (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
+      <main className="main"><div className="empty">Cargando historial…</div></main>
+    </div>
+  )
 
   const chartData = visibleMeses.filter(m => m.ninos_final > 0 || m.ninos_inicio > 0)
   const last = visibleMeses[visibleMeses.length - 1]
