@@ -343,7 +343,7 @@ test('reset público aplica cooldown y conserva una respuesta uniforme', async (
   }
   const deliverAccess = async (prepared) => calls.push(['delivery', prepared])
   const requestReset = usuariosServiceModule.createPublicPasswordReset({
-    repository, accessTokens, deliverAccess, logError: () => {},
+    repository, accessTokens, deliverAccess, schedule: () => {}, logError: () => {},
   })
 
   const existing = await requestReset(' ACTIVA@ALOHA.COM ')
@@ -357,6 +357,45 @@ test('reset público aplica cooldown y conserva una respuesta uniforme', async (
     userId: 8, purpose: 'reset', hours: 2, cooldownMinutes: 15,
   }])
   assert.equal(calls.some(([kind]) => kind === 'delivery'), false)
+})
+
+test('reset público agenda el correo sin esperarlo y absorbe el fallo del callback', async () => {
+  const callbacks = []
+  const logs = []
+  let deliveryStarted = false
+  const repository = {
+    transaction: async (work) => work(repository),
+    findUserByEmail: async () => ({
+      id: 8, nombre: 'A', email: 'activa@aloha.com', password_hash: 'hash',
+    }),
+  }
+  const accessTokens = {
+    replace: async () => ({
+      suppressed: false,
+      token: 'token-secreto',
+      user: { id: 8, nombre: 'A', email: 'activa@aloha.com' },
+    }),
+  }
+  const requestReset = usuariosServiceModule.createPublicPasswordReset({
+    repository,
+    accessTokens,
+    schedule: (callback) => callbacks.push(callback),
+    deliverAccess: async () => {
+      deliveryStarted = true
+      throw Object.assign(new Error('SMTP token-secreto activa@aloha.com'), { code: 'ETIMEDOUT' })
+    },
+    logError: (...args) => logs.push(args),
+  })
+
+  const result = await requestReset('activa@aloha.com')
+
+  assert.deepEqual(result, { ok: true })
+  assert.equal(deliveryStarted, false)
+  assert.equal(callbacks.length, 1)
+  await assert.doesNotReject(callbacks[0])
+  assert.equal(deliveryStarted, true)
+  assert.deepEqual(logs, [['[password:request-reset]', { code: 'ETIMEDOUT' }]])
+  assert.doesNotMatch(JSON.stringify(logs), /token-secreto|activa@aloha\.com|SMTP/)
 })
 
 test('Actions de contraseña no actualizan usuarios ni tokens directamente', () => {

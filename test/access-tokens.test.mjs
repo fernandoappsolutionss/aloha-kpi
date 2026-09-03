@@ -184,3 +184,37 @@ test('deliverAccess construye y envía el correo sin crear tokens', async () => 
     globalThis.fetch = previousFetch
   }
 })
+
+test('baseUrl exige APP_URL HTTPS canónica y no consulta hosts del request', async () => {
+  const { baseUrl } = await import('../lib/invitations.js')
+  assert.equal(await baseUrl({
+    APP_URL: 'https://kpi.aloha.test/',
+    NODE_ENV: 'production',
+    HOST: 'evil.example',
+    X_FORWARDED_HOST: 'evil.example',
+  }), 'https://kpi.aloha.test')
+  await assert.rejects(
+    () => baseUrl({ NODE_ENV: 'production', HOST: 'evil.example' }),
+    /APP_URL/,
+  )
+  await assert.rejects(
+    () => baseUrl({ APP_URL: 'http://kpi.aloha.test', NODE_ENV: 'production' }),
+    /APP_URL/,
+  )
+})
+
+test('baseUrl permite HTTP únicamente para localhost en desarrollo', async () => {
+  const { baseUrl } = await import('../lib/invitations.js')
+  assert.equal(
+    await baseUrl({ APP_URL: 'http://localhost:3000/', NODE_ENV: 'development' }),
+    'http://localhost:3000',
+  )
+  assert.equal(
+    await baseUrl({ APP_URL: 'http://127.0.0.1:3000', NODE_ENV: 'development' }),
+    'http://127.0.0.1:3000',
+  )
+  await assert.rejects(
+    () => baseUrl({ APP_URL: 'http://evil.example', NODE_ENV: 'development' }),
+    /APP_URL/,
+  )
+})

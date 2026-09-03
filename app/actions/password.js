@@ -1,4 +1,5 @@
 'use server'
+import { after } from 'next/server'
 import { sql } from '../../lib/db'
 import { hashPassword, createSession } from '../../lib/auth'
 import { accessTokensRepository } from '../../lib/access-tokens-repository'
@@ -11,6 +12,7 @@ const requestReset = createPublicPasswordReset({
   repository: accessTokensRepository,
   accessTokens,
   deliverAccess,
+  schedule: after,
 })
 
 // Solicitud pública de restablecimiento ("¿Olvidaste tu contraseña?").
