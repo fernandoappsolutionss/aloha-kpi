@@ -19,6 +19,9 @@ export const metadata = {
 }
 
 export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
   themeColor: '#00556D',
 }
 
@@ -26,6 +29,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es" className={futura.variable} suppressHydrationWarning>
       <body>
+        <a className="skip-link" href="#main-content">Saltar al contenido</a>
         {/* Clave nueva a propósito: con el rebrand todos vuelven al claro de
             ALOHA una vez, y quien prefiera oscuro lo reelige. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('aloha_theme');document.documentElement.dataset.theme=(t==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();` }} />

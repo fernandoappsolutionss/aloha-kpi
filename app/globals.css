@@ -80,6 +80,14 @@ html, body { height: 100%; }
   /* ---- Radios y motion (la promo va redondeada: xl en inputs, full en CTA) ---- */
   --r-sm: 12px; --r: 16px; --r-lg: 24px; --r-pill: 999px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- Contratos responsive compartidos ---- */
+  --mobile-body: 15px;
+  --mobile-label: 13px;
+  --mobile-caption: 12px;
+  --mobile-input: 16px;
+  --touch-target: 44px;
+  --mobile-bar-height: 64px;
 }
 
 body {
@@ -125,7 +133,12 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 /* ---------------------------------------------------------------- */
@@ -150,15 +163,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--touch-target);
   padding: 12px 18px;
   border: 1px solid var(--border-strong);
   background: transparent;
   border-radius: var(--r-sm);
   font-size: 13px; font-weight: 600;
   letter-spacing: 0.01em;
-  transition: all 0.2s var(--ease);
+  touch-action: manipulation;
+  transition: color .2s var(--ease), background-color .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
 }
 .btn:hover { background: var(--surface-2); border-color: var(--text-faint); }
+.btn:active { transform: translateY(1px); }
 .btn--primary {
   background: var(--aloha-lima);
   border-color: var(--aloha-lima);
@@ -229,7 +245,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /* ---------------------------------------------------------------- */
 /*  App shell                                                        */
 /* ---------------------------------------------------------------- */
-.shell { display: flex; min-height: 100vh; background: var(--bg); }
+.shell { display: flex; min-height: 100dvh; background: var(--bg); }
 .main { flex: 1; padding: 30px 34px; overflow-y: auto; min-width: 0; }
 /* El overflow del contenedor rompe position:sticky de lo que vive adentro.
    Las páginas con paneles pegados (Grupos) usan esta variante. */
@@ -1004,3 +1020,159 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 /* Badge de progreso del entrenamiento en el menú (n/9) */
 .sb__badge { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--ts-green-soft); color: var(--ts-green); border: 1px solid var(--ts-green-line); }
+
+/* ---------------------------------------------------------------- */
+/*  Fundaciones responsive compartidas                              */
+/* ---------------------------------------------------------------- */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--aloha-petroleo);
+  color: #fff;
+}
+.skip-link:focus { transform: translateY(0); }
+
+.page-actions, .dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.form-grid, .dialog-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 14px;
+}
+.page-actions > *, .form-grid > *, .dialog-form-grid > *, .responsive-grid > * { min-width: 0; }
+.operational-list { display: grid; gap: 12px; }
+.mobile-only.operational-list { display: none !important; }
+.operational-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+}
+.operational-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.operational-card :is(h2, h3, h4), .operational-card p, .operational-card dd { overflow-wrap: anywhere; }
+.operational-card dl { display: grid; gap: 10px; margin: 14px 0 0; }
+.operational-card dl > div {
+  display: grid;
+  grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr);
+  gap: 10px;
+}
+.operational-card dt { color: var(--text-dim); font-size: 13px; }
+.operational-card dd { margin: 0; }
+.operational-card__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.mobile-only { display: none !important; }
+.desktop-only { display: block; }
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgba(0, 0, 0, .58);
+  overscroll-behavior: contain;
+}
+.dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(var(--dialog-width), 100%);
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-1);
+  box-shadow: var(--chart-tooltip-shadow);
+}
+.dialog__header, .dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.dialog__body {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+}
+.dialog__close { flex: 0 0 44px; width: 44px; height: 44px; }
+
+.table-scroller {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border-radius: var(--r-sm);
+}
+.table-scroller:focus-visible { outline: 3px solid var(--ts-green); outline-offset: 3px; }
+.table-scroller__hint {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  margin: 0 0 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.table-scroller__viewport { width: max-content; min-width: 100%; }
+.table-scroller--sticky th:first-child, .table-scroller--sticky td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface-1);
+  box-shadow: 1px 0 0 var(--border);
+}
+.measured-chart { width: 100%; max-width: 100%; min-width: 0; }
+
+@media (max-width: 767px) {
+  body { font-size: var(--mobile-body); }
+  .main { min-width: 0; padding: 18px 14px max(24px, env(safe-area-inset-bottom)); }
+  .label { font-size: var(--mobile-label); letter-spacing: .08em; }
+  .table thead th, .pill { font-size: var(--mobile-caption); }
+  .h-sub { font-size: var(--mobile-label); }
+  .h-title { font-size: clamp(1.55rem, 8vw, 2.4rem); line-height: 1.12; text-wrap: balance; }
+  input, select, textarea, .input { font-size: var(--mobile-input); }
+  .kpi-grid, .responsive-grid, .form-grid, .dialog-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .page-actions, .dialog-actions { align-items: stretch; flex-direction: column; }
+  .page-actions .btn, .dialog-actions .btn { width: 100%; }
+  .operational-card dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .operational-card__actions .btn { flex: 1 1 100%; width: 100%; }
+  .mobile-only { display: block !important; }
+  .mobile-only.operational-list { display: grid !important; }
+  .desktop-only { display: none !important; }
+  .dialog-backdrop { place-items: end center; padding-inline: 0; }
+  .dialog { width: 100%; border-radius: var(--r) var(--r) 0 0; }
+  .dialog__footer { align-items: stretch; flex-direction: column; }
+  .dialog__footer .btn { width: 100%; }
+}
+
+@media (min-width: 768px) {
+  .mobile-only { display: none !important; }
+  .desktop-only { display: block; }
+  .table-scroller__hint { display: none; }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .responsive-grid, .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
