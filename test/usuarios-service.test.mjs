@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createUsuariosService } from '../lib/usuarios-service.mjs'
+import { readFileSync } from 'node:fs'
+import * as usuariosServiceModule from '../lib/usuarios-service.mjs'
 import { usuariosRepository } from '../lib/usuarios-repository.js'
+
+const { createUsuariosService } = usuariosServiceModule
 
 const coord = { id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'hash' }
 const rows = [
@@ -205,6 +208,32 @@ function readRepo(actor = coord, users = rows) {
   return repo
 }
 
+function accessFixture({
+  target,
+  delivery = { emailSent: true, link: 'https://app/set-password?token=t-1' },
+  deliveryError = null,
+}) {
+  const tokens = []
+  const deliveries = []
+  const repo = {
+    transaction: async (work) => work(repo),
+    loadActor: async () => ({ id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'actor' }),
+    lockUser: async (_query, id) => Number(id) === Number(target.id) ? target : null,
+  }
+  const accessTokens = {
+    replace: async (_query, row) => {
+      tokens.push(row)
+      return { token: 't-1', user: target }
+    },
+  }
+  const deliverAccess = async (row) => {
+    deliveries.push(row)
+    if (deliveryError) throw deliveryError
+    return delivery
+  }
+  return { repo, tokens, deliveries, service: createUsuariosService({ repo, accessTokens, deliverAccess }) }
+}
+
 test('pageData usa el actor de DB y el alcance vigente', async () => {
   const repo = readRepo()
   const result = await createUsuariosService({ repo }).pageData({ uid: 2, rol: 'admin_general', centros: null })
@@ -234,6 +263,107 @@ test('rol sin gestión queda denegado antes de listar', async () => {
   const repo = readRepo({ id: 7, rol: 'administradora', centro_id: 10, password_hash: 'x' })
   await assert.rejects(() => createUsuariosService({ repo }).pageData({ uid: 7 }), /No autorizado/)
   assert.equal(repo.calls.some((c) => c[0] === 'users'), false)
+})
+
+test('cuenta pendiente devuelve invitación de 48 horas y enlace copiable', async () => {
+  const fx = accessFixture({
+    target: { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, password_hash: null },
+  })
+  const result = await fx.service.resendAccess({ uid: 2 }, 9)
+  assert.deepEqual(result, {
+    ok: true, kind: 'invitation', emailSent: true, link: 'https://app/set-password?token=t-1',
+  })
+  assert.deepEqual(fx.tokens, [{ userId: 9, purpose: 'invite', hours: 48 }])
+})
+
+test('cuenta activa recibe reset de dos horas sin secreto en la respuesta', async () => {
+  const fx = accessFixture({
+    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+  })
+  const result = await fx.service.resendAccess({ uid: 2 }, 8)
+  assert.deepEqual(result, { ok: true, kind: 'reset', emailSent: true })
+  assert.deepEqual(fx.tokens, [{ userId: 8, purpose: 'reset', hours: 2 }])
+  assert.doesNotMatch(JSON.stringify(result), /set-password|t-1|a@aloha\.com/)
+})
+
+test('fallo resuelto del correo de reset activo no degrada a enlace copiable', async () => {
+  const fx = accessFixture({
+    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+    delivery: {
+      emailSent: false,
+      emailReason: '/set-password?token=secreto-del-proveedor',
+      link: 'https://app/set-password?token=t-1',
+    },
+  })
+  const result = await fx.service.resendAccess({ uid: 2 }, 8)
+  assert.deepEqual(result, { ok: true, kind: 'reset', emailSent: false, deliveryError: 'delivery_failed' })
+  assert.doesNotMatch(JSON.stringify(result), /set-password|secreto-del-proveedor|t-1/)
+})
+
+test('throw del transporte de reset se normaliza sin exponer secreto', async () => {
+  const fx = accessFixture({
+    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+    deliveryError: Object.assign(new Error('SMTP t-1'), { code: 'ETIMEDOUT' }),
+  })
+  const result = await fx.service.resendAccess({ uid: 2 }, 8)
+  assert.equal(fx.tokens.length, 1)
+  assert.deepEqual(result, { ok: true, kind: 'reset', emailSent: false, deliveryError: 'delivery_failed' })
+  assert.doesNotMatch(JSON.stringify(result), /SMTP|t-1|set-password/)
+})
+
+test('objetivo ajeno o privilegiado no emite token ni correo', async () => {
+  for (const target of [
+    { id: 18, rol: 'administradora', centro_id: 11, password_hash: 'x' },
+    { id: 20, rol: 'admin_general', centro_id: null, password_hash: 'x' },
+  ]) {
+    const fx = accessFixture({ target })
+    await assert.rejects(() => fx.service.resendAccess({ uid: 2 }, target.id), /No tienes permiso/)
+    assert.deepEqual(fx.tokens, [])
+    assert.deepEqual(fx.deliveries, [])
+  }
+})
+
+test('reset público aplica cooldown y conserva una respuesta uniforme', async () => {
+  assert.equal(typeof usuariosServiceModule.createPublicPasswordReset, 'function')
+  const calls = []
+  const repository = {
+    transaction: async (work) => work(repository),
+    findUserByEmail: async (_query, email) => {
+      calls.push(['find', email])
+      return email === 'activa@aloha.com'
+        ? { id: 8, nombre: 'A', email, password_hash: 'hash' }
+        : null
+    },
+  }
+  const accessTokens = {
+    replace: async (_query, row) => {
+      calls.push(['replace', row])
+      return { suppressed: true, user: { id: 8, nombre: 'A', email: 'activa@aloha.com' } }
+    },
+  }
+  const deliverAccess = async (prepared) => calls.push(['delivery', prepared])
+  const requestReset = usuariosServiceModule.createPublicPasswordReset({
+    repository, accessTokens, deliverAccess, logError: () => {},
+  })
+
+  const existing = await requestReset(' ACTIVA@ALOHA.COM ')
+  const missing = await requestReset('nadie@aloha.com')
+  const empty = await requestReset(' ')
+
+  assert.deepEqual(existing, { ok: true })
+  assert.deepEqual(missing, { ok: true })
+  assert.deepEqual(empty, { ok: true })
+  assert.deepEqual(calls.find(([kind]) => kind === 'replace'), ['replace', {
+    userId: 8, purpose: 'reset', hours: 2, cooldownMinutes: 15,
+  }])
+  assert.equal(calls.some(([kind]) => kind === 'delivery'), false)
+})
+
+test('Actions de contraseña no actualizan usuarios ni tokens directamente', () => {
+  for (const file of ['../app/actions/password.js', '../app/actions/auth.js']) {
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+    assert.doesNotMatch(source, /UPDATE\s+(?:usuarios|password_tokens)/i)
+  }
 })
 
 function queryRecorder(responses = []) {

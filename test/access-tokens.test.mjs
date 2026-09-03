@@ -144,3 +144,43 @@ test('invalidate revoca accesos dentro de una transacción externa', async () =>
   await repo.transaction((query) => service.invalidate(query, { userId: 8 }))
   assert.equal(repo.state.tokens.get('pendiente').used_at, 'used')
 })
+
+test('deliverAccess construye y envía el correo sin crear tokens', async () => {
+  const previousUrl = process.env.APP_URL
+  const previousKey = process.env.RESEND_API_KEY
+  const previousFetch = globalThis.fetch
+  const requests = []
+  process.env.APP_URL = 'https://kpi.aloha.test/'
+  process.env.RESEND_API_KEY = 'test-key'
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options })
+    return { ok: true }
+  }
+  try {
+    const invitations = await import('../lib/invitations.js')
+    assert.equal(typeof invitations.deliverAccess, 'function')
+    const result = await invitations.deliverAccess({
+      user: { id: 8, nombre: 'Ana', email: 'ana@aloha.com' },
+      purpose: 'reset',
+      token: 'token-seguro',
+      hours: 2,
+    })
+    assert.deepEqual(result, {
+      link: 'https://kpi.aloha.test/set-password?token=token-seguro',
+      emailSent: true,
+      emailReason: undefined,
+    })
+    assert.equal(requests.length, 1)
+    const payload = JSON.parse(requests[0].options.body)
+    assert.deepEqual(payload.to, ['ana@aloha.com'])
+    assert.equal(payload.subject, 'Restablece tu contraseña · ALOHA KPI')
+    assert.match(payload.html, /Restablece tu contraseña/)
+    assert.match(payload.html, /https:\/\/kpi\.aloha\.test\/set-password\?token=token-seguro/)
+  } finally {
+    if (previousUrl === undefined) delete process.env.APP_URL
+    else process.env.APP_URL = previousUrl
+    if (previousKey === undefined) delete process.env.RESEND_API_KEY
+    else process.env.RESEND_API_KEY = previousKey
+    globalThis.fetch = previousFetch
+  }
+})

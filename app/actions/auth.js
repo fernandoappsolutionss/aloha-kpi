@@ -3,6 +3,10 @@ import { sql } from '../../lib/db'
 import {
   createSession, destroySession, verifyPassword, hashPassword, requireSession,
 } from '../../lib/auth'
+import { accessTokensRepository } from '../../lib/access-tokens-repository'
+import { createAccessTokenService } from '../../lib/access-tokens.mjs'
+
+const accessTokens = createAccessTokenService({ repo: accessTokensRepository })
 
 export async function login(email, password) {
   if (!email || !password) return { error: 'Correo y contraseña son requeridos.' }
@@ -26,11 +30,11 @@ export async function logout() {
 }
 
 export async function changePassword(nueva) {
-  const s = await requireSession()
+  const session = await requireSession()
   if (!nueva || String(nueva).length < 8) {
     return { error: 'La contraseña debe tener al menos 8 caracteres.' }
   }
-  const hash = await hashPassword(String(nueva))
-  await sql`UPDATE usuarios SET password_hash = ${hash} WHERE id = ${s.uid}`
+  const passwordHash = await hashPassword(String(nueva))
+  await accessTokens.changePassword({ userId: Number(session.uid), passwordHash })
   return { ok: true }
 }
