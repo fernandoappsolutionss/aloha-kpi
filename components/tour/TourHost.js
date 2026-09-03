@@ -9,7 +9,7 @@
 // key={tourId}>: al cambiar de módulo React monta una instancia nueva (estado a
 // cero) y sin ?tour se desmonta. Dentro de un módulo, los pasos con `ruta`
 // conservan la key → el tour sobrevive a la navegación entre páginas.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
 import { rutaDePaso } from '../../lib/entrenamiento/progreso'
@@ -49,7 +49,10 @@ function TourActivo({ tourId }) {
   const audioRef = useRef(null)
   const targetRef = useRef(null)
   const cardRef = useRef(null)   // para medir la altura real de la tarjeta al posicionarla
+  const titleRef = useRef(null)
+  const previousFocusRef = useRef(null)
   const avanceRef = useRef(null) // timeout del avance tras un clic "hazlo" local
+  const titleId = `${useId()}-title`
 
   useEffect(() => { try { setMute(localStorage.getItem('tour_mute') === '1') } catch {} }, [])
 
@@ -69,7 +72,9 @@ function TourActivo({ tourId }) {
   }, [modulo, total, router, pathname, tourId, conCentro])
 
   // Quita ?tour sin fetch ni salto; TourHost deja de renderizar al no haber `tour`.
-  const salir = useCallback(() => { window.history.pushState(null, '', pathname) }, [pathname])
+  const salir = useCallback(() => {
+    if (!terminando) window.history.pushState(null, '', pathname)
+  }, [pathname, terminando])
 
   const terminar = useCallback(async () => {
     if (!modulo || terminando) return
@@ -123,16 +128,45 @@ function TourActivo({ tourId }) {
     return () => { cancelado = true; if (timer) clearTimeout(timer) }
   }, [modulo, step, pathname, medir])
 
-  // Re-medir en scroll/resize (y un par de veces tras el scroll suave; esas
-  // re-mediciones también corrigen la posición con la altura real de la tarjeta).
+  // Re-medir en scroll/resize, cambios de orientación y del viewport visual.
+  // ResizeObserver sigue tanto el target como la tarjeta: texto, fuentes o un
+  // panel que crece no dejan coordenadas obsoletas.
   useEffect(() => {
     if (estado !== 'listo') return
     const on = () => medir()
     window.addEventListener('scroll', on, true)
     window.addEventListener('resize', on)
+    window.addEventListener('orientationchange', on)
+    window.visualViewport?.addEventListener('resize', on)
+    window.visualViewport?.addEventListener('scroll', on)
+    const observer = new ResizeObserver(on)
+    if (targetRef.current) observer.observe(targetRef.current)
+    if (cardRef.current) observer.observe(cardRef.current)
     const t1 = setTimeout(on, 250), t2 = setTimeout(on, 600)
-    return () => { window.removeEventListener('scroll', on, true); window.removeEventListener('resize', on); clearTimeout(t1); clearTimeout(t2) }
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', on, true)
+      window.removeEventListener('resize', on)
+      window.removeEventListener('orientationchange', on)
+      window.visualViewport?.removeEventListener('resize', on)
+      window.visualViewport?.removeEventListener('scroll', on)
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
   }, [estado, step, medir])
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement
+    return () => {
+      const previous = previousFocusRef.current
+      if (previous?.isConnected && !previous.closest('[inert]')) previous.focus()
+    }
+  }, [])
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => titleRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [tourId, paso])
 
   // Paso "hazlo": avanzar cuando el usuario hace clic en el elemento real.
   useEffect(() => {
@@ -173,14 +207,20 @@ function TourActivo({ tourId }) {
   useEffect(() => {
     if (!modulo) return
     const onKey = (e) => {
-      if (e.key === 'Escape') { salir(); return }
+      if (e.defaultPrevented) return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!terminando) salir()
+        return
+      }
       const t = e.target
-      if (e.defaultPrevented || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))) return
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
       if (e.key === 'ArrowRight' && step?.tipo === 'mostrar' && !esUltimo) irA(paso + 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [modulo, step, paso, esUltimo, irA, salir])
+  }, [modulo, step, paso, esUltimo, irA, salir, terminando])
 
   if (!modulo || !step) return null // módulo desconocido o paso fuera de rango
 
@@ -215,12 +255,12 @@ function TourActivo({ tourId }) {
       {rect && estado === 'listo' && (
         <div className="tour-spot" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }} aria-hidden="true" />
       )}
-      <div ref={cardRef} className="tour-card" style={cardStyle} role="dialog" aria-label={`Recorrido: ${modulo.titulo}`}>
+      <div ref={cardRef} className="tour-card" style={cardStyle} role="dialog" aria-labelledby={titleId} aria-busy={terminando || undefined}>
         <div className="tour-card__head">
           <span className="label">Paso {paso} de {total} · {modulo.titulo}</span>
-          <button className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)" aria-label="Salir del recorrido">×</button>
+          <button className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)" aria-label="Salir del recorrido" disabled={terminando}>×</button>
         </div>
-        <h4 className="tour-card__title">{step.titulo}</h4>
+        <h4 ref={titleRef} id={titleId} className="tour-card__title" tabIndex={-1}>{step.titulo}</h4>
         <p className="tour-card__text" aria-live="polite">{estado === 'ausente'
           ? 'Todavía no veo este elemento. Si la pantalla sigue cargando, espera un momento; si tu centro no tiene datos para mostrarlo, puedes omitir el paso.'
           : step.texto}</p>

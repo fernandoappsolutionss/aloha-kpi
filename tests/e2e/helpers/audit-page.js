@@ -2,7 +2,7 @@ import { expect } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-export async function auditPage(page, { mobile, state = 'ready' }) {
+export async function auditPage(page, { mobile, state = 'ready', scope = null }) {
   const main = state === null
     ? page.locator('main')
     : page.locator(`#main-content[data-page-state="${state}"]`)
@@ -12,7 +12,9 @@ export async function auditPage(page, { mobile, state = 'ready' }) {
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
   })
 
-  const result = await page.evaluate(({ mobile }) => {
+  const result = await page.evaluate(({ mobile, scope }) => {
+    const surface = scope ? document.querySelector(scope) : document.body
+    if (!surface) return [`No existe superficie de auditoría: ${scope}`]
     const visible = (element) => {
       const style = getComputedStyle(element)
       const rect = element.getBoundingClientRect()
@@ -41,10 +43,10 @@ export async function auditPage(page, { mobile, state = 'ready' }) {
     const failures = []
     const root = document.documentElement
     const phone = window.innerWidth < 768
-    if (root.scrollWidth > root.clientWidth + 1) {
+    if (!scope && root.scrollWidth > root.clientWidth + 1) {
       failures.push(`document overflow ${root.scrollWidth}/${root.clientWidth}`)
     }
-    for (const element of document.body.querySelectorAll('*')) {
+    for (const element of surface.querySelectorAll('*')) {
       const style = getComputedStyle(element)
       if (/(auto|scroll)/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1 && !element.hasAttribute('data-horizontal-scroll')) {
         failures.push(`overflow fuera de TableScroller ${identify(element)}`)
@@ -52,7 +54,7 @@ export async function auditPage(page, { mobile, state = 'ready' }) {
     }
 
     if (mobile) {
-      const controls = document.querySelectorAll('a[href],button,.btn,[role="button"],[role="radio"],[role="tab"],[role="menuitem"],summary,select,textarea,input:not([type="hidden"])')
+      const controls = surface.querySelectorAll('a[href],button,.btn,[role="button"],[role="radio"],[role="tab"],[role="menuitem"],summary,select,textarea,input:not([type="hidden"])')
       for (const element of controls) {
         if (!visible(element) || element.matches('.skip-link:not(:focus)')) continue
         const target = ['checkbox', 'radio'].includes(element.type)
@@ -71,12 +73,12 @@ export async function auditPage(page, { mobile, state = 'ready' }) {
     }
 
     if (phone) {
-      for (const element of document.querySelectorAll('input:not([type="hidden"]),select,textarea')) {
+      for (const element of surface.querySelectorAll('input:not([type="hidden"]),select,textarea')) {
         if (visible(element) && parseFloat(getComputedStyle(element).fontSize) < 16) {
           failures.push(`input font ${getComputedStyle(element).fontSize}`)
         }
       }
-      for (const element of document.body.querySelectorAll('*')) {
+      for (const element of surface.querySelectorAll('*')) {
         const ownText = [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
         if (!ownText || !visible(element) || element.matches('script,style,.skip-link:not(:focus)') || element.classList.contains('sr-only')) continue
         const size = parseFloat(getComputedStyle(element).fontSize)
@@ -90,7 +92,7 @@ export async function auditPage(page, { mobile, state = 'ready' }) {
       }
     }
     return [...new Set(failures)]
-  }, { mobile })
+  }, { mobile, scope })
   expect(result, result.join('\n')).toEqual([])
 }
 

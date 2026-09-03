@@ -7,6 +7,7 @@ import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../.
 import { listarGruposActivos } from '../../../actions/grupos'
 import { retirarEstudiante, reincorporarEstudiante } from '../../../actions/estudiantes'
 import { ITINERARIOS, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, PRODUCTOS_MATERIAL, hoyISO } from '../../../../lib/operaciones'
+import Dialog from '../../../../components/Dialog'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const PRODUCTO_LABELS = { KIT: 'KIT', ABACO: 'ÁBACO', LIBRO: 'LIBRO', SUETER: 'SUÉTER', MOCHILA: 'MOCHILA', OTRO: 'OTRO' }
@@ -143,7 +144,7 @@ export default function CuadroPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || ''} centroId={id} />
-      <main className="main">
+      <main id="main-content" className="main" data-page-state="ready">
         {isAdmin && (
           <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
@@ -204,7 +205,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Comparación con KPI semanal</h3>
                 <span className="label">Detecta descuadres antes de entregar a la Junta</span>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                 <table className="table">
                   <thead>
                     <tr>
@@ -245,7 +246,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Royalties</h3>
                 <span className="label">× {money(data.royaltyRate)} por niño activo</span>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                 <table className="table">
                   <thead><tr>{['Nivel', nuevosLabel, 'Continúan', 'Total niños', 'Royalty'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -289,7 +290,7 @@ export default function CuadroPage() {
                   <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
                 )}
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                 <table className="table">
                   <thead><tr>{['Grupo', 'Mes anterior', nuevosLabel, 'Reincorporados', 'Retirados', 'Total del mes'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -377,7 +378,7 @@ export default function CuadroPage() {
               {!data.iniciosClase?.length ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin inicios de clase en {NOMBRES_MES[month - 1]} {year}.</div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
+                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Fecha de inscripción', 'Inicio del grupo', 'Inicio efectivo', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -413,7 +414,7 @@ export default function CuadroPage() {
               {data.deserciones.length === 0 ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin retiros en {NOMBRES_MES[month - 1]} {year}. 👏</div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
+                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Motivo', 'Fecha inicio', 'Fecha retiro', 'Última asistencia', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -448,7 +449,7 @@ export default function CuadroPage() {
                 <span className="label">Kits, ábacos y otros del mes (sección de la hoja Royalties)</span>
               </div>
               {data.pedidos.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
+                <div data-horizontal-scroll style={{ overflowX: 'auto' }}>
                   <table className="table">
                     <thead><tr>{['Fecha', 'N° O/E', 'Producto', 'Grupo', 'Nivel', 'Cantidad', 'Monto', 'Observaciones', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -583,15 +584,15 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Retirar a ${nino.nombre}`} onClose={onClose}
+    <Modal title={`Retirar a ${nino.nombre}`} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Retirar del cuadro'}</button>
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         <Field full label="Motivo del retiro *">
           <select className="input" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
             <option value="">Selecciona motivo…</option>
@@ -627,10 +628,10 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Reincorporar a ${nino.nombre}`} onClose={onClose}
+    <Modal title={`Reincorporar a ${nino.nombre}`} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
         </>
       )}>
@@ -652,21 +653,14 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
   )
 }
 
-function Modal({ title, width = 560, onClose, children, footer }) {
+function Modal({ title, width = 560, onClose, children, footer, closeDisabled = false }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width, maxWidth: '100%', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
-          <h3 className="panel__title">{title}</h3>
-          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
-        </div>
-        <div style={{ padding: 22, maxHeight: '62vh', overflowY: 'auto' }}>{children}</div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>{footer}</div>
-      </div>
-    </div>
+    <Dialog open title={title} width={width} onClose={onClose} closeDisabled={closeDisabled} footer={footer}>
+      {children}
+    </Dialog>
   )
 }
 
 function Field({ label, full, children }) {
-  return <div className="field" style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
+  return <label className="field" style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
 }

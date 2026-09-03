@@ -4,8 +4,21 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
+import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+test('fixture R3 rechaza transporte remoto antes de cualquier consulta', () => {
+  const env = { E2E_R3_DIALOGS: '1', E2E_DATABASE_CONFIRM: 'disposable',
+    DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',
+    USUARIOS_TEST_DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',
+    E2E_ADMIN_EMAIL: 'admin@e2e.invalid',
+    E2E_NEON_HTTP: 'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY: '127.0.0.1:5435' }
+  assert.doesNotThrow(() => requireDisposableGate(env))
+  assert.throws(() => requireDisposableGate({ ...env, E2E_NEON_HTTP: 'https://remote.invalid/sql' }), /local/)
+  assert.throws(() => requireDisposableGate({ ...env, E2E_NEON_WSPROXY: 'remote.invalid:5435' }), /local/)
+  assert.throws(() => requireDisposableGate({ ...env, RESPONSIVE_BASE_URL: 'https://remote.invalid' }), /local/)
+})
 
 test('el CSS global no contiene antipatrones que oculten o animen todo', () => {
   const css = read('../app/globals.css')
@@ -30,6 +43,39 @@ test('existen primitivas accesibles compartidas', () => {
   const card = read('../components/OperationalCard.js')
   assert.match(card, /headingLevel\s*=\s*3/)
   assert.match(card, /const Heading/)
+})
+
+test('los modales operativos usan Dialog compartido y bloquean el cierre durante escrituras', () => {
+  for (const path of [
+    '../components/PlanNino.js',
+    '../components/growth/GrowthBriefing.js',
+    '../app/centro/[id]/grupos/page.js',
+    '../app/centro/[id]/cuadro/page.js',
+    '../app/centro/[id]/eventos/page.js',
+  ]) {
+    assert.match(read(path), /from ['"].*Dialog['"]/, `${path} debe consumir Dialog`)
+  }
+
+  const dialog = read('../components/Dialog.js')
+  assert.match(dialog, /closeDisabled/)
+  assert.match(dialog, /stopImmediatePropagation/)
+  assert.doesNotMatch(read('../app/centro/[id]/eventos/page.js'), /overflowX:\s*['"]visible/)
+})
+
+test('sheet, menú y tour declaran sus contratos responsive y accesibles', () => {
+  const grupos = read('../app/centro/[id]/grupos/page.js')
+  const eventos = read('../app/centro/[id]/eventos/page.js')
+  const tour = read('../components/tour/TourHost.js')
+  const css = read('../app/globals.css')
+
+  assert.match(grupos, /mobile-sheet/)
+  assert.match(eventos, /role="menu"/)
+  assert.match(eventos, /role="menuitem"/)
+  assert.match(eventos, /getBoundingClientRect/)
+  assert.match(tour, /ResizeObserver/)
+  assert.match(tour, /aria-labelledby/)
+  assert.match(css, /\.mobile-sheet\s*\{[^}]*max-height:\s*100dvh/s)
+  assert.match(css, /\.tour-card\s*\{[^}]*100dvh/s)
 })
 
 test('los tokens móviles fijan tipografía y objetivos táctiles', () => {
@@ -138,4 +184,13 @@ test('el modo de mutaciones excluye todos los proyectos de auditoría read-only'
     },
   })
   assert.deepEqual(JSON.parse(output), ['setup', 'users-mutations-local'])
+})
+
+test('los diálogos con fixture nunca entran al smoke remoto', () => {
+  const output = execFileSync(process.execPath, ['--input-type=module', '--eval',
+    "import('./playwright.config.mjs').then(({default:c}) => console.log(JSON.stringify(c.projects.filter(p=>p.name.startsWith('phone-')).map(p=>p.testIgnore.test('dialogs.spec.js')))))"], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8',
+    env: { RESPONSIVE_BASE_URL: 'https://readonly.invalid' },
+  })
+  assert.deepEqual(JSON.parse(output), [true, true, true, true])
 })

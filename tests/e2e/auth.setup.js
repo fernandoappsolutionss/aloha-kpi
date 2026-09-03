@@ -1,7 +1,7 @@
 import { test as setup, expect } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 
-const required = [
+const allActorsRequired = [
   'E2E_ADMIN_EMAIL',
   'E2E_ADMIN_PASSWORD',
   'E2E_COORDINATOR_EMAIL',
@@ -12,8 +12,12 @@ const required = [
 ]
 
 function requireAuthEnvironment() {
+  const required = process.env.E2E_R3_DIALOGS === '1'
+    ? ['E2E_ADMIN_EMAIL', 'E2E_ADMIN_PASSWORD']
+    : allActorsRequired
   const missing = required.filter((name) => !process.env[name])
   if (missing.length > 0) throw new Error(`Faltan variables E2E de autenticación: ${missing.join(', ')}`)
+  if (process.env.E2E_R3_DIALOGS === '1') return null
   const centerId = Number(process.env.E2E_CENTRO_ID)
   if (!Number.isInteger(centerId) || centerId <= 0 || String(centerId) !== process.env.E2E_CENTRO_ID) {
     throw new Error('E2E_CENTRO_ID debe ser un entero positivo canónico.')
@@ -60,6 +64,7 @@ setup('autentica actores E2E en contextos aislados', async ({ browser, baseURL }
     expectedPath: /^\/dashboard(?:\/|$)/, allowedRoles: ['admin_general', 'supervisor'],
     statePath: 'tests/e2e/.auth/admin.json',
   })
+  if (process.env.E2E_R3_DIALOGS === '1') return
   await authenticate({
     browser, baseURL,
     emailName: 'E2E_COORDINATOR_EMAIL', passwordName: 'E2E_COORDINATOR_PASSWORD',

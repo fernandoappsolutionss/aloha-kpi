@@ -37,6 +37,7 @@ import { posicionDeIndice } from '../../../../lib/plan-nino-vista.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
+import Dialog, { ModalPortal, useModalLayer } from '../../../../components/Dialog'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -254,6 +255,7 @@ export default function GruposPage() {
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
   const [openId, setOpenId] = useState(null)
+  const [detalleVistas, setDetalleVistas] = useState({})
   // Workspace maestro/detalle: la lista manda, el detalle vive al lado (sticky)
   // y en pantallas angostas se abre como panel deslizante.
   const narrow = useNarrow()
@@ -383,14 +385,6 @@ export default function GruposPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [tab, hayModal, openId, visiblesKey])
-
-  // Con el panel deslizante abierto, el fondo no debe hacer scroll.
-  useEffect(() => {
-    if (!narrow || !abierto || tab !== 'grupos') return
-    const previo = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = previo }
-  }, [narrow, abierto, tab])
 
   // `prefill` opcional: desde el calendario o una recomendación del modelo.
   // Puede ser una sesión suelta { dia, hora_inicio, hora_fin, salon_id } o una
@@ -560,7 +554,7 @@ export default function GruposPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
-      <main className="main main--flow">
+      <main id="main-content" className="main main--flow" data-page-state="ready">
         {isAdmin && (
           <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
@@ -663,7 +657,10 @@ export default function GruposPage() {
 
               {!narrow && (
                 abierto ? (
-                  <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} onCerrarPanel={() => setOpenId(null)} />
+                  <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}}
+                    vista={detalleVistas[String(abierto.id)] || 'ninos'}
+                    onVistaChange={(vista) => setDetalleVistas((prev) => ({ ...prev, [String(abierto.id)]: vista }))}
+                    onCerrarPanel={() => setOpenId(null)} />
                 ) : (
                   <div className="panel grp-detail grp-detail--vacio">
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -740,10 +737,16 @@ export default function GruposPage() {
 
       {/* Pantallas angostas: el detalle entra como panel deslizante sobre la lista */}
       {tab === 'grupos' && narrow && abierto && (
-        <>
-          <div className="grp-backdrop" onClick={() => setOpenId(null)} />
-          <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}} sheet onCerrarPanel={() => setOpenId(null)} />
-        </>
+        <GrupoSheet
+          centroId={id}
+          g={abierto}
+          metas={metas}
+          acciones={acciones}
+          asistenciaMes={data?.asistenciaMes || {}}
+          vista={detalleVistas[String(abierto.id)] || 'ninos'}
+          onVistaChange={(vista) => setDetalleVistas((prev) => ({ ...prev, [String(abierto.id)]: vista }))}
+          onClose={() => setOpenId(null)}
+        />
       )}
 
       {grupoModal && (
@@ -783,9 +786,10 @@ export default function GruposPage() {
       {verPlan && ninoPlan && (
         <PlanNinoModal nino={ninoPlan} grupo={grupoPlan} hoy={hoy}
           onClose={() => setVerPlan(null)}
-          renderCreacion={({ nino, onPlanFijado }) => (
+          renderCreacion={({ nino, onPlanFijado, onBusyChange }) => (
             <div style={{ padding: '16px 18px' }}>
               <BloqueCrearPlan centroId={id} ninos={[nino]} etiqueta={`${nino.itinerario} ${nino.nivel}`}
+                onBusyChange={onBusyChange}
                 onFijado={(r) => {
                   setStatus('✅ ' + mensajeAnclaFijada(r.ninos, r.etiqueta, r.fecha))
                   // El modal repinta con el plan que devolvió el server y avisa
@@ -829,7 +833,7 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
   return (
     <div data-grupo={g.id} data-tour={tour} role="button" tabIndex={0} aria-pressed={activo}
       className={`grp-card${activo ? ' grp-card--on' : ''}`}
-      onClick={onAbrir}
+      onClick={(event) => { event.currentTarget.focus(); onAbrir() }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrir() } }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
@@ -928,11 +932,44 @@ function AccionesNino({ e, acciones, asis }) {
   )
 }
 
+function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, vista, onVistaChange, onClose }) {
+  const closeRef = useRef(null)
+  const { layerRef, surfaceRef, onBackdropPointerDown } = useModalLayer({
+    open: true,
+    onClose,
+    initialFocusRef: closeRef,
+  })
+  const titleId = `grupo-sheet-${g.id}-title`
+
+  return (
+    <ModalPortal>
+      <div ref={layerRef} className="grp-backdrop" data-modal-layer onPointerDown={onBackdropPointerDown}>
+        <GrupoDetalle
+          centroId={centroId}
+          g={g}
+          metas={metas}
+          acciones={acciones}
+          asistenciaMes={asistenciaMes}
+          vista={vista}
+          onVistaChange={onVistaChange}
+          sheet
+          surfaceRef={surfaceRef}
+          titleId={titleId}
+          closeRef={closeRef}
+          onCerrarPanel={onClose}
+        />
+      </div>
+    </ModalPortal>
+  )
+}
+
 // ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
-function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel }) {
-  const [vista, setVista] = useState('ninos')
+function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
+  const [localVista, setLocalVista] = useState('ninos')
+  const vista = controlledVista || localVista
+  const setVista = onVistaChange || setLocalVista
   const st = groupStatus(g, metas.gpnMin)
   const n = g.estudiantes.length
   const bajas = g.estudiantes.filter((e) => e.estado === 'baja_potencial').length
@@ -951,11 +988,20 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
     { l: 'Bajas potenciales', v: bajas, s: bajas ? 'se irían el próximo mes' : 'ninguna', c: bajas ? 'var(--warn)' : 'var(--text)' },
   ]
   return (
-    <section className={`panel grp-detail${sheet ? ' grp-detail--sheet' : ''}`} aria-label={`Grupo ${g.numero}`} data-tour="grupo.panel">
+    <section
+      ref={surfaceRef}
+      className={`panel grp-detail${sheet ? ' grp-detail--sheet mobile-sheet' : ''}`}
+      aria-label={sheet ? undefined : `Grupo ${g.numero}`}
+      aria-labelledby={sheet ? titleId : undefined}
+      aria-modal={sheet ? 'true' : undefined}
+      role={sheet ? 'dialog' : undefined}
+      tabIndex={sheet ? -1 : undefined}
+      data-tour="grupo.panel"
+    >
       <header className="grp-detail__head">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            <h3 className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+            <h3 id={sheet ? titleId : undefined} className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
               {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} nivel={it?.nivel} />}
@@ -970,7 +1016,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 : ' · Sin fecha de inicio (legacy: cuenta como iniciado)'}
             </p>
           </div>
-          <button className="btn" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
+          <button ref={closeRef} className={`btn${sheet ? ' mobile-sheet__close' : ''}`} style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
             onClick={onCerrarPanel} title="Cerrar el detalle (Esc)" aria-label="Cerrar el detalle">✕</button>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
@@ -1016,7 +1062,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
             <div key={t.l}>
               <span className="label">{t.l}</span>
               <div className="num" style={{ fontSize: 21, color: t.c || 'var(--text)', lineHeight: 1.1, marginTop: 4 }}>{t.v}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{t.s}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{t.s}</div>
             </div>
           ))}
           <div style={{ gridColumn: '1 / -1' }}><OcupacionBar n={n} metas={metas} /></div>
@@ -1056,14 +1102,14 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13.5 }}>{e.nombre}</div>
-                    {e.representante && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
+                    {e.representante && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{e.representante}</div>}
                   </div>
                   <EstadoNinoPill e={e} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
                   <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} />
-                  <span className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
+                  <span className="num" style={{ fontSize: 12, color: 'var(--text-dim)' }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
                     {cierre.fecha ? `cierra ${fmtDia(cierre.fecha)}` : 'sin cierre'}
                   </span>
                 </div>
@@ -1222,7 +1268,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
 // fijarInicioNivel (uno) o fijarInicioNivelLote (un montón homogéneo). Con
 // varios niños solo se ofrecen las fuentes que TODOS comparten con la MISMA
 // fecha (lib/ancla-lote): el lote no promedia fechas ajenas.
-function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar }) {
+function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBusyChange }) {
   const [sug, setSug] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [err, setErr] = useState('')
@@ -1250,13 +1296,18 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar }) {
   // Uno o varios, la escritura devuelve el plan YA recalculado por el server:
   // el mensaje puede decir en qué semana quedó el niño sin recargar nada.
   async function fijar({ fecha, origen }) {
-    const res = ids.length === 1
-      ? await fijarInicioNivel(centroId, ids[0], { fecha, origen })
-      : await fijarInicioNivelLote(centroId, { estudianteIds: ids, fecha, origen })
-    if (res?.error) return res
-    const lista = res.ninos || [{ id: ids[0], nombre: ninos[0]?.nombre, actualizado: res.actualizado, plan: res.plan }]
-    onFijado?.({ fecha, origen, etiqueta, ninos: lista, plan: res.plan || lista[0]?.plan || null })
-    return res
+    onBusyChange?.(true)
+    try {
+      const res = ids.length === 1
+        ? await fijarInicioNivel(centroId, ids[0], { fecha, origen })
+        : await fijarInicioNivelLote(centroId, { estudianteIds: ids, fecha, origen })
+      if (res?.error) return res
+      const lista = res.ninos || [{ id: ids[0], nombre: ninos[0]?.nombre, actualizado: res.actualizado, plan: res.plan }]
+      onFijado?.({ fecha, origen, etiqueta, ninos: lista, plan: res.plan || lista[0]?.plan || null })
+      return res
+    } finally {
+      onBusyChange?.(false)
+    }
   }
 
   if (cargando) return <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 0' }}>Calculando las opciones…</div>
@@ -1918,7 +1969,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
       )}
 
       {/* Calendario del día: columna por salón */}
-      <div className="card" style={{ padding: 14, overflowX: 'auto' }}>
+      <div className="card" data-horizontal-scroll style={{ padding: 14, overflowX: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols.length}, minmax(170px, 1fr))`, gap: 8, minWidth: 52 + cols.length * 178 }}>
           <div />
           {cols.map(({ salon }) => (
@@ -2148,15 +2199,15 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
   }
 
   return (
-    <Modal title={isEdit ? 'Editar clase de prueba' : 'Apartar clase de prueba'} width={560} onClose={onClose}
+    <Modal title={isEdit ? 'Editar clase de prueba' : 'Apartar clase de prueba'} width={560} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Apartar')}</button>
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         <Field label="Día de la clase de prueba">
           <select className="input" value={dia} onChange={(e) => setDia(e.target.value)}>
             {DIAS_OPERATIVOS.map((d) => <option key={d} value={d}>{DIAS[d]}</option>)}
@@ -2388,10 +2439,10 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={iniciado ? `Grupo ${initial.numero} · horario y coach` : (isEdit ? `Editar grupo ${initial.numero}` : 'Aperturar grupo')} width={640} onClose={onClose}
+    <Modal title={iniciado ? `Grupo ${initial.numero} · horario y coach` : (isEdit ? `Editar grupo ${initial.numero}` : 'Aperturar grupo')} width={640} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" data-tour="aperturar.cancelar" onClick={onClose}>Cancelar</button>
+          <button className="btn" data-tour="aperturar.cancelar" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" data-tour="aperturar.confirmar" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Aperturar grupo')}</button>
         </>
       )}>
@@ -2402,7 +2453,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
           El modelo lo cierra a edición: solo se cambian el <b style={{ color: 'var(--text)' }}>horario</b> y el <b style={{ color: 'var(--text)' }}>coach</b>. Un horario nuevo entra en vigor <b style={{ color: 'var(--text)' }}>mañana</b> y las clases ya dadas se conservan tal cual. Las notas se leen en el panel del grupo.
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         {!iniciado && (
           <>
             <Field label="Número de grupo *" tour="aperturar.numero"><input className="input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="Ej: 22" /></Field>
@@ -2463,21 +2514,21 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         <div style={{ gridColumn: '1 / -1' }}>
           <div className="label" style={{ marginBottom: 8 }}>Horarios</div>
           {f.horarios.map((h, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <select className="input" style={{ flex: 1 }} value={h.dia} onChange={(e) => setH(i, 'dia', e.target.value)}>
+            <div key={i} className="dialog-schedule-row">
+              <select aria-label={`Día del horario ${i + 1}`} className="input" value={h.dia} onChange={(e) => setH(i, 'dia', e.target.value)}>
                 {DIAS.slice(1).map((d, di) => <option key={di + 1} value={di + 1}>{d}</option>)}
               </select>
-              <input type="time" className="input" style={{ width: 110 }} value={h.hora_inicio} onChange={(e) => setH(i, 'hora_inicio', e.target.value)} />
-              <input type="time" className="input" style={{ width: 110 }} value={h.hora_fin} onChange={(e) => setH(i, 'hora_fin', e.target.value)} />
-              <select className="input" style={{ flex: 1 }} value={h.salon_id || ''} onChange={(e) => setH(i, 'salon_id', e.target.value)}>
+              <input aria-label={`Inicio del horario ${i + 1}`} type="time" className="input" value={h.hora_inicio} onChange={(e) => setH(i, 'hora_inicio', e.target.value)} />
+              <input aria-label={`Fin del horario ${i + 1}`} type="time" className="input" value={h.hora_fin} onChange={(e) => setH(i, 'hora_fin', e.target.value)} />
+              <select aria-label={`Salón del horario ${i + 1}`} className="input" value={h.salon_id || ''} onChange={(e) => setH(i, 'salon_id', e.target.value)}>
                 <option value="">Sin salón</option>
                 {salones.filter((s) => s.activo || String(s.id) === String(h.salon_id)).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
-              <button className="btn" style={{ padding: '6px 10px' }} onClick={() => set('horarios', f.horarios.filter((_, j) => j !== i))}>✕</button>
+              <button aria-label={`Eliminar horario ${i + 1}`} className="btn" onClick={() => set('horarios', f.horarios.filter((_, j) => j !== i))}>✕</button>
             </div>
           ))}
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('horarios', [...f.horarios, { dia: 1, hora_inicio: '', hora_fin: '', salon_id: '' }])}>+ Agregar horario</button>
-          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-dim)' }}>
             El programa son <b>2 horas semanales</b>: un bloque de 2 h, o dos bloques de 1 h en días distintos. Ventana: 12:30–8:30 pm (sábado desde 9:00 am) con 15 min entre clases.
           </div>
         </div>
@@ -2534,10 +2585,10 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Itinerario del grupo ${g.numero}`} width={620} onClose={onClose}
+    <Modal title={`Itinerario del grupo ${g.numero}`} width={620} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving || !dias.length}>{saving ? 'Guardando…' : 'Guardar itinerario'}</button>
         </>
       )}>
@@ -2547,7 +2598,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
           El grupo no tiene horario registrado. Sin días de clase no se puede armar el itinerario: edita el grupo y ponle horario.
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         <Field label="Nivel que cursa">
           <select className="input" value={nivel} onChange={(e) => setNivel(e.target.value)}>
             {Array.from({ length: topeNivel }, (_, i) => i + 1).map((nv) => <option key={nv} value={nv}>Nivel {nv}</option>)}
@@ -2637,15 +2688,15 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   }
 
   return (
-    <Modal title="Inscribir niño" width={600} onClose={onClose}
+    <Modal title="Inscribir niño" width={600} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" data-tour="inscribir.cancelar" onClick={onClose}>Cancelar</button>
+          <button className="btn" data-tour="inscribir.cancelar" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" data-tour="inscribir.confirmar" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Inscribir'}</button>
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         <Field full label="Nombre del niño *" tour="inscribir.nombre"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Itinerario">
           <select className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
@@ -2682,7 +2733,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
         <Field label="Cierre de nivel (override)" tour="inscribir.cierre-override">
           <input type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
             Déjalo vacío: el cierre se deriva solo del plan del niño en su grupo.
           </div>
         </Field>
@@ -2734,15 +2785,15 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Editar a ${est.nombre}`} width={600} onClose={onClose}
+    <Modal title={`Editar a ${est.nombre}`} width={600} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="dialog-form-grid">
         <Field full label="Nombre *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Itinerario">
           <select className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
@@ -2821,10 +2872,10 @@ function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
   }
 
   return (
-    <Modal title={`Retirar a ${est.nombre}`} width={480} onClose={onClose}
+    <Modal title={`Retirar a ${est.nombre}`} width={480} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           {requiereProg ? (
             <button className="btn btn--primary" onClick={programar} disabled={saving}>{saving ? 'Guardando…' : 'Retirar el próximo mes'}</button>
           ) : (
@@ -2869,10 +2920,10 @@ function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Retirar a ${est.nombre} el próximo mes`} width={480} onClose={onClose}
+    <Modal title={`Retirar a ${est.nombre} el próximo mes`} width={480} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Programar retiro'}</button>
         </>
       )}>
@@ -2914,10 +2965,10 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Reincorporar a ${est.nombre}`} width={440} onClose={onClose}
+    <Modal title={`Reincorporar a ${est.nombre}`} width={440} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
         </>
       )}>
@@ -2961,10 +3012,10 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={isEdit ? 'Editar coach' : 'Agregar coach'} width={440} onClose={onClose}
+    <Modal title={isEdit ? 'Editar coach' : 'Agregar coach'} width={440} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </>
       )}>
@@ -3015,10 +3066,10 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={isEdit ? 'Editar salón' : 'Agregar salón'} width={400} onClose={onClose}
+    <Modal title={isEdit ? 'Editar salón' : 'Agregar salón'} width={400} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </>
       )}>
@@ -3035,26 +3086,14 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
 }
 
 // ── Base de modales y campos ─────────────────────────────────────────────────
-function Modal({ title, width = 560, onClose, children, footer }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+function Modal({ title, width = 560, onClose, children, footer, closeDisabled = false }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width, maxWidth: '100%', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
-          <h3 className="panel__title">{title}</h3>
-          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
-        </div>
-        <div style={{ padding: 22, maxHeight: '62vh', overflowY: 'auto' }}>{children}</div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>{footer}</div>
-      </div>
-    </div>
+    <Dialog open title={title} width={width} onClose={onClose} closeDisabled={closeDisabled} footer={footer}>
+      {children}
+    </Dialog>
   )
 }
 
 function Field({ label, full, tour, children }) {
-  return <div className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
+  return <label className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
 }
