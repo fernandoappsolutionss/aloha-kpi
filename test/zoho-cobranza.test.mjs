@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia } from '../lib/zoho-cobranza.mjs'
+import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, emailAutorizado } from '../lib/zoho-cobranza.mjs'
 
 const ORG_FF = ORGS_ZOHO.find((o) => o.orgId === '667522360')
 const ORG_ALTAVIA = ORGS_ZOHO.find((o) => o.orgId === '903355420')
@@ -56,6 +56,14 @@ test('clasificarCentro — Altavia por referencia, vendedor o dirección', () =>
 
 test('clasificarCentro — org de un solo centro recibe todo', () => {
   assert.equal(clasificarCentro(ORG_VA, { reference_number: 'lo que sea' }), 6)
+})
+
+test('emailAutorizado — solo el correo de Fernando conecta Zoho', () => {
+  assert.equal(emailAutorizado('fperez@teamsolutionss.com'), true)
+  assert.equal(emailAutorizado('  FPerez@Teamsolutionss.COM '), true)
+  assert.equal(emailAutorizado('admin@alohapanama.com'), false)
+  assert.equal(emailAutorizado(''), false)
+  assert.equal(emailAutorizado(undefined), false)
 })
 
 test('vencidaElDia — reglas de vencimiento', () => {
