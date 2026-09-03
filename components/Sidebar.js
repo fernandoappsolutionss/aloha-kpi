@@ -30,6 +30,7 @@ function Icon({ name }) {
     case 'logout': return <svg viewBox="0 0 24 24" {...P}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
     case 'shield': return <svg viewBox="0 0 24 24" {...P}><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5Z" /></svg>
     case 'book': return <svg viewBox="0 0 24 24" {...P}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
+    case 'back': return <svg viewBox="0 0 24 24" {...P}><path d="M19 12H5m7-7-7 7 7 7" /></svg>
     case 'chevron': return <svg viewBox="0 0 24 24" {...P}><polyline points="6 9 12 15 18 9" /></svg>
     default: return null
   }
@@ -151,6 +152,8 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
   const centros = context?.centers || []
   const esCoordinador = actorRole === 'coordinador'
+  const mostrarRegreso = isPanel && Boolean(centroId)
+  const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
@@ -169,6 +172,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
   ]
   const configItems = [
+    ...(context?.capabilities.viewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
     ...(context?.capabilities.viewCenters ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
     ...(context?.capabilities.viewUsers ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]
@@ -275,6 +279,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
       {/* Footer */}
       <div className="sb__foot">
+        {mostrarRegreso && (
+          <Link href="/dashboard" onClick={() => closeDrawer({ restoreFocus: false })} className="sb__item sb__return"
+            title={etiquetaRegreso} aria-label={etiquetaRegreso}>
+            <Icon name="back" /><span>{etiquetaRegreso}</span>
+          </Link>
+        )}
         <ThemeToggle />
         <Link href="/perfil" onClick={() => closeDrawer({ restoreFocus: false })}
           aria-current={isActive('/perfil') ? 'page' : undefined}

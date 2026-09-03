@@ -19,6 +19,7 @@ export async function getNavigationContext() {
       viewCenters: esGerencia(user.rol),
       viewAdminTraining: esGerencia(user.rol),
       viewMetas: esGerencia(user.rol),
+      viewZoho: esGerencia(user.rol),
     },
   }
 }

@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { tienePanel } from '../../../../components/useRol'
+import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../../actions/cuadro'
 import { listarGruposActivos } from '../../../actions/grupos'
@@ -30,12 +29,10 @@ const money = (n) => '$' + Number(n || 0).toFixed(2)
 
 export default function CuadroPage() {
   const { id } = useParams()
-  const router = useRouter()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [rol, setRol] = useState('usuario')
-  const isAdmin = tienePanel(rol)
   const [data, setData] = useState(null)
   const [gruposActivos, setGruposActivos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -116,7 +113,12 @@ export default function CuadroPage() {
     return <span className="pill" style={{ background: 'var(--surface-3)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>Continúa</span>
   }
 
-  if (loading) return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text-dim)' }}>Cargando…</div>
+  if (loading) return (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
+      <main className="main"><div className="empty">Cargando…</div></main>
+    </div>
+  )
 
   const isError = status.includes('❌')
   const statusText = status.replace(/^[❌✅]\s*/, '')
@@ -146,12 +148,6 @@ export default function CuadroPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || ''} centroId={id} />
       <main id="main-content" className="main" data-page-state="ready">
-        {isAdmin && (
-          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
-            Volver al panel de administrador
-          </button>
-        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Informe mensual</div>

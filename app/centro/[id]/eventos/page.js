@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { tienePanel } from '../../../../components/useRol'
+import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
@@ -78,10 +77,8 @@ const EMPTY = {
 
 export default function EventosPage() {
   const { id } = useParams()
-  const router = useRouter()
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
   const [rol, setRol] = useState('usuario')
-  const isAdmin = tienePanel(rol)
   // El asistente registra clases de prueba, pero no las elimina.
   const esAsistente = rol === 'asistente'
   const [config, setConfig] = useState({ configured: true, baseUrl: '' })
@@ -211,12 +208,6 @@ export default function EventosPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroId={id} />
       <main id="main-content" className="main events-page" data-page-state={loading ? 'loading' : 'ready'}>
-        {isAdmin && (
-          <button onClick={() => router.push('/dashboard')} className="btn" style={{ marginBottom: 18, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
-            Volver al panel de administrador
-          </button>
-        )}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Clases de prueba</div>

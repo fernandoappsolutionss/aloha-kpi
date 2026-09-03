@@ -10,112 +10,162 @@ import manifest from '../../../../../lib/entrenamiento/audio-manifest.json'
 
 export default function ModuloPage() {
   const { id, modulo: moduloId } = useParams()
+  // Next puede conservar la página al navegar entre módulos. La clave reinicia
+  // respuestas, resultados y peticiones de progreso para cada módulo y centro.
+  return <ContenidoModulo key={`${id}/${moduloId}`} id={id} moduloId={moduloId} />
+}
+
+function ContenidoModulo({ id, moduloId }) {
   const router = useRouter()
   const modulo = useMemo(() => MODULOS.find((m) => m.id === moduloId), [moduloId])
   const idx = MODULOS.findIndex((m) => m.id === moduloId)
   const siguiente = MODULOS[idx + 1] || null
   const [nombre, setNombre] = useState('Centro')
-  const [progreso, setProgreso] = useState({})
+  const [progreso, setProgreso] = useState(null)
+  const [cargandoProgreso, setCargandoProgreso] = useState(true)
+  const [errorProgreso, setErrorProgreso] = useState('')
+  const [recargaProgreso, setRecargaProgreso] = useState(0)
   const [sel, setSel] = useState([null, null, null])
   const [resultado, setResultado] = useState(null) // { puntaje, correctas, explicaciones, aprobado }
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
     if (!id) return
-    getCentroNombre(id).then((n) => { if (n) setNombre(n) }).catch(() => {})
-    // { error } se ignora aquí: el quiz funciona igual sin el progreso previo.
-    cargarProgreso().then((p) => { if (p && !p.error) setProgreso(p) }).catch(() => {})
+    let activo = true
+    getCentroNombre(id).then((n) => { if (activo && n) setNombre(n) }).catch(() => {})
+    return () => { activo = false }
   }, [id])
 
-  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main className="main"><div className="alert alert--error">Este módulo no existe.</div></main></div>
+  useEffect(() => {
+    let activo = true
+    setCargandoProgreso(true)
+    setErrorProgreso('')
+    cargarProgreso().then((p) => {
+      if (!activo) return
+      if (!p || p.error) {
+        setErrorProgreso('No pudimos cargar tu progreso. Puedes seguir con el recorrido o las preguntas.')
+        return
+      }
+      setProgreso(p)
+    }).catch(() => {
+      if (activo) setErrorProgreso('No pudimos cargar tu progreso. Puedes seguir con el recorrido o las preguntas.')
+    }).finally(() => { if (activo) setCargandoProgreso(false) })
+    return () => { activo = false }
+  }, [recargaProgreso])
 
-  const p = progreso[modulo.id]
+  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main className="main"><button className="tour-card__link" onClick={() => router.push(`/centro/${id}/entrenamiento`)}>← Volver a Entrenamiento</button><div className="alert alert--error">Este módulo no existe.</div></main></div>
+
+  const progresoConocido = progreso !== null
+  const p = progreso?.[modulo.id]
   const tourVisto = Boolean(p?.tourVistoAt)
-  const listo = completado(p)
+  const quizAprobado = Boolean(p?.quizAprobadoAt || resultado?.aprobado)
+  // Una corrección exitosa ya está guardada en el servidor, aunque falle la
+  // lectura posterior. El recorrido sigue siendo obligatorio para completar.
+  const listo = completado(p) || (tourVisto && quizAprobado)
   const clipIntro = manifest[`${modulo.id}/intro`]
+  const respondidas = sel.filter((v) => v !== null).length
+  const estadoDesconocido = cargandoProgreso ? 'Consultando…' : 'Sin confirmar'
+  const volver = () => router.push(`/centro/${id}/entrenamiento`)
+  const continuar = () => siguiente ? router.push(`/centro/${id}/entrenamiento/${siguiente.id}`) : volver()
 
   const iniciar = () => router.push(`${modulo.inicio.ruta.replace('{id}', String(id))}?tour=${modulo.id}&paso=1`)
 
   async function corregir() {
-    if (sel.some((v) => v === null)) return
+    if (enviando || sel.some((v) => v === null)) return
     setEnviando(true)
     try {
       const r = await responderQuiz(modulo.id, sel)
       if (r?.error) { setResultado({ error: r.error }); return }
       setResultado(r)
+      setRecargaProgreso((n) => n + 1)
     } catch {
       setResultado({ error: 'No se pudo corregir. Recarga la página e intenta de nuevo.' })
       return
     } finally { setEnviando(false) }
-    // El quiz ya quedó corregido: si el refresco del progreso falla, no es un
-    // error de corrección — se ignora y el resultado en pantalla manda.
-    const np = await cargarProgreso().catch(() => null)
-    if (np && !np.error) setProgreso(np)
   }
   const reintentar = () => { setSel([null, null, null]); setResultado(null) }
 
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
-      <main className="main">
+      <main className="main ent-page">
         <div className="main__head"><div>
-          <button className="tour-card__link" onClick={() => router.push(`/centro/${id}/entrenamiento`)}>← Todos los módulos</button>
+          <button className="tour-card__link" onClick={volver}>← Volver a Entrenamiento</button>
           <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Módulo {modulo.orden} de {MODULOS.length} · {modulo.duracionMin} min</div>
           <h1 className="h-title">{modulo.titulo}</h1>
           {listo && <div className="ent-pill ent-pill--ok" style={{ display: 'inline-block', marginTop: 6 }}>✓ Completado</div>}
         </div></div>
 
-        <div className="card" style={{ padding: 20, marginBottom: 18 }}>
-          <div className="label" style={{ marginBottom: 8 }}>Por qué importa</div>
-          <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0 }}>{modulo.intro.texto}</p>
-          {clipIntro && <audio controls preload="none" src={`/entrenamiento/${clipIntro.file}`} style={{ marginTop: 12, width: '100%' }} />}
-          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-            <button className="btn btn--primary" onClick={iniciar}>{tourVisto ? 'Repetir recorrido' : 'Iniciar recorrido →'}</button>
-            {tourVisto && <span className="h-sub" style={{ margin: 0, alignSelf: 'center' }}>Recorrido visto. {listo ? 'Quiz aprobado.' : 'Te falta el quiz de abajo.'}</span>}
+        <section className="card ent-module-card" aria-labelledby="pasos-titulo">
+          <h2 id="pasos-titulo" style={{ fontSize: 20, margin: '0 0 10px' }}>Completa este módulo en 2 pasos</h2>
+          <ol className="ent-module-steps" aria-label="Pasos del módulo">
+            <li className={`ent-module-step${tourVisto ? ' ent-module-step--done' : progresoConocido ? ' ent-module-step--current' : ''}`} aria-current={progresoConocido && !tourVisto ? 'step' : undefined}>
+              <span className="ent-module-step__number" aria-hidden="true">{tourVisto ? '✓' : '1'}</span>
+              <div><strong>Haz el recorrido guiado</strong><p className="h-sub" style={{ margin: '4px 0 0' }}>{tourVisto ? 'Completado' : progresoConocido ? 'Paso actual · conoce dónde hacer cada tarea' : estadoDesconocido}</p></div>
+            </li>
+            <li className={`ent-module-step${quizAprobado ? ' ent-module-step--done' : tourVisto ? ' ent-module-step--current' : ''}`} aria-current={tourVisto && !quizAprobado ? 'step' : undefined}>
+              <span className="ent-module-step__number" aria-hidden="true">{quizAprobado ? '✓' : '2'}</span>
+              <div><strong>Responde 3 preguntas</strong><p className="h-sub" style={{ margin: '4px 0 0' }}>{quizAprobado ? 'Completado · 3 de 3 correctas' : tourVisto ? 'Paso actual · comprueba lo aprendido' : progresoConocido ? 'Pendiente · puedes responderlas cuando quieras' : estadoDesconocido}</p></div>
+            </li>
+          </ol>
+          {errorProgreso && <div className="alert alert--error" role="alert">
+            <p style={{ margin: '0 0 8px' }}>{errorProgreso}</p>
+            <button className="btn" onClick={() => setRecargaProgreso((n) => n + 1)} disabled={cargandoProgreso}>Reintentar cargar progreso</button>
+          </div>}
+          <div className="ent-module-action">
+            {!progresoConocido && cargandoProgreso ? <p className="h-sub" role="status" style={{ margin: 0 }}>Cargando tu progreso…</p> : listo ? (
+              <button className="btn btn--primary" onClick={continuar}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</button>
+            ) : tourVisto ? (
+              <a className="btn btn--primary" href="#quiz">Ir a las 3 preguntas →</a>
+            ) : (
+              <button className="btn btn--primary" onClick={iniciar}>{progresoConocido ? 'Iniciar recorrido →' : 'Abrir recorrido →'}</button>
+            )}
+            {tourVisto && <button className="btn" onClick={iniciar}>Repetir recorrido</button>}
           </div>
-        </div>
-
-        {modulo.errores.length > 0 && (
-          <div className="card" style={{ padding: 20, marginBottom: 18 }}>
-            <div className="label" style={{ marginBottom: 10 }}>Errores típicos de este módulo</div>
-            {modulo.errores.map((e, i) => (
-              <div key={i} className="ent-error">
-                <div style={{ fontWeight: 600 }}>{e.sintoma}</div>
-                <div className="h-sub" style={{ margin: '2px 0 0' }}><b>Por qué:</b> {e.causa} · <b>Qué hacer:</b> {e.arreglo}</div>
-              </div>
-            ))}
+          <div className="ent-module-intro">
+            <p>{modulo.intro.texto}</p>
+            {clipIntro && <details>
+              <summary>Escuchar explicación (opcional)</summary>
+              <audio controls preload="none" aria-label={`Explicación de ${modulo.titulo}`} src={`/entrenamiento/${clipIntro.file}`} style={{ marginTop: 12, width: '100%' }} />
+            </details>}
           </div>
-        )}
+        </section>
 
-        <div id="quiz" className="card" style={{ padding: 20 }}>
-          <div className="label" style={{ marginBottom: 4 }}>Quiz · necesitas 3 de 3</div>
-          <p className="h-sub" style={{ marginTop: 0 }}>{tourVisto ? 'Demuestra que lo entendiste.' : 'Puedes responderlo ya, pero el módulo solo queda completo con el recorrido visto y el quiz aprobado.'}</p>
+        <section id="quiz" className="card ent-module-card" aria-labelledby="quiz-titulo" tabIndex={-1} style={{ scrollMarginTop: 24 }}>
+          <div className="label" style={{ marginBottom: 6 }}>Paso 2</div>
+          <h2 id="quiz-titulo" style={{ fontSize: 20, margin: '0 0 8px' }}>Responde 3 preguntas</h2>
+          <p className="h-sub" style={{ marginTop: 0 }}>Necesitas 3 respuestas correctas. Puedes volver a intentarlo cuantas veces quieras. El módulo se completa con el recorrido visto y las preguntas aprobadas.</p>
+          {quizAprobado && !resultado && <p className="ent-pill ent-pill--ok">✓ Ya aprobaste estas preguntas. Puedes repasarlas si quieres.</p>}
           {modulo.quiz.map((q, qi) => {
             const marcada = resultado && !resultado.error ? resultado.correctas[qi] : null
             return (
-              <div key={qi} className={`ent-q${marcada === true ? ' ent-q--ok' : marcada === false ? ' ent-q--bad' : ''}`}>
-                <div className="ent-q__text">{qi + 1}. {q.pregunta}</div>
+              <div key={qi} className={`ent-q${marcada === true ? ' ent-q--ok' : marcada === false ? ' ent-q--bad' : ''}`} role="radiogroup" aria-labelledby={`pregunta-${qi}`} aria-describedby={marcada !== null ? `explicacion-${qi}` : undefined}>
+                <h3 id={`pregunta-${qi}`} className="ent-q__text" style={{ fontSize: 15, marginTop: 0 }}>{qi + 1}. {q.pregunta}</h3>
                 {q.opciones.map((op, oi) => (
                   <label key={oi} className="ent-opt">
-                    <input type="radio" name={`q${qi}`} checked={sel[qi] === oi} disabled={Boolean(resultado && !resultado.error)}
+                    <input type="radio" name={`q${qi}`} checked={sel[qi] === oi} disabled={enviando || Boolean(resultado && !resultado.error)}
                       onChange={() => setSel((s) => { const n = [...s]; n[qi] = oi; return n })} />
                     <span>{op}</span>
                   </label>
                 ))}
-                {marcada === false && <div className="ent-q__expl">✗ {resultado.explicaciones[qi]}</div>}
-                {marcada === true && <div className="ent-q__expl ent-q__expl--ok">✓ Correcto</div>}
+                {marcada === false && <div id={`explicacion-${qi}`} className="ent-q__expl">✗ {resultado.explicaciones[qi]}</div>}
+                {marcada === true && <div id={`explicacion-${qi}`} className="ent-q__expl ent-q__expl--ok">✓ Correcto</div>}
               </div>
             )
           })}
-          {resultado?.error && <div className="alert alert--error">{resultado.error}</div>}
+          {resultado?.error && <div className="alert alert--error" role="alert">{resultado.error}</div>}
           <div aria-live="polite" style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
             {!resultado || resultado.error ? (
-              <button className="btn btn--primary" onClick={corregir} disabled={enviando || sel.some((v) => v === null)}>{enviando ? 'Corrigiendo…' : 'Corregir'}</button>
+              <>
+                <button className="btn btn--primary" onClick={corregir} disabled={enviando || respondidas < modulo.quiz.length}>{enviando ? 'Comprobando…' : 'Comprobar respuestas'}</button>
+                <span className="h-sub" style={{ margin: 0 }}>{respondidas} de 3 respondidas</span>
+              </>
             ) : resultado.aprobado ? (
               <>
-                <div className="ent-pill ent-pill--ok">✓ 3 de 3 · {listo ? 'Módulo completado' : 'Quiz aprobado — te falta ver el recorrido'}</div>
-                {siguiente && <button className="btn btn--primary" onClick={() => router.push(`/centro/${id}/entrenamiento/${siguiente.id}`)}>Siguiente módulo: {siguiente.titulo} →</button>}
-                {!siguiente && <button className="btn" onClick={() => router.push(`/centro/${id}/entrenamiento`)}>Volver al índice</button>}
+                <div className="ent-pill ent-pill--ok">✓ 3 de 3 · {listo ? 'Módulo completado' : 'Preguntas aprobadas'}</div>
+                {listo ? <button className="btn btn--primary" onClick={continuar}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</button> : progresoConocido ? (
+                  <><span className="h-sub" style={{ margin: 0 }}>Solo falta completar el recorrido.</span><button className="btn btn--primary" onClick={iniciar}>Iniciar recorrido →</button></>
+                ) : <span className="h-sub" style={{ margin: 0 }}>{cargandoProgreso ? 'Comprobando el estado del recorrido…' : 'Falta confirmar el estado del recorrido. Reintenta cargar tu progreso arriba.'}</span>}
               </>
             ) : (
               <>
@@ -125,7 +175,21 @@ export default function ModuloPage() {
               </>
             )}
           </div>
-        </div>
+        </section>
+
+        {modulo.errores.length > 0 && (
+          <details className="card ent-help">
+            <summary>¿Algo no salió como esperabas? Revisa los errores típicos</summary>
+            <div className="ent-help__body">
+              {modulo.errores.map((e, i) => (
+                <div key={i} className="ent-error">
+                  <div style={{ fontWeight: 600 }}>{e.sintoma}</div>
+                  <div className="h-sub" style={{ margin: '2px 0 0' }}><b>Por qué:</b> {e.causa} · <b>Qué hacer:</b> {e.arreglo}</div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </main>
     </div>
   )

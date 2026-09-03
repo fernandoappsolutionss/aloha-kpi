@@ -804,3 +804,15 @@ CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
   UNIQUE (usuario_id, modulo)
 );
 -- (sin índice extra: el UNIQUE ya indexa usuario_id como primera columna)
+
+-- Conexión OAuth con Zoho Books (fila única): la autorización con la que el
+-- cron de cobranza (/api/cron/cobranza-zoho) lee las facturas de las 4
+-- organizaciones. Se crea desde /dashboard/zoho — solo el correo autorizado
+-- (lib/zoho-cobranza.mjs: EMAIL_ZOHO_AUTORIZADO) puede conectar.
+CREATE TABLE IF NOT EXISTS zoho_conexion (
+  id            INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  refresh_token TEXT NOT NULL,
+  email         TEXT NOT NULL,
+  conectado_por TEXT,
+  conectado_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
