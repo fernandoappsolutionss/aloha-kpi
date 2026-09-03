@@ -78,7 +78,7 @@ before(async () => {
   } finally {
     client.release()
   }
-})
+}, { timeout: 15_000 })
 
 beforeEach(async () => {
   const fixtureUsers = [ids.admin, ids.coord, ids.target, ids.outsider, ids.privileged]
@@ -108,7 +108,7 @@ beforeEach(async () => {
     'INSERT INTO usuario_centros (usuario_id, centro_id) VALUES ($1, $2)',
     [ids.coord, ids.centerA],
   )
-})
+}, { timeout: 15_000 })
 
 after(async () => {
   try {
@@ -121,7 +121,7 @@ after(async () => {
   } finally {
     await pool.end()
   }
-})
+}, { timeout: 15_000 })
 
 const [
   { usuariosRepository },
@@ -164,29 +164,32 @@ function deferred() {
 }
 
 function settle(work) {
-  return work().then(
+  return Promise.resolve().then(work).then(
     (value) => ({ status: 'fulfilled', value }),
     (reason) => ({ status: 'rejected', reason }),
   )
 }
 
-async function race(...works) {
-  const gate = deferred()
-  const runs = works.map((work) => settle(async () => {
-    await gate.promise
-    return work()
-  }))
-  gate.resolve()
-  return Promise.all(runs)
+function withTimeout(promise, label, timeoutMs = 5_000) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} excedió ${timeoutMs} ms`)), timeoutMs)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
 function namedTransactions(base, applicationName) {
   return {
     ...base,
-    transaction: (work) => base.transaction(async (query) => {
-      await query("SELECT set_config('application_name', $1, true)", [applicationName])
+    transaction: (work, options) => base.transaction(async (query) => {
+      await query(
+        `SELECT set_config('application_name', $1, true),
+                set_config('lock_timeout', '8000ms', true),
+                set_config('statement_timeout', '12000ms', true)`,
+        [applicationName],
+      )
       return work(query)
-    }),
+    }, options),
   }
 }
 
@@ -200,6 +203,20 @@ function pauseAfterActorLock(base, actorId, barrier) {
         await barrier.release.promise
       }
       return actor
+    },
+  }
+}
+
+function pauseAfterUserLock(base, userId, barrier) {
+  return {
+    ...base,
+    async lockUser(query, id) {
+      const user = await base.lockUser(query, id)
+      if (Number(id) === Number(userId)) {
+        barrier.locked.resolve()
+        await barrier.release.promise
+      }
+      return user
     },
   }
 }
@@ -219,16 +236,53 @@ async function waitForObservedLock(applicationName) {
   throw new Error(`No se observó el lock de ${applicationName}`)
 }
 
-function assertExpectedRaceError(result) {
+async function observedBlockedRace({
+  barrier,
+  holderWork,
+  waiterWork,
+  waiterName,
+  label,
+  onWaitObserved,
+}) {
+  const holder = settle(holderWork)
+  let waiter
+  let observationError
+  try {
+    await withTimeout(barrier.locked.promise, `${label}: el holder no adquirió el lock`)
+    waiter = settle(waiterWork)
+    await waitForObservedLock(waiterName)
+    onWaitObserved?.()
+  } catch (error) {
+    observationError = error
+  } finally {
+    barrier.release.resolve()
+  }
+
+  const works = waiter ? [holder, waiter] : [holder]
+  let results
+  try {
+    results = await withTimeout(Promise.all(works), `${label}: las transacciones no terminaron`, 14_000)
+  } catch (drainError) {
+    if (observationError) {
+      throw new AggregateError([observationError, drainError], `${label}: falló la observación y el drenaje`)
+    }
+    throw drainError
+  }
+  if (observationError) throw observationError
+  if (!waiter) throw new Error(`${label}: el waiter no llegó a iniciarse`)
+  return results
+}
+
+function assertSerializableOrFulfilled(result, label) {
   if (result.status === 'fulfilled') return
-  assert.ok(
-    result.reason?.code === '40001'
-      || /No tienes permiso|No autorizado|ya fue usado/.test(result.reason?.message || ''),
-    `error inesperado: ${result.reason?.code || result.reason?.message}`,
+  assert.equal(
+    result.reason?.code,
+    '40001',
+    `${label}: error inesperado ${result.reason?.code || result.reason?.message}`,
   )
 }
 
-test('pageData restringe en SQL por rol y centro antes de presentar filas', async () => {
+test('pageData restringe en SQL por rol y centro antes de presentar filas', { timeout: 20_000 }, async () => {
   const data = await service.pageData({ uid: ids.coord })
   assert.deepEqual(data.users.map((user) => user.id), [ids.target])
   assert.deepEqual(data.users[0].centerIds, [ids.centerA])
@@ -238,42 +292,48 @@ test('pageData restringe en SQL por rol y centro antes de presentar filas', asyn
   )
 })
 
-test('la revocación espera el lock y ninguna edición confirma después de revocar', async () => {
+test('la revocación espera el lock y ninguna edición confirma después de revocar', { timeout: 20_000 }, async () => {
   const barrier = { locked: deferred(), release: deferred() }
-  const editRepo = pauseAfterActorLock(usuariosRepository, ids.coord, barrier)
+  const editRepo = pauseAfterActorLock(
+    namedTransactions(usuariosRepository, `${marker}-edit-holder`),
+    ids.coord,
+    barrier,
+  )
   const revokeName = `${marker}-revoke`
   const revokeRepo = namedTransactions(usuariosRepository, revokeName)
   const events = []
 
-  const edit = serviceFor(editRepo).update({ uid: ids.coord }, ids.target, {
-    nombre: `${marker}-updated`,
-    rol: 'administradora',
-    centro_id: ids.centerA,
-    centros: [],
-  }).then((value) => {
-    events.push('edit-confirmed')
-    return value
-  })
-
-  await barrier.locked.promise
   const revokeInput = {
     nombre: `${marker}-coord`,
     rol: 'coordinador',
     centro_id: null,
     centros: [ids.centerB],
   }
-  const revoke = settle(() => serviceFor(revokeRepo).update(
-    { uid: ids.admin },
-    ids.coord,
-    revokeInput,
-  ))
-  await waitForObservedLock(revokeName)
-  assert.deepEqual(events, [], 'ninguna transacción debía confirmar mientras se retenía el lock')
-  barrier.release.resolve()
-  await edit
-  const revokeResult = await revoke
+  const [editResult, revokeResult] = await observedBlockedRace({
+    barrier,
+    holderWork: () => serviceFor(editRepo).update({ uid: ids.coord }, ids.target, {
+      nombre: `${marker}-updated`,
+      rol: 'administradora',
+      centro_id: ids.centerA,
+      centros: [],
+    }).then((value) => {
+      events.push('edit-confirmed')
+      return value
+    }),
+    waiterWork: () => serviceFor(revokeRepo).update(
+      { uid: ids.admin },
+      ids.coord,
+      revokeInput,
+    ),
+    waiterName: revokeName,
+    label: 'revocación',
+    onWaitObserved: () => {
+      assert.deepEqual(events, [], 'ninguna transacción debía confirmar mientras se retenía el lock')
+    },
+  })
+  assert.equal(editResult.status, 'fulfilled', `edición falló: ${editResult.reason?.message}`)
   if (revokeResult.status === 'rejected') {
-    if (revokeResult.reason?.code !== '40001') throw revokeResult.reason
+    assert.equal(revokeResult.reason?.code, '40001')
     await service.update({ uid: ids.admin }, ids.coord, revokeInput)
   }
   events.push('revoke-confirmed')
@@ -298,17 +358,38 @@ test('la revocación espera el lock y ninguna edición confirma después de revo
   )
 })
 
-test('promover el objetivo y resetearlo nunca deja un token activo privilegiado', async () => {
-  const results = await race(
-    () => service.resendAccess({ uid: ids.coord }, ids.target),
-    () => service.update({ uid: ids.admin }, ids.target, {
+test('promover el objetivo y resetearlo nunca deja un token activo privilegiado', { timeout: 20_000 }, async () => {
+  const barrier = { locked: deferred(), release: deferred() }
+  const resetRepo = pauseAfterUserLock(
+    namedTransactions(usuariosRepository, `${marker}-promote-holder`),
+    ids.target,
+    barrier,
+  )
+  const promotionName = `${marker}-promote`
+  const promotionRepo = namedTransactions(usuariosRepository, promotionName)
+  const promotionInput = {
+    nombre: `${marker}-target`,
+    rol: 'admin_general',
+    centro_id: null,
+    centros: [],
+  }
+  const [resetResult, promotionResult] = await observedBlockedRace({
+    barrier,
+    holderWork: () => serviceFor(resetRepo).resendAccess({ uid: ids.coord }, ids.target),
+    waiterWork: () => serviceFor(promotionRepo).update({ uid: ids.admin }, ids.target, promotionInput),
+    waiterName: promotionName,
+    label: 'promoción contra reset',
+  })
+  assert.equal(resetResult.status, 'fulfilled', `reset falló: ${resetResult.reason?.message}`)
+  if (promotionResult.status === 'rejected') {
+    assert.equal(promotionResult.reason?.code, '40001')
+    await service.update({ uid: ids.admin }, ids.target, {
       nombre: `${marker}-target`,
       rol: 'admin_general',
       centro_id: null,
       centros: [],
-    }),
-  )
-  results.forEach(assertExpectedRaceError)
+    })
+  }
   const state = await pool.query(
     `SELECT u.rol, count(t.token) FILTER (WHERE t.used_at IS NULL) AS activos
      FROM usuarios u
@@ -317,12 +398,19 @@ test('promover el objetivo y resetearlo nunca deja un token activo privilegiado'
      GROUP BY u.id`,
     [ids.target],
   )
-  if (state.rows[0].rol === 'admin_general') {
-    assert.equal(Number(state.rows[0].activos), 0)
-  }
+  assert.equal(state.rows[0].rol, 'admin_general')
+  assert.equal(Number(state.rows[0].activos), 0)
 })
 
-test('dos altas con el mismo correo dejan una fila y no filtran 23505', async () => {
+test('dos altas con el mismo correo dejan una fila y no filtran 23505', { timeout: 20_000 }, async () => {
+  const barrier = { locked: deferred(), release: deferred() }
+  const holderRepo = pauseAfterActorLock(
+    namedTransactions(usuariosRepository, `${marker}-create-holder`),
+    ids.coord,
+    barrier,
+  )
+  const waiterName = `${marker}-create-waiter`
+  const waiterRepo = namedTransactions(usuariosRepository, waiterName)
   const email = `${marker}-duplicate@test.invalid`
   const input = {
     nombre: `${marker}-duplicate`,
@@ -330,10 +418,13 @@ test('dos altas con el mismo correo dejan una fila y no filtran 23505', async ()
     rol: 'asistente',
     centro_id: ids.centerA,
   }
-  const results = await race(
-    () => service.create({ uid: ids.coord }, input),
-    () => service.create({ uid: ids.coord }, input),
-  )
+  const results = await observedBlockedRace({
+    barrier,
+    holderWork: () => serviceFor(holderRepo).create({ uid: ids.coord }, input),
+    waiterWork: () => serviceFor(waiterRepo).create({ uid: ids.coord }, input),
+    waiterName,
+    label: 'alta duplicada',
+  })
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1)
   const rejected = results.find((result) => result.status === 'rejected')
   assert.ok(rejected)
@@ -350,18 +441,33 @@ test('dos altas con el mismo correo dejan una fila y no filtran 23505', async ()
   assert.equal(count.rows[0].n, 1)
 })
 
-test('dos reemplazos simultáneos dejan un solo token activo', async () => {
-  const results = await race(
-    () => accessTokensRepository.transaction((query) => accessTokens.replace(
-      query,
-      { userId: ids.target, purpose: 'reset', hours: 2 },
-    )),
-    () => accessTokensRepository.transaction((query) => accessTokens.replace(
-      query,
-      { userId: ids.target, purpose: 'reset', hours: 2 },
-    )),
+test('dos reemplazos simultáneos dejan un solo token activo', { timeout: 20_000 }, async () => {
+  const barrier = { locked: deferred(), release: deferred() }
+  const holderRepo = pauseAfterUserLock(
+    namedTransactions(accessTokensRepository, `${marker}-replace-holder`),
+    ids.target,
+    barrier,
   )
-  results.forEach(assertExpectedRaceError)
+  const holderTokens = createAccessTokenService({ repo: holderRepo })
+  const waiterName = `${marker}-replace-waiter`
+  const waiterRepo = namedTransactions(accessTokensRepository, waiterName)
+  const waiterTokens = createAccessTokenService({ repo: waiterRepo })
+  const results = await observedBlockedRace({
+    barrier,
+    holderWork: () => holderRepo.transaction((query) => holderTokens.replace(
+      query,
+      { userId: ids.target, purpose: 'reset', hours: 2 },
+    )),
+    waiterWork: () => waiterRepo.transaction((query) => waiterTokens.replace(
+      query,
+      { userId: ids.target, purpose: 'reset', hours: 2 },
+    )),
+    waiterName,
+    label: 'reemplazo concurrente',
+  })
+  // Tras observar el lock, ambos reemplazos pueden confirmar en serie o el waiter
+  // puede abortar con 40001; cualquier otro rechazo viola el contrato.
+  results.forEach((result) => assertSerializableOrFulfilled(result, 'reemplazo concurrente'))
   assert.ok(results.some((result) => result.status === 'fulfilled'))
   const active = await pool.query(
     'SELECT count(*)::int AS n FROM password_tokens WHERE user_id = $1 AND used_at IS NULL',
@@ -370,7 +476,7 @@ test('dos reemplazos simultáneos dejan un solo token activo', async () => {
   assert.equal(active.rows[0].n, 1)
 })
 
-test('dos tokens consumidos a la vez permiten una sola contraseña y revocan ambos', async () => {
+test('dos tokens consumidos a la vez permiten una sola contraseña y revocan ambos', { timeout: 20_000 }, async () => {
   const expires = new Date(Date.now() + 3_600_000)
   const tokenA = `${marker}-consume-a`
   const tokenB = `${marker}-consume-b`
@@ -379,12 +485,31 @@ test('dos tokens consumidos a la vez permiten una sola contraseña y revocan amb
      VALUES ($1, $3, 'reset', $4), ($2, $3, 'reset', $4)`,
     [tokenA, tokenB, ids.target, expires],
   )
-  const results = await race(
-    () => accessTokens.consume({ token: tokenA, passwordHash: 'hash-a' }),
-    () => accessTokens.consume({ token: tokenB, passwordHash: 'hash-b' }),
+  const barrier = { locked: deferred(), release: deferred() }
+  const holderRepo = pauseAfterUserLock(
+    namedTransactions(accessTokensRepository, `${marker}-consume-holder`),
+    ids.target,
+    barrier,
   )
+  const holderTokens = createAccessTokenService({ repo: holderRepo })
+  const waiterName = `${marker}-consume-waiter`
+  const waiterRepo = namedTransactions(accessTokensRepository, waiterName)
+  const waiterTokens = createAccessTokenService({ repo: waiterRepo })
+  const results = await observedBlockedRace({
+    barrier,
+    holderWork: () => holderTokens.consume({ token: tokenA, passwordHash: 'hash-a' }),
+    waiterWork: () => waiterTokens.consume({ token: tokenB, passwordHash: 'hash-b' }),
+    waiterName,
+    label: 'consumo concurrente',
+  })
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1)
-  results.forEach(assertExpectedRaceError)
+  const rejected = results.find((result) => result.status === 'rejected')
+  assert.ok(rejected)
+  assert.ok(
+    rejected.reason?.code === '40001'
+      || rejected.reason?.message === 'Este enlace ya fue usado.',
+    `consumo concurrente: error inesperado ${rejected.reason?.code || rejected.reason?.message}`,
+  )
   const state = await pool.query(
     `SELECT u.password_hash,
             count(t.token) FILTER (WHERE t.used_at IS NULL) AS activos
