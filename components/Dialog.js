@@ -41,7 +41,10 @@ export default function Dialog({ open, title, description, onClose, initialFocus
   }, [open, initialFocusRef])
 
   const onBackdrop = (event) => {
-    if (event.target === event.currentTarget) onClose()
+    if (event.target === event.currentTarget) {
+      event.preventDefault()
+      onClose()
+    }
   }
 
   return open ? (

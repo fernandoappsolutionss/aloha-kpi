@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -41,4 +42,78 @@ test('el layout ofrece salto visible al contenido', () => {
   const layout = read('../app/layout.js')
   assert.match(layout, /href="\#main-content"/)
   assert.match(layout, /Saltar al contenido/)
+})
+
+test('el shell móvil declara drawer, breakpoint de tablet y navegación semántica', () => {
+  const sidebar = read('../components/Sidebar.js')
+  const css = read('../app/globals.css')
+  assert.match(sidebar, /matchMedia\('\(max-width: 1024px\)'\)/)
+  assert.match(sidebar, /<Link/)
+  assert.match(sidebar, /aria-current/)
+  assert.match(sidebar, /aria-label="Abrir menú"/)
+  assert.match(sidebar, /aria-label="Cerrar menú"/)
+  assert.match(css, /\.mobile-bar/)
+  assert.match(css, /\.sb--open/)
+  assert.match(css, /@media\s*\(max-width:\s*1024px\)/)
+})
+
+test('el selector de tema expone estado presionado y no actúa como submit', () => {
+  const toggle = read('../components/ThemeToggle.js')
+  assert.match(toggle, /type="button"/)
+  assert.match(toggle, /aria-pressed=\{dark\}/)
+})
+
+test('el launcher authenticated entrega a Next solo la allowlist del servidor', () => {
+  const source = {
+    NODE_ENV: 'test',
+    DATABASE_URL: 'db',
+    USUARIOS_TEST_DATABASE_URL: 'db',
+    E2E_DATABASE_CONFIRM: 'disposable',
+    E2E_NEON_HTTP: 'http://proxy.invalid/sql',
+    E2E_NEON_WSPROXY: 'proxy.invalid:443',
+    E2E_DELIVERY_MODE: 'stub',
+    SESSION_SECRET: 'session',
+    E2E_ADMIN_PASSWORD: 'must-not-pass',
+    E2E_VALID_ACCESS_TOKEN: 'must-not-pass',
+    UNRELATED_SECRET: 'must-not-pass',
+  }
+  assert.deepEqual(buildNextEnvironment(source, 'authenticated'), {
+    NODE_ENV: 'development',
+    NEXT_TELEMETRY_DISABLED: '1',
+    DATABASE_URL: 'db',
+    USUARIOS_TEST_DATABASE_URL: 'db',
+    E2E_DATABASE_CONFIRM: 'disposable',
+    E2E_NEON_HTTP: 'http://proxy.invalid/sql',
+    E2E_NEON_WSPROXY: 'proxy.invalid:443',
+    E2E_DELIVERY_MODE: 'stub',
+    SESSION_SECRET: 'session',
+  })
+})
+
+test('el launcher primitives no entrega base, sesión ni credenciales a Next', () => {
+  const result = buildNextEnvironment({
+    E2E_UI_FIXTURES: '1',
+    E2E_DATABASE_CONFIRM: 'disposable',
+    DATABASE_URL: 'must-not-pass',
+    SESSION_SECRET: 'must-not-pass',
+    E2E_ADMIN_PASSWORD: 'must-not-pass',
+  }, 'primitives')
+  assert.deepEqual(result, {
+    NODE_ENV: 'development',
+    NEXT_TELEMETRY_DISABLED: '1',
+    E2E_UI_FIXTURES: '1',
+    E2E_DATABASE_CONFIRM: 'disposable',
+  })
+})
+
+test('el launcher ungated inicia el smoke 404 sin heredar ningún secreto', () => {
+  assert.deepEqual(buildNextEnvironment({
+    DATABASE_URL: 'must-not-pass',
+    E2E_UI_FIXTURES: '1',
+    E2E_DATABASE_CONFIRM: 'disposable',
+    SESSION_SECRET: 'must-not-pass',
+  }, 'ungated'), {
+    NODE_ENV: 'development',
+    NEXT_TELEMETRY_DISABLED: '1',
+  })
 })
