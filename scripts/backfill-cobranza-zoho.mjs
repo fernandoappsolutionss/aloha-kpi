@@ -22,6 +22,12 @@ if (!year || !month) {
 }
 
 const sql = neon(process.env.DATABASE_URL)
+const refreshToken = process.env.ZOHO_REFRESH_TOKEN ||
+  (await sql`SELECT refresh_token FROM zoho_conexion WHERE id = 1`.catch(() => []))[0]?.refresh_token
+if (!refreshToken) {
+  console.error('Zoho sin conectar: conecta desde /dashboard/zoho o exporta ZOHO_REFRESH_TOKEN')
+  process.exit(1)
+}
 const mm = String(month).padStart(2, '0')
 const finMes = new Date(Date.UTC(year, month, 0)).getUTCDate()
 const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Panama' })
@@ -37,12 +43,12 @@ for (let d = 1; d <= finMes; d++) {
 const conteo = {} // centroId -> { iso -> n }
 const sinClasificar = []
 for (const org of ORGS_ZOHO) {
-  const unpaid = await listarFacturas(org.orgId, { status: 'unpaid', due_date_end: `${year}-${mm}-${finMes}` })
+  const unpaid = await listarFacturas(org.orgId, { status: 'unpaid', due_date_end: `${year}-${mm}-${finMes}` }, refreshToken)
   const paid = await listarFacturas(org.orgId, {
     status: 'paid',
     due_date_end: `${year}-${mm}-${finMes}`,
     last_modified_time: `${year}-${mm}-01T00:00:00-0500`,
-  })
+  }, refreshToken)
   for (const inv of [...unpaid, ...paid]) {
     const centroId = clasificarCentro(org, inv)
     if (centroId === null) {
