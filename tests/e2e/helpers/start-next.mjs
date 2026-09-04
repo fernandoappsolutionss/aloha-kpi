@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { buildNextEnvironment } from './next-server-env.mjs'
+import { createLogRedactor } from './redact-sensitive.mjs'
 
 const profile = process.env.E2E_NEXT_PROFILE
 const port = Number(process.env.E2E_NEXT_PORT)
@@ -19,8 +20,14 @@ const child = spawn(process.execPath, [
   cwd: process.cwd(),
   env: buildNextEnvironment(process.env, profile),
   shell: false,
-  stdio: 'inherit',
+  stdio: ['ignore', 'pipe', 'pipe'],
 })
+
+for (const [source, target] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+  const redactor = createLogRedactor(chunk => target.write(chunk))
+  source.on('data', chunk => redactor.write(chunk))
+  source.on('end', () => redactor.end())
+}
 
 const forward = (signal) => {
   if (!child.killed) child.kill(signal)

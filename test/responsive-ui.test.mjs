@@ -8,6 +8,18 @@ import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
 import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
 import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
 import { requireR8Gate } from '../tests/e2e/helpers/r8-fixture.mjs'
+import { requireR9Gate } from '../tests/e2e/helpers/r9-fixture.mjs'
+
+test('R9 nunca registra Coach remoto ni artefactos privados y sus fixtures son exclusivas', () => {
+  const env={E2E_R9_OPERATIONS:'1',E2E_DATABASE_CONFIRM:'disposable',DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',USUARIOS_TEST_DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',E2E_NEON_HTTP:'http://127.0.0.1:4446/sql',E2E_NEON_WSPROXY:'127.0.0.1:5435',SESSION_SECRET:'dummy-session'}
+  assert.doesNotThrow(()=>requireR9Gate(env))
+  for(const override of [{RESPONSIVE_BASE_URL:'https://remote.invalid'},{E2E_R3_DIALOGS:'1'},{E2E_R8_CENTER_CORE:'1'},{E2E_R6_COMPARISONS:'1'},{E2E_RUN_MUTATIONS:'1'},{E2E_CENTRO_ID:'3'}]) assert.throws(()=>requireR9Gate({...env,...override}))
+  const inspect=(env,expression)=>JSON.parse(execFileSync(process.execPath,['--input-type=module','--eval',`import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify(${expression})))`],{cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:'utf8',env}))
+  assert.equal(inspect({RESPONSIVE_BASE_URL:'https://remote.invalid'},"c.projects.find(p=>p.name==='phone-390').testIgnore.test('center-operations.spec.js')"),true)
+  const c=inspect(env,'({workers:c.workers,preserve:c.preserveOutput,projects:c.projects})')
+  assert.equal(c.workers,1);assert.equal(c.preserve,'never')
+  assert.ok(c.projects.every(p=>p.use.trace==='off'&&p.use.screenshot==='off'&&p.use.video==='off'))
+})
 
 test('R8 mantiene fixture, autenticación propia y rutas escritoras fuera del gate remoto', () => {
   const env = { E2E_R8_CENTER_CORE:'1', E2E_DATABASE_CONFIRM:'disposable', DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', USUARIOS_TEST_DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', E2E_NEON_HTTP:'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY:'127.0.0.1:5435', SESSION_SECRET:'dummy-long-session' }

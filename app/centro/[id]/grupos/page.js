@@ -1,7 +1,9 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Children } from 'react'
 import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import OperationalCard from '../../../../components/OperationalCard'
 import Sidebar from '../../../../components/Sidebar'
 import {
   loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, setInscripcionAbierta, extenderVentanaLlenado, linkCoach, siguienteNumero,
@@ -247,6 +249,7 @@ function ChipLlenado({ v, programa, nivel }) {
 export default function GruposPage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [tab, setTab] = useState('grupos')
@@ -276,8 +279,9 @@ export default function GruposPage() {
   const load = useCallback(async () => {
     try {
       const res = await loadOperaciones(id)
-      setData(res)
-    } catch (e) { setStatus('❌ ' + e.message) }
+      if (res.error) { setLoadError(res.error); setLoading(false); return }
+      setData(res); setLoadError('')
+    } catch (e) { setLoadError(e.message || 'No se pudo cargar la operación.') }
     setLoading(false)
   }, [id])
   useEffect(() => { load() }, [load])
@@ -535,9 +539,11 @@ export default function GruposPage() {
   if (loading) return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
-      <main className="main"><div className="empty">Cargando…</div></main>
+      <main id="main-content" className="main operations-page" data-page-state="loading"><h1>Grupos</h1><div className="empty" role="status">Cargando…</div></main>
     </div>
   )
+
+  if (loadError) return <div className="shell"><Sidebar rol="usuario" centroId={id} /><main id="main-content" className="main operations-page" data-page-state="error"><h1>Grupos</h1><div role="alert" className="alert alert--error">{loadError}</div><Link className="btn" href={`/centro/${id}`}>Volver al centro</Link></main></div>
 
   const isError = status.includes('❌')
   const statusText = status.replace(/^[❌✅]\s*/, '')
@@ -555,7 +561,7 @@ export default function GruposPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
-      <main id="main-content" className="main main--flow" data-page-state="ready">
+      <main id="main-content" className="main main--flow operations-page" data-page-state="ready">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Operaciones</div>
@@ -569,7 +575,7 @@ export default function GruposPage() {
         </div>
 
         {status && (
-          <div className={`alert${isError ? ' alert--error' : ''}`}
+          <div role={isError ? "alert" : "status"} className={`alert${isError ? ' alert--error' : ''}`}
             style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
@@ -671,9 +677,9 @@ export default function GruposPage() {
 
             {data?.sinGrupo?.length > 0 && (
               <div className="panel" style={{ marginTop: 16 }}>
-                <div className="panel__head"><h3 className="panel__title">Niños sin grupo ({data.sinGrupo.length})</h3></div>
-                <table className="table">
-                  <thead><tr>{['Niño', 'Nivel', 'Inscrito', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                <div className="panel__head"><h2 className="panel__title">Niños sin grupo ({data.sinGrupo.length})</h2></div>
+                <OperationsTable label="Niños sin grupo">
+                  <thead><tr>{['Niño', 'Nivel', 'Inscrito', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
                   <tbody>
                     {data.sinGrupo.map((e) => (
                       <tr key={e.id} style={{ cursor: 'default' }}>
@@ -684,18 +690,18 @@ export default function GruposPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </OperationsTable>
               </div>
             )}
 
             {data?.retirados?.length > 0 && (
               <div className="panel" style={{ marginTop: 16 }}>
                 <div className="panel__head">
-                  <h3 className="panel__title">Retirados recientes</h3>
+                  <h2 className="panel__title">Retirados recientes</h2>
                   <span className="label">Últimos {data.retirados.length}</span>
                 </div>
-                <table className="table">
-                  <thead><tr>{['Niño', 'Nivel', 'Motivo', 'Fecha retiro', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                <OperationsTable label="Retirados recientes">
+                  <thead><tr>{['Niño', 'Nivel', 'Motivo', 'Fecha retiro', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
                   <tbody>
                     {data.retirados.map((e) => (
                       <tr key={e.id} style={{ cursor: 'default' }}>
@@ -707,7 +713,7 @@ export default function GruposPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </OperationsTable>
               </div>
             )}
           </>
@@ -779,11 +785,12 @@ export default function GruposPage() {
           enriquecido por lote desde loadOperaciones — el modal no re-deriva.
           Si le falta el ancla, ahí mismo se crea (bloque de creación rápida). */}
       {verPlan && ninoPlan && (
-        <PlanNinoModal nino={ninoPlan} grupo={grupoPlan} hoy={hoy}
+        <PlanNinoModal key={ninoPlan.id} nino={ninoPlan} grupo={grupoPlan} hoy={hoy}
           onClose={() => setVerPlan(null)}
           renderCreacion={({ nino, onPlanFijado, onBusyChange }) => (
             <div style={{ padding: '16px 18px' }}>
               <BloqueCrearPlan centroId={id} ninos={[nino]} etiqueta={`${nino.itinerario} ${nino.nivel}`}
+                onCancelar={() => setVerPlan(null)}
                 onBusyChange={onBusyChange}
                 onFijado={(r) => {
                   setStatus('✅ ' + mensajeAnclaFijada(r.ninos, r.etiqueta, r.fecha))
@@ -826,10 +833,8 @@ function OcupacionBar({ n, metas }) {
 function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
   const st = groupStatus(g, metas.gpnMin)
   return (
-    <div data-grupo={g.id} data-tour={tour} role="button" tabIndex={0} aria-pressed={activo}
-      className={`grp-card${activo ? ' grp-card--on' : ''}`}
-      onClick={(event) => { event.currentTarget.focus(); onAbrir() }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrir() } }}>
+    <article data-grupo={g.id} data-tour={tour} className={`grp-card${activo ? ' grp-card--on' : ''}`}>
+      <button type="button" className="btn grp-card__open" aria-label={`Abrir grupo ${g.numero}`} aria-expanded={activo} aria-controls={`grupo-detail-${g.id}`} onClick={onAbrir}>Abrir grupo {g.numero}</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.2 }}>
@@ -862,7 +867,7 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 7 }}>{nivelesTexto(g)}</div>
-    </div>
+    </article>
   )
 }
 
@@ -962,6 +967,7 @@ function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, vista, onVist
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
 function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
+  const useCards = useNarrow(767)
   const [localVista, setLocalVista] = useState('ninos')
   const vista = controlledVista || localVista
   const setVista = onVistaChange || setLocalVista
@@ -985,6 +991,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
   return (
     <section
       ref={surfaceRef}
+      id={`grupo-detail-${g.id}`}
       className={`panel grp-detail${sheet ? ' grp-detail--sheet mobile-sheet' : ''}`}
       aria-label={sheet ? undefined : `Grupo ${g.numero}`}
       aria-labelledby={sheet ? titleId : undefined}
@@ -996,11 +1003,11 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
       <header className="grp-detail__head">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            <h3 id={sheet ? titleId : undefined} className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+            <h2 id={sheet ? titleId : undefined} className="panel__title" style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               Grupo {g.numero} · {g.itinerario}{g.es_online ? ' · Online' : ''}
               <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
               {activo && ll && <ChipLlenado v={ll.ventana} programa={g.itinerario} nivel={it?.nivel} />}
-            </h3>
+            </h2>
             {/* (R1) Una sola fecha: inicio de clases. created_at es la historia
                 de publicación (fechaPublicacion, día civil de Panamá). */}
             <p className="h-sub" style={{ marginTop: 5 }}>
@@ -1087,13 +1094,13 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
             Este grupo no tiene niños activos.
             {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>Inscribir el primero</button>}
           </div>
-        ) : sheet ? (
+        ) : useCards ? (
           // En el panel deslizante la tabla no cabe: cada niño va apilado.
           <div>
             {g.estudiantes.map((e) => {
               const cierre = cierreNino(e)
               return (
-              <div key={e.id} className="grp-roster__item">
+              <article key={e.id} className="grp-roster__item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13.5 }}>{e.nombre}</div>
@@ -1111,15 +1118,15 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
                   <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} />
                 </div>
-              </div>
+              </article>
             ) })}
           </div>
         ) : (
-          <table className="table">
+          <OperationsTable label="Niños del grupo">
             {/* El cierre de nivel va bajo el nivel (y no en columna aparte) para
                 que las acciones de cada niño quepan en una sola línea. Cierre =
                 efectivo (override manual ?? derivado del plan del niño, g1-11). */}
-            <thead><tr>{['Niño', 'Nivel · cierre', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Niño', 'Nivel · cierre', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
               {g.estudiantes.map((e) => {
                 const cierre = cierreNino(e)
@@ -1149,7 +1156,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 </tr>
               ) })}
             </tbody>
-          </table>
+          </OperationsTable>
         )}
         </>
         )}
@@ -1264,8 +1271,9 @@ function BloqueLlenado({ g, ll, onExtender }) {
 // varios niños solo se ofrecen las fuentes que TODOS comparten con la MISMA
 // fecha (lib/ancla-lote): el lote no promedia fechas ajenas.
 function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBusyChange }) {
-  const completePlan = useDialogCallback(onFijado, centroId)
-  const notifyBusy = useDialogCallback(onBusyChange, centroId)
+  const instance = `${centroId}:${(ninos || []).map(n => n.id).join(',')}`
+  const completePlan = useDialogCallback(onFijado, instance)
+  const notifyBusy = useDialogCallback(onBusyChange, instance)
   const [sug, setSug] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [err, setErr] = useState('')
@@ -1307,8 +1315,8 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBu
     }
   }
 
-  if (cargando) return <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 0' }}>Calculando las opciones…</div>
-  if (err) return <div className="alert alert--error" style={{ fontSize: 12 }}>{err}</div>
+  if (cargando) return <div role="status" style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 0' }}>Calculando las opciones…</div>
+  if (err) return <div role="alert" className="alert alert--error" style={{ fontSize: 12 }}>{err}</div>
   if (!sug?.opciones?.length) return <div className="alert alert--error" style={{ fontSize: 12 }}>No hay ninguna fecha que ofrecer para estos niños.</div>
 
   const uno = ninos.length === 1 ? ninos[0] : null
@@ -1319,7 +1327,7 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBu
         ? `Es el día en que ${uno.nombre} empezó el nivel que cursa hoy (${etiqueta}). El sistema no la dedujo porque su historia no la demuestra —y no la inventa—: escoge la fuente que la sostenga o escríbela.`
         : `Los ${ninos.length} niños comparten ${etiqueta}: una sola fecha los resuelve a todos. Solo se ofrecen las fuentes en las que TODOS coinciden.`}
       cta={uno ? `Fijar el plan de ${String(uno.nombre).split(' ')[0]}` : `Fijar el plan de los ${ninos.length} niños`}
-      onFijar={fijar} onCancelar={onCancelar} />
+      onFijar={fijar} onCancelar={onCancelar} onBusyChange={notifyBusy} />
   )
 }
 
@@ -1563,7 +1571,7 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
       {origen && (
         <div className="panel" style={{ marginBottom: 16 }}>
           <div className="panel__head">
-            <h3 className="panel__title">Destinos para el grupo {origen.numero} ({origen.estudiantes.length} niños)</h3>
+            <h2 className="panel__title">Destinos para el grupo {origen.numero} ({origen.estudiantes.length} niños)</h2>
             <button className="btn" style={BTN_XS} onClick={() => setOrigenId(null)}>✕ Cerrar</button>
           </div>
           <div style={{ padding: 16, display: 'grid', gap: 12 }}>
@@ -1581,12 +1589,12 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
       ) : (
         <>
           <div className="panel" style={{ marginBottom: 16 }} data-tour="fusiones.bajo-meta">
-            <div className="panel__head"><h3 className="panel__title">Grupos bajo meta ({fus.bajoMeta.length})</h3></div>
+            <div className="panel__head"><h2 className="panel__title">Grupos bajo meta ({fus.bajoMeta.length})</h2></div>
             {fus.bajoMeta.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Ningún grupo por debajo de la meta de {metas.gpnMin} niños. 💪</div>
             ) : (
-              <table className="table">
-                <thead><tr>{['Grupo', 'Niños', 'Coach', 'Horario', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <OperationsTable label="Grupos bajo meta">
+                <thead><tr>{['Grupo', 'Niños', 'Coach', 'Horario', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
                 <tbody>
                   {fus.bajoMeta.map((g) => (
                     <tr key={g.id} style={{ cursor: 'default' }}>
@@ -1598,12 +1606,12 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </OperationsTable>
             )}
           </div>
 
           <div className="panel" data-tour="fusiones.sugeridas">
-            <div className="panel__head"><h3 className="panel__title">Fusiones sugeridas del mes</h3></div>
+            <div className="panel__head"><h2 className="panel__title">Fusiones sugeridas del mes</h2></div>
             <div style={{ padding: 16, display: 'grid', gap: 12 }}>
               {fus.sugerencias.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin fusiones sugeridas: no hay pares viables este mes.</div>
@@ -1861,11 +1869,11 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
         return (
           <div className="panel" style={{ marginBottom: 14, borderLeft: '3px solid var(--warn)' }}>
             <div className="panel__head">
-              <h3 className="panel__title">📣 Bloques por liberarse — mercadear con antelación</h3>
+              <h2 className="panel__title">📣 Bloques por liberarse — mercadear con antelación</h2>
               <span className="label">Grupos en su último nivel: al cierre, su horario queda libre</span>
             </div>
-            <table className="table">
-              <thead><tr>{['Grupo', 'Horario', 'Se libera', 'Mercadear desde'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+            <OperationsTable label="Bloques por liberarse">
+              <thead><tr>{['Grupo', 'Horario', 'Se libera', 'Mercadear desde'].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
                 {porLiberarse.map(({ g, lib }) => (
                   <tr key={g.id} style={{ cursor: 'default' }}>
@@ -1876,7 +1884,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </OperationsTable>
           </div>
         )
       })()}
@@ -1934,10 +1942,10 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
 
       {/* Selector de día + reglas */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="schedule-days">
           {DIAS_OPERATIVOS.map((d) => (
             <button key={d} className={`btn${dia === d ? ' btn--primary' : ''}`} style={{ padding: '5px 12px', fontSize: 12 }}
-              onClick={() => setDia(d)}>{DIAS[d].slice(0, 3)}</button>
+              aria-pressed={dia === d} onClick={() => setDia(d)}>{DIAS[d].slice(0, 3)}</button>
           ))}
         </div>
         {reservaDia ? (
@@ -1965,8 +1973,19 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
         </div>
       )}
 
-      {/* Calendario del día: columna por salón */}
-      <div className="card" style={{ padding: 14 }}>
+      <div className="operational-list schedule-list" aria-label="Sesiones y horarios disponibles">
+        {cols.map(({salon,sesiones,huecos}) => <section key={salon.id}><h2>{salon.nombre}</h2>
+          {sesiones.map(({grupo,horario,inicio,fin})=><OperationalCard key={`${grupo.id}-${horario.id}`} title={grupo.es_reserva?'Clase de prueba':`Grupo ${grupo.numero}`} fields={[{label:'Horario',value:`${aHora12(inicio)}–${aHora12(fin)}`},{label:'Coach',value:grupo.coach?.nombre||'Sin coach'}]} />)}
+          {slotsDelDia(dia, conPrueba.has(dia)).filter(sl=>huecos.some(h=>sl.inicio>=h.inicio&&sl.fin<=h.fin)).map(sl=>{
+            const unidad=unidadesLibres(activos,[salon]).find(u=>u.sesiones.some(s=>s.dia===dia&&s.inicio===sl.inicio&&s.fin===sl.fin))
+            const par=(sl.tipo==='LM'||(sl.kinder&&(dia===1||dia===3)))?(dia===1?3:1):(sl.tipo==='MJ'||(sl.kinder&&(dia===2||dia===4)))?(dia===2?4:2):null
+            const horarios=unidad?unidad.sesiones.map(s=>({dia:s.dia,hora_inicio:aHora(s.inicio),hora_fin:aHora(s.fin),salon_id:String(s.salon_id)})):[{dia,hora_inicio:aHora(sl.inicio),hora_fin:aHora(sl.fin),salon_id:String(salon.id)},...(par?[{dia:par,hora_inicio:aHora(sl.inicio),hora_fin:aHora(sl.fin),salon_id:''}]:[])]
+            return <OperationalCard key={sl.inicio} title={`Disponible ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} subtitle={sl.sub} actions={<button type="button" className="btn" onClick={()=>onAbrirGrupo({horarios,itinerario:sl.kinder?'KINDER':undefined})}>Aperturar en este horario</button>} />
+          })}
+        </section>)}
+      </div>
+      {/* Calendario del día: vista densa informativa; las acciones viven arriba. */}
+      <div className="card schedule-calendar" style={{ padding: 14 }}>
         <TableScroller label="Calendario de salones">
         <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols.length}, minmax(170px, 1fr))`, gap: 8, minWidth: 52 + cols.length * 178 }}>
           <div />
@@ -2088,7 +2107,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 const subTexto = unidad ? sl.sub : (sl.kinder ? sl.sub : diaPar ? '1 h + 1 h · par en otro salón' : sl.sub)
                 const esKinder = !!sl.kinder
                 return (
-                  <button key={`s-${sl.inicio}`} onClick={() => onAbrirGrupo({ horarios, itinerario: esKinder ? 'KINDER' : undefined })}
+                  <div key={`s-${sl.inicio}`}
                     title={esKinder
                       ? `Zona Kinder (2:45–3:45 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`
                       : `${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
@@ -2103,7 +2122,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                       ? <span style={{ fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>Zona Kinder</span>
                       : <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>}
                     {!corto && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -2207,7 +2226,7 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Apartar')}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div className="dialog-form-grid">
         <Field label="Día de la clase de prueba">
           <select className="input" value={dia} onChange={(e) => setDia(e.target.value)}>
@@ -2272,17 +2291,17 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div className="dialog-form-grid operations-resources" style={{ gap: 16, alignItems: 'start' }}>
       <div className="panel">
         <div className="panel__head">
-          <h3 className="panel__title">Coaches</h3>
+          <h2 className="panel__title">Coaches</h2>
           <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setCoachModal({})}>+ Agregar coach</button>
         </div>
         {coaches.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Aún no hay coaches registrados.</div>
         ) : (
-          <table className="table">
-            <thead><tr>{['Coach', 'Certificación', 'Kinder', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+          <OperationsTable label="Coaches">
+            <thead><tr>{['Coach', 'Certificación', 'Kinder', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
               {coaches.map((c) => (
                 <tr key={c.id} style={{ cursor: 'default', opacity: c.activo ? 1 : 0.55 }}>
@@ -2307,20 +2326,20 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </OperationsTable>
         )}
       </div>
 
       <div className="panel">
         <div className="panel__head">
-          <h3 className="panel__title">Salones</h3>
+          <h2 className="panel__title">Salones</h2>
           <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setSalonModal({})}>+ Agregar salón</button>
         </div>
         {salones.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Aún no hay salones registrados.</div>
         ) : (
-          <table className="table">
-            <thead><tr>{['Salón', 'Híbrido', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+          <OperationsTable label="Salones">
+            <thead><tr>{['Salón', 'Híbrido', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
               {salones.map((s) => (
                 <tr key={s.id} style={{ cursor: 'default', opacity: s.activo ? 1 : 0.55 }}>
@@ -2340,7 +2359,7 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </OperationsTable>
         )}
       </div>
 
@@ -2448,7 +2467,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
           <button className="btn btn--primary" data-tour="aperturar.confirmar" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Aperturar grupo')}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       {iniciado && (
         <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--text-muted)', background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', padding: '10px 14px', borderRadius: 'var(--r-sm)', lineHeight: 1.7 }}>
           <b style={{ color: 'var(--warn)' }}>Este grupo ya inició clases{initial.fecha_inicio_clases ? ` (el ${fmtDia(initial.fecha_inicio_clases)})` : ' (grupo veterano sin fecha registrada: cuenta como iniciado)'}.</b>{' '}
@@ -2458,9 +2477,9 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
       <div className="dialog-form-grid">
         {!iniciado && (
           <>
-            <Field label="Número de grupo *" tour="aperturar.numero"><input className="input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="Ej: 22" /></Field>
+            <Field label="Número de grupo *" tour="aperturar.numero"><input name="numero" className="input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="Ej: 22" /></Field>
             <Field label="Itinerario" tour="aperturar.itinerario">
-              <select className="input" value={f.itinerario} onChange={(e) => set('itinerario', e.target.value)}>
+              <select name="itinerario" className="input" value={f.itinerario} onChange={(e) => set('itinerario', e.target.value)}>
                 {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
               </select>
             </Field>
@@ -2497,10 +2516,10 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         {!isEdit && (
           <>
             <Field label="Nivel inicial" tour="aperturar.nivel">
-              <input type="number" min="1" max={NIVEL_MAX[f.itinerario]} className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)} />
+              <input name="nivel" type="number" min="1" max={NIVEL_MAX[f.itinerario]} className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)} />
             </Field>
             <Field label="Niños con los que abre">
-              <input type="number" min="0" className="input" value={f.ninos_iniciales} onChange={(e) => set('ninos_iniciales', e.target.value)} placeholder="(opcional)" />
+              <input name="ninos_iniciales" type="number" min="0" className="input" value={f.ninos_iniciales} onChange={(e) => set('ninos_iniciales', e.target.value)} placeholder="(opcional)" />
             </Field>
             <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
               Apertura mínima del manual para {f.itinerario} nivel {parseInt(f.nivel) || 1}: <b style={{ color: 'var(--text)' }}>{minimo} niños</b>. Con menos, el grupo queda bajo responsabilidad del centro en niveles superiores.
@@ -2537,7 +2556,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         {/* Notas: editable solo PRE-inicio; post-inicio se leen en el panel del
             grupo, no en este modal (contrato literal, R2). */}
         {!iniciado && (
-          <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
+          <Field full label="Notas"><textarea name="notas" className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
         )}
       </div>
     </Modal>
@@ -2595,7 +2614,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving || !dias.length}>{saving ? 'Guardando…' : 'Guardar itinerario'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       {!dias.length && (
         <div className="alert alert--error" style={{ marginBottom: 14 }}>
           El grupo no tiene horario registrado. Sin días de clase no se puede armar el itinerario: edita el grupo y ponle horario.
@@ -2699,21 +2718,21 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
           <button className="btn btn--primary" data-tour="inscribir.confirmar" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Inscribir'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div className="dialog-form-grid">
-        <Field full label="Nombre del niño *" tour="inscribir.nombre"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+        <Field full label="Nombre del niño *" tour="inscribir.nombre"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Itinerario">
-          <select className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
+          <select name="itinerario" className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
             {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
           </select>
         </Field>
         <Field label="Nivel">
-          <select className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)}>
+          <select name="nivel" className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)}>
             {Array.from({ length: NIVEL_MAX[f.itinerario] }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Nivel {n}</option>)}
           </select>
         </Field>
         <Field label="Grupo" tour="inscribir.grupo">
-          <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+          <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
             {activos.map((g) => {
               const v = ventanaPorId.get(String(g.id))
@@ -2723,27 +2742,27 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
           </select>
         </Field>
         <Field label="Origen" tour="inscribir.origen">
-          <select className="input" value={f.origen} onChange={(e) => set('origen', e.target.value)}>
+          <select name="origen" className="input" value={f.origen} onChange={(e) => set('origen', e.target.value)}>
             {ORIGENES.map((o) => <option key={o} value={o}>{ORIGEN_LABELS[o] || o}</option>)}
           </select>
         </Field>
         <Field label="Origen comercial *" tour="inscribir.origen-comercial">
-          <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+          <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
             <option value="">Seleccionar origen</option>
             {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
           </select>
         </Field>
-        <Field label="Fecha de inscripción" tour="inscribir.fecha"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        <Field label="Fecha de inscripción" tour="inscribir.fecha"><input name="fecha" type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
         <Field label="Cierre de nivel (override)" tour="inscribir.cierre-override">
-          <input type="date" className="input" value={f.fecha_cierre_nivel}
+          <input name="fecha_cierre_nivel" type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
             Déjalo vacío: el cierre se deriva solo del plan del niño en su grupo.
           </div>
         </Field>
-        <Field label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-        <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-        <Field full label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+        <Field label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
+        <Field label="Teléfono"><input name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+        <Field full label="Correo"><input name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
       </div>
     </Modal>
   )
@@ -2797,42 +2816,42 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div className="dialog-form-grid">
-        <Field full label="Nombre *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+        <Field full label="Nombre *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Itinerario">
-          <select className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
+          <select name="itinerario" className="input" value={f.itinerario} onChange={(e) => { const it = e.target.value; setF((p) => ({ ...p, itinerario: it, nivel: Math.min(parseInt(p.nivel) || 1, NIVEL_MAX[it]) })) }}>
             {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
           </select>
         </Field>
         <Field label="Nivel">
-          <select className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)}>
+          <select name="nivel" className="input" value={f.nivel} onChange={(e) => set('nivel', e.target.value)}>
             {Array.from({ length: NIVEL_MAX[f.itinerario] }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Nivel {n}</option>)}
           </select>
         </Field>
         <Field label="Grupo (mover de grupo)">
-          <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+          <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
             {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
         <Field label="Origen comercial">
-          <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+          <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
             <option value="">Por clasificar</option>
             {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
           </select>
         </Field>
         <Field label="Cierre de nivel (override)">
-          <input type="date" className="input" value={f.fecha_cierre_nivel}
+          <input name="fecha_cierre_nivel" type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
             Efectivo hoy: <b style={{ color: 'var(--text-muted)' }}>{cierreVigente.fecha ? `${fmtDia(cierreVigente.fecha)} (${ORIGEN_CIERRE[cierreVigente.origen]})` : 'sin cierre resoluble'}</b>. Vacío = se deriva del plan del niño.
           </div>
         </Field>
-        <Field label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-        <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-        <Field full label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
-        <Field full label="Notas"><textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
+        <Field label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
+        <Field label="Teléfono"><input name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+        <Field full label="Correo"><input name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+        <Field full label="Notas"><textarea name="notas" className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
       </div>
     </Modal>
   )
@@ -2890,14 +2909,14 @@ function RetiroModal({ centroId, est, onClose, onSaved, onProgramado }) {
           )}
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
         <Field label="Motivo de retiro *">
-          <select className="input" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
+          <select name="motivo" className="input" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
             {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m]}</option>)}
           </select>
         </Field>
-        <Field label="Fecha de retiro"><input type="date" className="input" value={f.fecha} max={hoyISO()} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        <Field label="Fecha de retiro"><input name="fecha" type="date" className="input" value={f.fecha} max={hoyISO()} onChange={(e) => set('fecha', e.target.value)} /></Field>
         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>El niño pasa al cuadro de deserciones del mes de la fecha de retiro y su status en plataforma queda en DESACTIVAR. La última asistencia se calcula sola de las clases marcadas por el coach.</div>
       </div>
     </Modal>
@@ -2935,7 +2954,7 @@ function ProgramarRetiroModal({ centroId, est, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Programar retiro'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>
           El niño <b style={{ color: 'var(--text)' }}>vio clases este mes</b>, así que por norma del cuadro termina su mes: queda en baja potencial y el retiro se ejecuta solo el <b style={{ color: 'var(--text)' }}>día 1 del próximo mes</b>. Puedes cancelarlo mientras tanto desde el roster.
@@ -2981,7 +3000,7 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           {est.itinerario} nivel {est.nivel} · retirado el {fmtDia(est.fecha_retiro)} ({MOTIVOS_RETIRO_LABELS[est.motivo_retiro] || est.motivo_retiro || 'sin motivo'})
@@ -3029,11 +3048,11 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
-        <Field label="Nombre *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+        <Field label="Nombre *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Nivel KIDS que domina">
-          <select className="input" value={f.nivel_kids} onChange={(e) => set('nivel_kids', e.target.value)}>
+          <select name="nivel_kids" className="input" value={f.nivel_kids} onChange={(e) => set('nivel_kids', e.target.value)}>
             <option value={0}>Sin registrar</option>
             {Array.from({ length: 8 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Kids hasta nivel {n}</option>)}
           </select>
@@ -3084,9 +3103,9 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
           <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
-        <Field label="Nombre *"><input className="input" value={f.nombre} onChange={(e) => setF((p) => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Salón 3" /></Field>
+        <Field label="Nombre *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => setF((p) => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Salón 3" /></Field>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={f.es_hibrido} onChange={(e) => setF((p) => ({ ...p, es_hibrido: e.target.checked }))} />
           <span><b style={{ color: 'var(--text)' }}>Salón híbrido</b><br /><span className="h-sub">Equipado para clases presenciales y online</span></span>
@@ -3107,4 +3126,21 @@ function Modal({ title, width = 560, onClose, children, footer, closeDisabled = 
 
 function Field({ label, full, tour, children }) {
   return <label className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
+}
+
+// Render each collection from its single row array: compact definition cards
+// below 768, the same cells in one named scroller at wider widths.
+function OperationsTable({ label, children }) {
+  const cards = useNarrow(767)
+  if (!cards) return <TableScroller label={label}><table className="table">{children}</table></TableScroller>
+  const sections = Children.toArray(children)
+  const head = sections.find(node => node.type === 'thead')
+  const body = sections.find(node => node.type === 'tbody')
+  const headers = Children.toArray(Children.toArray(head?.props.children)[0]?.props.children).map(cell => cell.props['data-actions'] ? '' : cell.props.children)
+  return <div className="operational-list" aria-label={label}>{Children.toArray(body?.props.children).map((row, index) => {
+    const cells = Children.toArray(row.props.children)
+    const fields = cells.slice(1).flatMap((cell, i) => headers[i+1] ? [{label:headers[i+1],value:cell.props.children}] : [])
+    const actions = cells.slice(1).filter((cell,i)=>!headers[i+1]).map(cell=>cell.props.children)
+    return <OperationalCard key={row.key||index} title={cells[0]?.props.children} fields={fields} actions={actions.length?actions:null} />
+  })}</div>
 }

@@ -1576,3 +1576,65 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .growth-action__owner { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:12px 0; }
 .growth-data-note details { min-width:0; }
 @media (max-width:760px) { .growth-population { grid-template-columns:1fr; gap:8px; } .growth-segments { flex-wrap:wrap; } .growth-actions .btn { min-height:44px; } }
+/* R9 — daily operations: one collection, cards under 768, named scrollers above. */
+.r9-mobile { display: none; }
+.coach-page { min-height: 100dvh; background: var(--bg); padding: 20px 16px 40px; color: var(--text); }
+.coach-content { max-width: 1100px; margin-inline: auto; min-width: 0; }
+.coach-page h1 { font-family: var(--font-serif); font-size: clamp(24px, 4vw, 32px); }
+.coach-page p { margin-block: 12px; }
+.coach-page :is(h1,h3,p,td,th,dd), .operations-page, .events-page, .plan-nino-dialog { overflow-wrap: anywhere; }
+.attendance-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.attendance-actions button[aria-pressed="true"] { background: var(--ts-green-soft); border-color: var(--ts-green); color: var(--text); }
+.coach-date { display: grid; gap: 10px; margin-block: 18px; }
+.coach-table th:first-child { min-width: 180px; max-width: 260px; white-space: normal; }
+.coach-table select { min-width: 150px; }
+.coach-note textarea { width: 100%; margin-top: 8px; }
+.events-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); margin-bottom: 20px; gap: 12px; }
+.events-registrations, .operations-resources > *, .grp-detail, .grp-list { min-width: 0; }
+.events-registrations a[href] { display: inline-flex; align-items: center; }
+.events-page .operational-card__header { flex-wrap: wrap; }
+.events-page .operational-card__header > :first-child { flex: 1 1 180px; min-width: 0; }
+.events-page .operational-card__status { flex: 0 0 auto; white-space: nowrap; }
+.grp-card__open { width: 100%; margin-bottom: 10px; text-align: left; justify-content: flex-start; }
+.grp-card__edit { opacity: 1; }
+.grp-detail--sheet { display: block; overflow-y: auto; }
+.grp-detail--sheet .grp-detail__head { position: static; }
+.grp-detail--sheet .grp-detail__body { overflow: visible; }
+.schedule-days { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 4px; }
+.schedule-list { margin-block: 16px; }
+.schedule-list > section { display: grid; gap: 10px; min-width: 0; }
+.schedule-list > section h3 { margin-bottom: 0; }
+.anchor-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; cursor: pointer; }
+.anchor-choice input { flex: 0 0 auto; }
+.anchor-selector input[type="date"] { max-width: 100%; }
+.plan-nino-dialog .itin-tl { flex-wrap: wrap; }
+.plan-nino-dialog .itin-fila { flex-wrap: wrap; }
+.plan-nino-dialog .itin-fila__fechas { flex-wrap: wrap; min-width: 0; }
+.operations-page .panel__head, .events-page .panel__head { flex-wrap: wrap; gap: 10px; }
+@media (min-width: 1360px) { .events-metrics { grid-template-columns: repeat(6,minmax(0,1fr)); } }
+@media (max-width: 1024px) {
+  :is(.operations-page,.events-page,.grp-detail,.plan-nino-dialog,.anchor-selector,.coach-page,.coach-note) :is(button,a[href],select,input:not([type="radio"]):not([type="checkbox"]),textarea) { min-height: 44px; min-width: 44px; }
+  .grp-search .input { padding-right: 52px; }
+  .grp-search__clear { right: 0; }
+  .schedule-calendar { display: none; }
+  .events-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 767px) {
+  .r9-mobile { display: block; }
+  .r9-desktop { display: none; }
+  .schedule-days { grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; }
+  .operations-resources { grid-template-columns: minmax(0,1fr); }
+  .operations-page :is(.panel,.card), .events-page .panel { min-width: 0; }
+  .grp-card > div:first-of-type { flex-wrap: wrap; }
+  .grp-roster__item > div:first-child { flex-wrap: wrap; }
+  :is(.operations-page,.events-page,.grp-detail,.plan-nino-dialog,.anchor-selector,.coach-page,.coach-note) :is(input,select,textarea) { font-size: 16px !important; max-width: 100%; }
+  :is(.operations-page,.events-page,.grp-detail,.plan-nino-dialog,.anchor-selector,.coach-page,.coach-note) :is([style*="font-size: 9"],[style*="font-size: 10"],[style*="font-size: 11"],[style*="font-size: 12"],.grp-chip,.grp-chip__n,.label,dt,dd) { font-size: 13px !important; }
+  :is(.operations-page,.events-page,.grp-detail,.plan-nino-dialog,.anchor-selector,.coach-page,.coach-note) :is(p:not(.h-sub):not(.label),li) { font-size: 15px !important; }
+  .plan-nino-dialog .itin-fila { display: flex; gap: 8px; }
+  :is(.plan-nino-dialog,.grp-detail) :is(.itin-blk,.itin-leyenda,.itin-mes,.itin-fila__chip,.itin-fecha) { font-size: 13px; }
+  .grp-detail .itin-fila { flex-wrap: wrap; }
+  .grp-detail .itin-fila__fechas { flex-wrap: wrap; min-width: 0; }
+  .plan-nino-dialog .itin-fila__fechas { margin-left: 0; width: 100%; }
+  .plan-nino-dialog .itin-fecha, .grp-detail button.itin-fecha { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}
+@media (max-width: 359px) { .events-metrics { grid-template-columns: minmax(0,1fr); } }

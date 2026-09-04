@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { TIPOS_SEMANA } from '../lib/itinerario'
 import { calendarioVersionadoDe, planNino, posicionPlanNino, cierreEfectivo } from '../lib/plan-nino.mjs'
 import { posicionDeIndice, estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
-import Dialog from './Dialog'
+import Dialog, { useDialogCallback } from './Dialog'
 
 // Fechas DATE de Postgres llegan como 'AAAA-MM-DD' o como Date según el driver.
 const isoDia = (d) => {
@@ -230,10 +230,11 @@ export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion
   const sinAncla = !ancla
   const sinCalendario = !sinAncla && sinPlan
 
-  const fijado = (planNuevo) => {
+  const fijado = useDialogCallback((planNuevo) => {
     if (planNuevo) setPlanFijado(planNuevo)
     onCambio?.(planNuevo || null)
-  }
+  }, nino?.id)
+  const notifyBusy = useDialogCallback(setCloseDisabled, nino?.id)
 
   const titulo = `Plan de ${nino?.nombre || 'el niño'}`
 
@@ -255,7 +256,7 @@ export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion
         </div>
 
         {/* Ancla y cierre: las dos fechas que MANDAN en el plan del niño */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10, marginTop: 12 }}>
+        <div className="dialog-form-grid" style={{ gap: 10, marginTop: 12 }}>
           <div>
             <span className="label">Empezó su nivel</span>
             <div className="num" style={{ fontSize: 14, color: ancla ? 'var(--text)' : 'var(--text-dim)', marginTop: 3 }}>
@@ -294,7 +295,7 @@ export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion
             Ponle horario y fecha de inicio de clases al grupo y este plan aparece solo.
           </div>
         ) : renderCreacion ? (
-          renderCreacion({ nino, grupo, onPlanFijado: fijado, onBusyChange: setCloseDisabled })
+          renderCreacion({ nino, grupo, onPlanFijado: fijado, onBusyChange: notifyBusy })
         ) : (
           <div style={{ padding: 10, color: 'var(--text-dim)', fontSize: 12.5, lineHeight: 1.7, display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)' }}>Este niño no tiene fecha de inicio de nivel</div>

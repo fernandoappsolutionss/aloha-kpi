@@ -19,9 +19,12 @@ function parseBaseURL(value) {
 const remoteRun = Boolean(process.env.RESPONSIVE_BASE_URL)
 const dialogsRun = process.env.E2E_R3_DIALOGS === '1'
 const comparisonsRun = process.env.E2E_R6_COMPARISONS === '1'
+const operationsRun = process.env.E2E_R9_OPERATIONS === '1'
+if (operationsRun && remoteRun) throw new Error('R9 solo permite ejecución local disposable.')
+if (operationsRun) process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1'
 const centerCoreRun = process.env.E2E_R8_CENTER_CORE === '1'
 if (centerCoreRun && remoteRun) throw new Error('R8 solo permite ejecución local disposable.')
-if ([dialogsRun, comparisonsRun, centerCoreRun, process.env.E2E_RUN_MUTATIONS === '1'].filter(Boolean).length > 1) {
+if ([operationsRun, dialogsRun, comparisonsRun, centerCoreRun, process.env.E2E_RUN_MUTATIONS === '1'].filter(Boolean).length > 1) {
   throw new Error('Los gates con fixture son exclusivos; no se pueden combinar.')
 }
 if (comparisonsRun && remoteRun) throw new Error('R6 solo permite ejecución local disposable.')
@@ -81,7 +84,7 @@ const dialogProjects = dialogsRun ? [
 ] : []
 
 const serverEnv = remoteRun ? undefined : {
-  E2E_NEXT_PROFILE: centerCoreRun ? 'center-core' : dialogsRun ? 'dialogs' : 'authenticated',
+  E2E_NEXT_PROFILE: operationsRun ? 'center-operations' : centerCoreRun ? 'center-core' : dialogsRun ? 'dialogs' : 'authenticated',
   E2E_NEXT_PORT: '3000',
   DATABASE_URL: testDatabase,
   USUARIOS_TEST_DATABASE_URL: testDatabase,
@@ -90,27 +93,29 @@ const serverEnv = remoteRun ? undefined : {
   E2E_NEON_WSPROXY: process.env.E2E_NEON_WSPROXY,
   E2E_DELIVERY_MODE: process.env.E2E_DELIVERY_MODE || 'stub',
   SESSION_SECRET: process.env.SESSION_SECRET,
-  ...(dialogsRun || centerCoreRun ? {
+  ...(dialogsRun || centerCoreRun || operationsRun ? {
     CRM_API_URL: 'http://127.0.0.1:4317',
     CRM_SERVICE_TOKEN: process.env.CRM_SERVICE_TOKEN,
-    ...(centerCoreRun ? { E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
+    ...(operationsRun ? { E2E_R9_OPERATIONS:'1' } : centerCoreRun ? { E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
   } : {}),
 }
 
 export default defineConfig({
   testDir: './tests/e2e',
   outputDir: mutationRun ? 'test-results/r7-users-mutations' : 'test-results',
-  preserveOutput: mutationRun ? 'never' : 'always',
-  reporter: mutationRun ? [['line']] : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
+  preserveOutput: mutationRun || operationsRun ? 'never' : 'always',
+  reporter: operationsRun ? [['./tests/e2e/helpers/r9-reporter.mjs']] : mutationRun ? [['line']] : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   expect: { timeout: 10_000 },
-  globalSetup: centerCoreRun ? './tests/e2e/helpers/r8-global-setup.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
-  globalTeardown: centerCoreRun ? './tests/e2e/helpers/r8-global-teardown.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
-  workers: mutationRun || dialogsRun || comparisonsRun || centerCoreRun ? 1 : undefined,
+  globalSetup: operationsRun ? './tests/e2e/helpers/r9-global-setup.mjs' : centerCoreRun ? './tests/e2e/helpers/r8-global-setup.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
+  globalTeardown: operationsRun ? './tests/e2e/helpers/r9-global-teardown.mjs' : centerCoreRun ? './tests/e2e/helpers/r8-global-teardown.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
+  workers: operationsRun || mutationRun || dialogsRun || comparisonsRun || centerCoreRun ? 1 : undefined,
   use: {
     baseURL,
     channel: 'chrome',
+    ...(operationsRun ? {actionTimeout:15_000,navigationTimeout:45_000} : {}),
     trace: 'off',
-    screenshot: 'only-on-failure',
+    screenshot: operationsRun ? 'off' : 'only-on-failure',
+    video: 'off',
   },
   webServer: remoteRun ? undefined : [
     {
@@ -120,19 +125,22 @@ export default defineConfig({
       timeout: 120_000,
       env: serverEnv,
     },
-    ...(dialogsRun || centerCoreRun ? [{
+    ...(dialogsRun || centerCoreRun || operationsRun ? [{
       command: 'node tests/e2e/helpers/crm-readonly-stub.mjs',
       url: 'http://127.0.0.1:4317/health',
       reuseExistingServer: false,
       timeout: 30_000,
       env: {
         NODE_ENV: 'development',
-        ...(centerCoreRun ? { ...serverEnv, E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
+        ...(operationsRun ? { ...serverEnv, E2E_R9_OPERATIONS:'1' } : centerCoreRun ? { ...serverEnv, E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
         CRM_SERVICE_TOKEN: process.env.CRM_SERVICE_TOKEN,
       },
     }] : []),
   ],
-  projects: centerCoreRun ? [
+  projects: operationsRun ? [
+    {name:'r9-setup',testMatch:/r9-auth\.setup\.js/,use:{trace:'off',screenshot:'off',video:'off'}},
+    ...[...sizes.filter(([n])=>['phone-320','phone-390','tablet-768','desktop-1440'].includes(n)),['desktop-1024',1024,900],['desktop-1025',1025,900]].map(([name,width,height])=>({name,testMatch:/center-operations\.spec\.js/,dependencies:['r9-setup'],fullyParallel:false,use:{viewport:{width,height},storageState:'tests/e2e/.auth/r9-center.json',trace:'off',screenshot:'off',video:'off'}})),
+  ] : centerCoreRun ? [
     { name: 'r8-setup', testMatch: /r8-auth\.setup\.js/, use: { trace: 'off', screenshot: 'off' } },
     ...[...sizes, ['desktop-1025', 1025, 900]].map(([name, width, height]) => ({
       name, testMatch: /center-core\.spec\.js/, dependencies: ['r8-setup'], fullyParallel: false,
@@ -168,7 +176,7 @@ export default defineConfig({
       name,
       dependencies: ['setup'],
       grepInvert: /@coordinator/,
-      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|center-core\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
+      testIgnore: new RegExp(`(r9-auth\\.setup|center-operations\\.spec|auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|center-core\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
     {

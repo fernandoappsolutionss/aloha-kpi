@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import OperationalCard from '../../../../components/OperationalCard'
 import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
@@ -15,6 +17,11 @@ import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, 
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
 
+function useMobileCards() {
+  const [mobile,setMobile]=useState(false)
+  useEffect(()=>{const media=window.matchMedia('(max-width: 767px)');const update=()=>setMobile(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update)},[])
+  return mobile
+}
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
 const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
@@ -77,6 +84,8 @@ const EMPTY = {
 
 export default function EventosPage() {
   const { id } = useParams()
+  const mobileCards=useMobileCards()
+  const [loadError,setLoadError]=useState('')
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
   const [rol, setRol] = useState('usuario')
   // El asistente registra clases de prueba, pero no las elimina.
@@ -99,14 +108,14 @@ export default function EventosPage() {
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);setLoadError('')
     try {
       const cfg = await eventosConfig(); setConfig(cfg)
       const [evRes, opRes] = await Promise.all([listarEventos(id), opcionesFormulario(id)])
-      if (evRes.error) setStatus('❌ ' + evRes.error)
+      if (evRes.error || opRes.error) setLoadError(evRes.error || opRes.error)
       setEvents(evRes.events || [])
       setOpts({ sales_teams: opRes.sales_teams || [], pipeline_stages: opRes.pipeline_stages || [] })
-    } catch (e) { setStatus('❌ ' + e.message) }
+    } catch (e) { setLoadError(e.message || 'No se pudieron cargar las clases.') }
     setLoading(false)
   }, [id])
   useEffect(() => { load() }, [load])
@@ -202,12 +211,14 @@ export default function EventosPage() {
     { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ts-green)' },
     { l: 'En compras', v: `$${agg.revenue.toLocaleString()}`, c: 'var(--text)' },
   ]
+  const eventActions = ev => <button type="button" onClick={e=>toggleActionMenu(e,ev)} className="btn" style={{padding:'3px 10px',fontSize:16,lineHeight:1,minWidth:44}} aria-label={`Acciones de ${ev.name}`} aria-haspopup="menu" aria-expanded={menuId===ev.id}>⋯</button>
+  const registrationButton = ev => <button type="button" className="btn" aria-label={`Ver registros de ${ev.name}`} aria-expanded={openId===ev.id} aria-controls={`registros-${ev.id}`} onClick={()=>setOpenId(openId===ev.id?null:ev.id)}>Ver registros</button>
   const menuEvent = menuId ? events.find((ev) => ev.id === menuId) : null
 
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroId={id} />
-      <main id="main-content" className="main events-page" data-page-state={loading ? 'loading' : 'ready'}>
+      <main id="main-content" className="main events-page" data-page-state={loading ? 'loading' : loadError ? 'error' : 'ready'}>
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Clases de prueba</div>
@@ -217,18 +228,20 @@ export default function EventosPage() {
           <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" data-tour="eventos.nueva" disabled={!config.configured}>+ Nueva clase de prueba</button>
         </div>
 
+        {loadError && <div role="alert" className="alert alert--error">{loadError} <Link className="btn" href={`/centro/${id}`}>Volver al centro</Link></div>}
+        {loading && <div role="status">Cargando clases…</div>}
         {!config.configured && (
           <div className="alert alert--error" style={{ marginBottom: 16 }}>
             La conexión con el CRM no está configurada (faltan <b>CRM_API_URL</b> / <b>CRM_SERVICE_TOKEN</b>).
           </div>
         )}
         {status && (
-          <div className={`alert${isError ? ' alert--error' : ''}`}
+          <div role={isError ? "alert" : "status"} className={`alert${isError ? ' alert--error' : ''}`}
             style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
         {/* Tarjetas de stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 20 }} data-tour="eventos.metricas">
+        <div className="responsive-grid events-metrics" data-tour="eventos.metricas">
           {CARDS.map((c, i) => (
             <div key={i} className="kpi" style={{ padding: '14px 16px' }}>
               <div className="kpi__top"><span className="label">{c.l}</span></div>
@@ -240,7 +253,7 @@ export default function EventosPage() {
 
         {/* Filtros */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-          <input className="input" style={{ maxWidth: 280 }} placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" style={{ maxWidth: 280 }} name="busqueda" aria-label="Buscar clases por nombre" placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
           <select aria-label="Periodo de las clases" className="input" style={{ maxWidth: 180 }} value={filterPeriodo} onChange={(e) => { setFilterPeriodo(e.target.value); setOpenId(null) }}>
             <option value="mes_actual">Este mes</option>
             <option value="todos">Todos los meses</option>
@@ -254,10 +267,10 @@ export default function EventosPage() {
           </select>
         </div>
 
-        <div className="panel" data-tour="eventos.lista">
-          <TableScroller label="Clases de prueba">
+        {!loadError && <div className="panel" data-tour="eventos.lista">
+          {mobileCards ? <div className="operational-list">{visible.map(ev=><OperationalCard headingLevel={2} key={ev.id} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>)}</div> : <TableScroller label="Clases de prueba">
             <table className="table">
-              <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
                 {loading ? (
                   <tr style={{ cursor: 'default' }}><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</td></tr>
@@ -267,9 +280,9 @@ export default function EventosPage() {
                   const count = ev.stats?.total ?? ev.registration_count ?? 0
                   return (
                     <Fragment key={ev.id}>
-                      <tr style={{ cursor: 'pointer' }} onClick={() => setOpenId(openId === ev.id ? null : ev.id)}>
+                      <tr>
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
-                          {ev.name}
+                          {ev.name}<div>{registrationButton(ev)}</div>
                           {ev.location && <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-faint)' }}>📍 {ev.location}</div>}
                           {ev.grupo ? (
                             <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>
@@ -285,36 +298,23 @@ export default function EventosPage() {
                         <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{count}{ev.max_capacity ? `/${ev.max_capacity}` : ''}</td>
                         <td style={{ fontSize: 13 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 10 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
                         <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={(e) => toggleActionMenu(e, ev)}
-                            className="btn"
-                            style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1, minWidth: 44 }}
-                            aria-label={`Acciones de ${ev.name}`}
-                            aria-haspopup="menu"
-                            aria-expanded={menuId === ev.id}
-                          >
-                            ⋯
-                          </button>
+                          {eventActions(ev)}
                         </td>
                       </tr>
-                      {openId === ev.id && (
-                        <tr style={{ cursor: 'default' }}>
-                          <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
-                            <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load} />
-                          </td>
-                        </tr>
-                      )}
+
                     </Fragment>
                   )
                 })}
               </tbody>
             </table>
-          </TableScroller>
-        </div>
+          </TableScroller>}
+          {mobileCards && !loading && visible.length===0 && <div role="status" className="empty">Sin clases para estos filtros.</div>}
+          {openId && visible.some(ev=>ev.id===openId) && <section id={`registros-${openId}`} aria-label="Registros de la clase"><Registrations key={openId} centroId={id} eventId={openId} grupoId={events.find(ev=>ev.id===openId)?.grupo?.id} onChange={load}/></section>}
+        </div>}
       </main>
 
-      {menuId && <div onPointerDown={() => closeActionMenu()} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />}
+      {menuId && <section aria-label="Acciones de la clase de prueba">
+      <div onPointerDown={() => closeActionMenu()} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
       {menuEvent && (
         <div
           ref={menuRef}
@@ -335,6 +335,8 @@ export default function EventosPage() {
           ))}
         </div>
       )}
+
+      </section>}
 
       {editing && (
         <EventModal centroId={id} opts={opts} initial={editing}
@@ -429,14 +431,14 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
         ))}
       </div>
 
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
 
       {tab === 'info' && (
             <div className="dialog-form-grid">
-              <Field full label="Nombre de la clase de prueba *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
-              <Field full label="Descripción"><textarea className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
+              <Field full label="Nombre de la clase de prueba *"><input name="name" className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
+              <Field full label="Descripción"><textarea name="description" className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
               <Field full label="Grupo que se va a aperturar" tour="evento.grupo">
-                <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+                <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
                   <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
                   {vinculoCerrado && (
                     <option value={vinculoCerrado.id} disabled>Grupo {vinculoCerrado.numero} · {vinculoCerrado.itinerario} · 🔒 {AVISO_CERRADO_A_NUEVOS}</option>
@@ -451,24 +453,24 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                 )}
               </Field>
               <Field label="Zona horaria">
-                <select className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
+                <select name="timezone" className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
                   <option value="America/Panama">Panamá (GMT-5)</option>
                   <option value="America/Caracas">Venezuela (GMT-4)</option>
                 </select>
               </Field>
               <Field label="Modalidad">
-                <select className="input" value={f.event_type} onChange={(e) => set('event_type', e.target.value)}>
+                <select name="event_type" className="input" value={f.event_type} onChange={(e) => set('event_type', e.target.value)}>
                   <option value="in_person">Presencial</option><option value="online">Online</option>
                 </select>
               </Field>
-              <Field label="Inicio *" tour="evento.inicio"><input type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
-              <Field label="Fin"><input type="datetime-local" className="input" value={f.endLocal} onChange={(e) => set('endLocal', e.target.value)} /></Field>
+              <Field label="Inicio *" tour="evento.inicio"><input name="start_date" type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
+              <Field label="Fin"><input name="end_date" type="datetime-local" className="input" value={f.endLocal} onChange={(e) => set('endLocal', e.target.value)} /></Field>
               {f.event_type === 'online'
-                ? <Field full label="Link de la reunión"><input className="input" value={f.meeting_url} onChange={(e) => set('meeting_url', e.target.value)} placeholder="https://zoom.us/…" /></Field>
-                : <Field full label="Lugar"><input className="input" value={f.location} onChange={(e) => set('location', e.target.value)} placeholder="Dirección / salón" /></Field>}
-              <Field label="Cupo máximo"><input type="number" min="0" className="input" value={f.max_capacity} onChange={(e) => set('max_capacity', e.target.value)} placeholder="(sin límite)" /></Field>
+                ? <Field full label="Link de la reunión"><input name="meeting_url" className="input" value={f.meeting_url} onChange={(e) => set('meeting_url', e.target.value)} placeholder="https://zoom.us/…" /></Field>
+                : <Field full label="Lugar"><input name="location" className="input" value={f.location} onChange={(e) => set('location', e.target.value)} placeholder="Dirección / salón" /></Field>}
+              <Field label="Cupo máximo"><input name="max_capacity" type="number" min="0" className="input" value={f.max_capacity} onChange={(e) => set('max_capacity', e.target.value)} placeholder="(sin límite)" /></Field>
               <Field label="Estado">
-                <select className="input" value={f.status} onChange={(e) => set('status', e.target.value)}>
+                <select name="status" className="input" value={f.status} onChange={(e) => set('status', e.target.value)}>
                   <option value="published">Publicado</option><option value="draft">Borrador</option><option value="completed">Finalizado</option>
                 </select>
               </Field>
@@ -478,17 +480,17 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
       {tab === 'pago' && (
             <div style={{ display: 'grid', gap: 16 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={f.is_free} onChange={(e) => set('is_free', e.target.checked)} />
+                <input name="is_free" type="checkbox" checked={f.is_free} onChange={(e) => set('is_free', e.target.checked)} />
                 <span><b style={{ color: 'var(--text)' }}>Evento gratuito</b><br /><span className="h-sub">Desactiva para establecer un precio</span></span>
               </label>
               {!f.is_free && (
                 <div className="dialog-form-grid">
-                  <Field label="Precio"><input type="number" min="0" className="input" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
-                  <Field label="Moneda"><input className="input" value={f.currency} onChange={(e) => set('currency', e.target.value)} /></Field>
+                  <Field label="Precio"><input name="price" type="number" min="0" className="input" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
+                  <Field label="Moneda"><input name="currency" className="input" value={f.currency} onChange={(e) => set('currency', e.target.value)} /></Field>
                 </div>
               )}
               <Field label="Equipo asignado">
-                <select className="input" value={f.sales_team_id} onChange={(e) => set('sales_team_id', e.target.value)}>
+                <select name="sales_team_id" className="input" value={f.sales_team_id} onChange={(e) => set('sales_team_id', e.target.value)}>
                   <option value="">Todos los equipos (sin restricción)</option>
                   {opts.sales_teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -498,7 +500,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                 <div style={{ display: 'grid', gap: 10 }}>
                   {[['pipeline_stage_id', '1. Al registrarse en el evento'], ['attended_stage_id', '2. Al marcar “Asistió”'], ['won_stage_id', '3. Al confirmar pago (ganado)']].map(([k, l]) => (
                     <Field key={k} label={l}>
-                      <select className="input" value={f[k]} onChange={(e) => set(k, e.target.value)}>
+                      <select name={k} className="input" value={f[k]} onChange={(e) => set(k, e.target.value)}>
                         <option value="">Sin etapa</option>
                         {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
@@ -511,7 +513,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
 
       {tab === 'preg' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                 <span className="h-sub" style={{ margin: 0 }}>Preguntas extra del formulario (además de nombre, email y teléfono).</span>
                 <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('registration_questions', [...f.registration_questions, { label: '', type: 'text', required: false }])}>+ Agregar</button>
               </div>
@@ -534,6 +536,7 @@ function Field({ label, full, tour, children }) {
 }
 
 function Registrations({ centroId, eventId, grupoId, onChange }) {
+  const mobileCards=useMobileCards()
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(null)
@@ -543,9 +546,11 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   const [inscribir, setInscribir] = useState(null) // registro a inscribir como estudiante
 
   const load = useCallback(async () => {
-    const res = await listarRegistros(centroId, eventId)
-    if (res.error) setStatus('❌ ' + res.error)
-    setRegs(res.registrations || [])
+    try {
+      const res = await listarRegistros(centroId, eventId)
+      if (res.error) {setStatus('❌ ' + res.error);setRegs([]);return}
+      setStatus('');setRegs(res.registrations || [])
+    } catch {setStatus('❌ No se pudieron cargar los registros.');setRegs([])}
   }, [centroId, eventId])
   useEffect(() => { load() }, [load])
 
@@ -572,13 +577,13 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   }
 
   return (
-    <div style={{ padding: '16px 18px' }}>
+    <div className="events-registrations" style={{ padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span className="label">Registrados {regs ? `(${regs.length})` : ''}</span>
         <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>
       </div>
       {status && (
-        <div className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
+        <div role={status.includes('❌') ? 'alert' : 'status'} className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
           style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
           {status.replace(/^[❌✅]\s*/, '')}
         </div>
@@ -586,16 +591,19 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
       {showInv && (
         <form onSubmit={addInv} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14, padding: 12, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)' }}>
           {[['first_name', 'Nombre *'], ['last_name', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']].map(([k, l]) => (
-            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label">{l}</label><input className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
+            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label" htmlFor={`invite-${k}`}>{l}</label><input id={`invite-${k}`} name={k} type={k==='email'?'email':k==='phone'?'tel':'text'} className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
           ))}
           <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? '…' : 'Agregar'}</button>
         </form>
       )}
-      {regs === null ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
-        : regs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
-          : (
-            <table className="table" style={{ background: 'var(--surface)' }}>
-              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+      {regs === null ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
+        : status.includes('❌') ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
+          : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={<>
+            <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
+            <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
+          </>}/>)}</div> : (
+            <TableScroller label="Inscritos en la clase"><table className="table" style={{ background: 'var(--surface)' }}>
+              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
                 {regs.map((r) => {
                   const origen = origenDeRegistro(r)
@@ -641,7 +649,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                   )
                 })}
               </tbody>
-            </table>
+            </table></TableScroller>
           )}
       {inscribir && (
         <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
@@ -736,21 +744,21 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
         </>
       )}
     >
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
           <div className="dialog-form-grid">
-            <Field full label="Nombre del niño *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+            <Field full label="Nombre del niño *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
             <Field label="Itinerario">
-              <select className="input" value={f.itinerario} onChange={(e) => setF((p) => ({ ...p, itinerario: e.target.value, nivel: 1 }))}>
+              <select name="itinerario" className="input" value={f.itinerario} onChange={(e) => setF((p) => ({ ...p, itinerario: e.target.value, nivel: 1 }))}>
                 {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
               </select>
             </Field>
             <Field label="Nivel">
-              <select className="input" value={f.nivel} onChange={(e) => set('nivel', parseInt(e.target.value))}>
+              <select name="nivel" className="input" value={f.nivel} onChange={(e) => set('nivel', parseInt(e.target.value))}>
                 {niveles.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </Field>
             <Field full label="Grupo">
-              <select className="input" value={f.grupo_id} onChange={(e) => {
+              <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => {
                 const sel = (grupos || []).find((x) => String(x.id) === String(e.target.value))
                 setF((p) => ({ ...p, grupo_id: e.target.value, ...desdeGrupo(sel) }))
               }}>
@@ -764,14 +772,14 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
               )}
             </Field>
             <Field full label="Origen del nuevo ingreso *">
-              <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+              <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
                 <option value="">Seleccionar origen</option>
                 {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
               </select>
             </Field>
-            <Field full label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-            <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-            <Field label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+            <Field full label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
+            <Field label="Teléfono"><input type="tel" name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+            <Field label="Correo"><input type="email" name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
           </div>
     </Dialog>
   )

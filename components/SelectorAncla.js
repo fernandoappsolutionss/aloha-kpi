@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useId } from 'react'
+import { useDialogCallback } from './Dialog'
 import { errorFechaAncla, topeAncla } from '../lib/ancla-sugerencias.mjs'
 
 // ── Bloque de creación rápida del plan de un niño (R3) ──────────────────────
@@ -33,7 +34,11 @@ export default function SelectorAncla({
   cta = 'Fijar el plan',
   onFijar,
   onCancelar,
+  onBusyChange,
 }) {
+  const choiceId = useId()
+  const notifyBusy = useDialogCallback(onBusyChange, choiceId)
+  const reportError = useDialogCallback(setError => setError(), choiceId)
   const [clave, setClave] = useState(recomendada || opciones[0]?.clave || 'manual')
   const [manual, setManual] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -53,9 +58,16 @@ export default function SelectorAncla({
     if (problema) { setErr(problema); return }
     setErr('')
     setGuardando(true)
-    const res = await onFijar({ fecha, origen: clave })
-    setGuardando(false)
-    if (res?.error) setErr(res.error)
+    notifyBusy(true)
+    try {
+      const res = await onFijar({ fecha, origen: clave })
+      if (res?.error) reportError(() => setErr(res.error))
+    } catch {
+      reportError(() => setErr('No se pudo fijar el plan. Revisa la conexión e intenta nuevamente.'))
+    } finally {
+      reportError(() => setGuardando(false))
+      notifyBusy(false)
+    }
   }
 
   function escoger(k) {
@@ -64,20 +76,14 @@ export default function SelectorAncla({
   }
 
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
+    <div className="anchor-selector" style={{ display: 'grid', gap: 10 }}>
       {nota && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{nota}</div>}
 
-      <div role="radiogroup" aria-label="Cuándo empezó el nivel" style={{ display: 'grid', gap: 8 }}>
+      <fieldset disabled={guardando} style={{ display: 'grid', gap: 8, border: 0, padding: 0, margin: 0, minWidth: 0 }}><legend className="label">Cuándo empezó el nivel</legend>
         {opciones.map((o) => {
           const on = o.clave === clave
           return (
-            <div
-              key={o.clave}
-              role="radio"
-              aria-checked={on}
-              tabIndex={0}
-              onClick={() => escoger(o.clave)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); escoger(o.clave) } }}
+            <div key={o.clave}
               style={{
                 display: 'grid', gap: 3, padding: '9px 12px', cursor: 'pointer',
                 borderRadius: 'var(--r-sm)',
@@ -85,12 +91,8 @@ export default function SelectorAncla({
                 border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border)'}`,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span aria-hidden style={{
-                  width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-                  border: `2px solid ${on ? 'var(--ts-green)' : 'var(--border-strong)'}`,
-                  background: on ? 'var(--ts-green)' : 'transparent',
-                }} />
+              <label className="anchor-choice" htmlFor={`${choiceId}-${o.clave}`}>
+                <input id={`${choiceId}-${o.clave}`} type="radio" name={choiceId} value={o.clave} checked={on} onChange={() => escoger(o.clave)} />
                 <b style={{ color: 'var(--text)', fontSize: 12.5 }}>{o.etiqueta}</b>
                 {o.fecha && (
                   <span className="num" style={{ fontSize: 12, color: on ? 'var(--ts-green)' : 'var(--text-muted)' }}>{fmtDia(o.fecha)}</span>
@@ -102,11 +104,12 @@ export default function SelectorAncla({
                     la más probable
                   </span>
                 )}
-              </div>
+              </label>
               <div style={{ fontSize: 11.5, lineHeight: 1.6, color: 'var(--text-muted)', paddingLeft: 20 }}>{o.explicacion}</div>
               {o.clave === 'manual' && on && (
                 <div style={{ paddingLeft: 20, marginTop: 3 }}>
-                  <input
+                  <label htmlFor={`${choiceId}-date`}>Fecha manual de inicio</label>
+                  <input id={`${choiceId}-date`} name="fecha_inicio_nivel"
                     type="date" className="input" style={{ width: 170 }} value={manual} max={tope || undefined}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => { setManual(e.target.value); setErr('') }}
@@ -116,7 +119,7 @@ export default function SelectorAncla({
             </div>
           )
         })}
-      </div>
+      </fieldset>
 
       {/* Lo que NO se puede aplicar al lote, con su motivo: el bloque no
           promedia fechas ajenas — esos niños se resuelven uno por uno. */}
@@ -129,7 +132,7 @@ export default function SelectorAncla({
       )}
 
       {(err || avisoFecha) && (
-        <div className="alert alert--error" style={{ fontSize: 12 }}>{err || avisoFecha}</div>
+        <div role="alert" className="alert alert--error" style={{ fontSize: 12 }}>{err || avisoFecha}</div>
       )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
