@@ -55,7 +55,8 @@ test('gerencia elimina definitivamente con confirmación, y una petición formal
   const list = read('../components/foda/PeticionesList.js')
   assert.match(list, /eliminarPeticion/)
   assert.match(list, /Eliminar definitivamente/)
-  assert.match(list, /confirm\(/)
+  assert.match(list, /<Dialog open title=/)
+  assert.match(list, /setConfirmAction\(\{row,type:'delete'\}\)/)
   assert.match(
     list,
     /estado === 'Anulada'[\s\S]{0,400}Eliminar definitivamente|Eliminar definitivamente[\s\S]{0,400}estado === 'Anulada'/

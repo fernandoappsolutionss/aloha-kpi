@@ -3,9 +3,64 @@ import assert from 'node:assert/strict'
 import {
   loadCurrentUser, assertCentroAccess, assertAdmin, assertPuedeCerrarMes, assertPuedeEliminar,
   esAdminDe, centrosDe, vePanelGerencia,
+  puedeGestionarUsuarios, rolesAsignablesUsuarios, centrosDestinoUsuarios,
+  puedeGestionarUsuario, puedeAsignarUsuario, accionesGestionUsuario,
+  assertGestionUsuarios,
 } from '../lib/current-user.mjs'
 
+const gerencia = { id: 1, rol: 'admin_general', centros: [] }
+const coordinador = { id: 2, rol: 'coordinador', centros: [10, 12] }
+const sinCentros = { id: 3, rol: 'coordinador', centros: [] }
+const admin10 = { id: 8, rol: 'administradora', centro_id: 10, password_hash: 'hash' }
+const asistente12 = { id: 9, rol: 'asistente', centro_id: 12, password_hash: null }
+const admin11 = { id: 10, rol: 'administradora', centro_id: 11, password_hash: 'hash' }
+const otroCoord = { id: 11, rol: 'coordinador', centro_id: null, centros: [10] }
+
 const queryWith = (rows) => async () => rows
+
+test('solo gerencia y coordinador abren Gestión de usuarios', () => {
+  assert.equal(puedeGestionarUsuarios(gerencia), true)
+  assert.equal(puedeGestionarUsuarios(coordinador), true)
+  assert.equal(puedeGestionarUsuarios({ rol: 'administradora', centro_id: 10 }), false)
+  assert.throws(() => assertGestionUsuarios({ rol: 'asistente', centro_id: 10 }), /No autorizado/)
+})
+
+test('roles y centros asignables dependen del actor vigente', () => {
+  assert.deepEqual(rolesAsignablesUsuarios(gerencia), ['admin_general', 'coordinador', 'administradora', 'asistente'])
+  assert.deepEqual(rolesAsignablesUsuarios(coordinador), ['administradora', 'asistente'])
+  assert.deepEqual(centrosDestinoUsuarios(gerencia), null)
+  assert.deepEqual(centrosDestinoUsuarios(coordinador), [10, 12])
+  assert.deepEqual(centrosDestinoUsuarios(sinCentros), [])
+})
+
+test('coordinador gestiona solo cuentas operativas de sus centros', () => {
+  assert.equal(puedeGestionarUsuario(coordinador, admin10), true)
+  assert.equal(puedeGestionarUsuario(coordinador, asistente12), true)
+  assert.equal(puedeGestionarUsuario(coordinador, admin11), false)
+  assert.equal(puedeGestionarUsuario(coordinador, otroCoord), false)
+  assert.equal(puedeGestionarUsuario(sinCentros, admin10), false)
+})
+
+test('coordinador solo asigna roles operativos a centros propios', () => {
+  assert.equal(puedeAsignarUsuario(coordinador, { rol: 'administradora', centroId: 10 }), true)
+  assert.equal(puedeAsignarUsuario(coordinador, { rol: 'asistente', centroId: 12 }), true)
+  assert.equal(puedeAsignarUsuario(coordinador, { rol: 'asistente', centroId: 11 }), false)
+  assert.equal(puedeAsignarUsuario(coordinador, { rol: 'coordinador', centros: [10] }), false)
+  assert.equal(puedeAsignarUsuario(coordinador, { rol: 'administradora', centroId: null }), false)
+})
+
+test('acciones distinguen invitación, reset y borrado de gerencia', () => {
+  assert.deepEqual(accionesGestionUsuario(coordinador, asistente12), {
+    editar: true, reenviarInvitacion: true, enviarRestablecimiento: false, eliminar: false,
+  })
+  assert.deepEqual(accionesGestionUsuario(coordinador, admin10), {
+    editar: true, reenviarInvitacion: false, enviarRestablecimiento: true, eliminar: false,
+  })
+  assert.equal(accionesGestionUsuario(coordinador, { ...admin10, password_hash: undefined, activo: true }).enviarRestablecimiento, true)
+  assert.equal(accionesGestionUsuario(gerencia, { ...admin10, id: 1 }).eliminar, false)
+  assert.equal(accionesGestionUsuario(gerencia, { id: 20, rol: 'admin_general', password_hash: 'x' }).eliminar, false)
+  assert.equal(accionesGestionUsuario(gerencia, { id: 21, rol: 'supervisor', password_hash: 'x' }).eliminar, true)
+})
 
 test('relee el usuario por el uid del JWT', async () => {
   const user = await loadCurrentUser({ uid: 8, rol: 'admin_general' }, queryWith([

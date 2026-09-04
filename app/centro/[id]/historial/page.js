@@ -1,8 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { useParams, useSearchParams } from 'next/navigation'
+import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
+import Link from 'next/link'
+import TableScroller from '../../../../components/TableScroller'
+import MeasuredChart from '../../../../components/MeasuredChart'
 import { getHistorialCentro } from '../../../actions/centro'
 import { balanceMensual, finalVisibleKpi, inicioVisibleKpi, valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
 
@@ -11,7 +14,7 @@ const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agos
 
 /* Paleta conectada al tema: en light las barras grises ya no se pierden. */
 const C = {
-  green:  'var(--ts-green)',
+  green:  'var(--ok-text)',
   greenDeep: 'var(--ts-green-deep)',
   mut:    'var(--chart-muted)',
   dim:    'var(--text-dim)',
@@ -56,10 +59,10 @@ const funnelPercentages = (data, keys, baseKey) => {
 const Trend = ({ val, prev }) => {
   if (prev === undefined || prev === null) return null
   const diff = val - prev
-  if (Math.abs(diff) < 0.01) return <span style={{color:C.dim,fontSize:11}}> →</span>
+  if (Math.abs(diff) < 0.01) return <span style={{color:C.dim,fontSize:13}}> →</span>
   return diff > 0
-    ? <span style={{color:C.green,fontSize:11}}> ↑ {Math.abs(diff).toFixed(1)}</span>
-    : <span style={{color:C.bad,fontSize:11}}> ↓ {Math.abs(diff).toFixed(1)}</span>
+    ? <span style={{color:C.green,fontSize:13}}> ↑ {Math.abs(diff).toFixed(1)}</span>
+    : <span style={{color:C.bad,fontSize:13}}> ↓ {Math.abs(diff).toFixed(1)}</span>
 }
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -74,13 +77,13 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-const axisTick = { fontSize: 11, fill: C.dim, fontFamily: 'var(--font-mono)' }
-const legendStyle = { fontSize: 11, color: C.mut }
+const axisTick = { fontSize: 13, fill: C.dim, fontFamily: 'var(--font-mono)' }
+const legendStyle = { fontSize: 13, color: C.mut }
 
 const LegendWithPercent = ({ payload, percentages }) => {
   if (!payload?.length) return null
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 6, color: 'var(--text-dim)', fontSize: 11 }}>
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 6, color: 'var(--text-dim)', fontSize: 13 }}>
       {payload.map((item) => {
         const key = item.dataKey || item.payload?.dataKey || item.value
         const color = item.color || item.payload?.fill || item.payload?.stroke || 'var(--text-dim)'
@@ -100,16 +103,26 @@ const LegendWithPercent = ({ payload, percentages }) => {
 
 export default function HistorialPage() {
   const { id } = useParams()
-  const router = useRouter()
+  const sp = useSearchParams()
   const [centroNombre, setCentroNombre] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [meses, setMeses] = useState([])
-  const [vistaActiva, setVistaActiva] = useState('tendencias') // 'tendencias' | 'tabla' | 'detalle'
-  const [periodo, setPeriodo] = useState({ tipo: '12m', from: '', to: '' })
+  const [vistaActiva, setVistaActiva] = useState(() => ['tendencias','comparativa','tabla','cuadro'].includes(sp.get('vista')) ? sp.get('vista') : 'tendencias') // 'tendencias' | 'tabla' | 'detalle'
+  const [periodo, setPeriodo] = useState(() => ({ tipo: ['3m','12m','custom'].includes(sp.get('rango')) ? sp.get('rango') : '12m', from: sp.get('from') || '', to: sp.get('to') || '' }))
   const [mesDetalle, setMesDetalle] = useState(null)
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('vista', vistaActiva); url.searchParams.set('rango', periodo.tipo)
+    for(const key of ['from','to']) { if(periodo[key]) url.searchParams.set(key,periodo[key]); else url.searchParams.delete(key) }
+    window.history.replaceState(null, '', url)
+  }, [vistaActiva, periodo])
 
   const loadHistorial = useCallback(async () => {
     setLoading(true)
+    setError('')
+    try {
     const { nombre, resumen, estados, semanas, cuadros } = await getHistorialCentro(id)
     if (nombre) setCentroNombre(nombre)
 
@@ -190,7 +203,8 @@ export default function HistorialPage() {
       return row
     })
     setMeses(data)
-    setLoading(false)
+    } catch { setError('No se pudo cargar el historial. Intenta nuevamente.') }
+    finally { setLoading(false) }
   }, [id])
 
   useEffect(() => { loadHistorial() }, [loadHistorial])
@@ -220,7 +234,7 @@ export default function HistorialPage() {
   if (loading) return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
-      <main className="main"><div className="empty">Cargando historial…</div></main>
+      <main id="main-content" data-page-state="loading" className="main reports-page"><div className="empty" role="status">Cargando historial…</div></main>
     </div>
   )
 
@@ -260,7 +274,7 @@ export default function HistorialPage() {
   const vistaBtn = (v, label) => {
     const on = vistaActiva === v
     return (
-      <button onClick={()=>setVistaActiva(v)} className={`btn${on ? ' btn--primary' : ''}`} style={{ padding: '9px 18px' }}>
+      <button type="button" aria-pressed={on} onClick={()=>setVistaActiva(v)} className={`btn${on ? ' btn--primary' : ''}`} style={{ padding: '9px 18px' }}>
         {label}
       </button>
     )
@@ -276,6 +290,7 @@ export default function HistorialPage() {
           from: tipo === 'custom' ? (p.from || defaultCustomFrom) : p.from,
           to: tipo === 'custom' ? (p.to || latestInput) : p.to,
         }))}
+        aria-pressed={on}
         className={`btn${on ? ' btn--primary' : ''}`}
         style={{ padding: '7px 12px', fontSize: 12 }}
       >
@@ -288,18 +303,24 @@ export default function HistorialPage() {
   // minWidth:0 es imprescindible: como cada tarjeta es un ítem de un grid
   // `1fr 1fr` (cuyo min-width por defecto es `auto`), sin esto el
   // ResponsiveContainer de recharts mide ancho 0 y la gráfica sale en blanco.
-  const ChartCard = ({ title, sub, children }) => (
+  const ChartCard = ({ title, sub, children, data, columns }) => (
     <div className="card" style={{ padding: 20, minWidth: 0 }}>
       <h3 className="panel__title" style={{ fontSize: 16, marginBottom: sub ? 4 : 16 }}>{title}</h3>
       {sub && <p className="h-sub" style={{ marginTop: 0, marginBottom: 12 }}>{sub}</p>}
       {children}
+      <details className="chart-data"><summary>Ver datos de {title}</summary>
+        <TableScroller label={'Datos: '+title} stickyFirstColumn><table className="table"><thead><tr><th scope="col">Mes</th>{columns.map(([key,label])=><th scope="col" key={key}>{label}</th>)}</tr></thead><tbody>
+          {data.map(row=><tr key={row.mes}><th scope="row">{row.mesLabel}</th>{columns.map(([key])=><td key={key}>{row[key]==null ? '—' : new Intl.NumberFormat('es-PA',{maximumFractionDigits:2}).format(row[key])}</td>)}</tr>)}
+        </tbody></table></TableScroller>
+      </details>
     </div>
   )
 
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id}/>
-      <main className="main">
+      <main id="main-content" data-page-state={error ? 'error' : 'ready'} className="main reports-page">
+        {error && <div role="alert">{error}<button type="button" className="btn" onClick={loadHistorial}>Reintentar</button></div>}
 
         {/* Header */}
         <div className="main__head">
@@ -308,9 +329,9 @@ export default function HistorialPage() {
             <h1 className="h-title">Historial &amp; Tendencias</h1>
             <p className="h-sub">{centroNombre} · {meses.length} mes(es) con datos</p>
           </div>
-          <button onClick={()=>router.push('/centro/'+id+'/kpi')} className="btn">
+          <Link href={`/centro/${id}/kpi`} className="btn">
             ‹ Volver al KPI
-          </button>
+          </Link>
         </div>
 
         {meses.length === 0 ? (
@@ -333,6 +354,7 @@ export default function HistorialPage() {
                 {periodo.tipo === 'custom' && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <input
+                      aria-label="Desde mes" name="from"
                       type="month"
                       value={periodo.from || defaultCustomFrom}
                       onChange={(e) => setPeriodo((p) => ({ ...p, tipo: 'custom', from: e.target.value }))}
@@ -341,6 +363,7 @@ export default function HistorialPage() {
                     />
                     <span style={{ color: 'var(--text-dim)' }}>→</span>
                     <input
+                      aria-label="Hasta mes" name="to"
                       type="month"
                       value={periodo.to || latestInput}
                       onChange={(e) => setPeriodo((p) => ({ ...p, tipo: 'custom', to: e.target.value }))}
@@ -380,7 +403,7 @@ export default function HistorialPage() {
             )}
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            <div className="history-view-tabs" role="group" aria-label="Vistas del historial">
               {vistaBtn('tendencias','Tendencias')}
               {vistaBtn('comparativa','Comparativa')}
               {vistaBtn('tabla','Tabla detalle')}
@@ -389,12 +412,11 @@ export default function HistorialPage() {
 
             {/* VISTA: TENDENCIAS */}
             {vistaActiva === 'tendencias' && chartData.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="reports-grid">
 
                 {/* Gráfica 1: Niños (inicio vs final) */}
-                <ChartCard title="Evolución de Niños por Mes">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={chartData}>
+                <ChartCard title="Evolución de Niños por Mes" data={chartData} columns={[["ninos_inicio","Inicio mes"],["ninos_final","Final mes"]]}>
+<MeasuredChart label="Gráfico 1: serie mensual" minHeight={220}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
@@ -402,14 +424,12 @@ export default function HistorialPage() {
                       <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
                       <Line type="monotone" dataKey="ninos_inicio" name="Inicio mes" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
                       <Line type="monotone" dataKey="ninos_final" name="Final mes" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                    </LineChart>
-                  </ResponsiveContainer>
+                    </LineChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Gráfica 2: ventas, nuevos activos y meta comercial */}
-                <ChartCard title="Ventas, Activos y Meta" sub="La meta comercial aplica solo a ventas">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={chartData}>
+                <ChartCard title="Ventas, Activos y Meta" sub="La meta comercial aplica solo a ventas" data={chartData} columns={[["nuevos_ingresos_venta","Nuevos ingresos venta"],["nuevos_activos","Nuevos activos"],["meta_nuevos","Meta venta"]]}>
+<MeasuredChart label="Gráfico 2: serie mensual" minHeight={220}>{({width,height}) => <ComposedChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
@@ -418,38 +438,33 @@ export default function HistorialPage() {
                       <Bar dataKey="nuevos_ingresos_venta" name="Nuevos ingresos venta" fill={C.green} radius={[4,4,0,0]}/>
                       <Line type="monotone" dataKey="nuevos_activos" name="Nuevos activos" stroke={C.mut} strokeWidth={2.5} dot={{r:4,fill:'var(--surface-1)',stroke:C.mut,strokeWidth:2}}/>
                       <Line type="stepAfter" dataKey="meta_nuevos" name="Meta venta" stroke={C.warn} strokeWidth={2.5} strokeDasharray="6 5" dot={{r:3,fill:C.warn}}/>
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                    </ComposedChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Gráfica 3: Promedio niños/grupo */}
-                <ChartCard title="Promedio Niños por Grupo" sub="Meta: ≥ 8 niños/grupo">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
+                <ChartCard title="Promedio Niños por Grupo" sub="Meta: ≥ 8 niños/grupo" data={chartData} columns={[["prom_grupo","Prom. niños/grupo"]]}>
+<MeasuredChart label="Gráfico 3: serie mensual" minHeight={200}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint} domain={[0,'auto']}/>
                       <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <ReferenceLine y={8} stroke={C.warn} strokeDasharray="5 5" label={{value:'Meta 8',fill:C.warn,fontSize:10,position:'right'}}/>
+                      <ReferenceLine y={8} stroke={C.warn} strokeDasharray="5 5" label={{value:'Meta 8',fill:C.warn,fontSize:13,position:'right'}}/>
                       <Line type="monotone" dataKey="prom_grupo" name="Prom. niños/grupo" stroke={C.green} strokeWidth={2.5} dot={{r:4,fill:C.green}}/>
-                    </LineChart>
-                  </ResponsiveContainer>
+                    </LineChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Gráfica 4: %CV y GPN */}
-                <ChartCard title="%CV y GPN (Rentabilidad)" sub="%CV = Costo Variable. GPN = Ganancia por Niño">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
+                <ChartCard title="%CV y GPN (Rentabilidad)" sub="%CV = Costo Variable. GPN = Ganancia por Niño" data={chartData} columns={[["pcv","%CV"],["gpn","GPN $"]]}>
+<MeasuredChart label="Gráfico 4: serie mensual" minHeight={200}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis yAxisId="left" tick={axisTick} stroke={C.faint} label={{value:'%CV',angle:-90,position:'insideLeft',fontSize:10,fill:C.dim}}/>
-                      <YAxis yAxisId="right" orientation="right" tick={axisTick} stroke={C.faint} label={{value:'GPN $',angle:90,position:'insideRight',fontSize:10,fill:C.dim}}/>
+                      <YAxis yAxisId="left" tick={axisTick} stroke={C.faint} label={{value:'%CV',angle:-90,position:'insideLeft',fontSize:13,fill:C.dim}}/>
+                      <YAxis yAxisId="right" orientation="right" tick={axisTick} stroke={C.faint} label={{value:'GPN $',angle:90,position:'insideRight',fontSize:13,fill:C.dim}}/>
                       <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
                       <Line yAxisId="left" type="monotone" dataKey="pcv" name="%CV" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
                       <Line yAxisId="right" type="monotone" dataKey="gpn" name="GPN $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                    </LineChart>
-                  </ResponsiveContainer>
+                    </LineChart>}</MeasuredChart>
                 </ChartCard>
 
               </div>
@@ -457,12 +472,11 @@ export default function HistorialPage() {
 
             {/* VISTA: COMPARATIVA */}
             {vistaActiva === 'comparativa' && chartData.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="reports-grid">
 
                 {/* Origen de nuevos ingresos */}
-                <ChartCard title="Origen de Nuevos Ingresos por Mes">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={chartData} stackOffset="expand">
+                <ChartCard title="Origen de Nuevos Ingresos por Mes" data={chartData} columns={[["orig_referido","Referido"],["orig_marketing","Marketing"],["orig_centro","Centro"],["orig_activaciones","Activaciones"]]}>
+<MeasuredChart label="Gráfico 5: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData} stackOffset="expand">
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint} tickFormatter={(value) => `${Math.round(value * 100)}%`}/>
@@ -472,14 +486,12 @@ export default function HistorialPage() {
                       <Bar dataKey="orig_marketing" name="Marketing" fill={C.greenDeep} stackId="a"/>
                       <Bar dataKey="orig_centro" name="Centro" fill={C.mut} stackId="a"/>
                       <Bar dataKey="orig_activaciones" name="Activaciones" fill={C.dim} stackId="a" radius={[4,4,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
+                    </BarChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Motivos deserción */}
-                <ChartCard title="Motivos de Deserción por Mes">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={chartData}>
+                <ChartCard title="Motivos de Deserción por Mes" data={chartData} columns={[["mot_perdida_clase","Pérd. clase"],["mot_economico","Económico"],["mot_tecnica","Técnica"],["mot_horario","Horario"]]}>
+<MeasuredChart label="Gráfico 6: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
@@ -489,14 +501,12 @@ export default function HistorialPage() {
                       <Bar dataKey="mot_economico" name="Económico" fill={C.warn} stackId="b"/>
                       <Bar dataKey="mot_tecnica" name="Técnica" fill={C.mut} stackId="b"/>
                       <Bar dataKey="mot_horario" name="Horario" fill={C.dim} stackId="b" radius={[4,4,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
+                    </BarChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Clase de prueba */}
-                <ChartCard title="Clase de Prueba — Embudo">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={chartData}>
+                <ChartCard title="Clase de Prueba — Embudo" data={chartData} columns={[["cp_invitados","Invitados"],["cp_asistieron","Asistieron"],["cp_matriculados","Matriculados"]]}>
+<MeasuredChart label="Gráfico 7: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
@@ -505,21 +515,18 @@ export default function HistorialPage() {
                       <Bar dataKey="cp_invitados" name="Invitados" fill={C.track} radius={[4,4,0,0]}/>
                       <Bar dataKey="cp_asistieron" name="Asistieron" fill={C.mut} radius={[4,4,0,0]}/>
                       <Bar dataKey="cp_matriculados" name="Matriculados" fill={C.green} radius={[4,4,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
+                    </BarChart>}</MeasuredChart>
                 </ChartCard>
 
                 {/* Grupos activos */}
-                <ChartCard title="Grupos Activos por Mes" sub="Más grupos = mayor capacidad de ingresos">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData}>
+                <ChartCard title="Grupos Activos por Mes" sub="Más grupos = mayor capacidad de ingresos" data={chartData} columns={[["grupos_activos","Grupos activos"]]}>
+<MeasuredChart label="Gráfico 8: serie mensual" minHeight={200}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                       <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                       <YAxis tick={axisTick} stroke={C.faint}/>
                       <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                       <Bar dataKey="grupos_activos" name="Grupos activos" fill={C.green} radius={[4,4,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
+                    </BarChart>}</MeasuredChart>
                 </ChartCard>
 
               </div>
@@ -528,7 +535,7 @@ export default function HistorialPage() {
             {/* VISTA: TABLA */}
             {vistaActiva === 'tabla' && (
               <div className="panel">
-                <div style={{ overflowX: 'auto' }}>
+                <TableScroller label="Historial mensual" stickyFirstColumn>
                   <table className="table">
                     <thead>
                       <tr>
@@ -578,7 +585,7 @@ export default function HistorialPage() {
                     {visibleMeses.length > 1 && (
                       <tfoot style={{ background: 'var(--surface-3)', borderTop: '1px solid var(--border-strong)' }}>
                         <tr>
-                          <td colSpan={2} className="label" style={{ padding: '12px 16px', color: 'var(--ts-green)' }}>PROMEDIO GENERAL</td>
+                          <td colSpan={2} className="label" style={{ padding: '12px 16px', color: 'var(--ok-text)' }}>PROMEDIO GENERAL</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.ninos_inicio,0)/visibleMeses.length)}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.ninos_final,0)/visibleMeses.length)}</td>
                           <td className="num" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{Math.round(visibleMeses.reduce((a,m)=>a+m.grupos_activos,0)/visibleMeses.length)}</td>
@@ -598,8 +605,7 @@ export default function HistorialPage() {
                         </tr>
                       </tfoot>
                     )}
-                  </table>
-                </div>
+                  </table></TableScroller>
               </div>
             )}
 
@@ -613,10 +619,9 @@ export default function HistorialPage() {
               )
               return (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-                    <ChartCard title="Niños a pagar y movimientos" sub="Foto congelada al cierre de cada mes">
-                      <ResponsiveContainer width="100%" height={220}>
-                        <ComposedChart data={conCuadro}>
+                  <div className="reports-grid" style={{marginBottom:20}}>
+                    <ChartCard title="Niños a pagar y movimientos" sub="Foto congelada al cierre de cada mes" data={conCuadro} columns={[["cuadro_nuevos","Nuevos activos"],["cuadro_retirados","Retirados"],["cuadro_aPagar","Niños a pagar"]]}>
+<MeasuredChart label="Gráfico 9: serie mensual" minHeight={220}>{({width,height}) => <ComposedChart width={width} height={height} data={conCuadro}>
                           <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                           <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                           <YAxis tick={axisTick} stroke={C.faint}/>
@@ -625,19 +630,16 @@ export default function HistorialPage() {
                           <Bar dataKey="cuadro_nuevos" name="Nuevos activos" fill={C.greenDeep} radius={[4,4,0,0]}/>
                           <Bar dataKey="cuadro_retirados" name="Retirados" fill={C.bad} radius={[4,4,0,0]}/>
                           <Line type="monotone" dataKey="cuadro_aPagar" name="Niños a pagar" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                        </ComposedChart>}</MeasuredChart>
                     </ChartCard>
-                    <ChartCard title="Royalty mensual" sub={'Congelado con el cuadro de cada mes'}>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <LineChart data={conCuadro}>
+                    <ChartCard title="Royalty mensual" sub={'Congelado con el cuadro de cada mes'} data={conCuadro} columns={[["cuadro_royalty","Royalty $"]]}>
+<MeasuredChart label="Gráfico 10: serie mensual" minHeight={220}>{({width,height}) => <LineChart width={width} height={height} data={conCuadro}>
                           <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
                           <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
                           <YAxis tick={axisTick} stroke={C.faint}/>
                           <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
                           <Line type="monotone" dataKey="cuadro_royalty" name="Royalty $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                        </LineChart>
-                      </ResponsiveContainer>
+                        </LineChart>}</MeasuredChart>
                     </ChartCard>
                   </div>
                   <div className="panel">
@@ -645,7 +647,7 @@ export default function HistorialPage() {
                       <h3 className="panel__title">Cuadros congelados por mes</h3>
                       <span className="label">La misma foto que se entregó a la Junta</span>
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
+                    <TableScroller label="Historial mensual" stickyFirstColumn>
                       <table className="table">
                         <thead>
                           <tr>{['Mes','A pagar','Nuevos activos','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
@@ -664,15 +666,14 @@ export default function HistorialPage() {
                               <td className="num" style={{ textAlign: 'center', color: (m.cuadro.promedio ?? 0) >= 8 ? C.green : C.bad }}>
                                 {m.cuadro.promedio == null ? '—' : Number(m.cuadro.promedio).toFixed(1)}
                               </td>
-                              <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--ts-green)' }}>${Number(m.cuadro.royalty || 0).toFixed(2)}</td>
-                              <td className="num" style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                              <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--ok-text)' }}>${Number(m.cuadro.royalty || 0).toFixed(2)}</td>
+                              <td className="num" style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-dim)' }}>
                                 {m.cuadro.cerrado_at ? String(m.cuadro.cerrado_at).slice(0, 10) : '—'}
                               </td>
                             </tr>
                           ))}
                         </tbody>
-                      </table>
-                    </div>
+                      </table></TableScroller>
                   </div>
                 </>
               )

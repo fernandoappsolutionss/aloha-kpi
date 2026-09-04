@@ -16,6 +16,7 @@ export default function EntrenamientoPage() {
   const [progreso, setProgreso] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -29,7 +30,7 @@ export default function EntrenamientoPage() {
       .catch(() => { if (activo) setError('No se pudo cargar tu progreso. Recarga la página.') })
       .finally(() => { if (activo) setLoading(false) })
     return () => { activo = false }
-  }, [id])
+  }, [id, retry])
 
   const resumen = useMemo(() => porcentaje(progreso, MODULOS), [progreso])
   const siguiente = useMemo(() => siguienteModulo(progreso, MODULOS), [progreso])
@@ -53,7 +54,7 @@ export default function EntrenamientoPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
-      <main className="main ent-page">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main ent-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Entrenamiento</div>
@@ -63,7 +64,7 @@ export default function EntrenamientoPage() {
         </div>
 
         {loading ? <div className="card ent-loading" role="status">Preparando tu siguiente paso…</div> : error ? (
-          <div className="alert alert--error" role="alert">{error}</div>
+          <div className="alert alert--error" role="alert">{error}<button type="button" className="btn" onClick={()=>setRetry(n=>n+1)}>Reintentar</button></div>
         ) : (
           <>
             <section className="ent-start" aria-labelledby="ent-start-title">

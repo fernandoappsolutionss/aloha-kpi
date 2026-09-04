@@ -1,6 +1,8 @@
 'use client'
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import OperationalCard from '../../../../components/OperationalCard'
 import Sidebar from '../../../../components/Sidebar'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
@@ -12,14 +14,20 @@ import { origenDeRegistro } from '../../../../lib/registro-origen'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES_VENTA, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
+import Dialog, { useDialogCallback } from '../../../../components/Dialog'
+import TableScroller from '../../../../components/TableScroller'
 
+function useMobileCards() {
+  const [mobile,setMobile]=useState(false)
+  useEffect(()=>{const media=window.matchMedia('(max-width: 767px)');const update=()=>setMobile(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update)},[])
+  return mobile
+}
 const ESTADO_PILL = { published: 'pill--ok', draft: 'pill--warn', completed: 'pill--warn', cancelled: 'pill--bad' }
 const ESTADO_TXT = { published: 'Publicado', draft: 'Borrador', completed: 'Finalizado', cancelled: 'Cancelado' }
 const TZ_OFFSET = { 'America/Panama': '-05:00', 'America/Caracas': '-04:00' }
 const fmtFecha = (d) => d ? new Date(d).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const pct = (n, t) => t > 0 ? Math.round((n / t) * 100) : 0
 const ACTION_MENU_WIDTH = 238
-const ACTION_MENU_HEIGHT = 178
 const ORIGEN_VENTA_LABELS = {
   referido: 'Referido',
   marketing: 'Marketing',
@@ -30,6 +38,15 @@ const ORIGEN_VENTA_LABELS = {
 // Semáforo de cupos del grupo por aperturar: verde >3, ámbar 1–3, rojo 0.
 const cupoColor = (n) => n === 0 ? 'var(--bad)' : n <= 3 ? 'var(--warn)' : 'var(--ok)'
 const cupoTexto = (n) => n === 0 ? 'grupo lleno' : `quedan ${n} de ${NINOS_POR_GRUPO_MODELO} cupos`
+const clamp = (min, value, max) => Math.min(Math.max(value, min), Math.max(min, max))
+function positionFloating(trigger, menu) {
+  const t = trigger.getBoundingClientRect()
+  const m = menu.getBoundingClientRect()
+  return {
+    left: clamp(8, t.right - m.width, window.innerWidth - m.width - 8),
+    top: clamp(8, t.bottom + 6, window.innerHeight - m.height - 8),
+  }
+}
 
 function monthKey(date, timeZone = 'America/Panama') {
   const parts = new Intl.DateTimeFormat('en', { timeZone, year: 'numeric', month: '2-digit' }).formatToParts(date)
@@ -67,6 +84,8 @@ const EMPTY = {
 
 export default function EventosPage() {
   const { id } = useParams()
+  const mobileCards=useMobileCards()
+  const [loadError,setLoadError]=useState('')
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
   const [rol, setRol] = useState('usuario')
   // El asistente registra clases de prueba, pero no las elimina.
@@ -81,20 +100,22 @@ export default function EventosPage() {
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
-  const [menuPos, setMenuPos] = useState({ left: 0, top: 0 })
+  const [menuPos, setMenuPos] = useState(null)
+  const menuRef = useRef(null)
+  const menuTriggerRef = useRef(null)
   const [editing, setEditing] = useState(null) // null=cerrado, {}=nuevo, {...}=editar
 
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);setLoadError('')
     try {
       const cfg = await eventosConfig(); setConfig(cfg)
       const [evRes, opRes] = await Promise.all([listarEventos(id), opcionesFormulario(id)])
-      if (evRes.error) setStatus('❌ ' + evRes.error)
+      if (evRes.error || opRes.error) setLoadError(evRes.error || opRes.error)
       setEvents(evRes.events || [])
       setOpts({ sales_teams: opRes.sales_teams || [], pipeline_stages: opRes.pipeline_stages || [] })
-    } catch (e) { setStatus('❌ ' + e.message) }
+    } catch (e) { setLoadError(e.message || 'No se pudieron cargar las clases.') }
     setLoading(false)
   }, [id])
   useEffect(() => { load() }, [load])
@@ -115,34 +136,67 @@ export default function EventosPage() {
     (filterEstado === 'todos' || e.status === filterEstado) &&
     (!q || (e.name || '').toLowerCase().includes(q.toLowerCase())))
 
-  async function onDelete(ev) {
+  const closeActionMenu = useCallback(({ restoreFocus = true } = {}) => {
+    const trigger = menuTriggerRef.current
+    if (restoreFocus && trigger?.isConnected) trigger.focus()
     setMenuId(null)
+    setMenuPos(null)
+  }, [])
+
+  useEffect(() => {
+    if (!menuId) return undefined
+    const position = () => {
+      if (!menuTriggerRef.current?.isConnected || !menuRef.current) return
+      setMenuPos(positionFloating(menuTriggerRef.current, menuRef.current))
+    }
+    const frame = requestAnimationFrame(() => {
+      position()
+    })
+    const onKeyDown = (event) => {
+      if (event.defaultPrevented || event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      closeActionMenu()
+    }
+    window.addEventListener('resize', position)
+    window.addEventListener('orientationchange', position)
+    window.visualViewport?.addEventListener('resize', position)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', position)
+      window.removeEventListener('orientationchange', position)
+      window.visualViewport?.removeEventListener('resize', position)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuId, mobileCards, closeActionMenu])
+
+  const menuVisible = menuPos !== null
+  useEffect(() => {
+    if (menuVisible) menuRef.current?.querySelector('[role="menuitem"]')?.focus({ preventScroll: true })
+  }, [menuId, menuVisible])
+
+  async function onDelete(ev) {
+    closeActionMenu()
     if (!confirm(`¿Eliminar la clase de prueba "${ev.name}"? Esta acción no se puede deshacer.`)) return
     setStatus('')
     const res = await eliminarEvento(id, ev.id)
     if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba eliminada.'); load() }
   }
   async function onDuplicate(ev) {
-    setMenuId(null); setStatus('')
+    closeActionMenu(); setStatus('')
     const res = await duplicarEvento(id, ev.id)
     if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba duplicada (queda en borrador).'); load() }
   }
   function copy(text, msg) {
-    setMenuId(null)
+    closeActionMenu()
     navigator.clipboard?.writeText(text).then(() => setStatus('✅ ' + msg)).catch(() => setStatus('Link: ' + text))
   }
   function toggleActionMenu(e, ev) {
     e.stopPropagation()
-    if (menuId === ev.id) { setMenuId(null); return }
-    const r = e.currentTarget.getBoundingClientRect()
-    const gap = 8
-    const menuHeight = ACTION_MENU_HEIGHT
-    const left = Math.max(gap, Math.min(window.innerWidth - ACTION_MENU_WIDTH - gap, r.right - ACTION_MENU_WIDTH))
-    const below = r.bottom + gap
-    const top = below + menuHeight > window.innerHeight - gap
-      ? Math.max(gap, r.top - menuHeight - gap)
-      : below
-    setMenuPos({ left, top })
+    if (menuId === ev.id) { closeActionMenu(); return }
+    menuTriggerRef.current = e.currentTarget
+    setMenuPos(null)
     setMenuId(ev.id)
   }
   const segUrl = (e) => `${config.baseUrl}/events/tracking/${e.tracking_token}`
@@ -154,15 +208,17 @@ export default function EventosPage() {
     { l: 'Asistieron', v: `${pct(agg.attended, agg.total)}%`, s: `${agg.attended}`, c: 'var(--ok)' },
     { l: 'No asistieron', v: `${pct(agg.not_attended, agg.total)}%`, s: `${agg.not_attended}`, c: 'var(--bad)' },
     { l: 'Pendientes', v: `${pct(agg.pending, agg.total)}%`, s: `${agg.pending}`, c: 'var(--warn)' },
-    { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ts-green)' },
+    { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ok-text)' },
     { l: 'En compras', v: `$${agg.revenue.toLocaleString()}`, c: 'var(--text)' },
   ]
+  const eventActions = ev => <button type="button" ref={node=>{if(node && menuId===ev.id)menuTriggerRef.current=node}} onClick={e=>toggleActionMenu(e,ev)} className="btn" style={{padding:'3px 10px',fontSize:16,lineHeight:1,minWidth:44}} aria-label={`Acciones de ${ev.name}`} aria-haspopup="menu" aria-expanded={menuId===ev.id}>⋯</button>
+  const registrationButton = ev => <button type="button" className="btn" aria-label={`Ver registros de ${ev.name}`} aria-expanded={openId===ev.id} aria-controls={`registros-${ev.id}`} onClick={()=>setOpenId(openId===ev.id?null:ev.id)}>Ver registros</button>
   const menuEvent = menuId ? events.find((ev) => ev.id === menuId) : null
 
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroId={id} />
-      <main className="main">
+      <main id="main-content" className="main events-page" data-page-state={loading ? 'loading' : loadError ? 'error' : 'ready'}>
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Clases de prueba</div>
@@ -172,18 +228,20 @@ export default function EventosPage() {
           <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" data-tour="eventos.nueva" disabled={!config.configured}>+ Nueva clase de prueba</button>
         </div>
 
+        {loadError && <div role="alert" className="alert alert--error">{loadError} <Link className="btn" href={`/centro/${id}`}>Volver al centro</Link></div>}
+        {loading && <div role="status">Cargando clases…</div>}
         {!config.configured && (
           <div className="alert alert--error" style={{ marginBottom: 16 }}>
             La conexión con el CRM no está configurada (faltan <b>CRM_API_URL</b> / <b>CRM_SERVICE_TOKEN</b>).
           </div>
         )}
         {status && (
-          <div className={`alert${isError ? ' alert--error' : ''}`}
+          <div role={isError ? "alert" : "status"} className={`alert${isError ? ' alert--error' : ''}`}
             style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
         {/* Tarjetas de stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 20 }} data-tour="eventos.metricas">
+        <div className="responsive-grid events-metrics" data-tour="eventos.metricas">
           {CARDS.map((c, i) => (
             <div key={i} className="kpi" style={{ padding: '14px 16px' }}>
               <div className="kpi__top"><span className="label">{c.l}</span></div>
@@ -195,12 +253,12 @@ export default function EventosPage() {
 
         {/* Filtros */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-          <input className="input" style={{ maxWidth: 280 }} placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="input" style={{ maxWidth: 180 }} value={filterPeriodo} onChange={(e) => { setFilterPeriodo(e.target.value); setOpenId(null) }}>
+          <input className="input" style={{ maxWidth: 280 }} name="busqueda" aria-label="Buscar clases por nombre" placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select aria-label="Periodo de las clases" className="input" style={{ maxWidth: 180 }} value={filterPeriodo} onChange={(e) => { setFilterPeriodo(e.target.value); setOpenId(null) }}>
             <option value="mes_actual">Este mes</option>
             <option value="todos">Todos los meses</option>
           </select>
-          <select className="input" style={{ maxWidth: 200 }} value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
+          <select aria-label="Estado de las clases" className="input" style={{ maxWidth: 200 }} value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
             <option value="published">Publicado</option>
             <option value="draft">Borrador</option>
@@ -209,10 +267,10 @@ export default function EventosPage() {
           </select>
         </div>
 
-        <div className="panel" data-tour="eventos.lista">
-          <div style={{ overflowX: 'visible' }}>
+        {!loadError && <div className="panel" data-tour="eventos.lista">
+          {mobileCards ? <div className="operational-list">{visible.map(ev=><OperationalCard headingLevel={2} key={ev.id} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>)}</div> : <TableScroller label="Clases de prueba">
             <table className="table">
-              <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
                 {loading ? (
                   <tr style={{ cursor: 'default' }}><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</td></tr>
@@ -222,59 +280,63 @@ export default function EventosPage() {
                   const count = ev.stats?.total ?? ev.registration_count ?? 0
                   return (
                     <Fragment key={ev.id}>
-                      <tr style={{ cursor: 'pointer' }} onClick={() => setOpenId(openId === ev.id ? null : ev.id)}>
+                      <tr>
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
-                          {ev.name}
-                          {ev.location && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>📍 {ev.location}</div>}
+                          {ev.name}<div>{registrationButton(ev)}</div>
+                          {ev.location && <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>📍 {ev.location}</div>}
                           {ev.grupo ? (
-                            <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
+                            <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>
                               Grupo {ev.grupo.numero}{ev.grupo.horarioTexto ? ` · ${ev.grupo.horarioTexto}` : ''} · <span style={{ color: cupoColor(ev.grupo.cupos), fontWeight: 600 }}>{ev.grupo.cerrado ? '🔒 grupo cerrado a inscripciones' : cupoTexto(ev.grupo.cupos)}</span>
                             </div>
                           ) : (
-                            <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>Sin grupo relacionado</div>
+                            <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>Sin grupo relacionado</div>
                           )}
                         </td>
-                        <td className="num" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{fmtFecha(ev.start_date)}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_type === 'online' ? 'Online' : 'Presencial'}</td>
+                        <td className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>{fmtFecha(ev.start_date)}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{ev.event_type === 'online' ? 'Online' : 'Presencial'}</td>
                         <td><span className={`pill ${ESTADO_PILL[ev.status] || 'pill--warn'}`}><span className="dot" />{ESTADO_TXT[ev.status] || ev.status}</span></td>
                         <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{count}{ev.max_capacity ? `/${ev.max_capacity}` : ''}</td>
-                        <td style={{ fontSize: 12 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 10 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
-                        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <button onClick={(e) => toggleActionMenu(e, ev)} className="btn" style={{ padding: '3px 10px', fontSize: 16, lineHeight: 1 }}>⋯</button>
+                        <td style={{ fontSize: 13 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 13 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {eventActions(ev)}
                         </td>
                       </tr>
-                      {openId === ev.id && (
-                        <tr style={{ cursor: 'default' }}>
-                          <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
-                            <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load} />
-                          </td>
-                        </tr>
-                      )}
+
                     </Fragment>
                   )
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
+          </TableScroller>}
+          {mobileCards && !loading && visible.length===0 && <div role="status" className="empty">Sin clases para estos filtros.</div>}
+          {openId && visible.some(ev=>ev.id===openId) && <section id={`registros-${openId}`} aria-label="Registros de la clase"><Registrations key={openId} centroId={id} eventId={openId} grupoId={events.find(ev=>ev.id===openId)?.grupo?.id} onChange={load}/></section>}
+        </div>}
       </main>
 
-      {menuId && <div onClick={() => setMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />}
+      {menuId && <section aria-label="Acciones de la clase de prueba">
+      <div onPointerDown={() => closeActionMenu()} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
       {menuEvent && (
-        <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: menuPos.left, top: menuPos.top, zIndex: 60, background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 18px 42px rgba(0,0,0,0.28)', width: ACTION_MENU_WIDTH, padding: 6, textAlign: 'left' }}>
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={`Acciones de ${menuEvent.name}`}
+          style={{ position: 'fixed', left: menuPos?.left ?? 8, top: menuPos?.top ?? 8, visibility: menuPos ? 'visible' : 'hidden', zIndex: 60, background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 18px 42px rgba(0,0,0,0.28)', width: ACTION_MENU_WIDTH, maxWidth: 'calc(100vw - 16px)', padding: 6, textAlign: 'left' }}
+        >
           {[
-            ['✏️ Editar', () => { setMenuId(null); openEdit(menuEvent, setEditing) }],
+            ['✏️ Editar', () => { closeActionMenu(); openEdit(menuEvent, setEditing) }],
             ['⧉ Duplicar', () => onDuplicate(menuEvent)],
             ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
             !esAsistente && ['🗑 Eliminar', () => onDelete(menuEvent), true],
           ].filter(Boolean).map(([txt, fn, danger], k) => (
-            <button key={k} onClick={fn}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>
+            <button key={k} type="button" role="menuitem" onClick={fn}
+              style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>
               {txt}
             </button>
           ))}
         </div>
       )}
+
+      </section>}
 
       {editing && (
         <EventModal centroId={id} opts={opts} initial={editing}
@@ -299,6 +361,7 @@ function openEdit(ev, setEditing) {
 }
 
 function EventModal({ centroId, opts, initial, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const [tab, setTab] = useState('info')
   const [f, setF] = useState(initial)
   const [grupos, setGrupos] = useState(null)
@@ -335,36 +398,47 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
       start_date: localToISO(f.startLocal, f.timezone),
       end_date: f.endLocal ? localToISO(f.endLocal, f.timezone) : null,
     }
-    const res = isEdit ? await actualizarEvento(centroId, f.id, data) : await crearEvento(centroId, data)
-    setSaving(false)
-    if (res.error) setErr(res.error); else onSaved(isEdit ? 'Clase de prueba actualizada.' : 'Clase de prueba creada en el CRM.')
+    try {
+      const res = isEdit ? await actualizarEvento(centroId, f.id, data) : await crearEvento(centroId, data)
+      if (res.error) setErr(res.error); else complete(isEdit ? 'Clase de prueba actualizada.' : 'Clase de prueba creada en el CRM.')
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const stages = opts.pipeline_stages || []
   const TABS = [['info', 'Información'], ['pago', 'Precio y Pago'], ['preg', 'Preguntas']]
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 640, maxWidth: '100%', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
-          <h3 className="panel__title">{isEdit ? 'Editar clase de prueba' : 'Crear clase de prueba'}</h3>
-          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
-        </div>
-        <div style={{ display: 'flex', gap: 6, padding: '12px 22px 0' }}>
-          {TABS.map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} className={`btn${tab === k ? ' btn--primary' : ''}`} style={{ padding: '6px 14px', fontSize: 13 }}>{l}</button>
-          ))}
-        </div>
+    <Dialog
+      open
+      title={isEdit ? 'Editar clase de prueba' : 'Crear clase de prueba'}
+      width={640}
+      onClose={onClose}
+      closeDisabled={saving}
+      footer={(
+        <>
+          <button className="btn" data-tour="evento.cancelar" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary" data-tour="evento.crear" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear clase de prueba')}</button>
+        </>
+      )}
+    >
+      <div role="tablist" aria-label="Secciones de la clase de prueba" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+        {TABS.map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`btn${tab === k ? ' btn--primary' : ''}`} style={{ padding: '6px 14px', fontSize: 13 }}>{l}</button>
+        ))}
+      </div>
 
-        <div style={{ padding: 22, maxHeight: '62vh', overflowY: 'auto' }}>
-          {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
 
-          {tab === 'info' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Field full label="Nombre de la clase de prueba *"><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
-              <Field full label="Descripción"><textarea className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
+      {tab === 'info' && (
+            <div className="dialog-form-grid">
+              <Field full label="Nombre de la clase de prueba *"><input name="name" className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Calle 50 — Clase de prueba" /></Field>
+              <Field full label="Descripción"><textarea name="description" className="input" rows={2} value={f.description} onChange={(e) => set('description', e.target.value)} /></Field>
               <Field full label="Grupo que se va a aperturar" tour="evento.grupo">
-                <select className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
+                <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
                   <option value="">{grupos === null ? 'Cargando grupos…' : 'Sin grupo'}</option>
                   {vinculoCerrado && (
                     <option value={vinculoCerrado.id} disabled>Grupo {vinculoCerrado.numero} · {vinculoCerrado.itinerario} · 🔒 {AVISO_CERRADO_A_NUEVOS}</option>
@@ -379,44 +453,44 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                 )}
               </Field>
               <Field label="Zona horaria">
-                <select className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
+                <select name="timezone" className="input" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
                   <option value="America/Panama">Panamá (GMT-5)</option>
                   <option value="America/Caracas">Venezuela (GMT-4)</option>
                 </select>
               </Field>
               <Field label="Modalidad">
-                <select className="input" value={f.event_type} onChange={(e) => set('event_type', e.target.value)}>
+                <select name="event_type" className="input" value={f.event_type} onChange={(e) => set('event_type', e.target.value)}>
                   <option value="in_person">Presencial</option><option value="online">Online</option>
                 </select>
               </Field>
-              <Field label="Inicio *" tour="evento.inicio"><input type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
-              <Field label="Fin"><input type="datetime-local" className="input" value={f.endLocal} onChange={(e) => set('endLocal', e.target.value)} /></Field>
+              <Field label="Inicio *" tour="evento.inicio"><input name="start_date" type="datetime-local" className="input" value={f.startLocal} onChange={(e) => set('startLocal', e.target.value)} /></Field>
+              <Field label="Fin"><input name="end_date" type="datetime-local" className="input" value={f.endLocal} onChange={(e) => set('endLocal', e.target.value)} /></Field>
               {f.event_type === 'online'
-                ? <Field full label="Link de la reunión"><input className="input" value={f.meeting_url} onChange={(e) => set('meeting_url', e.target.value)} placeholder="https://zoom.us/…" /></Field>
-                : <Field full label="Lugar"><input className="input" value={f.location} onChange={(e) => set('location', e.target.value)} placeholder="Dirección / salón" /></Field>}
-              <Field label="Cupo máximo"><input type="number" min="0" className="input" value={f.max_capacity} onChange={(e) => set('max_capacity', e.target.value)} placeholder="(sin límite)" /></Field>
+                ? <Field full label="Link de la reunión"><input name="meeting_url" className="input" value={f.meeting_url} onChange={(e) => set('meeting_url', e.target.value)} placeholder="https://zoom.us/…" /></Field>
+                : <Field full label="Lugar"><input name="location" className="input" value={f.location} onChange={(e) => set('location', e.target.value)} placeholder="Dirección / salón" /></Field>}
+              <Field label="Cupo máximo"><input name="max_capacity" type="number" min="0" className="input" value={f.max_capacity} onChange={(e) => set('max_capacity', e.target.value)} placeholder="(sin límite)" /></Field>
               <Field label="Estado">
-                <select className="input" value={f.status} onChange={(e) => set('status', e.target.value)}>
+                <select name="status" className="input" value={f.status} onChange={(e) => set('status', e.target.value)}>
                   <option value="published">Publicado</option><option value="draft">Borrador</option><option value="completed">Finalizado</option>
                 </select>
               </Field>
             </div>
-          )}
+      )}
 
-          {tab === 'pago' && (
+      {tab === 'pago' && (
             <div style={{ display: 'grid', gap: 16 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={f.is_free} onChange={(e) => set('is_free', e.target.checked)} />
+                <input name="is_free" type="checkbox" checked={f.is_free} onChange={(e) => set('is_free', e.target.checked)} />
                 <span><b style={{ color: 'var(--text)' }}>Evento gratuito</b><br /><span className="h-sub">Desactiva para establecer un precio</span></span>
               </label>
               {!f.is_free && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <Field label="Precio"><input type="number" min="0" className="input" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
-                  <Field label="Moneda"><input className="input" value={f.currency} onChange={(e) => set('currency', e.target.value)} /></Field>
+                <div className="dialog-form-grid">
+                  <Field label="Precio"><input name="price" type="number" min="0" className="input" value={f.price} onChange={(e) => set('price', e.target.value)} /></Field>
+                  <Field label="Moneda"><input name="currency" className="input" value={f.currency} onChange={(e) => set('currency', e.target.value)} /></Field>
                 </div>
               )}
               <Field label="Equipo asignado">
-                <select className="input" value={f.sales_team_id} onChange={(e) => set('sales_team_id', e.target.value)}>
+                <select name="sales_team_id" className="input" value={f.sales_team_id} onChange={(e) => set('sales_team_id', e.target.value)}>
                   <option value="">Todos los equipos (sin restricción)</option>
                   {opts.sales_teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -426,7 +500,7 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                 <div style={{ display: 'grid', gap: 10 }}>
                   {[['pipeline_stage_id', '1. Al registrarse en el evento'], ['attended_stage_id', '2. Al marcar “Asistió”'], ['won_stage_id', '3. Al confirmar pago (ganado)']].map(([k, l]) => (
                     <Field key={k} label={l}>
-                      <select className="input" value={f[k]} onChange={(e) => set(k, e.target.value)}>
+                      <select name={k} className="input" value={f[k]} onChange={(e) => set(k, e.target.value)}>
                         <option value="">Sin etapa</option>
                         {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
@@ -435,40 +509,35 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {tab === 'preg' && (
+      {tab === 'preg' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                 <span className="h-sub" style={{ margin: 0 }}>Preguntas extra del formulario (además de nombre, email y teléfono).</span>
                 <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('registration_questions', [...f.registration_questions, { label: '', type: 'text', required: false }])}>+ Agregar</button>
               </div>
               {f.registration_questions.length === 0 ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin preguntas personalizadas.</div>
               ) : f.registration_questions.map((qq, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input className="input" style={{ flex: 1 }} placeholder="Pregunta" value={qq.label} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], label: e.target.value }; set('registration_questions', a) }} />
-                  <button className="btn" onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
-                </div>
+                <fieldset key={i} className="events-question-fields">
+                  <legend className="label">Pregunta personalizada {i + 1}</legend>
+                  <Field label={`Pregunta ${i + 1}`}><input name={`pregunta_${i + 1}`} className="input" placeholder="Pregunta" value={qq.label} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], label: e.target.value }; set('registration_questions', a) }} /></Field>
+                  <button className="btn" aria-label={`Quitar pregunta ${i + 1}`} onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
+                </fieldset>
               ))}
             </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
-          <button className="btn" data-tour="evento.cancelar" onClick={onClose}>Cancelar</button>
-          <button className="btn btn--primary" data-tour="evento.crear" onClick={save} disabled={saving}>{saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Crear clase de prueba')}</button>
-        </div>
-      </div>
-    </div>
+      )}
+    </Dialog>
   )
 }
 
 function Field({ label, full, tour, children }) {
-  return <div className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><label className="label">{label}</label>{children}</div>
+  return <label className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
 }
 
 function Registrations({ centroId, eventId, grupoId, onChange }) {
+  const mobileCards=useMobileCards()
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(null)
@@ -476,11 +545,15 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [saving, setSaving] = useState(false)
   const [inscribir, setInscribir] = useState(null) // registro a inscribir como estudiante
+  const inscribirReturnFocusRef = useRef(null)
+  const inscribirTriggerRef = (node, id) => { if (node && String(inscribir?.id) === String(id)) inscribirReturnFocusRef.current = node }
 
   const load = useCallback(async () => {
-    const res = await listarRegistros(centroId, eventId)
-    if (res.error) setStatus('❌ ' + res.error)
-    setRegs(res.registrations || [])
+    try {
+      const res = await listarRegistros(centroId, eventId)
+      if (res.error) {setStatus('❌ ' + res.error);setRegs([]);return}
+      setStatus('');setRegs(res.registrations || [])
+    } catch {setStatus('❌ No se pudieron cargar los registros.');setRegs([])}
   }, [centroId, eventId])
   useEffect(() => { load() }, [load])
 
@@ -507,13 +580,13 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   }
 
   return (
-    <div style={{ padding: '16px 18px' }}>
+    <div className="events-registrations" style={{ padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span className="label">Registrados {regs ? `(${regs.length})` : ''}</span>
         <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>
       </div>
       {status && (
-        <div className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
+        <div role={status.includes('❌') ? 'alert' : 'status'} className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
           style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
           {status.replace(/^[❌✅]\s*/, '')}
         </div>
@@ -521,16 +594,19 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
       {showInv && (
         <form onSubmit={addInv} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14, padding: 12, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)' }}>
           {[['first_name', 'Nombre *'], ['last_name', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']].map(([k, l]) => (
-            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label">{l}</label><input className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
+            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label" htmlFor={`invite-${k}`}>{l}</label><input id={`invite-${k}`} name={k} autoComplete={{first_name:'given-name',last_name:'family-name',email:'email',phone:'tel'}[k]} type={k==='email'?'email':k==='phone'?'tel':'text'} className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
           ))}
           <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? '…' : 'Agregar'}</button>
         </form>
       )}
-      {regs === null ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
-        : regs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
-          : (
-            <table className="table" style={{ background: 'var(--surface)' }}>
-              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+      {regs === null ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
+        : status.includes('❌') ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
+          : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={<>
+            <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
+            <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button ref={node => inscribirTriggerRef(node, r.id)} type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
+          </>}/>)}</div> : (
+            <TableScroller label="Inscritos en la clase"><table className="table" style={{ background: 'var(--surface)' }}>
+              <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
                 {regs.map((r) => {
                   const origen = origenDeRegistro(r)
@@ -544,15 +620,15 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                     <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>
                       {tel
                         ? <a href={`tel:${tel.replace(/[^\d+]/g, '')}`} style={{ color: 'var(--text)', fontWeight: 600 }}>{tel}</a>
-                        : <span style={{ color: 'var(--text-faint)' }}>Sin teléfono</span>}
-                      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{r.email || '—'}</div>
+                        : <span style={{ color: 'var(--text-muted)' }}>Sin teléfono</span>}
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email || '—'}</div>
                     </td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 11 }} title={origen.detalle}>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }} title={origen.detalle}>
                       <span style={{ fontSize: 13, marginRight: 4 }}>{origen.icono}</span>{origen.nombre}
                     </td>
                     <td>
                       <button onClick={() => setPagoR(r, r.payment_status !== 'paid')} disabled={busy === r.id + 'p'}
-                        className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 10, cursor: 'pointer', border: 'none' }}>
+                        className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 13, cursor: 'pointer', border: 'none' }}>
                         {r.payment_status === 'paid' ? 'Pagado' : r.payment_status === 'waived' ? 'Gratis' : 'Pendiente'}
                       </button>
                     </td>
@@ -561,25 +637,26 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                         {/* Cancelado conserva su etiqueta (cuenta como no asistió en las stats);
                             los botones quedan por si el niño igual se presentó. */}
                         {r.attendance_status === 'cancelled' && (
-                          <span className="pill pill--bad" style={{ fontSize: 10 }}>Cancelado</span>
+                          <span className="pill pill--bad" style={{ fontSize: 13 }}>Cancelado</span>
                         )}
                         <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
-                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
+                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
                         <button onClick={() => setAsist(r, false)} disabled={busy === r.id + 'a'}
-                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? 'var(--bad-text)' : 'var(--text-dim)' }}>No vino</button>
+                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? 'var(--bad-text)' : 'var(--text-dim)' }}>No vino</button>
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 11 }}>Inscribir</button>
+                      <button ref={node => inscribirTriggerRef(node, r.id)} onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>
                     </td>
                   </tr>
                   )
                 })}
               </tbody>
-            </table>
+            </table></TableScroller>
           )}
       {inscribir && (
         <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
+          returnFocusRef={inscribirReturnFocusRef}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
       )}
@@ -600,7 +677,8 @@ const desdeGrupo = (g) => {
 // estudiante con origen 'clase_prueba' y el crm_registration_id del registro
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
 // de prueba tiene grupo por aperturar, viene preseleccionado en el select.
-function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
+function InscribirModal({ centroId, reg, grupoId, onClose, onSaved, returnFocusRef }) {
+  const complete = useDialogCallback(onSaved, centroId)
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
     nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
@@ -639,41 +717,53 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
     if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     setSaving(true); setErr('')
-    const res = await inscribirEstudiante(centroId, {
-      nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
-      origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
-      representante: f.representante, telefono: f.telefono, correo: f.correo,
-    })
-    setSaving(false)
-    if (res.error) { setErr(res.error); return }
-    const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
-    onSaved(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
+    try {
+      const res = await inscribirEstudiante(centroId, {
+        nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
+        origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
+        representante: f.representante, telefono: f.telefono, correo: f.correo,
+      })
+      if (res.error) { setErr(res.error); return }
+      const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
+      complete(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const niveles = Array.from({ length: NIVEL_MAX[f.itinerario] || 1 }, (_, i) => i + 1)
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 480, maxWidth: '100%', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
-          <h3 className="panel__title">Inscribir niño</h3>
-          <button className="btn" style={{ padding: '4px 10px' }} onClick={onClose}>✕</button>
-        </div>
-        <div style={{ padding: 22 }}>
-          {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <Field full label="Nombre del niño *"><input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
+    <Dialog
+      open
+      title="Inscribir niño"
+      returnFocusRef={returnFocusRef}
+      width={480}
+      onClose={onClose}
+      closeDisabled={saving}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</button>
+        </>
+      )}
+    >
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+          <div className="dialog-form-grid">
+            <Field full label="Nombre del niño *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
             <Field label="Itinerario">
-              <select className="input" value={f.itinerario} onChange={(e) => setF((p) => ({ ...p, itinerario: e.target.value, nivel: 1 }))}>
+              <select name="itinerario" className="input" value={f.itinerario} onChange={(e) => setF((p) => ({ ...p, itinerario: e.target.value, nivel: 1 }))}>
                 {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
               </select>
             </Field>
             <Field label="Nivel">
-              <select className="input" value={f.nivel} onChange={(e) => set('nivel', parseInt(e.target.value))}>
+              <select name="nivel" className="input" value={f.nivel} onChange={(e) => set('nivel', parseInt(e.target.value))}>
                 {niveles.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </Field>
             <Field full label="Grupo">
-              <select className="input" value={f.grupo_id} onChange={(e) => {
+              <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => {
                 const sel = (grupos || []).find((x) => String(x.id) === String(e.target.value))
                 setF((p) => ({ ...p, grupo_id: e.target.value, ...desdeGrupo(sel) }))
               }}>
@@ -687,21 +777,15 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
               )}
             </Field>
             <Field full label="Origen del nuevo ingreso *">
-              <select className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
+              <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
                 <option value="">Seleccionar origen</option>
                 {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
               </select>
             </Field>
-            <Field full label="Representante"><input className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-            <Field label="Teléfono"><input className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-            <Field label="Correo"><input className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+            <Field full label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
+            <Field label="Teléfono"><input type="tel" name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+            <Field label="Correo"><input type="email" name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
           </div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }

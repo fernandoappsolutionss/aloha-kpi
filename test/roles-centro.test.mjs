@@ -5,6 +5,30 @@ import { soloDeMisCentros } from '../lib/current-user.mjs'
 
 const fuente = (ruta) => readFileSync(new URL(ruta, import.meta.url), 'utf8')
 
+test('configuración global rechaza actor no vigente antes de consultar o mutar SQL', async () => {
+  for (const [path, names] of [
+    ['../app/actions/metas.js', ['getMetas', 'saveMetas']],
+    ['../app/actions/centros.js', ['listCentrosConUsuarios', 'createCentro', 'updateCentro', 'deleteCentro']],
+  ]) {
+    let queries = 0
+    let freshChecks = 0
+    const source = fuente(path).replace(/^import .*\n/gm, '').replace(/export async function/g, 'async function')
+    const actions = new Function('sql', 'requireCurrentAdmin', 'requireAdmin', 'requireSession', 'fallo',
+      `${source}\nreturn { ${names.join(', ')} }`)(
+      () => { queries++; return [] },
+      async () => { freshChecks++; throw new Error('Actor vigente sin permiso') },
+      async () => ({}), async () => ({}), (_name, error) => ({ error: error.message }),
+    )
+    for (const name of names) {
+      const args = name === 'createCentro' ? [{ nombre: 'Prueba', pais: 'PA' }] : [2026, { nombre: 'Prueba', pais: 'PA' }, {}]
+      if (name === 'deleteCentro') assert.equal((await actions[name](...args)).error, 'Actor vigente sin permiso')
+      else await assert.rejects(actions[name](...args), /Actor vigente sin permiso/)
+    }
+    assert.equal(freshChecks, names.length)
+    assert.equal(queries, 0, 'una denegación nunca debe llegar a SQL')
+  }
+})
+
 test('soloDeMisCentros recorta al alcance del coordinador', () => {
   const filas = [{ centro_id: 10, n: 1 }, { centro_id: 11, n: 2 }, { centro_id: 12, n: 3 }]
   assert.deepEqual(soloDeMisCentros(filas, [10, 12]).map((f) => f.n), [1, 3])
@@ -43,9 +67,43 @@ test('las eliminaciones del centro exigen un rol que pueda eliminar', () => {
   }
 })
 
-test('gestionar usuarios y centros sigue siendo solo de gerencia', () => {
+test('Gestión de usuarios usa actor fresco y servicio; centros sigue solo en gerencia', () => {
   const usuarios = fuente('../app/actions/usuarios.js')
-  assert.equal((usuarios.match(/await requireAdmin\(\)/g) || []).length, 5)
+  assert.match(usuarios, /requireSession\(\)/)
+  assert.match(usuarios, /createUsuariosService/)
+  assert.doesNotMatch(usuarios, /requireAdmin\(\)/)
+  assert.doesNotMatch(usuarios, /SELECT\s|INSERT\s|UPDATE\s|DELETE\s/i)
+
+  const page = fuente('../app/dashboard/usuarios/page.js')
+  assert.doesNotMatch(page, /['"]use client['"]/)
+  assert.match(page, /getUsuariosPageData/)
+  assert.match(page, /UsuariosClient/)
+
+  const sidebar = fuente('../components/Sidebar.js')
+  assert.doesNotMatch(sidebar, /aloha_rol/)
+  assert.doesNotMatch(sidebar, /localStorage\.getItem\(['"]aloha_rol/)
+  assert.match(sidebar, /viewUsers/)
+  assert.match(sidebar, /viewCenters/)
+
   const centros = fuente('../app/actions/centros.js')
-  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 200), /requireAdmin\(\)/)
+  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 240), /requireCurrentAdmin\(\)/)
+})
+
+test('la página conserva props frescas, una sola mutación y la confirmación de acceso', () => {
+  const client = fuente('../app/dashboard/usuarios/UsuariosClient.js')
+  assert.match(client, /const EMPTY_FORM\s*=\s*\{[^}]*centros:\s*\[\]/s)
+  assert.match(client, /function resetEditor\(\)/)
+  assert.match(client, /setAccessResult\(/)
+  assert.match(client, /initialData\.users\.filter/)
+  assert.match(client, /pendingRef\.current/)
+  assert.doesNotMatch(client, /useState\(initialData\.users\)/)
+  assert.doesNotMatch(client, /listCentros/)
+})
+
+test('navegación usa usuario fresco y evita consulta global para alcance vacío', () => {
+  const navigation = fuente('../app/actions/navigation.js')
+  assert.match(navigation, /requireCurrentUser\(\)/)
+  assert.match(navigation, /scope\.length\s*===\s*0\s*\?\s*\[\]/)
+  assert.match(navigation, /viewUsers/)
+  assert.match(navigation, /viewCenters/)
 })

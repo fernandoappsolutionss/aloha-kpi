@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Sidebar from '../../../components/Sidebar'
+import TableScroller from '../../../components/TableScroller'
 import { getGrowthAdminOverview } from '../../actions/growth'
 import { confidenceMeta, formatGrowthPeriod } from '../../../lib/growth/presenter.mjs'
 
@@ -65,7 +66,6 @@ function EmptyModel({ model }) {
 }
 
 export default function GrowthAdminPage() {
-  const router = useRouter()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -109,7 +109,7 @@ export default function GrowthAdminPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general" />
-      <main className="main growth-admin-page">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main growth-admin-page comparisons-page">
         <header className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Franquicia · proyección</div>
@@ -121,7 +121,8 @@ export default function GrowthAdminPage() {
           </button>
         </header>
 
-        {error && <div className="alert alert--error">{error}</div>}
+        {error && <div role="alert" className="alert alert--error">{error}</div>}
+        {loading && data && <div role="status">Actualizando crecimiento…</div>}
 
         {data && (
           <>
@@ -139,25 +140,27 @@ export default function GrowthAdminPage() {
               <input
                 className="input"
                 type="search"
+                name="centro"
+                autoComplete="off"
                 aria-label="Buscar centro"
                 placeholder="Buscar centro..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
-              <select className="select" aria-label="Filtrar por calidad de datos" value={confidence} onChange={(event) => setConfidence(event.target.value)}>
+              <select className="select" name="confianza" autoComplete="off" aria-label="Filtrar por calidad de datos" value={confidence} onChange={(event) => setConfidence(event.target.value)}>
                 <option value="all">Toda calidad de datos</option>
                 <option value="high">Datos completos</option>
                 <option value="medium">Datos por revisar</option>
                 <option value="low">Datos insuficientes</option>
               </select>
-              <select className="select" aria-label="Filtrar por prioridad" value={priority} onChange={(event) => setPriority(event.target.value)}>
+              <select className="select" name="prioridad" autoComplete="off" aria-label="Filtrar por prioridad" value={priority} onChange={(event) => setPriority(event.target.value)}>
                 <option value="all">Toda prioridad</option>
                 <option value="data">Completar datos</option>
                 <option value="capacity">Revisar capacidad</option>
                 <option value="stalled">Ritmo detenido</option>
                 <option value="on_track">Con avance</option>
               </select>
-              <select className="select" aria-label="Ordenar centros" value={sort} onChange={(event) => setSort(event.target.value)}>
+              <select className="select" name="orden" autoComplete="off" aria-label="Ordenar centros" value={sort} onChange={(event) => setSort(event.target.value)}>
                 <option value="priority">Orden: prioridad</option>
                 <option value="gap">Menor brecha</option>
                 <option value="growth">Mayor crecimiento</option>
@@ -169,13 +172,14 @@ export default function GrowthAdminPage() {
         )}
 
         {loading && !data ? (
-          <div className="growth-admin-loading">
+          <div className="growth-admin-loading" role="status">
             <strong>Calculando rutas de todos los centros</strong>
             <span>Este primer cálculo puede tomar unos segundos.</span>
           </div>
         ) : data && rows.length ? (
-          <div className="growth-admin-table-wrap">
+          <TableScroller label="Crecimiento por centro" stickyFirstColumn>
             <table className="table growth-admin-table">
+              <caption className="sr-only">Crecimiento por centro: nivel, proyección y prioridades</caption>
               <thead>
                 <tr>
                   <th>Centro</th>
@@ -194,7 +198,7 @@ export default function GrowthAdminPage() {
                     <tr key={row.id}>
                       <td><strong>{row.name}</strong></td>
                       <td colSpan="6" style={{ color: 'var(--bad)' }}>No se pudo calcular este centro.</td>
-                      <td><button type="button" className="btn" onClick={() => router.push(`/centro/${row.id}`)}>Abrir</button></td>
+                      <td><Link className="btn" href={`/centro/${row.id}`} aria-label={`Abrir centro ${row.name}`}>Abrir</Link></td>
                     </tr>
                   )
                   const confidenceInfo = confidenceMeta(row.confidence.level)
@@ -246,16 +250,16 @@ export default function GrowthAdminPage() {
                         <small>{GUARDRAIL[row.backtest.guardrail]?.label}</small>
                       </td>
                       <td>
-                        <button type="button" className="btn growth-admin-open" title={`Abrir ruta de ${row.name}`} onClick={() => router.push(`/centro/${row.id}/ruta-nivel`)}>
+                        <Link className="btn growth-admin-open" aria-label={`Abrir ruta de ${row.name}`} href={`/centro/${row.id}/ruta-nivel`}>
                           Abrir
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroller>
         ) : data ? (
           <div className="growth-admin-loading"><strong>No hay centros con estos filtros.</strong></div>
         ) : null}

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' }
+const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: 'false' }
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState('light')
@@ -13,13 +13,15 @@ export default function ThemeToggle() {
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'dark' ? '#012B36' : '#FBFAF8')
     try { localStorage.setItem('aloha_theme', next) } catch {}
     setTheme(next)
   }
 
   const dark = theme === 'dark'
   return (
-    <button onClick={toggle} className="theme-toggle" aria-label="Cambiar tema claro u oscuro" title="Cambiar tema">
+    <button type="button" onClick={toggle} className="theme-toggle" aria-label="Cambiar tema claro u oscuro"
+      aria-pressed={dark} title="Cambiar tema">
       {dark ? (
         <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
       ) : (

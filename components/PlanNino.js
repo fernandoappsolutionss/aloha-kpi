@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { TIPOS_SEMANA } from '../lib/itinerario'
 import { calendarioVersionadoDe, planNino, posicionPlanNino, cierreEfectivo } from '../lib/plan-nino.mjs'
 import { posicionDeIndice, estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
+import Dialog, { useDialogCallback } from './Dialog'
 
 // Fechas DATE de Postgres llegan como 'AAAA-MM-DD' o como Date según el driver.
 const isoDia = (d) => {
@@ -34,7 +35,7 @@ export const TIPO_ESTILO = {
   induccion: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
   clase: { bg: 'var(--surface-3)', line: 'var(--border-strong)', fg: 'var(--text-muted)' },
   evaluacion: { bg: 'var(--warn-bg)', line: 'var(--warn-line)', fg: 'var(--warn)' },
-  mental: { bg: 'var(--ts-green-soft)', line: 'var(--ts-green-line)', fg: 'var(--ts-green)' },
+  mental: { bg: 'var(--ts-green-soft)', line: 'var(--ts-green-line)', fg: 'var(--ok-text)' },
   cierre: { bg: 'var(--bad-bg)', line: 'var(--bad-line)', fg: 'var(--bad)' },
 }
 const estiloDe = (tipo) => TIPO_ESTILO[tipo] || TIPO_ESTILO.clase
@@ -55,7 +56,7 @@ export function ProgresoPlan({ it, estado, indice }) {
   const { pct, texto } = progresoPlan({ total, estado, indice, etiqueta })
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 5 }}>
         <span>{texto}</span>
         <span className="num">{pct}%</span>
       </div>
@@ -115,7 +116,7 @@ export function LineaTiempoPlan({ it, estado, indice, onFecha, tour }) {
               <div key={i} className={`itin-fila${hoy ? ' itin-fila--hoy' : ''}`} style={pasada ? { opacity: 0.55 } : undefined}>
                 <span className="itin-fila__chip" style={{ background: est.bg, borderColor: est.line, color: est.fg }}>{s.corto}</span>
                 <span style={{ color: hoy ? 'var(--text)' : 'var(--text-muted)', fontWeight: hoy ? 600 : 400 }}>{s.etiqueta}</span>
-                {hoy && <span className="pill pill--ok" style={{ fontSize: 10 }}><span className="dot" />Hoy</span>}
+                {hoy && <span className="pill pill--ok" style={{ fontSize: 13 }}><span className="dot" />Hoy</span>}
                 <span className="num itin-fila__fechas">
                   {(s.saltadas || []).map((k) => (
                     <span key={k.fecha} className="itin-fecha itin-fecha--out" title={`${fmtDia(k.fecha)}: ${k.motivo} — por eso corrió el plan`}>
@@ -147,17 +148,17 @@ export function NotasPlan({ it, style }) {
   return (
     <div style={{ padding: '12px 18px', display: 'grid', gap: 8, ...style }}>
       {it.clases_suspendidas?.length > 0 && (
-        <div style={{ fontSize: 11.5, color: 'var(--warn)' }}>
+        <div style={{ fontSize: 12, color: 'var(--warn)' }}>
           ⏸ Clases suspendidas del grupo: {it.clases_suspendidas.map((c) => `${fmtDia(c.fecha)}${c.motivo ? ` (${c.motivo})` : ''}`).join(' · ')}
         </div>
       )}
       {it.feriados_saltados?.length > 0 && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
           🎌 Sin clases por feriados y vacaciones del manual: {it.feriados_saltados.map(fmtDia).join(' · ')}
         </div>
       )}
       {it.inicio_siguiente_nivel && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
           ➡️ El nivel {it.nivel + 1} arrancaría el <b style={{ color: 'var(--text)' }}>{fmtDia(it.inicio_siguiente_nivel)}</b>
           {Number(it.nivel) % 2 === 0 ? ' (incluye la semana de vacaciones de fin de ciclo)' : ''}.
         </div>
@@ -179,14 +180,9 @@ const ORIGEN_CIERRE = { manual: 'override manual', derivado: 'derivado de su pro
 //     modal explica qué falta y por qué el sistema no lo adivina.
 //   onCambio(plan) — avisa a la pantalla que el ancla cambió (para refrescar
 //     el roster); el modal ya repinta solo con el plan que devuelve el server.
-export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion, onCambio }) {
+export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion, onCambio, returnFocusRef }) {
   const [planFijado, setPlanFijado] = useState(null)
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const [closeDisabled, setCloseDisabled] = useState(false)
 
   const base = planFijado || nino?.plan || null
 
@@ -234,99 +230,94 @@ export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion
   const sinAncla = !ancla
   const sinCalendario = !sinAncla && sinPlan
 
-  const fijado = (planNuevo) => {
+  const fijado = useDialogCallback((planNuevo) => {
     if (planNuevo) setPlanFijado(planNuevo)
     onCambio?.(planNuevo || null)
-  }
+  }, nino?.id)
+  const notifyBusy = useDialogCallback(setCloseDisabled, nino?.id)
+
+  const titulo = `Plan de ${nino?.nombre || 'el niño'}`
 
   return (
-    <div onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 640, maxWidth: '100%', padding: 0 }}
-        role="dialog" aria-modal="true" aria-label={`Plan de ${nino?.nombre || 'el niño'}`}>
-
-        <div className="itin-head">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              <span className="label">Plan del niño</span>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
-                {nino?.nombre}
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
-                {nino?.itinerario} · Nivel {nino?.nivel}
-                {grupo ? ` · Grupo ${grupo.numero}` : ''}
-                {nino?.representante ? ` · ${nino.representante}` : ''}
-              </div>
-            </div>
-            <button className="btn" style={{ padding: '4px 10px', flexShrink: 0 }} onClick={onClose}
-              title="Cerrar (Esc)" aria-label="Cerrar el plan del niño">✕</button>
-          </div>
-
-          {/* Ancla y cierre: las dos fechas que MANDAN en el plan del niño */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10, marginTop: 12 }}>
-            <div>
-              <span className="label">Empezó su nivel</span>
-              <div className="num" style={{ fontSize: 14, color: ancla ? 'var(--text)' : 'var(--text-dim)', marginTop: 3 }}>
-                {ancla ? fmtDia(ancla) : 'sin fecha de inicio'}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                {ancla
-                  ? 'Es su ancla: de aquí sale todo su plan (no del grupo).'
-                  : 'Sin ancla no hay plan: el sistema no la adivina.'}
-              </div>
-            </div>
-            <div>
-              <span className="label">Cierra su nivel</span>
-              <div className="num" style={{ fontSize: 14, color: cierre.fecha ? 'var(--text)' : 'var(--text-dim)', marginTop: 3 }}>
-                {cierre.fecha ? fmtDia(cierre.fecha) : 'sin cierre resoluble'}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                {cierre.origen ? ORIGEN_CIERRE[cierre.origen] : 'sin override manual ni plan derivable'}
-              </div>
-            </div>
-          </div>
-
-          {!sinPlan && (
-            <div style={{ marginTop: 12 }}>
-              <ProgresoPlan it={it} estado={estado} indice={plan?.indiceSemana} />
-            </div>
-          )}
+    <Dialog
+      open
+      title={titulo}
+      returnFocusRef={returnFocusRef}
+      onClose={onClose}
+      closeDisabled={closeDisabled}
+      width={640}
+      className="plan-nino-dialog"
+    >
+      <div className="itin-head">
+        <span className="label">Plan del niño</span>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>
+          {nino?.itinerario} · Nivel {nino?.nivel}
+          {grupo ? ` · Grupo ${grupo.numero}` : ''}
+          {nino?.representante ? ` · ${nino.representante}` : ''}
         </div>
 
-        <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
-          {sinPlan ? (
-            sinCalendario ? (
-              <div style={{ padding: 26, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12.5, lineHeight: 1.7 }}>
-                {nino?.nombre} sí tiene su fecha de inicio de nivel ({fmtDia(ancla)}), pero
-                {grupo ? ` el grupo ${grupo.numero}` : ' su grupo'} todavía no tiene horario ni itinerario:
-                <b style={{ color: 'var(--text)' }}> sin calendario del aula no hay plan que derivar</b>.
-                Ponle horario y fecha de inicio de clases al grupo y este plan aparece solo.
-              </div>
-            ) : renderCreacion ? (
-              renderCreacion({ nino, grupo, onPlanFijado: fijado })
-            ) : (
-              <div style={{ padding: 26, color: 'var(--text-dim)', fontSize: 12.5, lineHeight: 1.7, display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)' }}>Este niño no tiene fecha de inicio de nivel</div>
-                <p style={{ maxWidth: 420, margin: 0 }}>
-                  Su historia no alcanza para deducirla (su inscripción declara un nivel distinto al que cursa hoy),
-                  y el sistema <b style={{ color: 'var(--text)' }}>no la inventa</b>. Hay que fijarla a mano: es el día
-                  en que {nino?.nombre} empezó el nivel {nino?.nivel} que cursa ahora.
-                </p>
-              </div>
-            )
-          ) : (
-            <>
-              <LineaTiempoPlan it={it} estado={estado} indice={plan?.indiceSemana} />
-              <NotasPlan it={it} />
-              <div style={{ padding: '0 18px 14px', fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.6 }}>
-                Este plan es de {nino?.nombre}: sale de SU fecha de inicio de nivel sobre el calendario
-                {grupo ? ` del grupo ${grupo.numero}` : ' de su grupo'} (con sus feriados y clases suspendidas).
-                Sus compañeros con otra ancla van por otra semana.
-              </div>
-            </>
-          )}
+        {/* Ancla y cierre: las dos fechas que MANDAN en el plan del niño */}
+        <div className="dialog-form-grid" style={{ gap: 10, marginTop: 12 }}>
+          <div>
+            <span className="label">Empezó su nivel</span>
+            <div className="num" style={{ fontSize: 14, color: ancla ? 'var(--text)' : 'var(--text-dim)', marginTop: 3 }}>
+              {ancla ? fmtDia(ancla) : 'sin fecha de inicio'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+              {ancla
+                ? 'Es su ancla: de aquí sale todo su plan (no del grupo).'
+                : 'Sin ancla no hay plan: el sistema no la adivina.'}
+            </div>
+          </div>
+          <div>
+            <span className="label">Cierra su nivel</span>
+            <div className="num" style={{ fontSize: 14, color: cierre.fecha ? 'var(--text)' : 'var(--text-dim)', marginTop: 3 }}>
+              {cierre.fecha ? fmtDia(cierre.fecha) : 'sin cierre resoluble'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+              {cierre.origen ? ORIGEN_CIERRE[cierre.origen] : 'sin override manual ni plan derivable'}
+            </div>
+          </div>
         </div>
+
+        {!sinPlan && (
+          <div style={{ marginTop: 12 }}>
+            <ProgresoPlan it={it} estado={estado} indice={plan?.indiceSemana} />
+          </div>
+        )}
       </div>
-    </div>
+
+      {sinPlan ? (
+        sinCalendario ? (
+          <div style={{ padding: 10, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12.5, lineHeight: 1.7 }}>
+            {nino?.nombre} sí tiene su fecha de inicio de nivel ({fmtDia(ancla)}), pero
+            {grupo ? ` el grupo ${grupo.numero}` : ' su grupo'} todavía no tiene horario ni itinerario:
+            <b style={{ color: 'var(--text)' }}> sin calendario del aula no hay plan que derivar</b>.
+            Ponle horario y fecha de inicio de clases al grupo y este plan aparece solo.
+          </div>
+        ) : renderCreacion ? (
+          renderCreacion({ nino, grupo, onPlanFijado: fijado, onBusyChange: notifyBusy })
+        ) : (
+          <div style={{ padding: 10, color: 'var(--text-dim)', fontSize: 12.5, lineHeight: 1.7, display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)' }}>Este niño no tiene fecha de inicio de nivel</div>
+            <p style={{ maxWidth: 420, margin: 0 }}>
+              Su historia no alcanza para deducirla (su inscripción declara un nivel distinto al que cursa hoy),
+              y el sistema <b style={{ color: 'var(--text)' }}>no la inventa</b>. Hay que fijarla a mano: es el día
+              en que {nino?.nombre} empezó el nivel {nino?.nivel} que cursa ahora.
+            </p>
+          </div>
+        )
+      ) : (
+        <>
+          <LineaTiempoPlan it={it} estado={estado} indice={plan?.indiceSemana} />
+          <NotasPlan it={it} />
+          <div style={{ padding: '0 2px 14px', fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.6 }}>
+            Este plan es de {nino?.nombre}: sale de SU fecha de inicio de nivel sobre el calendario
+            {grupo ? ` del grupo ${grupo.numero}` : ' de su grupo'} (con sus feriados y clases suspendidas).
+            Sus compañeros con otra ancla van por otra semana.
+          </div>
+        </>
+      )}
+    </Dialog>
   )
 }
