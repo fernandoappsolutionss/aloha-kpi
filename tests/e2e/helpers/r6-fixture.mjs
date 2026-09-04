@@ -103,11 +103,11 @@ export async function cleanupR6Fixture() {
       return
     }
     await owned(query, true)
-    const snapshots = await query('SELECT id FROM growth_snapshots WHERE centro_id=$1 ORDER BY id', [R6_IDS.center])
+    const snapshots = await query('SELECT id,engine_version FROM growth_snapshots WHERE centro_id=$1 ORDER BY id', [R6_IDS.center])
     const recommendations = await query('SELECT id FROM growth_recommendations WHERE centro_id=$1 ORDER BY id', [R6_IDS.center])
     const snapshotIds = snapshots.map(r => Number(r.id))
     const receipts = await query('SELECT id FROM growth_notification_receipts WHERE snapshot_id=ANY($1::bigint[]) ORDER BY id', [snapshotIds])
-    manifest.growth = { snapshotIds, recommendationIds: recommendations.map(r => Number(r.id)), receiptIds: receipts.map(r => Number(r.id)) }
+    manifest.growth = { snapshotIds, snapshots, recommendationIds: recommendations.map(r => Number(r.id)), receiptIds: receipts.map(r => Number(r.id)) }
     manifest.baseAfter = await baseFootprint(query)
     manifest.phase = 'cleanup-growth'
     await save(manifest)

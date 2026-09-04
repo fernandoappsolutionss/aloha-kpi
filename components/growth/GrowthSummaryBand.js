@@ -1,3 +1,4 @@
+import { nextPendingRecommendation } from '../../lib/growth/notifications.mjs'
 import {
   confidenceMeta,
   formatGrowthPeriod,
@@ -7,11 +8,7 @@ import {
 const rangeText = (data) => {
   const confidence = data?.metrics?.confidence?.level
   if (confidence === 'low') return 'Completa los datos para estimar una fecha'
-  const conservative = data?.projection?.scenarios?.conservative?.recognitionQuarter
   const action = data?.projection?.scenarios?.action?.recognitionQuarter
-  if (conservative && action && conservative !== action) {
-    return `${formatGrowthPeriod(action)} a ${formatGrowthPeriod(conservative)}`
-  }
   const estimate = action || data?.projection?.scenarios?.base?.recognitionQuarter
   return estimate ? formatGrowthPeriod(estimate) : 'Sin fecha al ritmo actual'
 }
@@ -23,7 +20,7 @@ export default function GrowthSummaryBand({ data, onOpen }) {
   const confidence = confidenceMeta(metrics?.confidence?.level)
   const progress = growthStageProgress(projection)
   const nextMonth = projection.scenarios?.base?.series?.[0]
-  const principal = recommendations[0]
+  const principal = nextPendingRecommendation(recommendations)
 
   return (
     <section className="growth-band" aria-labelledby="growth-band-title">
@@ -43,21 +40,21 @@ export default function GrowthSummaryBand({ data, onOpen }) {
         <div className="growth-band__progress">
           <div className="growth-band__numberline">
             <strong className="num">{projection.currentChildren}</strong>
-            <span>{next ? `de ${next.threshold} · inicio confirmado` : 'con inicio confirmado'}</span>
-            {next && <b className="num">Faltan {next.gap}</b>}
+            <span>{next ? `de ${next.threshold} · cierre previsto` : 'previstos al cierre'}</span>
+            {next && <b className="num">Faltarían {next.gap}</b>}
           </div>
           <div className="growth-track" role="progressbar" aria-label={next ? `Avance al Nivel ${next.level}` : 'Nivel máximo alcanzado'} aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
             <span style={{ width: `${progress}%` }} />
           </div>
           <div className="growth-band__stage">
-            <span>Nivel actual: {projection.currentLevel || 'sin nivel'}</span>
-            <span>{progress}% de esta etapa</span>
+            <span>Nivel según cierre previsto: {projection.currentLevel || 'sin nivel'}</span>
+            <span>{formatGrowthPeriod(operational?.currentPeriod)} · {progress}% de esta etapa</span>
           </div>
         </div>
 
         <div className="growth-band__facts">
           <div>
-            <span className="label">Rango estimado</span>
+            <span className="label">Si se cumplen las acciones</span>
             <strong>{rangeText(data)}</strong>
           </div>
           <div>
@@ -65,7 +62,7 @@ export default function GrowthSummaryBand({ data, onOpen }) {
             <strong className="num">{nextMonth?.endChildren ?? projection.currentChildren} niños</strong>
             {nextMonth && (
               <small className="num">
-                {nextMonth.startChildren} - {nextMonth.withdrawals} + {nextMonth.newActives}
+                {nextMonth.startChildren} - {nextMonth.withdrawals} + {nextMonth.newActives} + {nextMonth.reincorporations || 0}
               </small>
             )}
           </div>

@@ -12,7 +12,8 @@ import { ejecutarRetiroEn } from '../../lib/retiros-service'
 import { calcularKpiAutoMes } from '../../lib/kpi-semanal-service'
 import { superponerSemanasAuto } from '../../lib/kpi-semanal-auto.mjs'
 import { CAMPOS_RESUMEN_AUTO, poblacionKpiAutomatica, usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
-import { fotoKpiAutomatica } from '../../lib/kpi-auto-server'
+import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
+import { classifyTrialSales } from '../../lib/trial-enrollments.mjs'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -81,6 +82,8 @@ export async function loadKpiMes(centroId, year, month) {
     kpiAuto = await calcularKpiAutoMes(centroId, intOr(year), intOr(month))
     if (kpiAuto?.estado === 'manual_pre_gate') kpiAuto = null
     if (kpiAuto?.estado === 'auto') {
+      const trialFunnel = classifyTrialSales(kpiAuto.ventas)
+      kpiAuto = { ...kpiAuto, cp: trialFunnel.reliable ? trialFunnel.trialEnrollments : null, trialFunnel }
       semanas = superponerSemanasAuto(semanas, {
         centroId, year: intOr(year), month: intOr(month), auto: kpiAuto,
       })
@@ -96,7 +99,7 @@ export async function loadKpiMes(centroId, year, month) {
     if (automatic.complete) {
       const automaticSummary = {}
       for (const key of CAMPOS_RESUMEN_AUTO) automaticSummary[key] = automatic.data[key]
-      res = { ...(res || {}), ...automaticSummary }
+      ;[res] = mezclarResumenAutomatico([{ ...(res || {}), year: intOr(year), month: intOr(month) }], year, month, automaticSummary)
       motivosAuto = {
         ...(motivosAuto || {}),
         mot_tecnica: automatic.data.mot_tecnica,
@@ -107,7 +110,7 @@ export async function loadKpiMes(centroId, year, month) {
         mot_otro: automatic.data.mot_otro,
         total: kpiAuto?.estado === 'auto' ? kpiAuto.desTotal : (motivosAuto?.total ?? 0),
       }
-      autoSync = { ok: true, adjusted: automatic.adjusted }
+      autoSync = { ok: true, adjusted: automatic.adjusted, trialFunnel: automatic.data._trial_funnel || null }
     } else {
       autoSync = { ok: false, error: automatic.error || 'No se pudo sincronizar el KPI.' }
     }
@@ -175,15 +178,15 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
   const retirados = esAuto ? kpiAuto.desTotal : auto ? auto.total : totalDes
   const reincorporados = auto ? auto.reincorporados : 0
   const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
-  // (g1-21) cp_matriculados con override: efectivo = override ?? derivado. El
-  // derivado son las ventas del mes (sin traslados) que contó el motor; el
-  // efectivo se materializa en cp_matriculados para no tocar consumidores.
+  // Matrícula de prueba: origen técnico explícito, CRM como respaldo. El
+  // override sigue mandando; una clasificación parcial conserva lo declarado.
   const overrideCrudo = config.cp_matriculados_override
   const cpOverride = overrideCrudo === undefined || overrideCrudo === null || overrideCrudo === ''
     ? null
     : intOr(overrideCrudo)
-  const cpDerivado = esAuto
-    ? kpiAuto.cp
+  const trialSales = esAuto ? classifyTrialSales(kpiAuto.ventas) : null
+  const cpDerivado = trialSales?.reliable
+    ? trialSales.trialEnrollments
     : automaticData ? automaticData.cp_matriculados : intOr(config.cp_matriculados)
   const now = new Date().toISOString()
 

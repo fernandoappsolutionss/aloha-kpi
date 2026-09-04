@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import * as notifications from '../lib/growth/notifications.mjs'
 
 import {
   briefingEligibility,
@@ -73,4 +74,39 @@ test('las acciones de recomendacion solo aceptan transiciones validas', () => {
   assert.equal(recommendationStatusFor('dismiss'), 'dismissed')
   assert.equal(recommendationStatusFor('postpone'), 'postponed')
   assert.throws(() => recommendationStatusFor('archive'), /Accion no valida/)
+})
+
+test('la proxima accion excluye completadas, descartadas y pospuestas', () => {
+  const pending = { id: 4, kind: 'schedule', status: 'pending' }
+  const recommendations = [
+    { id: 1, status: 'completed' }, { id: 2, status: 'dismissed' },
+    { id: 3, status: 'postponed' }, pending,
+  ]
+  assert.deepEqual(notifications.nextPendingRecommendation?.(recommendations), pending)
+  assert.equal(notifications.nextPendingRecommendation?.(recommendations.slice(0, 3)), null)
+})
+
+test('completar la tarea conserva la hipotesis pero nunca acredita impacto observado', () => {
+  const recommendations = [
+    { kind: 'invitations', target: 40 },
+    { kind: 'enrollment', status: 'pending', target: 50 },
+    { kind: 'schedule', status: 'completed', target: 2 },
+    { kind: 'activations', status: 'dismissed', target: 2 },
+    { kind: 'attendance', status: 'postponed', target: 60 },
+    { kind: 'technique', status: 'expired', target: 0 },
+    { kind: 'class_loss', status: 'superseded', target: 0 },
+  ]
+  assert.deepEqual(notifications.planInterventions?.(recommendations), recommendations.slice(0, 3))
+  assert.deepEqual(notifications.planInterventions?.([]), [])
+  assert.equal(notifications.nextPendingRecommendation?.([recommendations[0]]), recommendations[0])
+})
+
+test('una tarea nueva vence desde su fecha real de alta, no desde el lunes', () => {
+  assert.equal(notifications.dueDateForRecommendation?.({ createdOn: '2026-09-03', dueDays: 2 }), '2026-09-05')
+  assert.equal(notifications.dueDateForRecommendation?.({ createdOn: '2026-12-30', dueDays: 7 }), '2027-01-06')
+})
+
+test('recalcular una recomendacion conserva su vencimiento incluso si ya paso', () => {
+  assert.equal(notifications.dueDateForRecommendation?.({ createdOn: '2026-09-03', dueDays: 7, existingDueDate: '2026-09-01' }), '2026-09-01')
+  assert.equal(notifications.dueDateForRecommendation?.({ createdOn: '2026-09-03', dueDays: 7, existingDueDate: new Date('2026-09-12T00:00:00Z') }), '2026-09-12')
 })

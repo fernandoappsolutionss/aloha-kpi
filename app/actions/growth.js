@@ -3,14 +3,17 @@
 import { requireCentroAccess } from '../../lib/auth'
 import { alcancePanel, soloDeMisCentros } from '../../lib/alcance'
 import { sql } from '../../lib/db'
+import { GROWTH_ENGINE_VERSION } from '../../lib/growth/constants.mjs'
 import { evaluateGrowthForecasts } from '../../lib/growth/backtest.mjs'
 import {
   briefingEligibility,
+  nextPendingRecommendation,
   growthWeekStart,
   recommendationStatusFor,
   snoozeUntilTomorrow,
 } from '../../lib/growth/notifications.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
+import { refreshAfterRecommendationUpdate } from '../../lib/growth/engine.mjs'
 
 export async function getCentroGrowth(centroId, options = {}) {
   await requireCentroAccess(centroId)
@@ -26,9 +29,7 @@ const receiptShape = (row) => row ? {
 
 const briefingShape = (growth) => {
   const nextMonth = growth.projection.scenarios.base.series[0] || null
-  const topRecommendation = growth.recommendations.find((item) => item.status === 'pending')
-    || growth.recommendations.find((item) => item.status === 'postponed')
-    || null
+  const topRecommendation = nextPendingRecommendation(growth.recommendations)
 
   return {
     center: growth.center,
@@ -37,7 +38,7 @@ const briefingShape = (growth) => {
     currentChildren: growth.projection.currentChildren,
     nextLevel: growth.projection.nextLevel,
     nextMonth,
-    weeklyInvitations: growth.projection.requirements.weeklyInvitations,
+    weeklyInvitations: growth.projection.requirements.commercial?.weeklyInvitations ?? null,
     topRecommendation,
   }
 }
@@ -148,14 +149,12 @@ export async function updateGrowthRecommendation(centroId, recommendationId, com
     RETURNING id, status, due_date, completed_at
   `
   if (!updated) throw new Error('La recomendacion ya no esta activa')
-  return updated
+  return refreshAfterRecommendationUpdate(updated, () => calculateCentroGrowth(centroId))
 }
 
 const adminGrowthRow = (growth, backtest) => {
   const projection = growth.projection
-  const topAction = growth.recommendations.find((item) => item.status === 'pending')
-    || growth.recommendations.find((item) => item.status === 'postponed')
-    || null
+  const topAction = nextPendingRecommendation(growth.recommendations)
   const nextMonth = projection.scenarios.base.series[0] || null
   const nextThreshold = projection.nextLevel?.threshold ?? null
 
@@ -163,6 +162,7 @@ const adminGrowthRow = (growth, backtest) => {
     id: growth.center.id,
     name: growth.center.nombre,
     currentChildren: projection.currentChildren,
+    population: growth.population,
     currentLevel: projection.currentLevel,
     nextLevel: projection.nextLevel,
     confidence: growth.metrics.confidence,
@@ -206,6 +206,7 @@ export async function getGrowthAdminOverview() {
       SELECT centro_id, snapshot_date, payload
       FROM growth_snapshots
       WHERE snapshot_date >= CURRENT_DATE - INTERVAL '24 months'
+        AND engine_version = ${GROWTH_ENGINE_VERSION}
       ORDER BY snapshot_date
     `,
     sql`
@@ -225,10 +226,11 @@ export async function getGrowthAdminOverview() {
   // coordinador no le sirve (ni le corresponde) el promedio de los demás.
   const misSnapshots = soloDeMisCentros(snapshots, centroIds)
   const misActuals = soloDeMisCentros(closedActuals, centroIds)
-  const model = evaluateGrowthForecasts({ snapshots: misSnapshots, actuals: misActuals })
+  const model = evaluateGrowthForecasts({ snapshots: misSnapshots, actuals: misActuals, engineVersion: GROWTH_ENGINE_VERSION })
   const rows = calculated.map(({ center, growth, error }) => {
     if (error || !growth) return { id: center.id, name: center.nombre, error: true }
     const centerBacktest = evaluateGrowthForecasts({
+      engineVersion: GROWTH_ENGINE_VERSION,
       snapshots: misSnapshots.filter((item) => String(item.centro_id) === String(center.id)),
       actuals: misActuals.filter((item) => String(item.centro_id) === String(center.id)),
     })

@@ -101,7 +101,10 @@ test('GrowthSummaryBand expone progreso nombrado, datos y acción con tipografí
   // Etapa 170–200, 185 es exactamente el 50%; dato independiente del presenter.
   await expect(band.getByRole('progressbar', { name: 'Avance al Nivel 2' })).toHaveAttribute('aria-valuenow', '50')
   await expect(band).toContainText('185')
-  await expect(band).toContainText('Faltan 15')
+  await expect(band).toContainText('Faltarían 15')
+  await expect(band).toContainText('cierre previsto')
+  await expect(band.locator('.growth-band__stage')).toContainText('Septiembre 2026')
+  await expect(band.locator('.growth-band__facts')).toContainText('Completar las fechas de inicio')
   await expect(band).toContainText('191 niños')
   await auditPage(page, { mobile: true, state: null, scope: '.growth-band' })
   const smallSizes = await band.locator('small, .growth-band__stage, .growth-band__numberline span').evaluateAll(els => els.map(el => parseFloat(getComputedStyle(el).fontSize)))

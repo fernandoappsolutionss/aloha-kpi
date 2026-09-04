@@ -94,3 +94,33 @@ test('un cierre nulo no se convierte en cero niños', () => {
   })
   assert.equal(result.sampleSize, 0)
 })
+
+test('rejects snapshots at or after their forecast target month', () => {
+  const result = evaluateGrowthForecasts({ snapshots: [snapshot({ date: '2026-02-10', current: 100, period: '2026-02', forecast: 110 })], actuals: [{ centro_id: 1, period: '2026-02', actual: 110 }] })
+  assert.equal(result.sampleSize, 0)
+})
+
+test('evaluates each scenario and horizon separately while preserving base one-month aggregate', () => {
+  const s = snapshot({ date: '2026-01-10', current: 100, period: '2026-02', forecast: 108 })
+  s.payload.projection.scenarios.base.series.push({ period: '2026-03', endChildren: 116 })
+  s.payload.projection.scenarios.action = { series: [{ period: '2026-02', endChildren: 110 }, { period: '2026-03', endChildren: 118 }] }
+  const result = evaluateGrowthForecasts({ snapshots: [s], actuals: [{ centro_id: 1, period: '2026-02', actual: 110 }, { centro_id: 1, period: '2026-03', actual: 118 }], minSample: 1 })
+  assert.equal(result.sampleSize, 1)
+  assert.equal(result.engineMae, 2)
+  assert.equal(result.byScenario.base['2'].engineMae, 2)
+  assert.equal(result.byScenario.action['2'].engineMae, 0)
+})
+
+test('does not credit a new engine with older model observations', () => {
+  const old = snapshot({ date: '2026-01-10', current: 100, period: '2026-02', forecast: 110 })
+  old.payload.engineVersion = '1.0.0'
+  const result = evaluateGrowthForecasts({ engineVersion: '2.0.0', snapshots: [old], actuals: [{ centro_id: 1, period: '2026-02', actual: 110 }] })
+  assert.equal(result.sampleSize, 0)
+})
+
+test('rejects payloads generated after the target even when snapshot_date is earlier', () => {
+  const late = snapshot({ date: '2026-01-10', current: 100, period: '2026-02', forecast: 110 })
+  late.payload.generatedAt = '2026-03-10T00:00:00Z'
+  const result = evaluateGrowthForecasts({ snapshots: [late], actuals: [{ centro_id: 1, period: '2026-02', actual: 110 }] })
+  assert.equal(result.sampleSize, 0)
+})

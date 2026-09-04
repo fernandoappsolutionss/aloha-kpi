@@ -375,7 +375,7 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
   })
   await page.goto('/centro/3', { waitUntil: 'domcontentloaded' })
 
-  const dialog = page.getByRole('dialog', { name: /Faltan|El reto ahora/i })
+  const dialog = page.getByRole('dialog', { name: /Faltarían.*al cierre|El reto ahora/i })
   await expect(dialog).toBeVisible({ timeout: 60_000 })
   const title = dialog.getByRole('heading')
   await expect(title.locator('[tabindex="-1"]')).toBeFocused()

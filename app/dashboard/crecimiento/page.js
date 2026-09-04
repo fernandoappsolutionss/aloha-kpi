@@ -52,7 +52,7 @@ function EmptyModel({ model }) {
     <section className="growth-model-band" aria-labelledby="model-band-title">
       <div>
         <span className="label">Control del motor</span>
-        <h2 id="model-band-title">Backtesting de proyección mensual</h2>
+        <h2 id="model-band-title">Precisión de la versión actual</h2><p className="growth-explanation">Comparación con cierres posteriores a cada pronóstico. Menos de seis cierres evaluados no permiten validar la precisión.</p>
       </div>
       <div className="growth-model-band__metrics">
         <span><small>Muestra</small><strong className="num">{model.sampleSize}</strong></span>
@@ -128,7 +128,7 @@ export default function GrowthAdminPage() {
           <>
             <section className="growth-admin-summary" aria-label="Resumen de crecimiento">
               <SummaryMetric label="Centros calculados" value={`${data.summary.calculated}/${data.summary.centers}`} detail="con ruta disponible" />
-              <SummaryMetric label="Confianza baja" value={data.summary.lowConfidence} detail="requieren completar datos" tone={data.summary.lowConfidence ? 'warn' : 'ok'} />
+              <SummaryMetric label="Datos insuficientes" value={data.summary.lowConfidence} detail="requieren completar datos" tone={data.summary.lowConfidence ? 'warn' : 'ok'} />
               <SummaryMetric label="Ritmo positivo" value={data.summary.positiveBase} detail="centros con crecimiento base" tone="ok" />
               <SummaryMetric label="Bloqueo de capacidad" value={data.summary.capacityBlocked} detail="no sostienen el próximo nivel" tone={data.summary.capacityBlocked ? 'warn' : 'ok'} />
               <SummaryMetric label="Crecimiento proyectado" value={signed(data.summary.projectedMonthlyNet)} detail="niños netos por mes" />
@@ -147,11 +147,11 @@ export default function GrowthAdminPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
-              <select className="select" name="confianza" autoComplete="off" aria-label="Filtrar por confianza" value={confidence} onChange={(event) => setConfidence(event.target.value)}>
-                <option value="all">Toda confianza</option>
-                <option value="high">Confianza alta</option>
-                <option value="medium">Confianza media</option>
-                <option value="low">Confianza baja</option>
+              <select className="select" name="confianza" autoComplete="off" aria-label="Filtrar por calidad de datos" value={confidence} onChange={(event) => setConfidence(event.target.value)}>
+                <option value="all">Toda calidad de datos</option>
+                <option value="high">Datos completos</option>
+                <option value="medium">Datos por revisar</option>
+                <option value="low">Datos insuficientes</option>
               </select>
               <select className="select" name="prioridad" autoComplete="off" aria-label="Filtrar por prioridad" value={priority} onChange={(event) => setPriority(event.target.value)}>
                 <option value="all">Toda prioridad</option>
@@ -183,7 +183,7 @@ export default function GrowthAdminPage() {
               <thead>
                 <tr>
                   <th>Centro</th>
-                  <th>Nivel y brecha</th>
+                  <th>Cierre previsto y brecha</th>
                   <th>Proyección</th>
                   <th>Próximo mes</th>
                   <th>Control local</th>
@@ -210,24 +210,24 @@ export default function GrowthAdminPage() {
                     <tr key={row.id}>
                       <td>
                         <strong className="growth-admin-table__name">{row.name}</strong>
-                        <span className="label">Nivel {row.currentLevel || 0}</span>
+                        <span className="label">Nivel previsto {row.currentLevel || 0}</span>
                       </td>
                       <td>
                         <div className="growth-admin-gap">
                           <strong className="num">{row.currentChildren}</strong>
-                          <span>{row.nextLevel ? `faltan ${row.nextLevel.gap} para N${row.nextLevel.level}` : 'nivel máximo'}</span>
+                          <span>{row.nextLevel ? `faltarían ${row.nextLevel.gap} para N${row.nextLevel.level}` : 'nivel máximo'}</span>
                         </div>
                         <div className="growth-mini-track"><span style={{ width: `${progress}%` }} /></div>
                       </td>
                       <td>
-                        <div className="growth-admin-pair"><span>Actual</span><strong className="num">{signed(row.baseMonthlyNet)}/mes</strong></div>
-                        <div className="growth-admin-pair"><span>Con plan</span><strong className="num growth-admin-positive">{signed(row.actionMonthlyNet)}/mes</strong></div>
+                        <div className="growth-admin-pair"><span>Base</span><strong className="num">{signed(row.baseMonthlyNet)}/mes</strong></div>
+                        <div className="growth-admin-pair"><span>Si se cumple</span><strong className="num growth-admin-positive">{signed(row.actionMonthlyNet)}/mes</strong></div>
                         <small>{row.actionQuarter ? formatGrowthPeriod(row.actionQuarter) : 'Sin trimestre confiable'}</small>
                       </td>
                       <td>
                         {row.nextMonth ? (
                           <>
-                            <div className="growth-admin-equation num">{row.nextMonth.startChildren} − {row.nextMonth.withdrawals} + {row.nextMonth.newActives} = <b>{row.nextMonth.endChildren}</b></div>
+                            <div className="growth-admin-equation num">{row.nextMonth.startChildren} − {row.nextMonth.withdrawals} + {row.nextMonth.newActives} + {row.nextMonth.reincorporations || 0} = <b>{row.nextMonth.endChildren}</b></div>
                             <small>{formatGrowthPeriod(row.nextMonth.period)}</small>
                           </>
                         ) : '—'}

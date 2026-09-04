@@ -54,7 +54,7 @@ test('Crecimiento muestra opciones largas completas y apila los filtros en móvi
   await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1)
   await page.evaluate(async () => { await document.fonts.ready })
   for (const [name, value, text] of [
-    ['Filtrar por confianza', 'medium', 'Confianza media'],
+    ['Filtrar por calidad de datos', 'medium', 'Datos por revisar'],
     ['Filtrar por prioridad', 'capacity', 'Revisar capacidad'],
     ['Ordenar centros', 'growth', 'Mayor crecimiento'],
   ]) {

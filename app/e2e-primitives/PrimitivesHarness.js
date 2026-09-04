@@ -10,8 +10,8 @@ import GrowthSummaryBand from '../../components/growth/GrowthSummaryBand'
 const growthFixture = {
   projection: { currentChildren: 185, currentLevel: 1, nextLevel: { level: 2, threshold: 200, gap: 15 }, scenarios: { base: { series: [{ startChildren: 185, withdrawals: 2, newActives: 8, endChildren: 191 }] } } },
   metrics: { confidence: { level: 'low' } },
-  operational: { undatedStarts: 1 },
-  recommendations: [{ title: 'Completar las fechas de inicio' }],
+  operational: { currentPeriod: '2026-09', undatedStarts: 1 },
+  recommendations: [{ status: 'pending', title: 'Completar las fechas de inicio' }],
 }
 
 export default function PrimitivesHarness() {
