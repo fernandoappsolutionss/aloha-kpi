@@ -39,10 +39,11 @@ function SetPasswordInner() {
   }
 
   const reset = info?.purpose === 'reset'
+  const pageState = loading || info === null ? 'loading' : error || !info.valid ? 'error' : 'ready'
 
   return (
     <div className="login">
-      <main id="main-content" className="login__panel login__panel--single" data-page-state={info === null ? 'loading' : info.valid ? 'ready' : 'error'}>
+      <main id="main-content" className="login__panel login__panel--single" data-page-state={pageState}>
         <div className="login__card">
           <div className="login__cardhead">
             <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
@@ -99,6 +100,7 @@ function SetPasswordInner() {
               <button type="submit" disabled={loading} className="btn btn--primary btn--block login__submit">
                 {loading ? 'Guardando…' : (reset ? 'Restablecer y entrar' : 'Crear contraseña y entrar')}
               </button>
+              {loading && <p className="sr-only" role="status" aria-live="polite">Guardando contraseña…</p>}
             </form>
           )}
 

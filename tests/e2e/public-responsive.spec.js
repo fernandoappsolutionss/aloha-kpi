@@ -115,6 +115,72 @@ test('set-password-valid muestra formulario sin consumir el token fixture', asyn
   }
 })
 
+test('set-password-valid expone error de validación sin enviar ni consumir la fixture', async ({ browser }, testInfo) => {
+  const token = process.env.E2E_VALID_ACCESS_TOKEN
+  expect(token, 'falta E2E_VALID_ACCESS_TOKEN para la fixture local').toBeTruthy()
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: testInfo.project.use.viewport })
+  try {
+    const page = await context.newPage()
+    await page.goto(`/set-password?token=${encodeURIComponent(token)}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 30_000 })
+    await page.getByLabel('Nueva contraseña').fill('corta')
+    await page.getByLabel('Confirmar contraseña').fill('corta')
+    await page.getByRole('button', { name: /contraseña y entrar/i }).click()
+    await expect(page.locator('#main-content[data-page-state="error"]')).toHaveCount(1)
+    await expect(page.locator('#main-content').getByRole('alert')).toContainText(/al menos 8 caracteres/i)
+  } finally {
+    await context.close()
+  }
+})
+
+test('set-password-valid cambia a loading mientras su POST real queda retenido sin consumir la fixture', async ({ browser }, testInfo) => {
+  const token = process.env.E2E_VALID_ACCESS_TOKEN
+  expect(token, 'falta E2E_VALID_ACCESS_TOKEN para la fixture local').toBeTruthy()
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: testInfo.project.use.viewport })
+  try {
+    const page = await context.newPage()
+    await page.goto(`/set-password?token=${encodeURIComponent(token)}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 30_000 })
+    let releasePost
+    await page.route('**/set-password?*', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      await new Promise((resolve) => { releasePost = resolve })
+      await route.abort()
+    })
+    await page.getByLabel('Nueva contraseña').fill('contraseña-e2e-segura')
+    await page.getByLabel('Confirmar contraseña').fill('contraseña-e2e-segura')
+    const click = page.getByRole('button', { name: /contraseña y entrar/i }).click({ noWaitAfter: true })
+    await expect(page.locator('#main-content[data-page-state="loading"]')).toHaveCount(1)
+    await expect.poll(() => typeof releasePost).toBe('function')
+    releasePost()
+    void click.catch(() => {})
+  } finally {
+    await context.close()
+  }
+})
+
+test('set-password-valid cambia a error ante respuesta 500 sin consumir la fixture', async ({ browser }, testInfo) => {
+  const token = process.env.E2E_VALID_ACCESS_TOKEN
+  expect(token, 'falta E2E_VALID_ACCESS_TOKEN para la fixture local').toBeTruthy()
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: testInfo.project.use.viewport })
+  try {
+    const page = await context.newPage()
+    await page.goto(`/set-password?token=${encodeURIComponent(token)}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 30_000 })
+    await page.route('**/set-password?*', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      await route.fulfill({ status: 500, contentType: 'text/plain', body: 'Fallo de prueba local' })
+    })
+    await page.getByLabel('Nueva contraseña').fill('contraseña-e2e-segura')
+    await page.getByLabel('Confirmar contraseña').fill('contraseña-e2e-segura')
+    await page.getByRole('button', { name: /contraseña y entrar/i }).click({ noWaitAfter: true })
+    await expect(page.locator('#main-content[data-page-state="error"]')).toHaveCount(1)
+    await expect(page.locator('#main-content').getByRole('alert')).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
 test('perfil espera hidratación y conserva el correo dentro de la pantalla', async ({ page }) => {
   await page.goto('/perfil', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1)

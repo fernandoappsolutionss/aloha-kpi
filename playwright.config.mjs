@@ -151,6 +151,8 @@ export default defineConfig({
     {
       name: 'public-audit',
       testMatch: /public-responsive\.spec\.js/,
+      // Este proyecto no carga storageState: conserva sólo los casos públicos.
+      grepInvert: /perfil espera hidratación|filtros focales/,
       use: { viewport: { width: 390, height: 844 }, storageState: undefined },
     },
     {

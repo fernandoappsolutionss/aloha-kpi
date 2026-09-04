@@ -589,7 +589,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   transition: color 0.15s, border-color 0.15s;
 }
 .login__credit:hover { color: var(--aloha-verde-deep); border-bottom-color: var(--aloha-verde); }
-.login__link { display: inline-flex; align-items: center; min-height: var(--touch-target); color: var(--aloha-verde-deep); font-weight: 600; text-decoration: none; }
+.login__link { display: inline-flex; align-items: center; min-height: calc(var(--touch-target) + 1px); color: var(--aloha-verde-deep); font-weight: 600; text-decoration: none; }
 .login__submit { margin-top: 6px; padding: 13px; }
 .login__success { margin-bottom: 8px; background: var(--ok-bg); border: 1px solid var(--ok-line); color: var(--ok-text); }
 
