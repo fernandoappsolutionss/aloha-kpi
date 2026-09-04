@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Sidebar from '../../../components/Sidebar'
+import TableScroller from '../../../components/TableScroller'
+import OperationalCard from '../../../components/OperationalCard'
 import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
 // El país del centro define las FECHAS PATRIAS que salta su calendario de
@@ -22,6 +23,7 @@ const REGIONES = {
 export default function CentrosPage() {
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [status, setStatus] = useState('')
@@ -32,11 +34,11 @@ export default function CentrosPage() {
   useEffect(() => { loadCentros() }, [])
 
   async function loadCentros() {
-    setLoading(true)
+    setLoading(true); setError('')
     try {
       const data = await listCentrosConUsuarios()
       setCentros(data || [])
-    } catch { setCentros([]) }
+    } catch { setError('No se pudieron cargar los centros. Intenta de nuevo.') }
     setLoading(false)
   }
 
@@ -86,26 +88,45 @@ export default function CentrosPage() {
   const isError = status.includes('❌')
   const statusText = status.replace(/^[❌✅]\s*/, '')
 
+  function equipo(c) {
+    return <div className="center-team">{(c.miembros || []).length === 0 ? <span>Sin miembros</span> : c.miembros.map(m => {
+      const meta = ROL_MIEMBRO[m.rol] || { label: m.rol, pill: '' }
+      return <div className="center-team__member" key={`${m.rol}-${m.id}`}>
+        <span className={`pill ${meta.pill}`}>{meta.label}</span>
+        <span>{m.nombre}{m.activo ? '' : ' (pendiente)'}</span>
+        <span className="center-team__email">{m.email}</span>
+      </div>
+    })}</div>
+  }
+
+  function acciones(c) {
+    return <div className="page-actions operations-center-actions">
+      <button className="btn btn--compact" aria-label={`Editar ${c.nombre}`} onClick={() => editCentro(c)}>Editar</button>
+      <button className="btn btn--compact" aria-label={`Eliminar ${c.nombre}`} disabled={deleting === c.id}
+        onClick={() => deleteCenter(c.id, c.nombre, c.user_count || 0)}>{deleting === c.id ? 'Eliminando…' : 'Eliminar'}</button>
+    </div>
+  }
+
   return (
     <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading || saving || deleting ? 'loading' : error || isError ? 'error' : 'ready'} className="main operations-page">
 
         {/* Header */}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Configuración · Centros</div>
             <h1 className="h-title">Gestión de centros</h1>
-            <p className="h-sub">{centros.length} centros registrados</p>
+            {!loading && !error && <p role="status" className="h-sub">{centros.length} centros registrados</p>}
           </div>
           <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá',pais:'PA'}); setShowForm(!showForm) }}
-            className={`btn${showForm ? '' : ' btn--primary'}`}>
+            disabled={loading || saving || !!error} className={`btn${showForm ? '' : ' btn--primary'}`}>
             {showForm ? '✕ Cancelar' : '+ Nuevo centro'}
           </button>
         </div>
 
         {status && (
-          <div className={`alert${isError ? ' alert--error' : ''}`}
+          <div role={isError ? 'alert' : 'status'} className={`alert${isError ? ' alert--error' : ''}`}
             style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
             {statusText}
           </div>
@@ -113,28 +134,28 @@ export default function CentrosPage() {
 
         {showForm && (
           <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-            <h3 className="panel__title" style={{ marginBottom: 20 }}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h3>
-            <form onSubmit={saveCentro}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 18 }}>
+            <h2 id="center-form-title" className="panel__title" style={{ marginBottom: 20 }}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h2>
+            <form role="form" aria-labelledby="center-form-title" autoComplete="off" onSubmit={saveCentro}>
+              <div className="form-grid operations-center-form">
                 <div className="field">
-                  <label className="label">Nombre del centro *</label>
-                  <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
+                  <label className="label" htmlFor="center-name">Nombre del centro *</label>
+                  <input id="center-name" name="nombre" autoComplete="off" required value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
                     placeholder="Ej: BRISAS DEL GOLF" className="input"/>
                 </div>
                 <div className="field">
-                  <label className="label">País *</label>
-                  <select value={form.pais}
+                  <label className="label" htmlFor="center-country">País *</label>
+                  <select id="center-country" name="pais" autoComplete="off" value={form.pais}
                     onChange={e=>{ const p = e.target.value; setForm({...form, pais: p, region: REGIONES[p][0]}) }}
                     className="input">
                     {Object.entries(PAISES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                  <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>
                     Define las fechas patrias que salta el calendario de clases.
                   </div>
                 </div>
                 <div className="field">
-                  <label className="label">Región</label>
-                  <select value={form.region} onChange={e=>setForm({...form,region:e.target.value})} className="input">
+                  <label className="label" htmlFor="center-region">Región</label>
+                  <select id="center-region" name="region" autoComplete="off" value={form.region} onChange={e=>setForm({...form,region:e.target.value})} className="input">
                     {(REGIONES[form.pais] || []).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
@@ -149,69 +170,44 @@ export default function CentrosPage() {
           </div>
         )}
 
-        <div className="panel">
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
+        {loading ? <p role="status">Cargando centros…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <div className="panel">
+          <h2 className="panel__title" style={{ padding: 18 }}>Centros y equipo</h2>
+          <div className="desktop-only operational-table">
+          <TableScroller label="Centros y equipo">
+            <table className="table operations-table--centers">
+              <caption className="sr-only">Centros, país, región y equipo asignado</caption>
               <thead>
                 <tr>{['Centro','País','Región','Equipo','Acciones'].map(h=>
                   <th key={h}>{h}</th>
                 )}</tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr style={{ cursor: 'default' }}><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando...</td></tr>
-                ) : centros.map((c) => {
-                  const userCount = c.user_count || 0
-                  return (
+                {centros.map((c) => (
                     <tr key={c.id} style={{ cursor: 'default' }}>
                       <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
                       <td style={{ color: 'var(--text-dim)' }}>{PAISES[c.pais] || 'Panamá'}</td>
                       <td style={{ color: 'var(--text-dim)' }}>{c.region || '—'}</td>
-                      <td>
-                        {(c.miembros || []).length === 0
-                          ? <span style={{ color: 'var(--text-faint)', fontStyle: 'italic', fontSize: 12 }}>Sin miembros</span>
-                          : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {c.miembros.map(m => {
-                                const meta = ROL_MIEMBRO[m.rol] || { label: m.rol, pill: '' }
-                                return (
-                                  <div key={`${m.rol}-${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span className={`pill ${meta.pill}`} style={{ minWidth: 104, justifyContent: 'center' }}>
-                                      <span className="dot" />{meta.label}
-                                    </span>
-                                    <span style={{ fontSize: 12, color: m.activo ? 'var(--text)' : 'var(--text-faint)' }} title={m.email}>
-                                      {m.nombre}{m.activo ? '' : ' (pendiente)'}
-                                    </span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={()=>editCentro(c)}
-                            style={{ padding: '5px 14px', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
-                            Editar
-                          </button>
-                          <button
-                            onClick={()=>deleteCenter(c.id, c.nombre, userCount)}
-                            disabled={deleting===c.id}
-                            style={{ padding: '5px 14px', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', background: 'transparent', color: 'var(--bad-text)', fontSize: 12, cursor: deleting===c.id?'wait':'pointer', opacity: deleting===c.id?0.6:1 }}>
-                            {deleting===c.id ? 'Eliminando...' : 'Eliminar'}
-                          </button>
-                        </div>
-                      </td>
+                      <td>{equipo(c)}</td>
+                      <td>{acciones(c)}</td>
                     </tr>
-                  )
-                })}
-                {!loading && centros.length === 0 && (
+                ))}
+                {centros.length === 0 && (
                   <tr style={{ cursor: 'default' }}><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No hay centros. Crea el primero.</td></tr>
                 )}
               </tbody>
             </table>
+          </TableScroller>
           </div>
-        </div>
+          <div className="mobile-only operational-list">
+            {centros.map(c => <OperationalCard key={c.id} headingLevel={3} title={c.nombre}
+              fields={[
+                { label: 'País', value: PAISES[c.pais] || 'Panamá' },
+                { label: 'Región', value: c.region || '—' },
+                { label: 'Equipo', value: equipo(c) },
+              ]} actions={acciones(c)} />)}
+            {centros.length === 0 && <p>No hay centros. Crea el primero.</p>}
+          </div>
+        </div>}
       </main>
     </div>
   )

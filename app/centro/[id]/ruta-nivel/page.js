@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import MeasuredChart from '../../../../components/MeasuredChart'
 import {
   CartesianGrid,
   Line,
   LineChart,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -99,7 +100,6 @@ function etaLabel(scenario, confidence) {
 
 export default function GrowthRoutePage() {
   const { id } = useParams()
-  const router = useRouter()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -125,17 +125,17 @@ export default function GrowthRoutePage() {
   const chartRows = useMemo(() => scenarioChartRows(data?.projection, { history: data?.metrics?.months, currentPeriod: data?.operational?.currentPeriod, startPeriod: data?.metrics?.window?.startPeriod }), [data])
 
   if (loading) return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre="Centro" centroId={id} />
-      <main className="main growth-loading">Calculando ruta de crecimiento...</main>
+      <main id="main-content" data-page-state="loading" className="main growth-loading"><div role="status" aria-live="polite">Calculando ruta de crecimiento...</div></main>
     </div>
   )
 
   if (error || !data) return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre="Centro" centroId={id} />
-      <main className="main">
-        <div className="alert alert--error">{error || 'No hay datos disponibles.'}</div>
+      <main id="main-content" data-page-state="error" className="main growth-page">
+        <div role="alert" className="alert alert--error">{error || 'No hay datos disponibles.'}</div>
       </main>
     </div>
   )
@@ -168,18 +168,18 @@ export default function GrowthRoutePage() {
   }
 
   return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={center.nombre} centroId={id} />
-      <main className="main growth-page">
+      <main id="main-content" data-page-state="ready" className="main growth-page">
         <header className="main__head growth-page__head">
           <div>
             <div className="label">Gestión · crecimiento</div>
             <h1 className="h-title">Ruta al Próximo Nivel</h1>
             <p className="h-sub">{center.nombre} · actualización {data.snapshotDate}</p>
           </div>
-          <button type="button" className="btn" onClick={() => router.push(`/centro/${id}`)}>
+          <Link className="btn" href={`/centro/${id}`}>
             Volver al resumen
-          </button>
+          </Link>
         </header>
 
         <section className="growth-overview" aria-labelledby="growth-overview-title">
@@ -192,7 +192,7 @@ export default function GrowthRoutePage() {
               {next ? `Nivel ${next.level}` : 'Nivel máximo'}
               <span className="num">{projection.currentChildren}{next ? ` / ${next.threshold}` : ''}</span>
             </h2>
-            <div className="growth-track growth-track--large" role="progressbar" data-tour="ruta.barra" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
+            <div className="growth-track growth-track--large" role="progressbar" aria-label="Progreso al próximo nivel" aria-valuetext={`${Math.round(progress)}% · ${projection.currentChildren} niños`} data-tour="ruta.barra" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
               <span style={{ width: `${progress}%` }} />
             </div>
             <div className="growth-overview__scale">
@@ -255,11 +255,11 @@ export default function GrowthRoutePage() {
             <p>{scenario.monthlyNetDefinition}</p>
           </details>
           <div className="growth-chart" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
+            <MeasuredChart label="Escenarios de crecimiento" minHeight={280}>
+              {({width,height}) => <LineChart width={width} height={height} data={chartRows} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
                 <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} tickLine={false} axisLine={{ stroke: 'var(--chart-axis)' }} interval="preserveStartEnd" />
-                <YAxis width={42} tick={{ fill: 'var(--text-dim)', fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 'dataMax + 10']} />
+                <XAxis dataKey="label" tick={{ fill: 'var(--text-dim)', fontSize: 12 }} tickLine={false} axisLine={{ stroke: 'var(--chart-axis)' }} interval="preserveStartEnd" />
+                <YAxis width={42} tick={{ fill: 'var(--text-dim)', fontSize: 12 }} tickLine={false} axisLine={false} domain={[0, 'dataMax + 10']} />
                 <Tooltip content={<ProjectionTooltip />} />
                 <Line type="linear" dataKey="observed" name="Cierre registrado" stroke="var(--text)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
                 {next && <ReferenceLine y={next.threshold} stroke="var(--warn)" strokeDasharray="5 5" />}
@@ -275,8 +275,8 @@ export default function GrowthRoutePage() {
                     activeDot={{ r: 4 }}
                   />
                 ))}
-              </LineChart>
-            </ResponsiveContainer>
+              </LineChart>}
+            </MeasuredChart>
           </div>
           <div className="sr-only"><table>
             <caption>Proyección mensual de niños por escenario</caption>
@@ -309,7 +309,7 @@ export default function GrowthRoutePage() {
               <h2 id="actions-title">Acciones y resultados por verificar</h2><p className="growth-explanation">El escenario del plan usa las metas de estas acciones. Posponer o descartar una acción retira su supuesto; realizarla no confirma que ya produjo el resultado.</p>
             </div>
           </div>
-          {recommendationError && <div className="alert alert--error">{recommendationError}<button type="button" className="btn" onClick={async () => {
+          {recommendationError && <div role="alert" className="alert alert--error">{recommendationError}<button type="button" className="btn" onClick={async () => {
             try { setData(await getCentroGrowth(id)); setRecommendationError('') }
             catch { setRecommendationError('No se pudo actualizar. La última decisión guardada se conserva.') }
           }}>Actualizar escenario</button></div>}

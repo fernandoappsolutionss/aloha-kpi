@@ -1,5 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import TableScroller from '../../../../components/TableScroller'
+import OperationalCard from '../../../../components/OperationalCard'
 import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
@@ -9,6 +11,11 @@ import { ajusteHistoricoKpi, finalVisibleKpi, inicioVisibleKpi } from '../../../
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const SEMANAS = [1, 2, 3, 4, 5]
+const KPI_METRICS = [
+  {tipo:'cob',label:'Cobranza Vencida (N°)'},
+  {tipo:'des',label:'Deserción (Retirados)'},
+  {tipo:'ing',label:'Nuevos Ingresos - Ventas'},
+]
 
 // Fórmulas KPI ALOHA (según Excel)
 const calcRes = (tipo, dias) => {
@@ -37,6 +44,8 @@ export default function KPIPage() {
   const [cerrando, setCerrando] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const loadSequence = useRef(0)
   const [config, setConfig] = useState({ ninos_inicio:0, grupos_activos:0, meta_nuevos_mensual:20, nuevos_activos_mes:0, cp_invitados:0, cp_asistieron:0, cp_matriculados:0, cp_matriculados_override:null, mot_tecnica:0, mot_perdida_clase:0, mot_economico:0, mot_horario:0, mot_graduado:0, mot_otro:0, orig_referido:0, orig_marketing:0, orig_centro:0, orig_activaciones:0, orig_medios:0, orig_por_clasificar:0 })
   const [semanas, setSemanas] = useState(SEMANAS.map(() => emptyW()))
   const [historial, setHistorial] = useState([])
@@ -54,16 +63,21 @@ export default function KPIPage() {
   const [kpiAuto, setKpiAuto] = useState(null)
 
   const loadData = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    setLoadError('')
     setLoading(true); setStatus(''); setAutoSync(null)
     let datos
     try {
       datos = await loadKpiMes(id, year, month)
+      if (!datos || datos.error) throw new Error(datos?.error || 'Respuesta no disponible')
     } catch (e) {
+      if (sequence !== loadSequence.current) return
       // Sin este catch la página se quedaba en "Cargando…" para siempre.
-      setStatus('❌ No se pudo cargar el KPI: ' + (e?.message || 'desconocido'))
+      setLoadError('No se pudo cargar el KPI: ' + (e?.message || 'desconocido'))
       setLoading(false)
       return
     }
+    if (sequence !== loadSequence.current) return
     const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, kpiAuto: kAuto, autoSync: sync } = datos
     setCentroNombre(cNombre || '')
     const estadoActual = estado || 'abierto'
@@ -113,7 +127,7 @@ export default function KPIPage() {
     setLoading(false)
   }, [id, year, month])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData(); return () => { loadSequence.current++ } }, [loadData])
   useEffect(() => { contarGruposActivos(id).then(n => setGruposModulo(n)).catch(() => {}) }, [id])
 
   const navMonth = (dir) => {
@@ -187,7 +201,16 @@ export default function KPIPage() {
   const gpn = ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
 
   const upd = (semIdx, tipo, di, val) => setSemanas(p => p.map((s,i) => i===semIdx ? {...s,[tipo]:s[tipo].map((d,j) => j===di?val:d)} : s))
-  const inp = (val, onChange, disabled) => <input type="number" min="0" value={val} onChange={e=>onChange(e.target.value)} disabled={disabled} className="num" style={{width:58,padding:'5px 6px',border:'1px solid var(--border-strong)',borderRadius:6,fontSize:13,textAlign:'center',background:disabled?'var(--surface-3)':'var(--bg)',color:'var(--text)',outline:'none',opacity:disabled?0.6:1}}/>
+  const weekInput = (semIdx, tipo, day, presentation) => {
+    const inputId = `kpi-${presentation}-${semIdx}-${tipo}-${day}`
+    const metric = KPI_METRICS.find(item=>item.tipo === tipo)
+    return <>
+      {presentation === 'desktop' && <label htmlFor={inputId} className="sr-only">{`${metric.label} · semana ${SEMANAS[semIdx]} · día ${day+1}`}</label>}
+      <input id={inputId} name={`semanas.${semIdx}.${tipo}.${day}`} type="number" inputMode="numeric" min="0"
+        value={semanas[semIdx][tipo][day]} onChange={e=>upd(semIdx,tipo,day,e.target.value)} disabled={locked || (autoIngDes && tipo !== 'cob')}
+        className="input num kpi-mobile-input" />
+    </>
+  }
   const badge = ok => <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Sí' : 'No'}</span>
   const locked = mesEstado === 'cerrado'
   // (g1-20) Solo el estado 'auto' bloquea ventas y retiros (el CERO también es
@@ -208,37 +231,42 @@ export default function KPIPage() {
     const deModulo = autoIngDes && (tipo === 'ing' || tipo === 'des')
     return (
       <tr key={tipo}>
-        <td style={{padding:'8px 16px',width:210,fontWeight:600,color:'var(--text-muted)',fontSize:12}}>
+        <td style={{padding:'8px 16px',width:210,fontWeight:600,color:'var(--text-muted)',fontSize: 13}}>
           {label}
-          {deModulo && <span style={{ display: 'block', fontSize: 10, color: 'var(--ts-green)', fontWeight: 500 }}>🔗 del módulo</span>}
+          {deModulo && <span style={{ display: 'block', fontSize: 13, color: 'var(--ok-text)', fontWeight: 500 }}>🔗 del módulo</span>}
         </td>
-        {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{inp(d, v => upd(semIdx,tipo,di,v), locked || deModulo)}</td>)}
+        {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{weekInput(semIdx,tipo,di,'desktop')}</td>)}
         <td className="num" style={{padding:'5px 8px',textAlign:'center',fontWeight:700,color:resColor,minWidth:50}}>{res}</td>
-        <td className="num" style={{padding:'5px 6px',textAlign:'center',color:'var(--text-dim)',fontSize:12}}>{meta}</td>
+        <td className="num" style={{padding:'5px 6px',textAlign:'center',color:'var(--text-dim)',fontSize: 13}}>{meta}</td>
         <td style={{padding:'5px 6px',textAlign:'center'}}>{badge(ok)}</td>
       </tr>
     )
   }
 
   if (loading) return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
-      <main className="main"><div className="empty">Cargando…</div></main>
+      <main id="main-content" data-page-state="loading" className="main kpi-page"><div className="empty" role="status" aria-live="polite">Cargando KPI…</div></main>
     </div>
   )
 
+  if (loadError) return <div className="shell center-core-shell">
+    <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
+    <main id="main-content" data-page-state="error" className="main kpi-page"><div role="alert" className="alert alert--error">{loadError}</div></main>
+  </div>
+
   // Estilo input de "Configuración" / cards de categoría
   const cfgInput = (key, full, bloqueado = false) => (
-    <input type="number" min="0" value={config[key]} disabled={locked || bloqueado}
+    <input id={`kpi-config-${key}`} name={`config.${key}`} inputMode="numeric" type="number" min="0" value={config[key]} disabled={locked || bloqueado}
       onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
       className="input num"
       style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: (locked || bloqueado) ? 0.6 : 1, background: (locked || bloqueado) ? 'var(--surface-3)' : 'var(--bg)' }}/>
   )
 
   return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={centroNombre} centroId={id}/>
-      <main className="main">
+      <main id="main-content" data-page-state="ready" className="main kpi-page">
 
         {/* Header */}
         <div className="main__head">
@@ -247,7 +275,7 @@ export default function KPIPage() {
             <h1 className="h-title">Registro KPI Mensual</h1>
             <p className="h-sub">{centroNombre}</p>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="kpi-page-actions">
             {locked ? (
               esAsistente
                 ? <span className="label" style={{ color: 'var(--text-faint)' }}>Mes cerrado — lo reabre el administrador del centro</span>
@@ -285,13 +313,13 @@ export default function KPIPage() {
         )}
 
         {!locked && syncFailed && (
-          <div className="alert alert--error" style={{ marginBottom: 16 }}>
+          <div role="alert" className="alert alert--error" style={{ marginBottom: 16 }}>
             {autoSync.error || 'No se pudo sincronizar el KPI.'} Clase de prueba, motivos y origen comercial quedan con los últimos valores guardados: revísalos antes de guardar.
           </div>
         )}
 
         {status && (
-          <div className={`alert ${status.includes('❌') ? 'alert--error' : ''}`}
+          <div role={status.includes('❌') ? 'alert' : 'status'} aria-live="polite" className={`alert ${status.includes('❌') ? 'alert--error' : ''}`}
             style={status.includes('❌') ? { marginBottom: 16 } : { marginBottom: 16, background: status.includes('🔒') ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1px solid ${status.includes('🔒') ? 'var(--warn-line)' : 'var(--ok-line)'}`, color: status.includes('🔒') ? 'var(--warn-text)' : 'var(--ok-text)' }}>
             {status.replace(/^[❌✅🔒]\s*/, '')}
           </div>
@@ -299,20 +327,20 @@ export default function KPIPage() {
 
         {/* Navegador de mes */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <button onClick={()=>navMonth(-1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>‹</button>
-          <div className="card" style={{ padding: '12px 28px', textAlign: 'center', minWidth: 180 }}>
+          <button aria-label="Mes anterior" onClick={()=>navMonth(-1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>‹</button>
+          <div className="card kpi-month-title" style={{ padding: '12px 16px', textAlign: 'center' }}>
             <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--text)', margin: 0 }}>{NOMBRES_MES[month-1]}</p>
-            <p className="num" style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0 }}>{year}</p>
+            <p className="num" style={{ fontSize: 15, color: 'var(--text-dim)', margin: 0 }}>{year}</p>
           </div>
-          <button onClick={()=>navMonth(1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>›</button>
+          <button aria-label="Mes siguiente" onClick={()=>navMonth(1)} className="btn" style={{ padding: '10px 16px', fontSize: 16 }}>›</button>
           {historial.length > 0 && (
             <div style={{ marginLeft: 16, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} data-tour="kpi.historial">
               <span className="label">Historial cerrado:</span>
               {historial.map(h => {
                 const on = year===h.year && month===h.month
                 return (
-                  <button key={h.year+'-'+h.month} onClick={()=>{setYear(h.year);setMonth(h.month)}}
-                    style={{ padding: '4px 11px', background: on ? 'var(--ts-green-soft)' : 'transparent', color: on ? 'var(--ts-green)' : 'var(--text-dim)', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+                  <button className="btn" key={h.year+'-'+h.month} onClick={()=>{setYear(h.year);setMonth(h.month)}}
+                    style={{ padding: '4px 11px', background: on ? 'var(--ts-green-soft)' : 'transparent', color: on ? 'var(--ts-green)' : 'var(--text-dim)', border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`, borderRadius: 'var(--r-pill)', fontFamily: 'var(--font-mono)', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>
                     {NOMBRES_MES[h.month-1].slice(0,3)} {h.year}
                   </button>
                 )
@@ -327,35 +355,35 @@ export default function KPIPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14 }}>
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual']].map(([lbl,key]) => (
               <div key={key} className="field">
-                <label className="label">{lbl}</label>
+                <label htmlFor={`kpi-config-${key}`} className="label">{lbl}</label>
                 {cfgInput(key, true, (key === 'ninos_inicio' && !!arrastrado) || (autoPeriod && key !== 'meta_nuevos_mensual'))}
                 {key === 'ninos_inicio' && arrastrado && (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
                     🔗 Arrastrado del cierre de {NOMBRES_MES[arrastrado.month-1]}: los meses encadenan y este número no se digita.
                   </span>
                 )}
                 {key === 'ninos_inicio' && ajusteHistorico !== null && (
-                  <span style={{ fontSize: 11, color: 'var(--warn)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--warn)' }}>
                     Ajuste histórico: {ajusteHistorico > 0 ? '+' : ''}{ajusteHistorico} vs cierre de {NOMBRES_MES[cierreAnterior.month-1]}.
                   </span>
                 )}
                 {key === 'grupos_activos' && gruposModulo !== null && (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     El módulo de grupos cuenta {gruposModulo} activos
                     <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={locked || autoPeriod}
-                      className="btn" style={{ padding: '2px 8px', fontSize: 11 }}>Usar</button>
+                      className="btn" style={{ padding: '2px 8px', fontSize: 13 }}>Usar</button>
                   </span>
                 )}
               </div>
             ))}
             <div className="field">
-              <label className="label">Nuevos ingresos venta</label>
-              <input type="number" value={totalIng} disabled className="input num" style={{ width: '100%', padding: '10px 12px', opacity: 0.75, background: 'var(--surface-3)' }} />
+              <label htmlFor="kpi-total-ing" className="label">Nuevos ingresos venta</label>
+              <input id="kpi-total-ing" name="totals.ing" inputMode="numeric" min="0" type="number" value={totalIng} disabled className="input num" style={{ width: '100%', padding: '10px 12px', opacity: 0.75, background: 'var(--surface-3)' }} />
             </div>
             <div className="field">
-              <label className="label">Nuevos activos del mes</label>
+              <label htmlFor="kpi-config-nuevos_activos_mes" className="label">Nuevos activos del mes</label>
               {cfgInput('nuevos_activos_mes', true, autoPeriod || !!motivosAuto)}
-              {motivosAuto && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{nA} inicio{nA === 1 ? '' : 's'} de clase declarado{nA === 1 ? '' : 's'} en Cuadro de Negocio</span>}
+              {motivosAuto && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{nA} inicio{nA === 1 ? '' : 's'} de clase declarado{nA === 1 ? '' : 's'} en Cuadro de Negocio</span>}
             </div>
           </div>
         </div>
@@ -385,7 +413,7 @@ export default function KPIPage() {
         <div className="card" style={{ background: gpn>=0 ? 'var(--ok-bg)' : 'var(--bad-bg)', border: `1px solid ${gpn>=0 ? 'var(--ok-line)' : 'var(--bad-line)'}`, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span className="label" style={{ color: gpn>=0 ? 'var(--ok-text)' : 'var(--bad-text)' }}>GPN — Ganancia por Niño:</span>
           <span className="num" style={{ fontSize: 24, fontWeight: 700, color: gpn>=0 ? 'var(--ok)' : 'var(--bad)', fontFamily: 'var(--font-serif)' }}>${gpn.toFixed(2)}</span>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
+          <span style={{ fontSize: 13, color: 'var(--text-dim)', flex: 1 }}>= ((niños final × 108) × (1 − %CV/100) − 7800) ÷ niños final</span>
         </div>
 
         {/* KPI sin manos: fuente visible y fallback explícito (g1-20) */}
@@ -401,9 +429,10 @@ export default function KPIPage() {
         )}
 
         {/* Tabla KPI semanal */}
-        <div className="panel" style={{ marginBottom: 20 }}>
-          <div style={{ overflowX: 'auto' }}>
+        <div className="panel desktop-only" style={{ marginBottom: 20 }}>
+          <TableScroller label="KPI semanal">
             <table className="table">
+              <caption className="sr-only">KPI semanal</caption>
               <thead>
                 <tr>
                   <th style={{ width: 210 }}>Semana / Indicador</th>
@@ -415,18 +444,27 @@ export default function KPIPage() {
               </thead>
               <tbody>
                 {SEMANAS.map((s,i) => (
-                  <>
+                  <Fragment key={s}>
                     <tr key={'sh'+i} style={{ cursor: 'default', background: 'var(--surface-2)' }}>
-                      <td colSpan={9} className="label" style={{ padding: '8px 16px', color: 'var(--ts-green)' }}>Semana {s}</td>
+                      <td colSpan={9} className="label" style={{ padding: '8px 16px', color: 'var(--ok-text)' }}>Semana {s}</td>
                     </tr>
-                    {kpiRow('cob','Cobranza Vencida (N°)',i)}
-                    {kpiRow('des','Deserción (Retirados)',i)}
-                    {kpiRow('ing','Nuevos Ingresos - Ventas',i)}
-                  </>
+                    {KPI_METRICS.map(metric=>kpiRow(metric.tipo,metric.label,i))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroller>
+        </div>
+        <div className="mobile-only operational-list kpi-week-cards">
+          {SEMANAS.flatMap((week,semIdx)=>KPI_METRICS.map(({tipo,label})=>{
+            const result = calcRes(tipo,semanas[semIdx][tipo]), goal = calcMeta(tipo,ni,metaN)
+            return <OperationalCard key={`${week}-${tipo}`} headingLevel={2} title={`Semana ${week} · ${label}`}
+              subtitle={autoIngDes && tipo !== 'cob' ? 'Del módulo · solo lectura' : undefined}
+              fields={[
+                ...[0,1,2,3,4].map(day=>({label:<label htmlFor={`kpi-mobile-${semIdx}-${tipo}-${day}`} className="kpi-day-label">Día {day+1}</label>,value:weekInput(semIdx,tipo,day,'mobile')})),
+                {label:'Resultado',value:result}, {label:'Meta',value:goal}, {label:'¿Cumple?',value:badge(cumple(tipo,result,goal))},
+              ]} />
+          }))}
         </div>
 
         {/* Clase de prueba / Motivos / Origen */}
@@ -442,7 +480,7 @@ export default function KPIPage() {
               </div>
               <div style={{ padding: 14 }}>
                 {auto && (
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
                     {source || `Se llena con los ${motivosAuto?.total || 0} retiros registrados este mes.`}
                   </div>
                 )}
@@ -457,19 +495,19 @@ export default function KPIPage() {
                     return (
                       <div key={key} style={{ marginBottom: 10 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
-                          <input type="number" min="0" value={efectivo} disabled={locked}
+                          <label htmlFor="kpi-config-cp_matriculados" style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</label>
+                          <input id="kpi-config-cp_matriculados" name="config.cp_matriculados_override" inputMode="numeric" type="number" min="0" value={efectivo} disabled={locked}
                             onChange={e=>setConfig(c=>({...c, cp_matriculados_override: e.target.value}))}
                             className="input num"
                             style={{ width: 65, padding: '6px 8px', textAlign: 'center', opacity: locked ? 0.6 : 1, background: locked ? 'var(--surface-3)' : 'var(--bg)' }}/>
                         </div>
                         {cpDerivado != null && (
-                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             {tieneOverride ? (
                               <>
                                 <span>Ajustado a mano · del módulo: {cpDerivado}</span>
                                 <button onClick={()=>setConfig(c=>({...c, cp_matriculados_override: null}))} disabled={locked}
-                                  className="btn" style={{ padding: '2px 8px', fontSize: 11 }}>Usar valor del módulo</button>
+                                  className="btn" style={{ padding: '2px 8px', fontSize: 13 }}>Usar valor del módulo</button>
                               </>
                             ) : (
                               <span>🔗 del módulo</span>
@@ -477,7 +515,7 @@ export default function KPIPage() {
                           </div>
                         )}
                         {autoIngDes && cpDerivado == null && (
-                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
                             {tieneOverride ? 'Se conserva tu ajuste manual. ' : 'Se conserva el valor guardado. '}
                             Falta clasificar el origen de algunas ventas para calcular las matrículas de prueba.
                           </div>
@@ -487,7 +525,7 @@ export default function KPIPage() {
                   }
                   return (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</span>
+                      <label htmlFor={`kpi-config-${key}`} style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</label>
                       {cfgInput(key, false, !!auto)}
                     </div>
                   )
@@ -498,8 +536,8 @@ export default function KPIPage() {
         </div>
 
         {/* Nota fórmulas */}
-        <div className="card" style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ts-green)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Retiros = suma | Ventas = suma | Niños final = inicio + nuevos activos + reincorporados − retirados | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
+        <div className="card" style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+          <strong style={{ color: 'var(--ok-text)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Retiros = suma | Ventas = suma | Niños final = inicio + nuevos activos + reincorporados − retirados | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
         </div>
       </main>
     </div>

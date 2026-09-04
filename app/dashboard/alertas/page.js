@@ -56,13 +56,15 @@ function buildAlertas(centros, prevNivel, label) {
 export default function AlertasPage() {
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [period, setPeriod] = useState(getCurrentPeriod())
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    setLoading(true)
+    let active = true
+    setLoading(true); setError('')
     const prevQ = period.quarter > 1 ? period.quarter - 1 : 4
     const prevY = period.quarter > 1 ? period.year : period.year - 1
     Promise.all([
@@ -70,12 +72,14 @@ export default function AlertasPage() {
       getCentrosKpi(prevY, prevQ),
     ])
       .then(([cur, prev]) => {
+        if (!active) return
         const prevNivel = {}
         for (const c of (prev || [])) prevNivel[c.id] = c.nivel
         setAlertas(buildAlertas(cur || [], prevNivel, label))
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .catch(() => { if (active) setError('No se pudo cargar alertas. Intenta de nuevo.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [period])
 
   const criticas = alertas.filter(a => a.tipo === 'critico')
@@ -85,28 +89,28 @@ export default function AlertasPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Alertas · {label}</div>
             <h1 className="h-title">Alertas</h1>
-            <p className="h-sub">{criticas.length} críticas · {advertencias.length} advertencias · {info.length} positivas</p>
+            {!loading && !error && <p className="h-sub" role="status">{criticas.length} críticas · {advertencias.length} advertencias · {info.length} positivas</p>}
           </div>
           <PeriodSelector value={period} onChange={changePeriod} />
         </div>
 
-        {loading ? (
-          <div className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Generando alertas…</div>
+        {error ? <p role="alert" className="alert alert--error">{error}</p> : loading ? (
+          <div role="status" className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Generando alertas…</div>
         ) : alertas.length === 0 ? (
           <div className="panel" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔔</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>No hay alertas todavía</div>
-            <div style={{ fontSize: 12, marginTop: 6 }}>Las alertas se generan a partir del cumplimiento de cada centro.</div>
+            <div style={{ fontWeight: 600, color: 'var(--text)' }}>No hay alertas todavía</div>
+            <div style={{ marginTop: 6 }}>Las alertas se generan a partir del cumplimiento de cada centro.</div>
           </div>
         ) : (
           <>
             {/* Resumen */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 26 }}>
+            <div className="responsive-grid operations-grid--three">
               {[{ l:'Alertas críticas', v:criticas.length, pill:'pill--bad', accent:'var(--bad)' },
                 { l:'Advertencias', v:advertencias.length, pill:'pill--warn', accent:'var(--warn)' },
                 { l:'Noticias positivas', v:info.length, pill:'pill--ok', accent:'var(--ts-green)' }]
@@ -129,16 +133,16 @@ export default function AlertasPage() {
                   <h2 className="label" style={{ marginBottom: 12 }}>{t}</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {items.map((a, i) => (
-                      <div key={i} style={{ background: COLORS[a.tipo].bg, border: `1px solid ${COLORS[a.tipo].border}`, borderRadius: 'var(--r)', padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <article className="operations-alert" key={i} style={{ background: COLORS[a.tipo].bg, border: `1px solid ${COLORS[a.tipo].border}`, borderRadius: 'var(--r)', padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[a.tipo].dot, flexShrink: 0, marginTop: 7 }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS[a.tipo].title }}>{a.centro}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="operations-alert__head">
+                            <h3 style={{ fontWeight: 600, color: COLORS[a.tipo].title }}>{a.centro}</h3>
                             <span className="label" style={{ color: 'var(--text-faint)' }}>{a.fecha}</span>
                           </div>
-                          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{a.msg}</p>
+                          <p style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{a.msg}</p>
                         </div>
-                      </div>
+                      </article>
                     ))}
                   </div>
                 </div>

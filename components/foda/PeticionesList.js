@@ -1,4 +1,5 @@
 'use client'
+import Dialog from '../Dialog'
 import { useState } from 'react'
 import { updateComentario, changePeticionStatus, eliminarPeticion } from '../../app/actions/peticiones'
 import { PETICION_CATEGORIAS, PETICION_ESTADOS } from '../../lib/peticiones-domain.mjs'
@@ -25,6 +26,7 @@ function quoteLabel(quote) {
 // una petición formal enviada exige anularla primero (dos pasos deliberados
 // para no perder por error el rastro de compras/proveedores).
 export default function PeticionesList({ items, permissions, uploadsAvailable, centroId, onRefresh, onStatus }) {
+  const [confirmAction,setConfirmAction]=useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const [busyId, setBusyId] = useState(null)
@@ -67,7 +69,6 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
   }
 
   async function eliminar(row) {
-    if (!confirm('¿Eliminar definitivamente este registro? Esta acción no se puede deshacer y borrará también sus PDFs.')) return
     setBusyId(row.id)
     try {
       const res = await eliminarPeticion(centroId, row.id)
@@ -85,6 +86,9 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+      {confirmAction && <Dialog open title={confirmAction.type==='delete'?'Eliminar registro':'Anular petición'} onClose={()=>setConfirmAction(null)} closeDisabled={busyId!==null} footer={<><button type="button" className="btn" disabled={busyId!==null} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busyId!==null} onClick={async()=>{if(confirmAction.type==='delete')await eliminar(confirmAction.row);else await setEstado(confirmAction.row,'Anulada');setConfirmAction(null)}}>Confirmar</button></>}>
+        <p>{confirmAction.type==='delete'?'Esta acción no se puede deshacer y eliminará también los PDFs del registro.':'La petición quedará anulada. Confirma que deseas continuar.'}</p>
+      </Dialog>}
       {items.map((row) => {
         const cotizaciones = row.cotizaciones || []
         const validQuotes = cotizaciones.filter((quote) => quote.upload_status === 'valid')
@@ -98,7 +102,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               <div style={{ flex: 1 }}>
                 <span className="label" style={{ color: 'var(--text-muted)' }}>{tipoLabel(row)}</span>
                 {editingId === row.id ? (
-                  <textarea className="input" value={editText} onChange={(e) => setEditText(e.target.value)}
+                  <textarea aria-label="Editar comentario" name="comentarioEditado" autoComplete="off" className="input" value={editText} onChange={(e) => setEditText(e.target.value)}
                     style={{ marginTop: 6, minHeight: 50, resize: 'vertical' }} />
                 ) : (
                   <p style={{ marginTop: 6, fontSize: 13 }}>{row.texto}</p>
@@ -135,21 +139,21 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                     return (
                       <button key={estado} type="button" disabled={busyId === row.id || !selectedCotizacionAprobada}
                         onClick={() => setEstado(row, estado, selectedCotizacionAprobada)}
-                        className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
+                        className="pill" style={{ cursor: 'pointer', borderColor: row.estado === estado ? 'var(--ok-text)' : 'var(--border-strong)' }}>
                         {estado}
                       </button>
                     )
                   }
                   return (
-                    <button key={estado} type="button" disabled={busyId === row.id} onClick={() => setEstado(row, estado)}
-                      className="pill" style={{ cursor: 'pointer', opacity: row.estado === estado ? 1 : 0.55 }}>
+                    <button key={estado} type="button" disabled={busyId === row.id} onClick={() => estado==='Anulada' ? setConfirmAction({row,type:'annul'}) : setEstado(row, estado)}
+                      className="pill" style={{ cursor: 'pointer', borderColor: row.estado === estado ? 'var(--ok-text)' : 'var(--border-strong)' }}>
                       {estado}
                     </button>
                   )
                 })}
                 {row.tipo === 'peticion' && (
                   <select
-                    name="cotizacionAprobada"
+                    name="cotizacionAprobada" aria-label="Cotización ganadora"
                     className="input"
                     value={selectedCotizacionAprobada}
                     onChange={(e) => setCotizacionAprobadaByRow((prev) => ({ ...prev, [row.id]: e.target.value }))}
@@ -169,14 +173,14 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                 row.estado === 'Anulada' && (
                   <button type="button" className="btn" disabled={busyId === row.id}
                     style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: 'var(--bad-text)' }}
-                    onClick={() => eliminar(row)}>
+                    onClick={() => setConfirmAction({row,type:'delete'})}>
                     Eliminar definitivamente
                   </button>
                 )
               ) : (
                 <button type="button" className="btn" disabled={busyId === row.id}
                   style={{ marginTop: 10, borderColor: 'var(--bad-line)', color: 'var(--bad-text)' }}
-                  onClick={() => eliminar(row)}>
+                  onClick={() => setConfirmAction({row,type:'delete'})}>
                   Eliminar
                 </button>
               )

@@ -39,10 +39,11 @@ function SetPasswordInner() {
   }
 
   const reset = info?.purpose === 'reset'
+  const pageState = loading || info === null ? 'loading' : error || !info.valid ? 'error' : 'ready'
 
   return (
     <div className="login">
-      <main className="login__panel" style={{ width: '100%' }}>
+      <main id="main-content" className="login__panel login__panel--single" data-page-state={pageState}>
         <div className="login__card">
           <div className="login__cardhead">
             <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
@@ -51,7 +52,7 @@ function SetPasswordInner() {
 
             {info && info.valid === false && (
               <>
-                <h2 className="login__welcome">Enlace no válido</h2>
+                <h1 className="login__welcome">Enlace no válido</h1>
                 <p className="login__cardsub">
                   {info.reason === 'usado' ? 'Este enlace ya fue usado.'
                     : info.reason === 'vencido' ? 'Este enlace venció.'
@@ -63,7 +64,7 @@ function SetPasswordInner() {
 
             {info && info.valid && (
               <>
-                <h2 className="login__welcome">{reset ? 'Restablece tu contraseña' : '¡Bienvenido a ALOHA KPI!'}</h2>
+                <h1 className="login__welcome">{reset ? 'Restablece tu contraseña' : '¡Bienvenido a ALOHA KPI!'}</h1>
                 <p className="login__cardsub">
                   {reset ? 'Crea una nueva contraseña para ' : 'Hola '}<b>{info.nombre}</b>
                   {reset ? '.' : ', define tu contraseña para acceder.'}
@@ -76,34 +77,35 @@ function SetPasswordInner() {
             <form onSubmit={handleSubmit} className="login__form">
               <div className="field">
                 <label className="label" htmlFor="pass">Nueva contraseña</label>
-                <input id="pass" className="input" type="password" required autoComplete="new-password"
+                <input id="pass" name="password" className="input" type="password" required autoComplete="new-password"
                   value={form.pass} onChange={e => setForm({ ...form, pass: e.target.value })}
                   placeholder="Mínimo 8 caracteres" />
               </div>
               <div className="field">
                 <label className="label" htmlFor="confirm">Confirmar contraseña</label>
-                <input id="confirm" className="input" type="password" required autoComplete="new-password"
+                <input id="confirm" name="password-confirmation" className="input" type="password" required autoComplete="new-password"
                   value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })}
                   placeholder="Repite la contraseña" />
               </div>
 
               {error && (
                 <div className="alert alert--error" role="alert">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                   <span>{error}</span>
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="btn btn--primary btn--block" style={{ marginTop: 6, padding: '13px' }}>
+              <button type="submit" disabled={loading} className="btn btn--primary btn--block login__submit">
                 {loading ? 'Guardando…' : (reset ? 'Restablecer y entrar' : 'Crear contraseña y entrar')}
               </button>
+              {loading && <p className="sr-only" role="status" aria-live="polite">Guardando contraseña…</p>}
             </form>
           )}
 
           <p className="login__help">
-            <Link href="/login" style={{ color: 'var(--ts-green)', fontWeight: 600 }}>← Volver al inicio de sesión</Link><br />
+            <Link href="/login" className="login__link">← Volver al inicio de sesión</Link><br />
             <a href="https://www.desarrolloweb.com.pa/" target="_blank" rel="noopener noreferrer" className="login__credit">Desarrollado por Appsolutionss</a>
           </p>
         </div>
@@ -114,7 +116,7 @@ function SetPasswordInner() {
 
 export default function SetPasswordPage() {
   return (
-    <Suspense fallback={<div className="login"><main className="login__panel" style={{ width: '100%' }}><div className="login__card"><p className="login__cardsub">Cargando…</p></div></main></div>}>
+    <Suspense fallback={<div className="login"><main id="main-content" className="login__panel login__panel--single" data-page-state="loading"><div className="login__card"><p className="login__cardsub" role="status">Cargando…</p></div></main></div>}>
       <SetPasswordInner />
     </Suspense>
   )

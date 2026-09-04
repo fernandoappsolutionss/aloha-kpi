@@ -26,6 +26,9 @@ export default function FodaPage() {
   const [vinculado, setVinculado] = useState({ fortalezas: [], debilidades: [] })
   const [estado, setEstado] = useState('')
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [retry, setRetry] = useState(0)
   // Período seleccionable (trimestre/año) — compartido con el resto del panel.
   // Permite editar el FODA de trimestres anteriores (p. ej. Junio en Q2).
   const [period, setPeriod] = useState(getCurrentPeriod())
@@ -35,8 +38,11 @@ export default function FodaPage() {
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   useEffect(() => {
-    if (params.id === 'demo') return
+    if (params.id === 'demo') { setLoading(false); return }
+    let active = true
+    setLoading(true); setError('')
     loadFoda(params.id, year, quarter).then((d) => {
+      if (!active) return
       if (!d) return
       const vinc = d.vinculado || { fortalezas: [], debilidades: [] }
       setVinculado(vinc)
@@ -50,8 +56,9 @@ export default function FodaPage() {
         comentarios: row?.comentarios ?? '',
       })
       setEstado(row?.comentario_estado || '')
-    }).catch(() => {})
-  }, [params.id, year, quarter])
+    }).catch(() => { if(active) setError('No se pudo cargar el FODA. Intenta nuevamente.') }).finally(() => { if(active) setLoading(false) })
+    return () => { active = false }
+  }, [params.id, year, quarter, retry])
 
   // Regenera Fortalezas/Debilidades desde el cumplimiento actual del trimestre.
   function actualizarDesdeCumplimiento(k) {
@@ -87,7 +94,7 @@ export default function FodaPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main reports-page">
 
         {/* Header */}
         <div className="main__head">
@@ -98,30 +105,31 @@ export default function FodaPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <PeriodSelector value={period} onChange={changePeriod} />
-            {status && <span style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') ? 'var(--bad)' : 'var(--ok)' }}>{status}</span>}
-            <button onClick={save} disabled={saving} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
+            {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') ? 'var(--bad-text)' : 'var(--ok-text)' }}>{status}</span>}
+            <button type="button" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
           </div>
         </div>
 
+        {loading ? <p role="status">Cargando FODA…</p> : error ? <div role="alert">{error}<button type="button" className="btn" onClick={()=>setRetry(n=>n+1)}>Reintentar</button></div> : <>
         <div className="alert" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', marginBottom: 20 }}>
           <span style={{ color: 'var(--ts-green)' }}>›</span>
           Las fortalezas y debilidades se pre-cargan desde tu checklist de cumplimiento (incluye el cumplimiento de metas) y quedan editables. Usa “Actualizar desde cumplimiento” para regenerarlas con los datos actuales.
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="reports-grid">
           {cuads.map(({t,accent,tone,k,prompts,linked})=>(
             <div key={t} className="card" style={{ padding: 18, borderTop: `2px solid ${accent}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                <h3 className="label" style={{ color: tone, fontSize: 12 }}>{t}</h3>
+                <h3 className="label" style={{ color: tone, fontSize: 13 }}><label htmlFor={`foda-${k}`}>{t}</label></h3>
                 {linked && (
-                  <button type="button" onClick={()=>actualizarDesdeCumplimiento(k)} className="btn" style={{ padding: '4px 10px', fontSize: 11 }}>
+                  <button type="button" onClick={()=>actualizarDesdeCumplimiento(k)} className="btn" style={{ padding: '4px 10px', fontSize: 13 }}>
                     Actualizar desde cumplimiento
                   </button>
                 )}
               </div>
               <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>{linked ? 'Vinculado al cumplimiento · editable' : 'Editable por la administradora'}</p>
-              {prompts.map((p,i)=><p key={i} style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{p}</p>)}
-              <textarea value={foda[k] ?? ''} onChange={e=>setFoda({...foda,[k]:e.target.value})} style={taStyle}/>
+              {prompts.map((p,i)=><p key={i} style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{p}</p>)}
+              <textarea id={`foda-${k}`} name={k} autoComplete="off" value={foda[k] ?? ''} onChange={e=>setFoda({...foda,[k]:e.target.value})} style={{...taStyle,fontSize:16}}/>
             </div>
           ))}
         </div>
@@ -134,6 +142,7 @@ export default function FodaPage() {
             onStatus={setStatus}
           />
         )}
+        </>}
       </main>
     </div>
   )

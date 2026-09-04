@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import TableScroller from '../../../components/TableScroller'
 import { matrizProgreso, reiniciarProgreso } from '../../actions/entrenamiento'
 import { listCentros } from '../../actions/centros'
 import { completado } from '../../../lib/entrenamiento/progreso'
@@ -15,14 +16,19 @@ export default function EntrenamientoAdminPage() {
   const [error, setError] = useState(null)
   const [recarga, setRecarga] = useState(0)
 
-  useEffect(() => { listCentros().then((c) => setCentros(c || [])).catch(() => {}) }, [])
   useEffect(() => {
+    let active = true
     setLoading(true)
     setError(null)
-    matrizProgreso(centroId ? Number(centroId) : null)
-      .then((d) => { if (d?.error) { setError(d.error); setData(null) } else setData(d) })
-      .catch(() => { setError('No se pudo cargar el progreso. Recarga la página.'); setData(null) })
-      .finally(() => setLoading(false))
+    Promise.all([listCentros(), matrizProgreso(centroId ? Number(centroId) : null)])
+      .then(([centers, d]) => {
+        if (!active) return
+        setCentros(centers || [])
+        if (d?.error) { setError(d.error); setData(null) } else setData(d)
+      })
+      .catch(() => { if (active) { setError('No se pudo cargar el progreso. Recarga la página.'); setData(null) } })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [centroId, recarga])
 
   async function reiniciar(u) {
@@ -36,29 +42,33 @@ export default function EntrenamientoAdminPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general" />
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error || !data ? 'error' : 'ready'} className="main comparisons-page training-admin-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento</div>
             <h1 className="h-title">Quién completó el entrenamiento</h1>
             <p className="h-sub">Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
           </div>
-          <select className="input" style={{ width: 240 }} value={centroId} onChange={(e) => setCentroId(e.target.value)} aria-label="Filtrar por centro">
+          <label className="training-filter" htmlFor="training-center">Filtrar por centro
+          <select id="training-center" name="centro" autoComplete="off" className="input" value={centroId} onChange={(e) => setCentroId(e.target.value)}>
             <option value="">Todos los centros</option>
             {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
+          </label>
         </div>
-        {loading ? <div className="h-sub">Cargando…</div> : error || !data ? (
-          <div className="alert alert--error">{error || 'No se pudo cargar el progreso. Recarga la página.'}</div>
+        {loading ? <div role="status" className="h-sub">Cargando…</div> : error || !data ? (
+          <div role="alert" className="alert alert--error">{error || 'No se pudo cargar el progreso. Recarga la página.'}</div>
         ) : (
-          <div className="panel" style={{ overflowX: 'auto' }}>
-            <table className="table">
+          <div className="panel">
+            <TableScroller label="Progreso de entrenamiento" stickyFirstColumn>
+            <table className="table training-admin-table">
+              <caption className="sr-only">Progreso por usuario y módulo de entrenamiento</caption>
               <thead>
                 <tr>
                   <th>Usuario</th><th>Centro</th>
-                  {data.modulos.map((m, i) => <th key={m.id} title={m.titulo} style={{ textAlign: 'center' }}>{i + 1}</th>)}
-                  <th style={{ textAlign: 'right' }}>%</th>
-                  <th />
+                  {data.modulos.map((m, i) => <th key={m.id} aria-label={`Módulo ${i + 1}: ${m.titulo}`} title={m.titulo} style={{ textAlign: 'center' }}>{i + 1}</th>)}
+                  <th aria-label="Porcentaje completado" style={{ textAlign: 'right' }}>%</th>
+                  <th aria-label="Acciones" />
                 </tr>
               </thead>
               <tbody>
@@ -77,7 +87,7 @@ export default function EntrenamientoAdminPage() {
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.pct === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.pct}%</td>
                     <td style={{ textAlign: 'right' }}>
                       {Object.keys(u.progreso).length > 0 && (
-                        <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando entra una administradora nueva con el mismo correo.">
+                        <button type="button" className="btn btn--compact" aria-label={`Reiniciar progreso de ${u.nombre}`} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando entra una administradora nueva con el mismo correo.">
                           Reiniciar
                         </button>
                       )}
@@ -86,6 +96,7 @@ export default function EntrenamientoAdminPage() {
                 ))}
               </tbody>
             </table>
+            </TableScroller>
             <div style={{ padding: '10px 16px', color: 'var(--text-dim)', fontSize: 12 }}>
               Módulos: {data.modulos.map((m, i) => `${i + 1} ${m.titulo}`).join(' · ')}
             </div>

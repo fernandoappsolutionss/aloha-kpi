@@ -1,10 +1,10 @@
 'use server'
-import { requireAdmin } from '../../lib/auth'
+import { requireCurrentAdmin } from '../../lib/auth'
 import { zohoConexionInfo } from '../../lib/zoho-conexion'
 import { EMAIL_ZOHO_AUTORIZADO } from '../../lib/zoho-cobranza.mjs'
 
 export async function getZohoEstado() {
-  try { await requireAdmin() } catch { return { error: 'No autorizado' } }
+  try { await requireCurrentAdmin() } catch { return { error: 'No autorizado' } }
   const conexion = await zohoConexionInfo()
   return {
     conexion, // { email, conectado_por, conectado_at } | null

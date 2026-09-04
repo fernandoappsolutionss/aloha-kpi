@@ -1,8 +1,8 @@
 'use client'
+import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { listCentros } from '../app/actions/centros'
-import { tienePanel, useRol } from './useRol'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { getNavigationContext } from '../app/actions/navigation'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
@@ -11,9 +11,10 @@ import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
 /* Inline stroke icons (no emojis) */
-const P = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' }
+const P = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: 'false' }
 function Icon({ name }) {
   switch (name) {
+    case 'menu': return <svg viewBox="0 0 24 24" {...P}><path d="M4 7h16M4 12h16M4 17h16" /></svg>
     case 'grid': return <svg viewBox="0 0 24 24" {...P}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>
     case 'trophy': return <svg viewBox="0 0 24 24" {...P}><path d="M6 4h12v4a6 6 0 0 1-12 0V4Z" /><path d="M6 6H4a2 2 0 0 0 0 4h2M18 6h2a2 2 0 0 1 0 4h-2" /><path d="M10 14.5V18M14 14.5V18M8 20h8" /></svg>
     case 'bell': return <svg viewBox="0 0 24 24" {...P}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
@@ -40,31 +41,154 @@ function Icon({ name }) {
 export default function Sidebar({ rol, centroNombre, centroId }) {
   const router = useRouter()
   const path = usePathname()
-  const isAdmin = rol === 'admin_general' || rol === 'supervisor'
-  const [centros, setCentros] = useState([])
   const [centrosOpen, setCentrosOpen] = useState(false)
-  // Las páginas del panel pasan rol="admin_general" fijo: el rol real (para
-  // distinguir al coordinador operativo) sale de la sesión guardada.
-  const rolReal = useRol()
-  const esCoordinador = rolReal === 'coordinador'
-  const mostrarRegreso = !isAdmin && Boolean(centroId) && tienePanel(rolReal)
-  const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
+  const [loading, setLoading] = useState(true)
+  const [context, setContext] = useState(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const drawerRef = useRef(null)
+  const previousPathRef = useRef(path)
+  const restoreEnvironmentRef = useRef(null)
+  const breakpointFocusRef = useRef(null)
+
+  const closeDrawer = useCallback(({ restoreFocus = true } = {}) => {
+    restoreEnvironmentRef.current?.()
+    if (restoreFocus) triggerRef.current?.focus()
+    setDrawerOpen(false)
+  }, [])
 
   useEffect(() => {
-    if (isAdmin) {
-      listCentros().then((data) => { if (data) setCentros(data) }).catch(() => {})
+    const media = window.matchMedia('(max-width: 1024px)')
+    let lastFocus = document.activeElement
+    const rememberFocus = event => { lastFocus = event.target }
+    document.addEventListener('focusin', rememberFocus)
+    const sync = () => {
+      const active = document.activeElement === document.body ? lastFocus : document.activeElement
+      const focusInSidebar = drawerRef.current?.contains(active)
+      const focusInMobileBar = triggerRef.current?.closest('.mobile-bar')?.contains(active)
+      setIsMobile(media.matches)
+      if (!media.matches) closeDrawer({ restoreFocus: false })
+      if (media.matches && focusInSidebar) {
+        breakpointFocusRef.current = 'trigger'
+      } else if (!media.matches && (focusInMobileBar || focusInSidebar)) {
+        breakpointFocusRef.current = 'sidebar'
+      }
     }
-  }, [isAdmin])
+    sync()
+    media.addEventListener('change', sync)
+    return () => { media.removeEventListener('change', sync); document.removeEventListener('focusin', rememberFocus) }
+  }, [closeDrawer])
+
+  useEffect(() => {
+    const destination = breakpointFocusRef.current
+    breakpointFocusRef.current = null
+    if (destination === 'trigger') triggerRef.current?.focus()
+    if (destination === 'sidebar') {
+      const drawer = drawerRef.current
+      const target = drawer?.querySelector('a[aria-current="page"]') || drawer?.querySelector('a[href]') || drawer
+      target?.focus()
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (previousPathRef.current !== path) {
+      previousPathRef.current = path
+      closeDrawer({ restoreFocus: false })
+    }
+  }, [path, closeDrawer])
+
+  useEffect(() => {
+    if (!drawerOpen || !isMobile) return undefined
+    const drawer = drawerRef.current
+    const shell = drawer?.closest('.shell')
+    if (!drawer || !shell) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    const background = [...shell.children]
+      .filter((element) => element !== drawer && !element.classList.contains('sb-backdrop'))
+      .map((element) => ({
+        element,
+        hadInert: element.hasAttribute('inert'),
+        inertValue: element.getAttribute('inert'),
+      }))
+    document.body.style.overflow = 'hidden'
+    for (const { element } of background) element.setAttribute('inert', '')
+
+    let restored = false
+    const restore = () => {
+      if (restored) return
+      restored = true
+      document.body.style.overflow = previousOverflow
+      for (const { element, hadInert, inertValue } of background) {
+        if (hadInert) element.setAttribute('inert', inertValue ?? '')
+        else element.removeAttribute('inert')
+      }
+      if (restoreEnvironmentRef.current === restore) restoreEnvironmentRef.current = null
+    }
+    restoreEnvironmentRef.current = restore
+
+    const focusables = () => [...drawer.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    const frame = requestAnimationFrame(() => (focusables()[0] || drawer).focus())
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeDrawer()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const nodes = focusables()
+      if (nodes.length === 0) {
+        event.preventDefault()
+        drawer.focus()
+        return
+      }
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKeyDown)
+      restore()
+    }
+  }, [drawerOpen, isMobile, closeDrawer])
+
+  useEffect(() => {
+    let mounted = true
+    getNavigationContext()
+      .then((data) => { if (mounted) setContext(data) })
+      .catch(() => { if (mounted) setContext(null) })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const actorRole = context?.actor?.role
+  const isPanel = actorRole === 'admin_general' || actorRole === 'supervisor' || actorRole === 'coordinador'
+  const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
+  const centros = context?.centers || []
+  const esCoordinador = actorRole === 'coordinador'
+  // El contexto visual procede de la ruta y del alcance fresco del servidor;
+  // no concede permisos ni sustituye las guardas de cada página/acción.
+  const isCenterContext = isPanel && centros.some(c => String(c.id) === String(centroId))
+    && (path === `/centro/${centroId}` || path.startsWith(`/centro/${centroId}/`))
+  const mostrarRegreso = isCenterContext
+  const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
-    if (isAdmin || !centroId) return
-    // En /centro/* el prop `rol` llega como "usuario" aunque sea un admin visitando el centro:
-    // leer el rol real. La action devuelve null para gerencia de todas formas.
-    const r = localStorage.getItem('aloha_rol')
-    if (tienePanel(r)) return
+    if (loading || !context || isPanel || !centroId || context.capabilities.viewUsers) return
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
-  }, [isAdmin, centroId])
+  }, [loading, context, isPanel, centroId])
 
   // Firmas pendientes del oficio: solo para quien puede firmarle a alguien
   // (administradora, coordinador, gerencia). El permiso real lo decide el
@@ -90,20 +214,16 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
-    // Metas y Entrenamiento son de gerencia: fijan objetivos globales y la
-    // matriz de todas las administradoras. El coordinador no los ve.
-    ...(esCoordinador ? [] : [
-      { label: 'Metas', icon: 'target', href: '/dashboard/metas' },
-      { label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' },
-      // La matriz del oficio va aparte: la de tours filtra rol='administradora'
-      // y dejaría fuera justo a las asistentes.
-      { label: 'Oficio (hats)', icon: 'shield', href: '/dashboard/entrenamiento/oficio' },
-    ]),
+    ...(context?.capabilities.viewMetas ? [{ label: 'Metas', icon: 'target', href: '/dashboard/metas' }] : []),
+    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
+    // La matriz del oficio va aparte: la de tours filtra rol='administradora'
+    // y dejaría fuera justo a las asistentes. Misma capacidad de gerencia.
+    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Oficio (hats)', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
   ]
-  const adminConfig = [
-    { label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' },
-    { label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' },
-    { label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' },
+  const configItems = [
+    ...(context?.capabilities.viewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
+    ...(context?.capabilities.viewCenters ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
+    ...(context?.capabilities.viewUsers ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
@@ -120,67 +240,91 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
     ...(firmaDrills ? [{ label: 'Firmas de drill', icon: 'check', href: `/centro/${centroId}/entrenamiento/firmas`, badge: firmas > 0 ? String(firmas) : null }] : []),
   ]
-  const items = isAdmin ? adminItems : centroItems
+  const items = isPanel ? (isCenterContext ? centroItems : adminItems) : (isCenterActor && centroId ? centroItems : [])
+  const roleLabel = isPanel
+    ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador')
+    : (centroNombre || 'Centro')
 
   async function logout() {
     try { await logoutAction() } catch {}
     localStorage.clear()
     router.push('/login')
   }
-  const isActive = (href) => path === href || (
-    href !== '/dashboard' && href !== `/centro/${centroId}` && path.startsWith(`${href}/`)
+  const isActive = (href) => path === href || (href.endsWith('/entrenamiento') && path.startsWith(`${href}/`))
+  const isCenterActive = (centerId) => {
+    const prefix = `/centro/${centerId}`
+    return path === prefix || path.startsWith(`${prefix}/`)
+  }
+
+  const navigationLink = (item, extraClass = '') => (
+    <Link key={item.href} href={item.href} title={item.label} data-tour={item.tour}
+      onClick={() => closeDrawer({ restoreFocus: false })}
+      aria-current={isActive(item.href) ? 'page' : undefined}
+      className={`sb__item${extraClass}${isActive(item.href) ? ' sb__item--active' : ''}`}>
+      <Icon name={item.icon} /><span>{item.label}</span>
+      {item.badge && <span className="sb__badge" style={{ color: 'var(--text)' }}>{item.badge}</span>}
+    </Link>
   )
 
   return (
-    <aside className="sb">
+    <>
+      <header className="mobile-bar">
+        <button ref={triggerRef} type="button" className="mobile-bar__menu"
+          aria-label="Abrir menú" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>
+          <Icon name="menu" />
+        </button>
+        <Logo size={34} />
+        <span className="mobile-bar__context">{centroNombre || roleLabel}</span>
+      </header>
+      {drawerOpen && (
+        <button type="button" className="sb-backdrop" aria-label="Cerrar menú al tocar fuera"
+          onPointerDown={(event) => event.preventDefault()} onClick={() => closeDrawer()} />
+      )}
+      <aside ref={drawerRef} className={`sb${drawerOpen ? ' sb--open' : ''}`}
+        aria-label="Navegación principal" role={isMobile ? 'dialog' : undefined}
+        aria-modal={isMobile ? 'true' : undefined}
+        aria-hidden={isMobile ? !drawerOpen : undefined}
+        inert={isMobile && !drawerOpen ? true : undefined} tabIndex={-1} data-navigation-state={loading ? 'loading' : 'ready'}>
+      <button type="button" className="sb__close" aria-label="Cerrar menú" onClick={() => closeDrawer()}>×</button>
       {/* Brand */}
       <div className="sb__brand">
         <Logo size={40} />
         <div className="sb__role">
-          <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isAdmin ? 'shield' : 'building'} /></span>
-          <span className="label">{isAdmin ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador') : (centroNombre || 'Centro')}</span>
+          <span style={{ width: 14, height: 14, color: 'var(--ts-green)' }}><Icon name={isPanel ? 'shield' : 'building'} /></span>
+          <span className="label">{roleLabel}</span>
         </div>
       </div>
 
       <nav className="sb__nav">
-        <div className="sb__section label">{isAdmin ? 'Panel' : 'Mi centro'}</div>
-        {items.map(item => (
-          <button key={item.href} onClick={() => router.push(item.href)} title={item.label} data-tour={item.tour}
-            className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
-            <Icon name={item.icon} /><span>{item.label}</span>
-            {item.badge && <span className="sb__badge">{item.badge}</span>}
-          </button>
-        ))}
+        <div className="sb__section label">{isCenterContext ? 'Centro' : isPanel ? 'Panel' : 'Mi centro'}</div>
+        {items.map(item => navigationLink(item))}
 
         {/* Centros expandible (admin) */}
-        {isAdmin && centros.length > 0 && (
+        {isPanel && centros.length > 0 && (
           <>
             <button onClick={() => setCentrosOpen(!centrosOpen)} className="sb__item">
               <Icon name="building" /><span>Ir a centro</span>
               <span className="sb__chev" style={{ transform: centrosOpen ? 'rotate(180deg)' : 'none' }}><Icon name="chevron" /></span>
             </button>
             {centrosOpen && centros.map(c => {
-              const active = path.startsWith(`/centro/${c.id}`)
+              const active = isCenterActive(c.id)
               return (
-                <button key={c.id} onClick={() => router.push(`/centro/${c.id}`)} title={c.nombre}
+                <Link key={c.id} href={`/centro/${c.id}`} title={c.nombre}
+                  onClick={() => closeDrawer({ restoreFocus: false })}
+                  aria-current={active && !isCenterContext ? 'page' : undefined}
                   className={`sb__item sb__sub${active ? ' sb__item--active' : ''}`}>
-                  <span style={{ width: 5, height: 5, borderRadius: 3, background: active ? 'var(--ts-green)' : 'var(--text-faint)', flexShrink: 0 }} />
+                  <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 3, background: active ? 'var(--ts-green)' : 'var(--text-faint)', flexShrink: 0 }} />
                   <span>{c.nombre.length > 18 ? c.nombre.split(' ').slice(0, 2).join(' ') : c.nombre}</span>
-                </button>
+                </Link>
               )
             })}
           </>
         )}
 
-        {isAdmin && !esCoordinador && (
+        {isPanel && configItems.length > 0 && (
           <>
             <div className="sb__section label" style={{ marginTop: 6 }}>Configuración</div>
-            {adminConfig.map(item => (
-              <button key={item.href} onClick={() => router.push(item.href)} title={item.label}
-                className={`sb__item${isActive(item.href) ? ' sb__item--active' : ''}`}>
-                <Icon name={item.icon} /><span>{item.label}</span>
-              </button>
-            ))}
+            {configItems.map(item => navigationLink(item))}
           </>
         )}
       </nav>
@@ -188,19 +332,22 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       {/* Footer */}
       <div className="sb__foot">
         {mostrarRegreso && (
-          <button onClick={() => router.push('/dashboard')} className="sb__item sb__return"
+          <Link href="/dashboard" onClick={() => closeDrawer({ restoreFocus: false })} className="sb__item sb__return"
             title={etiquetaRegreso} aria-label={etiquetaRegreso}>
             <Icon name="back" /><span>{etiquetaRegreso}</span>
-          </button>
+          </Link>
         )}
         <ThemeToggle />
-        <button onClick={() => router.push('/perfil')} aria-label="Mi perfil" className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
+        <Link href="/perfil" onClick={() => closeDrawer({ restoreFocus: false })}
+          aria-current={isActive('/perfil') ? 'page' : undefined}
+          className={`sb__item${isActive('/perfil') ? ' sb__item--active' : ''}`}>
           <Icon name="user" /><span>Mi perfil</span>
-        </button>
-        <button onClick={logout} aria-label="Cerrar sesión" className="sb__item">
+        </Link>
+        <button type="button" onClick={logout} className="sb__item">
           <Icon name="logout" /><span>Cerrar sesión</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

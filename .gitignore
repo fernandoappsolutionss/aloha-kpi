@@ -23,3 +23,7 @@
 
 # Reportes de corridas de scripts (dry-run/--apply): son evidencia local, no código
 scripts/out/
+/playwright-report/
+/test-results/
+/tests/e2e/.auth/
+/artifacts/responsive-audit/

@@ -3,17 +3,6 @@
 // Filtro del Panel general: alterna entre Trimestre (Q + año) y Mensual
 // (rango de meses por preset o personalizado). Gobierna tarjetas, tabla y
 // gráfico a la vez. El valor es el objeto `filter` (ver lib/period).
-const pill = (on) => ({
-  padding: '5px 13px',
-  border: `1px solid ${on ? 'var(--ts-green-line)' : 'var(--border-strong)'}`,
-  borderRadius: 'var(--r-pill)',
-  background: on ? 'var(--ts-green-soft)' : 'transparent',
-  fontFamily: 'var(--font-mono)', fontSize: 11,
-  color: on ? 'var(--ts-green)' : 'var(--text-dim)',
-  cursor: 'pointer', fontWeight: on ? 600 : 500,
-})
-const inp = { padding: '4px 8px', background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--font-mono)' }
-
 export default function PanelFilter({ value, onChange }) {
   const f = value || { mode: 'trimestre' }
   const cy = new Date().getFullYear()
@@ -22,42 +11,43 @@ export default function PanelFilter({ value, onChange }) {
   const preset = f.preset || '12m'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button style={pill(isT)} onClick={() => onChange({ mode: 'trimestre', year: f.year || cy, quarter: f.quarter || (Math.floor(new Date().getMonth() / 3) + 1) })}>Trimestre</button>
-        <button style={pill(!isT)} onClick={() => onChange({ mode: 'mensual', preset, from: f.from || '', to: f.to || '' })}>Mensual</button>
+    <div className="panel-filter">
+      <div className="panel-filter__modes" role="group" aria-label="Tipo de período">
+        <button type="button" className={`panel-filter__mode ${isT ? 'panel-filter__mode--active' : ''}`} aria-pressed={isT} onClick={() => onChange({ mode: 'trimestre', year: f.year || cy, quarter: f.quarter || (Math.floor(new Date().getMonth() / 3) + 1) })}>Trimestre</button>
+        <button type="button" className={`panel-filter__mode ${!isT ? 'panel-filter__mode--active' : ''}`} aria-pressed={!isT} onClick={() => onChange({ mode: 'mensual', preset, from: f.from || '', to: f.to || '' })}>Mensual</button>
       </div>
 
       {isT ? (
-        <div className="period">
-          <select className="select" value={f.quarter || 1} aria-label="Trimestre"
+        <div className="period panel-filter__period" role="group" aria-label="Periodo trimestral">
+          <label className="period__field"><span>Trimestre</span><select name="panel-quarter" className="select" value={f.quarter || 1}
             onChange={e => onChange({ ...f, mode: 'trimestre', quarter: Number(e.target.value) })}>
             {[1, 2, 3, 4].map(q => <option key={q} value={q}>Q{q}</option>)}
-          </select>
-          <select className="select" value={f.year || cy} aria-label="Año"
+          </select></label>
+          <label className="period__field"><span>Año</span><select name="panel-year" className="select" value={f.year || cy}
             onChange={e => onChange({ ...f, mode: 'trimestre', year: Number(e.target.value) })}>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          </select></label>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="panel-filter__presets" role="group" aria-label="Rango mensual">
           {[['12m', 'Últimos 12 meses'], ['36m', 'Últimos 3 años'], ['anio', 'Año completo'], ['ytd', 'Este año'], ['custom', 'Personalizado']].map(([k, l]) => (
-            <button key={k} style={pill(preset === k)} onClick={() => onChange({ ...f, mode: 'mensual', preset: k, year: f.year || cy })}>{l}</button>
+            <button type="button" key={k} className={`panel-filter__preset ${preset === k ? 'panel-filter__preset--active' : ''}`} aria-pressed={preset === k} onClick={() => onChange({ ...f, mode: 'mensual', preset: k, year: f.year || cy })}>{l}</button>
           ))}
           {preset === 'anio' && (
-            <select className="select" value={f.year || cy} aria-label="Año"
+            <label className="period__field panel-filter__year"><span>Año</span><select name="panel-monthly-year" className="select" value={f.year || cy}
               onChange={e => onChange({ ...f, mode: 'mensual', preset: 'anio', year: Number(e.target.value) })}>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            </select></label>
           )}
           {preset === 'custom' && (
-            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
-              <input type="month" value={f.from || ''} style={inp}
+            <div className="panel-filter__range">
+              <label><span>Desde</span><input type="month" name="desde" autoComplete="off" value={f.from || ''}
                 onChange={e => onChange({ ...f, mode: 'mensual', preset: 'custom', from: e.target.value })} />
-              <span style={{ color: 'var(--text-dim)' }}>→</span>
-              <input type="month" value={f.to || ''} style={inp}
+              </label>
+              <label><span>Hasta</span><input type="month" name="hasta" autoComplete="off" value={f.to || ''}
                 onChange={e => onChange({ ...f, mode: 'mensual', preset: 'custom', to: e.target.value })} />
-            </span>
+              </label>
+            </div>
           )}
         </div>
       )}

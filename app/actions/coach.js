@@ -47,7 +47,7 @@ export async function loadGrupoCoach(token) {
     ORDER BY nombre
   `
   const asistencias = await sql`
-    SELECT estudiante_id, fecha, estado FROM asistencias WHERE grupo_id = ${g.id}
+    SELECT estudiante_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, estado FROM asistencias WHERE grupo_id = ${g.id}
   `
   return {
     grupo: {
