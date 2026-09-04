@@ -54,9 +54,13 @@ test('Zoho layout redirects rejected current actor to dashboard and admits curre
 
 test('upstream fixture smoke is excluded from every remote viewport', () => {
   const result = execFileSync(process.execPath, ['--input-type=module', '--eval',
-    "import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify(c.projects.filter(p=>p.testIgnore).map(p=>p.testIgnore.test('upstream-integration.local.spec.js')))))"], {
+    "import('./playwright.config.mjs').then(({default:c})=>{const names=['phone-320','phone-375','phone-390','phone-430','tablet-768','desktop-1440'];const admins=c.projects.filter(p=>names.includes(p.name));const coordinator=c.projects.find(p=>p.name==='coordinator-audit');console.log(JSON.stringify({names:admins.map(p=>p.name),excluded:admins.map(p=>p.testIgnore.test('upstream-integration.local.spec.js')),coordinatorMatches:coordinator.testMatch.test('upstream-integration.local.spec.js')}))})"], {
     cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8',
     env: { RESPONSIVE_BASE_URL: 'https://readonly.invalid' },
   })
-  assert.deepEqual(JSON.parse(result), [true, true, true, true, true, true])
+  assert.deepEqual(JSON.parse(result), {
+    names: ['phone-320', 'phone-375', 'phone-390', 'phone-430', 'tablet-768', 'desktop-1440'],
+    excluded: [true, true, true, true, true, true],
+    coordinatorMatches: false,
+  })
 })

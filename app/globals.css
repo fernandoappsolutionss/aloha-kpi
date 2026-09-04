@@ -1315,6 +1315,37 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .mobile-only { display: none !important; }
 .desktop-only { display: block; }
 
+/* Gestión de usuarios: la comparación vive en la tabla, la operación móvil en tarjetas. */
+.users-page { min-width: 0; --text-dim: var(--text-muted); --text-faint: var(--text-muted); }
+.users-page .alert { margin-bottom: 16px; }
+.users-filter { max-width: 320px; margin-bottom: 18px; }
+.users-table { min-width: 1080px; }
+.users-table td { white-space: normal; overflow-wrap: anywhere; }
+.users-email { max-width: 240px; overflow-wrap: anywhere; }
+.users-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.users-editor, .users-notice { padding: 22px; margin-bottom: 20px; }
+.users-editor .panel__title, .users-notice .panel__title { margin-bottom: 8px; }
+.users-editor__actions { margin-top: 18px; justify-content: flex-end; }
+.users-centers { min-width: 0; margin: 0; padding: 0; border: 0; grid-column: 1 / -1; }
+.users-centers legend { margin-bottom: 8px; }
+.users-center-option { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); cursor: pointer; overflow-wrap: anywhere; }
+.users-center-option:has(:checked) { border-color: var(--ok-line); background: var(--ok-bg); }
+.users-center-option input { flex: 0 0 auto; }
+.users-notice__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.users-notice__header > div, .users-notice__delivery > * { min-width: 0; overflow-wrap: anywhere; }
+.users-notice__close { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+.users-notice__delivery { display: flex; align-items: flex-end; gap: 8px; margin-top: 14px; }
+.users-notice__delivery .field { flex: 1; }
+.users-notice__delivery .input { font-family: var(--font-mono, monospace); }
+.btn--danger { color: var(--bad-text); border-color: var(--bad-line); background: var(--bad-bg); }
+@media (max-width: 767px) {
+  .users-editor, .users-notice { padding: 16px; }
+  .users-cards .users-actions { width: 100%; }
+  .users-notice__delivery { flex-direction: column; align-items: stretch; }
+  .users-notice__delivery .btn { width: 100%; }
+  .users-notice__delivery .input { font-size: 16px; }
+}
+
 /* Operación administrativa: la tabla compara; la tarjeta conserva el detalle. */
 .nivel-badge { font-size: 12px; }
 .operations-page {

@@ -46,15 +46,17 @@ const sizes = [
   ['tablet-768', 768, 1024],
   ['desktop-1440', 1440, 900],
 ]
-const mutationProjects = process.env.E2E_RUN_MUTATIONS === '1' ? [{
+const mutationProjects = !remoteRun && process.env.E2E_RUN_MUTATIONS === '1' ? [{
   name: 'users-mutations-local',
   testMatch: /users-mutations\.local\.spec\.js/,
   dependencies: ['setup'],
   fullyParallel: false,
   workers: 1,
-  use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/admin.json' },
+  use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/admin.json', trace: 'off', screenshot: 'off', video: 'off' },
 }] : []
 const mutationRun = mutationProjects.length > 0
+// Los errores del mutante no deben generar snapshots del DOM con bearer tokens.
+if (mutationRun) process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1'
 const dialogProjects = dialogsRun ? [
   ...sizes
     .filter(([name]) => ['phone-320', 'phone-390', 'tablet-768'].includes(name))
@@ -95,8 +97,9 @@ const serverEnv = remoteRun ? undefined : {
 
 export default defineConfig({
   testDir: './tests/e2e',
-  outputDir: 'test-results',
-  reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
+  outputDir: mutationRun ? 'test-results/r7-users-mutations' : 'test-results',
+  preserveOutput: mutationRun ? 'never' : 'always',
+  reporter: mutationRun ? [['line']] : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   expect: { timeout: 10_000 },
   globalSetup: comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
   globalTeardown: comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
@@ -170,6 +173,7 @@ export default defineConfig({
     {
       name: 'coordinator-audit',
       testMatch: /(users-coordinator|dashboard-operations)\.spec\.js/,
+      testIgnore: /auth\.setup\.js/,
       grep: /@coordinator|^(?!.*dashboard-operations)/,
       dependencies: ['setup'],
       use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/coordinator.json' },

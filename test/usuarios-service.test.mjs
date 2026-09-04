@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import * as usuariosServiceModule from '../lib/usuarios-service.mjs'
 import { usuariosRepository } from '../lib/usuarios-repository.js'
+import { usuariosDeliveryForRuntime } from '../lib/usuarios-delivery.mjs'
 
 const { createUsuariosService } = usuariosServiceModule
 
@@ -30,6 +31,7 @@ function writeFixture({
   deleteError = null,
   deliveryError = null,
   deliveryResult = null,
+  deliveryTransport = null,
 } = {}) {
   const inserted = []
   const updated = []
@@ -170,6 +172,7 @@ function writeFixture({
     events.push(`delivery:${row.user.id}`)
     deliveries.push(row)
     if (deliveryError) throw deliveryError
+    if (deliveryTransport) return deliveryTransport(row)
     return deliveryResult || { emailSent: true, link: `https://app/set-password?token=${row.token}` }
   }
   return {
@@ -257,6 +260,20 @@ test('coordinador sin centros no cae en alcance global', async () => {
   assert.deepEqual(result.users, [])
   assert.equal(result.capabilities.createUser, false)
   assert.deepEqual(repo.calls.find((c) => c[0] === 'users')[1], [])
+})
+
+test('pageData no ofrece editar supervisor pero conserva acceso y eliminación gestionables', async () => {
+  const actor = { id: 1, rol: 'admin_general', centros: [], password_hash: 'actor' }
+  const supervisors = [false, true].map((activo, index) => ({
+    id: 40 + index, nombre: 'Supervisor', email: `supervisor-${index}@test.invalid`,
+    rol: 'supervisor', centro_id: null, centros: [], activo,
+  }))
+  const result = await createUsuariosService({ repo: readRepo(actor, supervisors) }).pageData({ uid: 1 })
+  assert.deepEqual(result.assignableRoles, ['admin_general', 'coordinador', 'administradora', 'asistente'])
+  assert.deepEqual(result.users.map(user => user.actions), [
+    { edit: false, resendInvitation: true, sendPasswordReset: false, delete: true },
+    { edit: false, resendInvitation: false, sendPasswordReset: true, delete: true },
+  ])
 })
 
 test('rol sin gestión queda denegado antes de listar', async () => {
@@ -452,6 +469,46 @@ test('coordinador crea rol operativo en centro propio y recibe invitación', asy
   assert.deepEqual(fx.transactionOptions, [{ isolationLevel: 'Serializable' }])
   assert.ok(fx.events.indexOf('tx:1:commit') < fx.events.indexOf('delivery:30'))
   assert.deepEqual(fx.events.slice(1, 5), ['actor:1:true', 'duplicate:1', 'insert:1', 'token:1:30'])
+})
+
+test('crear conserva el propósito invite hasta el transporte real disposable', async () => {
+  const deliveryTransport = usuariosDeliveryForRuntime({ env: {
+    NODE_ENV: 'development', E2E_DELIVERY_MODE: 'stub', E2E_DATABASE_CONFIRM: 'disposable',
+  } })
+  const fx = writeFixture({ deliveryTransport })
+  const result = await fx.service.create({ uid: 2 }, validInput())
+  assert.deepEqual(result, { ok: true, kind: 'invitation', emailSent: true, link: 'https://e2e.invalid/set-password?token=t-1' })
+})
+
+test('crear entrega invite al transporte live y compone correo sin red real', async () => {
+  const originalFetch = globalThis.fetch
+  const originalUrl = process.env.APP_URL
+  const originalKey = process.env.RESEND_API_KEY
+  const messages = []
+  try {
+    process.env.APP_URL = 'https://aloha.test.invalid'
+    process.env.RESEND_API_KEY = 'test-only-not-a-key'
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, 'https://api.resend.com/emails')
+      messages.push(JSON.parse(options.body))
+      return { ok: true }
+    }
+    const { deliverAccess } = await import('../lib/invitations.js')
+    const fx = writeFixture({ deliveryTransport: usuariosDeliveryForRuntime({ env: {}, live: deliverAccess }) })
+    const result = await fx.service.create({ uid: 2 }, validInput())
+    assert.equal(fx.deliveries[0].purpose, 'invite')
+    assert.equal(result.link, 'https://aloha.test.invalid/set-password?token=t-1')
+    assert.equal(messages.length, 1)
+    assert.deepEqual(messages[0].to, ['laura@aloha.com'])
+    assert.equal(messages[0].subject, 'Crea tu contraseña · ALOHA KPI')
+    assert.match(messages[0].html, /Crear mi contraseña/)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalUrl === undefined) delete process.env.APP_URL
+    else process.env.APP_URL = originalUrl
+    if (originalKey === undefined) delete process.env.RESEND_API_KEY
+    else process.env.RESEND_API_KEY = originalKey
+  }
 })
 
 test('fallo del transporte no revierte la cuenta ni filtra el error', async () => {

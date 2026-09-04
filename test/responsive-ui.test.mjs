@@ -10,6 +10,17 @@ import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
+test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invitación', () => {
+  const cwd = fileURLToPath(new URL('../', import.meta.url))
+  const config = env => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', "import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify({projects:c.projects,reporter:c.reporter})))"], { cwd, encoding: 'utf8', env }))
+  const remote = config({ RESPONSIVE_BASE_URL: 'https://readonly.invalid', E2E_RUN_MUTATIONS: '1' })
+  assert.equal(remote.projects.some(p => p.name === 'users-mutations-local'), false)
+  const local = config({ E2E_RUN_MUTATIONS: '1', E2E_DATABASE_CONFIRM: 'disposable', USUARIOS_TEST_DATABASE_URL: 'postgres://fixture:fixture@db.invalid:5432/fixture', E2E_NEON_HTTP: 'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY: '127.0.0.1:5435', SESSION_SECRET: 'dummy-long-session-secret' })
+  const mutant = local.projects.find(p => p.name === 'users-mutations-local')
+  assert.deepEqual([mutant.use.trace, mutant.use.screenshot, mutant.use.video], ['off', 'off', 'off'])
+  assert.deepEqual(local.reporter, [['line']])
+})
+
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
