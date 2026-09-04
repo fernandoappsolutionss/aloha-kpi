@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
@@ -9,6 +9,13 @@ import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
 import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
 import { requireR8Gate } from '../tests/e2e/helpers/r8-fixture.mjs'
 import { requireR9Gate } from '../tests/e2e/helpers/r9-fixture.mjs'
+
+test('Tour mide viewport y tarjeta fuera de render', () => {
+  const tour = read('../components/tour/TourHost.js')
+  const start = tour.indexOf('if (!modulo || !step) return null')
+  assert.ok(start > 0)
+  assert.doesNotMatch(tour.slice(start), /window\.inner(?:Width|Height)|\.offsetHeight|getBoundingClientRect/)
+})
 
 test('R9 nunca registra Coach remoto ni artefactos privados y sus fixtures son exclusivas', () => {
   const env={E2E_R9_OPERATIONS:'1',E2E_DATABASE_CONFIRM:'disposable',DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',USUARIOS_TEST_DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2',E2E_NEON_HTTP:'http://127.0.0.1:4446/sql',E2E_NEON_WSPROXY:'127.0.0.1:5435',SESSION_SECRET:'dummy-session'}
@@ -35,6 +42,24 @@ test('R8 mantiene fixture, autenticación propia y rutas escritoras fuera del ga
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
+test('R10 FODA confirma descartes y borrados mediante Dialog accesible',()=>{
+  for(const path of ['PeticionesList','PeticionDraftForm','CotizacionCard']) {
+    const source=read(`../components/foda/${path}.js`)
+    assert.match(source, /<Dialog/,path)
+    assert.doesNotMatch(source,/\bconfirm\(/,path)
+  }
+})
+
+test('R10 reportes conservan un main identificado y estados recuperables', () => {
+  for (const path of ['cuadro','cumplimiento','foda','historial','entrenamiento','entrenamiento/[modulo]']) {
+    const source = read(`../app/centro/[id]/${path}/page.js`)
+    assert.match(source, /id="main-content"/, path)
+    assert.match(source, /data-page-state=/, path)
+    assert.match(source, /role="alert"/, path)
+    assert.match(source, /Reintentar/, path)
+  }
+})
+
 test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invitación', () => {
   const cwd = fileURLToPath(new URL('../', import.meta.url))
   const config = env => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', "import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify({projects:c.projects,reporter:c.reporter})))"], { cwd, encoding: 'utf8', env }))
@@ -48,6 +73,31 @@ test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invi
 
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
+
+export const PRODUCT_ROUTE_FILES = ['app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
+export const NON_PRODUCT_ROUTE_FILES = ['app/e2e-primitives/page.js']
+test('R10 inventario local completo: 28 producto y una técnica, sin duplicados', () => {
+  const all = [...PRODUCT_ROUTE_FILES,...NON_PRODUCT_ROUTE_FILES]
+  assert.equal(PRODUCT_ROUTE_FILES.length,28)
+  assert.equal(NON_PRODUCT_ROUTE_FILES.length,1)
+  assert.equal(new Set(all).size,29)
+  const actual = readdirSync(new URL('../app/',import.meta.url),{recursive:true}).map(String).filter(p=>p==='page.js'||p.endsWith('/page.js')).map(p=>`app/${p}`)
+  assert.deepEqual(all.sort(),actual.sort())
+})
+test('R10 barrido global no conserva fuentes ilegibles ni interacciones no semánticas', () => {
+  const violations=[]
+  const pattern = /transition:\s*all|overflowX:\s*['"]visible|<(?:div|span|tr|td)\b[^>]*onClick|font(?:Size|-size):\s*['"]?(?:8|9|10|11)(?:\.\d+)?(?:px)?(?=[^\d.]|$)/g
+  for(const root of ['app','components']) for(const path of readdirSync(new URL(`../${root}/`,import.meta.url),{recursive:true})) {
+    if(!/\.(?:js|css)$/.test(path)) continue
+    const source = read(`../${root}/${path}`)
+    for(const match of source.matchAll(pattern)) violations.push(`${root}/${path}:${source.slice(0,match.index).split('\n').length}: ${match[0]}`)
+  }
+  assert.deepEqual(violations,[])
+  for(const path of readdirSync(new URL('../tests/e2e/',import.meta.url))) {
+    if(!path.endsWith('.spec.js'))continue
+    assert.doesNotMatch(read('../tests/e2e/'+path),/disableRules\(\[.*color-contrast/,path)
+  }
+})
 
 test('R6 limita fixture y Growth automático a base local y modos exclusivos', () => {
   const env = { E2E_R6_COMPARISONS: '1', E2E_DATABASE_CONFIRM: 'disposable', DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', USUARIOS_TEST_DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', E2E_NEON_HTTP: 'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY: '127.0.0.1:5435' }

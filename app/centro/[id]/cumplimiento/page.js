@@ -6,6 +6,7 @@ import { loadCumplimiento, saveCumplimiento } from '../../../actions/cumplimient
 import { getCentroNombre } from '../../../actions/centros'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, quarterMonths, periodLabel } from '../../../../lib/period'
 import PeriodSelector from '../../../../components/PeriodSelector'
+import TableScroller from '../../../../components/TableScroller'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -39,6 +40,7 @@ export default function CumplimientoPage() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
 
   const allKeys = CHECKS.flatMap(g => g.items.map(i => i.k))
   const totalSi = allKeys.filter(k => vals[k]==='si').length
@@ -52,11 +54,12 @@ export default function CumplimientoPage() {
   async function loadData() {
     if (!centroId) { setLoading(false); return }
     setLoading(true)
+    setError('')
     try {
       const { trimestreId, vals } = await loadCumplimiento(centroId, year, quarter, mes)
       setTrimestreId(trimestreId)
       setVals(vals || {...DEFS})
-    } catch (e) { setStatus('Error cargando: ' + e.message) }
+    } catch (e) { setError('No se pudo cargar el cumplimiento. Intenta nuevamente.') }
     setLoading(false)
   }
 
@@ -79,7 +82,7 @@ export default function CumplimientoPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main reports-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Checklist operativo · {label}</div>
@@ -88,20 +91,20 @@ export default function CumplimientoPage() {
           </div>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <PeriodSelector value={period} onChange={changePeriod} />
-            {status && <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad)' : 'var(--ok)', fontWeight: 500 }}>{status}</span>}
-            <button onClick={save} disabled={saving||loading} className="btn btn--primary">
+            {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad-text)' : 'var(--ok-text)', fontWeight: 500 }}>{status}</span>}
+            <button type="button" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border)', gap: 4 }}>
+        <div role="tablist" aria-label="Mes de cumplimiento" className="reports-tabs" style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border)', gap: 4 }}>
           {qMonths.map((mAbs,i)=>
-            <button key={mAbs} onClick={()=>setMes(i+1)} style={{ padding: '10px 20px', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', borderBottom: mes===i+1 ? '2px solid var(--ts-green)' : '2px solid transparent', color: mes===i+1 ? 'var(--text)' : 'var(--text-dim)', fontWeight: mes===i+1 ? 600 : 500, marginBottom: -1 }}>{NOMBRES_MES[mAbs-1]}</button>
+            <button type="button" role="tab" id={`mes-tab-${i+1}`} aria-controls="cumplimiento-panel" aria-selected={mes===i+1} tabIndex={mes===i+1 ? 0 : -1} key={mAbs} onClick={()=>setMes(i+1)} onKeyDown={e => { const next = e.key==='ArrowRight' ? mes%3+1 : e.key==='ArrowLeft' ? (mes+1)%3+1 : e.key==='Home' ? 1 : e.key==='End' ? 3 : null; if(next) { e.preventDefault(); setMes(next); document.getElementById(`mes-tab-${next}`)?.focus() } }} style={{ minHeight:44, padding: '10px 20px', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', borderBottom: mes===i+1 ? '2px solid var(--ts-green)' : '2px solid transparent', color: mes===i+1 ? 'var(--text)' : 'var(--text-dim)', fontWeight: mes===i+1 ? 600 : 500, marginBottom: -1 }}>{NOMBRES_MES[mAbs-1]}</button>
           )}
         </div>
 
-        {loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</div> : <>
+        {loading ? <div role="status" style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</div> : error ? <div role="alert">{error}<button type="button" className="btn" onClick={loadData}>Reintentar</button></div> : <div role="tabpanel" id="cumplimiento-panel" aria-labelledby={`mes-tab-${mes}`}>
           <div className="card" style={{ padding: '18px 20px', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
@@ -117,19 +120,15 @@ export default function CumplimientoPage() {
 
           {CHECKS.map(group => (
             <div key={group.g} className="card" style={{ padding: '16px 20px', marginBottom: 12 }}>
-              <h3 className="label" style={{ color: 'var(--ts-green)', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>{group.g}</h3>
-              {group.items.map((item, idx) => (
-                <div key={item.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: idx < group.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)', flex: 1, paddingRight: 16 }}>{item.l}</span>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={()=>toggle(item.k,'si')} style={{ padding: '5px 16px', borderRadius: 'var(--r-pill)', border: '1px solid', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', background: vals[item.k]==='si' ? 'var(--ok-bg)' : 'transparent', color: vals[item.k]==='si' ? 'var(--ok-text)' : 'var(--text-dim)', borderColor: vals[item.k]==='si' ? 'var(--ok-line)' : 'var(--border-strong)', fontWeight: vals[item.k]==='si' ? 600 : 400 }}>Sí</button>
-                    <button onClick={()=>toggle(item.k,'no')} style={{ padding: '5px 16px', borderRadius: 'var(--r-pill)', border: '1px solid', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', background: vals[item.k]==='no' ? 'var(--bad-bg)' : 'transparent', color: vals[item.k]==='no' ? 'var(--bad-text)' : 'var(--text-dim)', borderColor: vals[item.k]==='no' ? 'var(--bad-line)' : 'var(--border-strong)', fontWeight: vals[item.k]==='no' ? 600 : 400 }}>No</button>
-                  </div>
-                </div>
-              ))}
+              <h3 className="label" style={{ color: 'var(--ok-text)', marginBottom: 12 }}>{NOMBRES_MES[qMonths[mes-1]-1]} · {group.g}</h3>
+              <TableScroller label={`${NOMBRES_MES[qMonths[mes-1]-1]} · ${group.g}`} stickyFirstColumn>
+                <table className="table compliance-matrix"><thead><tr><th scope="col">Criterio</th><th scope="col">Sí</th><th scope="col">No</th></tr></thead><tbody>
+                  {group.items.map(item => <tr key={item.k}><th scope="row">{item.l}</th>{['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[item.k]===value} onClick={()=>toggle(item.k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>)}
+                </tbody></table>
+              </TableScroller>
             </div>
           ))}
-        </>}
+        </div>}
       </main>
     </div>
   )

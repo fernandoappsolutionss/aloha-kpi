@@ -69,14 +69,16 @@ function visibleFocusables(surface) {
   ))
 }
 
-export function useModalLayer({ open, onClose, closeDisabled = false, initialFocusRef }) {
+export function useModalLayer({ open, onClose, closeDisabled = false, initialFocusRef, returnFocusRef }) {
   const layerRef = useRef(null)
   const surfaceRef = useRef(null)
   const previousFocusRef = useRef(null)
   const onCloseRef = useRef(onClose)
   const closeDisabledRef = useRef(closeDisabled)
+  const returnTargetRef = useRef(returnFocusRef)
   onCloseRef.current = onClose
   closeDisabledRef.current = closeDisabled
+  returnTargetRef.current = returnFocusRef
 
   useEffect(() => {
     if (!open || !layerRef.current || !surfaceRef.current) return undefined
@@ -119,6 +121,13 @@ export function useModalLayer({ open, onClose, closeDisabled = false, initialFoc
       cancelAnimationFrame(frame)
       document.removeEventListener('keydown', onKeyDown)
       releaseEnvironment()
+      const target = returnTargetRef.current?.current
+      if (target?.isConnected && target.getClientRects().length > 0
+        && !target.closest('[hidden],[aria-hidden="true"],[inert]')
+        && !target.matches(':disabled') && getComputedStyle(target).visibility === 'visible') {
+        target.focus()
+        return
+      }
       const previous = previousFocusRef.current
       if (previous?.isConnected && !previous.closest('[inert]')) previous.focus()
     }
@@ -144,6 +153,7 @@ export default function Dialog({
   description,
   onClose,
   initialFocusRef,
+  returnFocusRef,
   footer,
   width = 560,
   closeDisabled = false,
@@ -158,6 +168,7 @@ export default function Dialog({
     onClose,
     closeDisabled,
     initialFocusRef,
+    returnFocusRef,
   })
 
   if (!open) return null

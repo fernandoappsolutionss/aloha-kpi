@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Sidebar from '../../../../../components/Sidebar'
+import Link from 'next/link'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarProgreso, responderQuiz } from '../../../../actions/entrenamiento'
 import { MODULOS } from '../../../../../lib/entrenamiento/modulos'
@@ -16,7 +17,6 @@ export default function ModuloPage() {
 }
 
 function ContenidoModulo({ id, moduloId }) {
-  const router = useRouter()
   const modulo = useMemo(() => MODULOS.find((m) => m.id === moduloId), [moduloId])
   const idx = MODULOS.findIndex((m) => m.id === moduloId)
   const siguiente = MODULOS[idx + 1] || null
@@ -53,7 +53,7 @@ function ContenidoModulo({ id, moduloId }) {
     return () => { activo = false }
   }, [recargaProgreso])
 
-  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main className="main"><button className="tour-card__link" onClick={() => router.push(`/centro/${id}/entrenamiento`)}>← Volver a Entrenamiento</button><div className="alert alert--error">Este módulo no existe.</div></main></div>
+  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main id="main-content" data-page-state="error" className="main ent-page"><Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link><div role="alert" className="alert alert--error">Este módulo no existe.</div></main></div>
 
   const progresoConocido = progreso !== null
   const p = progreso?.[modulo.id]
@@ -65,10 +65,8 @@ function ContenidoModulo({ id, moduloId }) {
   const clipIntro = manifest[`${modulo.id}/intro`]
   const respondidas = sel.filter((v) => v !== null).length
   const estadoDesconocido = cargandoProgreso ? 'Consultando…' : 'Sin confirmar'
-  const volver = () => router.push(`/centro/${id}/entrenamiento`)
-  const continuar = () => siguiente ? router.push(`/centro/${id}/entrenamiento/${siguiente.id}`) : volver()
-
-  const iniciar = () => router.push(`${modulo.inicio.ruta.replace('{id}', String(id))}?tour=${modulo.id}&paso=1`)
+  const continuarHref = siguiente ? `/centro/${id}/entrenamiento/${siguiente.id}` : `/centro/${id}/entrenamiento`
+  const iniciarHref = `${modulo.inicio.ruta.replace('{id}', String(id))}?tour=${modulo.id}&paso=1`
 
   async function corregir() {
     if (enviando || sel.some((v) => v === null)) return
@@ -88,9 +86,9 @@ function ContenidoModulo({ id, moduloId }) {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
-      <main className="main ent-page">
+      <main id="main-content" data-page-state={cargandoProgreso ? 'loading' : errorProgreso ? 'error' : 'ready'} className="main ent-page">
         <div className="main__head"><div>
-          <button className="tour-card__link" onClick={volver}>← Volver a Entrenamiento</button>
+          <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
           <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Módulo {modulo.orden} de {MODULOS.length} · {modulo.duracionMin} min</div>
           <h1 className="h-title">{modulo.titulo}</h1>
           {listo && <div className="ent-pill ent-pill--ok" style={{ display: 'inline-block', marginTop: 6 }}>✓ Completado</div>}
@@ -110,17 +108,17 @@ function ContenidoModulo({ id, moduloId }) {
           </ol>
           {errorProgreso && <div className="alert alert--error" role="alert">
             <p style={{ margin: '0 0 8px' }}>{errorProgreso}</p>
-            <button className="btn" onClick={() => setRecargaProgreso((n) => n + 1)} disabled={cargandoProgreso}>Reintentar cargar progreso</button>
+            <button type="button" className="btn" onClick={() => setRecargaProgreso((n) => n + 1)} disabled={cargandoProgreso}>Reintentar cargar progreso</button>
           </div>}
           <div className="ent-module-action">
             {!progresoConocido && cargandoProgreso ? <p className="h-sub" role="status" style={{ margin: 0 }}>Cargando tu progreso…</p> : listo ? (
-              <button className="btn btn--primary" onClick={continuar}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</button>
+              <Link className="btn btn--primary" href={continuarHref}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</Link>
             ) : tourVisto ? (
               <a className="btn btn--primary" href="#quiz">Ir a las 3 preguntas →</a>
             ) : (
-              <button className="btn btn--primary" onClick={iniciar}>{progresoConocido ? 'Iniciar recorrido →' : 'Abrir recorrido →'}</button>
+              <Link className="btn btn--primary" href={iniciarHref}>{progresoConocido ? 'Iniciar recorrido →' : 'Abrir recorrido →'}</Link>
             )}
-            {tourVisto && <button className="btn" onClick={iniciar}>Repetir recorrido</button>}
+            {tourVisto && <Link className="btn" href={iniciarHref}>Repetir recorrido</Link>}
           </div>
           <div className="ent-module-intro">
             <p>{modulo.intro.texto}</p>
@@ -157,21 +155,21 @@ function ContenidoModulo({ id, moduloId }) {
           <div aria-live="polite" style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
             {!resultado || resultado.error ? (
               <>
-                <button className="btn btn--primary" onClick={corregir} disabled={enviando || respondidas < modulo.quiz.length}>{enviando ? 'Comprobando…' : 'Comprobar respuestas'}</button>
+                <button type="button" className="btn btn--primary" onClick={corregir} disabled={enviando || respondidas < modulo.quiz.length}>{enviando ? 'Comprobando…' : 'Comprobar respuestas'}</button>
                 <span className="h-sub" style={{ margin: 0 }}>{respondidas} de 3 respondidas</span>
               </>
             ) : resultado.aprobado ? (
               <>
                 <div className="ent-pill ent-pill--ok">✓ 3 de 3 · {listo ? 'Módulo completado' : 'Preguntas aprobadas'}</div>
-                {listo ? <button className="btn btn--primary" onClick={continuar}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</button> : progresoConocido ? (
-                  <><span className="h-sub" style={{ margin: 0 }}>Solo falta completar el recorrido.</span><button className="btn btn--primary" onClick={iniciar}>Iniciar recorrido →</button></>
+                {listo ? <Link className="btn btn--primary" href={continuarHref}>{siguiente ? `Siguiente módulo: ${siguiente.titulo} →` : 'Volver a Entrenamiento'}</Link> : progresoConocido ? (
+                  <><span className="h-sub" style={{ margin: 0 }}>Solo falta completar el recorrido.</span><Link className="btn btn--primary" href={iniciarHref}>Iniciar recorrido →</Link></>
                 ) : <span className="h-sub" style={{ margin: 0 }}>{cargandoProgreso ? 'Comprobando el estado del recorrido…' : 'Falta confirmar el estado del recorrido. Reintenta cargar tu progreso arriba.'}</span>}
               </>
             ) : (
               <>
                 <div className="ent-pill ent-pill--bad">{resultado.puntaje} de 3 · lee las explicaciones y vuelve a intentar</div>
-                <button className="btn btn--primary" onClick={reintentar}>Intentar de nuevo</button>
-                <button className="btn" onClick={iniciar}>Repetir recorrido</button>
+                <button type="button" className="btn btn--primary" onClick={reintentar}>Intentar de nuevo</button>
+                <Link className="btn" href={iniciarHref}>Repetir recorrido</Link>
               </>
             )}
           </div>

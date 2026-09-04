@@ -1,5 +1,7 @@
 # Experiencia móvil integral — Implementation Plan
 
+> Alcance de verificación vigente: inventario LOCAL de 28 rutas de producto + 1 técnica, con actores correctos y DB disposable. Los snippets de configuración de este documento son históricos; los archivos finales del repositorio y el runbook Task 11 determinan la ejecución. El remoto usa únicamente `playwright.remote.config.mjs` y el rollback actualizado: `public` explícito/por defecto o `authenticated` con ambos actores completos. Nunca config general, capturas, Coach, centro, Growth ni tokens válidos en remoto. El harness local debe devolver 404 remoto. CUA solo repite los casos públicos del helper `remote-readonly.mjs` en inmutables protegidas con SSO existente; no extraer sesiones ni crear bypass.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Hacer que todas las rutas de KPI ALOHA sean legibles y operables entre 320 px y escritorio, sin desbordamiento del documento, controles cortados ni pérdida de funciones.
@@ -2032,197 +2034,19 @@ git commit -m "feat(ui): completar reportes formación y auditoría móvil"
 
 ---
 
-### Task 11: Preview, PR, merge y verificación productiva
+### Task 11: Entrega segura vigente
 
-**Files:**
-- No cambia código; consume la rama completa y los checks remotos.
+1. Repetir todos los gates locales no vacíos (enumerar cada modo con `--list`): base, primitivas, R3, R6, R8, R9, R10, mutaciones; `npm test`, integración disposable de Usuarios, build sin `E2E_DELIVERY_MODE`, diff-check y árbol limpio. No actualizar snapshots para obtener verde. Los reportes locales no autorizan DML remoto.
+2. Verificar repo `fernandoappsolutionss/aloha-kpi`, rama `codex/aloha-coordinator-mobile`, ancestralidad y PR existente. PR y squash merge están autorizados. No force ni rebase de esta rama publicada; integrar main por merge y repetir gates después de cada integración.
+3. Resolver deployment por projectId, name `aloha-kpi`, READY, target, SHA exacto, org/repo/ref. Guardar ID, proyecto, URL inmutable y SHA del productivo anterior; SHA debe corresponder a origin/main antes de merge.
+4. Preview del HEAD exacto: ejecutar solo `playwright.remote.config.mjs` + `tests/e2e/rollback-smoke.mjs`. Públicas: raíz/login/forgot-password/set-password inválido sin submits, guarda anónima Usuarios y 404 explícito del harness. Admin: Dashboard/Alertas/Centros/Entrenamiento/Historial/Metas/Ranking/Reporte/Usuarios/Perfil. Coordinador: Dashboard/Usuarios y abrir-cancelar Crear. No centro, Coach, Crecimiento/Growth, OAuth ni invitación válida. Zoho queda fuera hasta evidencia de lectura sin DML.
+5. `REMOTE_READONLY_MODE=public` es el default explícito permitido sin credenciales; declarar esa cobertura real. `authenticated` exige cuentas completas antes de arrancar, sin fallback ni skips. Credenciales solo en memoria, tras verificar origen y formulario. Nunca storage en disco, capturas, traces, video, HTML reporter ni Axe remoto. No crear cuentas ni fabricar JWT. CUA repite la misma allowlist pública y medidas solo en inmutables protegidas con SSO ya existente; alias público usa CLI. No extraer cookies ni crear bypass. Si falla acceso autorizado al preview, detener merge y comunicar impedimento.
+6. Probar también rollback smoke sobre producción anterior inmutable. La copia standalone del script en `mktemp` resuelve Chromium desde `process.cwd()/node_modules/playwright/index.mjs`. No promover preview a producción: se perdería correlación del SHA squash.
+7. Justo antes de merge: HEAD/base sin cambios, PR MERGEABLE/CLEAN, checks correctos; squash con `--match-head-commit`. Esperar MERGED y usar `mergeCommit.oid` autoritativo.
+8. Producción READY del SHA squash: comprobar URL inmutable y alias con mismo ID/proyecto. Config dedicado sobre inmutable y rollback smoke sobre alias. Reportar método y modo ejecutados, no atribuir CLI a CUA ni roles remotos al modo público.
+9. Si falla nuestra producción y el alias TODAVÍA apunta a nuestro deployment, rollback al ID anterior, verificación inmediata y PR revert del squash exacto sobre latest main. Si otro deployment tomó alias, investigar carrera sin revertir cambios ajenos. No cambiar env productivas, migraciones ni datos reales.
 
-**Interfaces:**
-- Consumes: los gates de ambos planes, GitHub y el deployment preview de Vercel.
-- Produces: un único PR squash-merged a `main` y smoke read-only sobre producción.
-
-- [ ] **Step 1: Confirmar alcance exacto y árbol limpio**
-
-```bash
-set -euo pipefail
-git status --short
-test -z "$(git status --porcelain)"
-git diff --check origin/main...HEAD
-git diff --name-only origin/main...HEAD
-git log --oneline origin/main..HEAD
-```
-
-Expected: solo archivos de KPI ALOHA y estos dos documentos/spec; ningún `.env`, storage state, reporte, screenshot ni `docs/sop/`. El worktree queda limpio.
-
-- [ ] **Step 2: Repetir gate local final**
-
-```bash
-set -euo pipefail
-npm test
-npm run test:usuarios:db
-npx playwright test
-npm run build
-```
-
-Ejecutar con `USUARIOS_TEST_DATABASE_URL`, `E2E_DATABASE_CONFIRM=disposable`, `E2E_ADMIN_*`, `E2E_COORDINATOR_*`, `E2E_CENTER_EMAIL`, `E2E_CENTER_PASSWORD`, `E2E_CENTRO_ID`, `E2E_COORDINATOR_SECOND_CENTER_ID`, `E2E_COACH_TOKEN`, `E2E_VALID_ACCESS_TOKEN` y `E2E_BRIEFING_CENTRO_ID` ya configurados. Expected: cero fallos; si falta una credencial, token fixture o DB desechable, detener la entrega y resolver el entorno, no omitir el gate.
-
-- [ ] **Step 3: Sincronizar y publicar la rama**
-
-```bash
-set -euo pipefail
-git fetch origin
-git rev-list --left-right --count origin/main...HEAD
-```
-
-Si el primer número es `0`, publicar:
-
-```bash
-git push -u origin codex/aloha-coordinator-mobile
-```
-
-Si el primer número es mayor que `0`, rebasar la rama sobre `origin/main`, resolver únicamente conflictos de esta rama, repetir gates y después publicar:
-
-```bash
-set -euo pipefail
-git rebase origin/main
-npm test
-npm run test:usuarios:db
-npx playwright test
-npm run build
-git diff --check
-git push -u origin codex/aloha-coordinator-mobile
-```
-
-El bloque de rebase se ejecuta solo cuando el conteo izquierdo es mayor que cero. Como la rama se publica después del rebase, no requiere force push; si ya existiera una rama remota homónima, inspeccionarla antes y no sobreescribir commits ajenos.
-
-- [ ] **Step 4: Crear un solo PR y esperar checks**
-
-```bash
-set -euo pipefail
-gh pr create --base main --head codex/aloha-coordinator-mobile --title "Usuarios por coordinador y experiencia móvil integral" --body $'## Resumen\n- habilita Gestión de usuarios para coordinadores dentro de sus centros vigentes\n- serializa autorización, mutaciones y ciclo de tokens sin exponer resets activos\n- adapta las 27 páginas a 320–1440 px con drawer, tarjetas, scrollers y diálogos accesibles\n\n## Verificación\n- npm test\n- npm run test:usuarios:db\n- npx playwright test\n- npm run build\n- git diff --check\n\n## Entrega\n- preview Vercel auditado con gerencia, coordinador y usuario de centro\n- sin migraciones ni variables productivas nuevas'
-gh pr checks --watch
-gh pr view --json url,number,headRefName,statusCheckRollup
-```
-
-El cuerpo enumera: matriz de permisos, transacciones/tokens, las 27 rutas, los 6 viewports, pruebas ejecutadas y riesgos operativos. La URL preview se toma del `targetUrl` del check Vercel exitoso; no se inventa.
-
-- [ ] **Step 5: Ejecutar smoke contra preview**
-
-```bash
-set -euo pipefail
-ALOHA_REPO_SLUG=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-ALOHA_HEAD_SHA=$(git rev-parse HEAD)
-ALOHA_DEPLOYMENT_ID=$(gh api "repos/$ALOHA_REPO_SLUG/deployments?sha=$ALOHA_HEAD_SHA&environment=Preview" --jq '.[0].id // empty')
-test -n "$ALOHA_DEPLOYMENT_ID"
-test "$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_DEPLOYMENT_ID" --jq .sha)" = "$ALOHA_HEAD_SHA"
-ALOHA_PREVIEW_URL=$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_DEPLOYMENT_ID/statuses" --jq 'map(select(.state == "success"))[0].environment_url // empty')
-: "${ALOHA_PREVIEW_URL:?No se encontró una URL Preview exitosa para HEAD}"
-vercel ls aloha-kpi --environment=preview --status=READY --meta "githubCommitSha=$ALOHA_HEAD_SHA" --yes
-ALOHA_PREVIEW_HOST=${ALOHA_PREVIEW_URL#https://}
-vercel api "/v13/deployments/$ALOHA_PREVIEW_HOST" \
-  | jq -e --arg sha "$ALOHA_HEAD_SHA" '.target != "production" and .meta.githubCommitSha == $sha'
-E2E_CAPTURE_DIR=artifacts/responsive-audit RESPONSIVE_BASE_URL="$ALOHA_PREVIEW_URL" npx playwright test
-RESPONSIVE_BASE_URL="$ALOHA_PREVIEW_URL" node tests/e2e/rollback-smoke.mjs
-RESPONSIVE_BASE_URL=https://aloha-kpi.vercel.app node tests/e2e/rollback-smoke.mjs
-```
-
-Expected: GitHub, la API de Vercel y `vercel ls` encuentran un deployment Preview `READY` cuyo `githubCommitSha` es exactamente `HEAD`; no se acepta el primer preview exitoso de otra revisión. La suite remota completa incluye públicas, drawer, gerencia, coordinador y usuario de centro en seis viewports, diálogos seguros, menú, tour, estados, las 27 rutas y Axe. El harness de rollback pasa tanto contra preview como contra la producción anterior; si esta última falla, corregir el harness para que mida disponibilidad/guardas compatibles antes de fusionar.
-
-Revisar las capturas de las 27 páginas —`public-responsive`, `full-route-audit` y `center-user` llaman el mismo helper `capturePage`— y abrir en navegador al menos `/dashboard`, `/dashboard/usuarios`, `/centro/$E2E_CENTRO_ID/grupos`, `/eventos`, `/cuadro` y Coach en 320, 390, 768 y 1440 px. En 390×844: abrir/cerrar drawer, entrar a Usuarios como coordinador, abrir/cancelar Crear usuario, abrir/cancelar un diálogo de Grupos, recorrer un paso del tour y alternar tema. No crear, editar, borrar, guardar asistencia ni enviar correos en preview.
-
-- [ ] **Step 6: Merge squash y verificación productiva**
-
-```bash
-set -euo pipefail
-ALOHA_EXPECTED_HEAD_SHA=$(git rev-parse HEAD)
-test "$(gh pr view --json headRefOid --jq .headRefOid)" = "$ALOHA_EXPECTED_HEAD_SHA"
-git fetch origin
-test "$(git rev-list --left-right --count origin/main...HEAD | awk '{print $1}')" = "0"
-gh pr checks --watch
-gh pr merge --squash --match-head-commit "$ALOHA_EXPECTED_HEAD_SHA"
-ALOHA_MERGE_SHA=$(gh pr view --json mergeCommit --jq .mergeCommit.oid)
-test -n "$ALOHA_MERGE_SHA"
-gh pr view --json state,mergedAt,mergeCommit,url
-git fetch origin
-test "$(git rev-parse origin/main)" = "$ALOHA_MERGE_SHA"
-ALOHA_REPO_SLUG=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-ALOHA_PROD_DEPLOYMENT_ID=''
-ALOHA_PROD_URL=''
-for attempt in {1..30}; do
-  ALOHA_PROD_DEPLOYMENT_ID=$(gh api "repos/$ALOHA_REPO_SLUG/deployments?sha=$ALOHA_MERGE_SHA&environment=Production" --jq '.[0].id // empty')
-  if test -n "$ALOHA_PROD_DEPLOYMENT_ID"; then
-    ALOHA_PROD_URL=$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_PROD_DEPLOYMENT_ID/statuses" --jq 'map(select(.state == "success"))[0].environment_url // empty')
-  fi
-  if test -n "$ALOHA_PROD_URL"; then break; fi
-  sleep 10
-done
-: "${ALOHA_PROD_URL:?No se encontró Production exitosa para el merge SHA}"
-test "$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_PROD_DEPLOYMENT_ID" --jq .sha)" = "$ALOHA_MERGE_SHA"
-vercel ls aloha-kpi --environment=production --status=READY --meta "githubCommitSha=$ALOHA_MERGE_SHA" --yes
-vercel inspect "$ALOHA_PROD_URL" --wait --timeout=5m
-vercel api /v13/deployments/aloha-kpi.vercel.app \
-  | jq -e --arg sha "$ALOHA_MERGE_SHA" '.target == "production" and .meta.githubCommitSha == $sha'
-RESPONSIVE_BASE_URL="$ALOHA_PROD_URL" npx playwright test
-RESPONSIVE_BASE_URL=https://aloha-kpi.vercel.app npx playwright test
-```
-
-Expected: PR `MERGED`; `origin/main`, GitHub Deployment, Vercel Production y el alias `aloha-kpi.vercel.app` apuntan al mismo `mergeCommit.oid`; tanto la URL inmutable como el alias pasan la suite read-only completa. La consulta REST del alias es obligatoria: probar solo el dominio no demuestra qué revisión lo sirve.
-
-Si falla un gate antes del merge, no fusionar. Si falla build o smoke después del merge, conservar evidencia y ejecutar inmediatamente una reversión mediante PR —el squash es un commit simple, no usa `-m`—:
-
-```bash
-set -euo pipefail
-ALOHA_REPO_SLUG=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-ALOHA_MERGE_SHA=$(gh pr list --repo "$ALOHA_REPO_SLUG" --state merged --head codex/aloha-coordinator-mobile --limit 1 --json mergeCommit --jq '.[0].mergeCommit.oid // empty')
-: "${ALOHA_MERGE_SHA:?No se pudo resolver el merge SHA del PR original}"
-ALOHA_ROLLBACK_SMOKE_DIR=$(mktemp -d)
-cp tests/e2e/rollback-smoke.mjs "$ALOHA_ROLLBACK_SMOKE_DIR/rollback-smoke.mjs"
-git fetch origin
-git switch -c "codex/revert-aloha-$ALOHA_MERGE_SHA" origin/main
-git revert --no-edit "$ALOHA_MERGE_SHA"
-ALOHA_REVERT_HEAD_SHA=$(git rev-parse HEAD)
-git push -u origin "codex/revert-aloha-$ALOHA_MERGE_SHA"
-ALOHA_REVERT_PR_URL=$(gh pr create --base main --head "codex/revert-aloha-$ALOHA_MERGE_SHA" --title "Revert: usuarios por coordinador y responsive móvil" --body "Revierte $ALOHA_MERGE_SHA porque el smoke productivo falló. La evidencia y el gate afectado quedan documentados en este PR.")
-test -n "$ALOHA_REVERT_PR_URL"
-gh pr checks "$ALOHA_REVERT_PR_URL" --watch
-test "$(gh pr view "$ALOHA_REVERT_PR_URL" --json headRefOid --jq .headRefOid)" = "$ALOHA_REVERT_HEAD_SHA"
-ALOHA_REVERT_PREVIEW_ID=$(gh api "repos/$ALOHA_REPO_SLUG/deployments?sha=$ALOHA_REVERT_HEAD_SHA&environment=Preview" --jq '.[0].id // empty')
-: "${ALOHA_REVERT_PREVIEW_ID:?No se encontró Preview para el commit de reversión}"
-test "$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_REVERT_PREVIEW_ID" --jq .sha)" = "$ALOHA_REVERT_HEAD_SHA"
-ALOHA_REVERT_PREVIEW_URL=$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_REVERT_PREVIEW_ID/statuses" --jq 'map(select(.state == "success"))[0].environment_url // empty')
-: "${ALOHA_REVERT_PREVIEW_URL:?No se encontró URL Preview exitosa para la reversión}"
-ALOHA_REVERT_PREVIEW_HOST=${ALOHA_REVERT_PREVIEW_URL#https://}
-vercel api "/v13/deployments/$ALOHA_REVERT_PREVIEW_HOST" \
-  | jq -e --arg sha "$ALOHA_REVERT_HEAD_SHA" '.target != "production" and .meta.githubCommitSha == $sha'
-RESPONSIVE_BASE_URL="$ALOHA_REVERT_PREVIEW_URL" node "$ALOHA_ROLLBACK_SMOKE_DIR/rollback-smoke.mjs"
-gh pr merge "$ALOHA_REVERT_PR_URL" --squash --match-head-commit "$ALOHA_REVERT_HEAD_SHA"
-ALOHA_REVERT_SHA=$(gh pr view "$ALOHA_REVERT_PR_URL" --json mergeCommit --jq .mergeCommit.oid)
-test -n "$ALOHA_REVERT_SHA"
-git fetch origin
-test "$(git rev-parse origin/main)" = "$ALOHA_REVERT_SHA"
-ALOHA_REVERT_DEPLOYMENT_ID=''
-ALOHA_REVERT_PROD_URL=''
-for attempt in {1..30}; do
-  ALOHA_REVERT_DEPLOYMENT_ID=$(gh api "repos/$ALOHA_REPO_SLUG/deployments?sha=$ALOHA_REVERT_SHA&environment=Production" --jq '.[0].id // empty')
-  if test -n "$ALOHA_REVERT_DEPLOYMENT_ID"; then
-    ALOHA_REVERT_PROD_URL=$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_REVERT_DEPLOYMENT_ID/statuses" --jq 'map(select(.state == "success"))[0].environment_url // empty')
-  fi
-  if test -n "$ALOHA_REVERT_PROD_URL"; then break; fi
-  sleep 10
-done
-: "${ALOHA_REVERT_PROD_URL:?No se encontró Production exitosa para el SHA de reversión}"
-test "$(gh api "repos/$ALOHA_REPO_SLUG/deployments/$ALOHA_REVERT_DEPLOYMENT_ID" --jq .sha)" = "$ALOHA_REVERT_SHA"
-vercel ls aloha-kpi --environment=production --status=READY --meta "githubCommitSha=$ALOHA_REVERT_SHA" --yes
-vercel inspect "$ALOHA_REVERT_PROD_URL" --wait --timeout=5m
-vercel api /v13/deployments/aloha-kpi.vercel.app \
-  | jq -e --arg sha "$ALOHA_REVERT_SHA" '.target == "production" and .meta.githubCommitSha == $sha'
-RESPONSIVE_BASE_URL="$ALOHA_REVERT_PROD_URL" node "$ALOHA_ROLLBACK_SMOKE_DIR/rollback-smoke.mjs"
-RESPONSIVE_BASE_URL=https://aloha-kpi.vercel.app node "$ALOHA_ROLLBACK_SMOKE_DIR/rollback-smoke.mjs"
-```
-
-El SHA válido de reversión es `mergeCommit.oid` del PR squash, no el commit local creado por `git revert`. Antes de fusionar, el harness mínimo debe pasar contra el Preview exacto del commit de reversión. La suite responsive nueva ya no existe después de revertir y la versión anterior no debe pasar sus expectativas; por eso el harness se copia antes y, después del squash, se repite contra la URL inmutable y el alias. No hacer una corrección directa sobre `main` ni dejar el deployment defectuoso activo mientras se desarrolla otro arreglo.
-
----
+Los comandos remotos heredados de las tareas anteriores están sustituidos por este procedimiento. Los reemplazos seguros R10 sí están autorizados para R11; no ejecutar R11 durante R10.
 
 ## Criterio de salida de este plan
 

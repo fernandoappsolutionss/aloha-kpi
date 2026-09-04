@@ -1,6 +1,49 @@
 import { test, expect } from '@playwright/test'
 import { auditPage } from './helpers/audit-page'
 
+test('tabla ancha en escritorio anuncia scroll y permite alcanzar la última celda', async ({ page }) => {
+  await page.setViewportSize({width:1440,height:900})
+  await page.goto('/dashboard')
+  await expect(page.locator('#main-content[data-page-state="ready"]')).toBeVisible()
+  const scrollers=page.locator('.table-scroller')
+  let covered=0
+  for(let i=0;i<await scrollers.count();i++) {
+    const region=scrollers.nth(i)
+    if(!await region.evaluate(n=>n.scrollWidth>n.clientWidth+1))continue
+    covered++
+    await expect(region.locator('.table-scroller__hint')).toBeVisible()
+    await region.evaluate(n=>{n.scrollLeft=n.scrollWidth})
+    const last=region.locator('tbody tr').first().locator('td,th').last()
+    await expect.poll(async()=>{const r=await region.boundingBox(),c=await last.boundingBox();return c.x+c.width<=r.x+r.width+1}).toBe(true)
+    expect(await region.evaluate(n=>n.scrollWidth)).toBeLessThan(10000)
+  }
+  expect(covered).toBeGreaterThan(0)
+})
+
+test('drawer cerrado es inert y el foco sobrevive ambos cruces de 1024', async ({ page }) => {
+  const inertWarnings = []
+  page.on('console', message => { if (/inert.*empty string|empty string.*inert/i.test(message.text())) inertWarnings.push(message.text()) })
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await page.goto('/dashboard')
+  const aside = page.locator('aside.sb')
+  await expect(aside).toHaveAttribute('data-navigation-state','ready')
+  const trigger = page.getByRole('button', { name: 'Abrir menú' })
+  await expect(aside).toHaveAttribute('inert', '')
+  await trigger.focus()
+  await aside.locator('a').first().evaluate(node => node.focus())
+  await expect(trigger).toBeFocused()
+  await page.setViewportSize({ width: 1025, height: 900 })
+  await expect(aside).not.toHaveAttribute('inert', '')
+  await expect(aside.locator('a[aria-current="page"]')).toBeFocused()
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await expect(trigger).toBeFocused()
+  await trigger.click()
+  await expect(aside).not.toHaveAttribute('inert', '')
+  await page.setViewportSize({ width: 1025, height: 900 })
+  await expect(aside.locator('a[aria-current="page"]')).toBeFocused()
+  expect(inertWarnings).toEqual([])
+})
+
 test('shell no desborda y drawer conserva navegación, foco, inert y cierre completo', async ({ page }, testInfo) => {
   await page.goto('/dashboard', { waitUntil: 'networkidle' })
   const mobile = testInfo.project.use.viewport.width <= 1024

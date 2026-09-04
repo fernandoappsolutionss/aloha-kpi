@@ -99,7 +99,9 @@ function TourActivo({ tourId }) {
       targetRef.current = el
     }
     const r = el.getBoundingClientRect()
-    setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+    setRect({ top: r.top, left: r.left, width: r.width, height: r.height,
+      viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
+      cardHeight: cardRef.current?.offsetHeight || 260 })
   }, [step])
 
   // Buscar el elemento del paso. El aviso "todavía no veo…" NO es terminal: las
@@ -115,7 +117,7 @@ function TourActivo({ tourId }) {
       const el = document.querySelector(`[data-tour="${step.target}"]`)
       if (el) {
         targetRef.current = el
-        try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+        try { el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }) } catch {}
         medir()
         setEstado('listo')
         return
@@ -238,9 +240,9 @@ function TourActivo({ tourId }) {
   // el primer frame usa 260 y las re-mediciones de `medir` la corrigen.
   let cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }
   if (rect && estado === 'listo') {
-    const vw = window.innerWidth, vh = window.innerHeight
+    const vw = rect.viewportWidth, vh = rect.viewportHeight
     const ancho = Math.min(ANCHO_TARJETA, vw - 2 * MARGEN)
-    const alto = cardRef.current?.offsetHeight || 260
+    const alto = rect.cardHeight
     const cabeDerecha = rect.left + rect.width + MARGEN + ancho <= vw - MARGEN
     let left = Math.max(MARGEN, Math.min(rect.left, vw - ancho - MARGEN))
     let top = rect.top + rect.height + MARGEN                       // debajo
@@ -258,7 +260,7 @@ function TourActivo({ tourId }) {
       <div ref={cardRef} className="tour-card" style={cardStyle} role="dialog" aria-labelledby={titleId} aria-busy={terminando || undefined}>
         <div className="tour-card__head">
           <span className="label">Paso {paso} de {total} · {modulo.titulo}</span>
-          <button className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)" aria-label="Salir del recorrido" disabled={terminando}>×</button>
+          <button type="button" className="tour-card__x" onClick={salir} title="Salir del recorrido (Esc)" aria-label="Salir del recorrido" disabled={terminando}>×</button>
         </div>
         <h4 ref={titleRef} id={titleId} className="tour-card__title" tabIndex={-1}>{step.titulo}</h4>
         <p className="tour-card__text" aria-live="polite">{estado === 'ausente'
@@ -266,29 +268,29 @@ function TourActivo({ tourId }) {
           : step.texto}</p>
         {clip && estado !== 'ausente' && (
           <div className="tour-card__audio">
-            <button className="btn" onClick={togglePlay} title={reproduciendo ? 'Pausar' : 'Escuchar'} aria-label={reproduciendo ? 'Pausar' : 'Escuchar'}>{reproduciendo ? '❚❚' : '▶'}</button>
-            <button className="btn" onClick={toggleMute} title={mute ? 'Activar voz' : 'Silenciar'} aria-label={mute ? 'Activar voz' : 'Silenciar'}>{mute ? '🔇' : '🔊'}</button>
+            <button type="button" className="btn" onClick={togglePlay} title={reproduciendo ? 'Pausar' : 'Escuchar'} aria-label={reproduciendo ? 'Pausar' : 'Escuchar'}>{reproduciendo ? '❚❚' : '▶'}</button>
+            <button type="button" className="btn" onClick={toggleMute} title={mute ? 'Activar voz' : 'Silenciar'} aria-label={mute ? 'Activar voz' : 'Silenciar'}>{mute ? '🔇' : '🔊'}</button>
             <span className="h-sub" style={{ margin: 0 }}>{mute ? 'Voz silenciada' : 'Con la voz de Fernando'}</span>
           </div>
         )}
-        {errorGuardar && <div className="alert alert--error" style={{ marginBottom: 10, fontSize: 12.5 }}>{errorGuardar}</div>}
+        {errorGuardar && <div role="alert" className="alert alert--error" style={{ marginBottom: 10, fontSize: 12.5 }}>{errorGuardar}</div>}
         <div className="tour-card__actions">
           {estado === 'ausente' ? (
             <>
-              <button className="btn" onClick={salir}>Salir</button>
-              {esUltimo ? <button className="btn btn--primary" onClick={terminar} disabled={terminando}>Terminar</button>
-                        : <button className="btn btn--primary" onClick={() => irA(paso + 1)}>Omitir →</button>}
+              <button type="button" className="btn" onClick={salir}>Salir</button>
+              {esUltimo ? <button type="button" className="btn btn--primary" onClick={terminar} disabled={terminando}>Terminar</button>
+                        : <button type="button" className="btn btn--primary" onClick={() => irA(paso + 1)}>Omitir →</button>}
             </>
           ) : step.tipo === 'hazlo' ? (
             <>
               <span className="tour-card__hint">Haz clic en el elemento resaltado</span>
-              <button className="tour-card__link" onClick={() => irA(paso + 1)}>Omitir este paso</button>
+              <button type="button" className="tour-card__link" onClick={() => irA(paso + 1)}>Omitir este paso</button>
             </>
           ) : (
             <>
-              <button className="btn" onClick={() => irA(paso - 1)} disabled={paso <= 1}>← Anterior</button>
-              {esUltimo ? <button className="btn btn--primary" onClick={terminar} disabled={terminando}>{terminando ? 'Guardando…' : 'Terminar ✓'}</button>
-                        : <button className="btn btn--primary" onClick={() => irA(paso + 1)}>Siguiente →</button>}
+              <button type="button" className="btn" onClick={() => irA(paso - 1)} disabled={paso <= 1}>← Anterior</button>
+              {esUltimo ? <button type="button" className="btn btn--primary" onClick={terminar} disabled={terminando}>{terminando ? 'Guardando…' : 'Terminar ✓'}</button>
+                        : <button type="button" className="btn btn--primary" onClick={() => irA(paso + 1)}>Siguiente →</button>}
             </>
           )}
         </div>

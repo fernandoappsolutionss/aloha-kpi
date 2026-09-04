@@ -22,7 +22,7 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#00556D',
+  themeColor: '#FBFAF8',
 }
 
 export default function RootLayout({ children }) {
@@ -32,7 +32,7 @@ export default function RootLayout({ children }) {
         <a className="skip-link" href="#main-content">Saltar al contenido</a>
         {/* Clave nueva a propósito: con el rebrand todos vuelven al claro de
             ALOHA una vez, y quien prefiera oscuro lo reelige. */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('aloha_theme');document.documentElement.dataset.theme=(t==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t='light';try{t=localStorage.getItem('aloha_theme')==='dark'?'dark':'light';}catch(e){}document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='dark'?'#012B36':'#FBFAF8';})();` }} />
         {children}
       </body>
     </html>

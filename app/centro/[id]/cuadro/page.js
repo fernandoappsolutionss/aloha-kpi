@@ -18,14 +18,14 @@ const fmtFecha = (d) => {
   if (!d) return '—'
   const s = typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10)
   const [y, m, day] = s.split('-')
-  return `${day}/${m}/${y}`
+  return new Intl.DateTimeFormat('es-PA',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(`${y}-${m}-${day}T12:00:00Z`))
 }
 // DATE de Postgres → valor para <input type="date">.
 const dateInputVal = (d) => {
   if (!d) return ''
   return typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10)
 }
-const money = (n) => '$' + Number(n || 0).toFixed(2)
+const money = n => new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(Number(n||0))
 
 export default function CuadroPage() {
   const { id } = useParams()
@@ -39,6 +39,8 @@ export default function CuadroPage() {
   const [status, setStatus] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [openGrupo, setOpenGrupo] = useState(null)
+  const [pedidoOpen,setPedidoOpen]=useState(false)
+  const [confirmAction,setConfirmAction]=useState(null)
   const [pedido, setPedido] = useState(EMPTY_PEDIDO)
   const [savingPedido, setSavingPedido] = useState(false)
   // { tipo: 'retirar' | 'reincorporar', nino } — acción sobre un niño del cuadro.
@@ -47,6 +49,7 @@ export default function CuadroPage() {
   useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
   const loadData = useCallback(async () => {
+    setStatus(previous => previous.startsWith('❌') ? '' : previous)
     setLoading(true)
     try {
       const [res, grps] = await Promise.all([loadCuadro(id, year, month), listarGruposActivos(id)])
@@ -64,32 +67,38 @@ export default function CuadroPage() {
 
   async function handleSincronizar() {
     if (cerrado) return
-    if (!confirm(`¿Sincronizar el KPI de ${NOMBRES_MES[month - 1]} ${year} con el cuadro? Se sobreescriben grupos activos, nuevos activos y motivos de deserción en el resumen mensual.`)) return
     setSyncing(true); setStatus('')
+    try {
     const res = await sincronizarConKpi(id, year, month)
     if (res.error) setStatus('❌ ' + res.error)
     else setStatus(`✅ KPI sincronizado: ${res.aplicado.grupos_activos} grupos activos, ${res.aplicado.nuevos_activos_mes} nuevos activos y motivos de deserción actualizados.`)
-    setSyncing(false)
+    } catch { setStatus('❌ No se pudo sincronizar. Revisa tu conexión e intenta nuevamente.') }
+    finally { setSyncing(false) }
   }
 
   async function handleGuardarPedido(e) {
     e.preventDefault()
     setSavingPedido(true); setStatus('')
+    try {
     const res = await savePedido(id, { ...pedido, id: pedido.id || undefined, year, month })
     if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(pedido.id ? '✅ Pedido actualizado.' : '✅ Pedido agregado.'); setPedido(EMPTY_PEDIDO); await loadData() }
-    setSavingPedido(false)
+    else { setStatus(pedido.id ? '✅ Pedido actualizado.' : '✅ Pedido agregado.'); setPedido(EMPTY_PEDIDO); setPedidoOpen(false); await loadData() }
+    } catch { setStatus('❌ No se pudo guardar el pedido. Revisa tu conexión e intenta nuevamente.') }
+    finally { setSavingPedido(false) }
   }
 
   async function handleEliminarPedido(p) {
-    if (!confirm('¿Eliminar este pedido de material?')) return
-    setStatus('')
+    setSyncing(true); setStatus('')
+    try {
     const res = await deletePedido(id, p.id)
     if (res.error) setStatus('❌ ' + res.error)
     else { if (pedido.id === p.id) setPedido(EMPTY_PEDIDO); setStatus('✅ Pedido eliminado.'); await loadData() }
+    } catch { setStatus('❌ No se pudo eliminar el pedido. Revisa tu conexión e intenta nuevamente.') }
+    finally { setSyncing(false) }
   }
 
   function editarPedido(p) {
+    setPedidoOpen(true)
     setPedido({
       id: p.id, fecha: dateInputVal(p.fecha), numero_oe: p.numero_oe || '', producto: p.producto || 'KIT',
       itinerario: p.itinerario || '', nivel: p.nivel ?? '', grupo_id: p.grupo_id == null ? '' : String(p.grupo_id),
@@ -116,7 +125,7 @@ export default function CuadroPage() {
   if (loading) return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
-      <main className="main"><div className="empty">Cargando…</div></main>
+      <main id="main-content" data-page-state="loading" className="main reports-page"><div className="empty" role="status">Cargando…</div></main>
     </div>
   )
 
@@ -136,7 +145,7 @@ export default function CuadroPage() {
     { l: 'Reincorporados', v: t.reincorporados, c: 'var(--ok)' },
     { l: 'Retirados del mes', v: t.retirados, c: t.retirados > 0 ? 'var(--bad)' : 'var(--text)', s: graduados > 0 ? `de ellos ${graduados} graduado${graduados === 1 ? '' : 's'} 🎓` : undefined },
     { l: 'Grupos activos', v: t.gruposActivos, c: 'var(--text)', s: `prom. ${data.promedios.sinK.toFixed(1)} niños/grupo sin Kinder` },
-    { l: 'Royalty total', v: money(data.royalties.totales.totalRoyalty), c: 'var(--ts-green)' },
+    { l: 'Royalty total', v: money(data.royalties.totales.totalRoyalty), c: 'var(--ok-text)' },
   ] : []
   const compCols = data ? [
     { l: nuevosLabel, cuadro: nuevosActivos, kpi: data.kpiComparacion.nuevosKpi },
@@ -147,7 +156,8 @@ export default function CuadroPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || ''} centroId={id} />
-      <main id="main-content" className="main" data-page-state="ready">
+      <main id="main-content" className="main reports-page" data-page-state={!data ? 'error' : 'ready'}>
+        {!data && <div role="alert">No se pudo cargar el cuadro.<button type="button" className="btn" onClick={loadData}>Reintentar</button></div>}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Informe mensual</div>
@@ -156,21 +166,21 @@ export default function CuadroPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <div className="period">
-              <select className="select" value={month} aria-label="Mes" onChange={(e) => { setStatus(''); setMonth(Number(e.target.value)) }}>
+              <select className="select" name="month" value={month} aria-label="Mes" onChange={(e) => { setStatus(''); setMonth(Number(e.target.value)) }}>
                 {NOMBRES_MES.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
               </select>
-              <select className="select" value={year} aria-label="Año" onChange={(e) => { setStatus(''); setYear(Number(e.target.value)) }}>
+              <select className="select" name="year" value={year} aria-label="Año" onChange={(e) => { setStatus(''); setYear(Number(e.target.value)) }}>
                 {[year - 1, year, year + 1].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
             {data && (
               <span className={`pill ${cerrado ? 'pill--warn' : 'pill--ok'}`}
-                title={congelado ? `Foto congelada al cierre${data.congeladoAt ? ' (' + fmtFecha(String(data.congeladoAt).slice(0, 10)) + ')' : ''}. Los movimientos posteriores no alteran este mes.` : undefined}>
+                title={congelado ? `Foto congelada al cierre${data.congeladoAt ? ' (' + fmtFecha(data.congeladoAt) + ')' : ''}. Los movimientos posteriores no alteran este mes.` : undefined}>
                 <span className="dot" />{congelado ? '🔒 Mes cerrado · foto congelada' : (cerrado ? 'Mes KPI cerrado' : 'Mes KPI abierto')}
               </span>
             )}
             <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download data-tour="cuadro.excel">⬇ Descargar Excel</a>
-            <button onClick={handleSincronizar} disabled={syncing || cerrado} className="btn"
+            <button type="button" onClick={()=>setConfirmAction({type:'sync'})} disabled={syncing || cerrado} className="btn"
               style={cerrado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               title={cerrado ? 'Este mes está cerrado en KPI Semanal. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
               {syncing ? 'Sincronizando…' : 'Sincronizar con KPI'}
@@ -179,7 +189,7 @@ export default function CuadroPage() {
         </div>
 
         {status && (
-          <div className={`alert${isError ? ' alert--error' : ''}`}
+          <div role="status" aria-live="polite" className={`alert${isError ? ' alert--error' : ''}`}
             style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
         )}
 
@@ -202,7 +212,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Comparación con KPI semanal</h3>
                 <span className="label">Detecta descuadres antes de entregar a la Junta</span>
               </div>
-              <TableScroller label="Comparación con KPI semanal">
+              <TableScroller stickyFirstColumn label="Comparación con KPI semanal">
                 <table className="table">
                   <thead>
                     <tr>
@@ -220,11 +230,11 @@ export default function CuadroPage() {
                       {compCols.map((c) => (
                         <td key={c.l} style={{ textAlign: 'center' }}>
                           {c.kpi == null ? (
-                            <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>Sin captura</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Sin captura</span>
                           ) : (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                               <span className="num" style={{ fontWeight: 700, color: 'var(--text)' }}>{c.kpi}</span>
-                              <span className={`pill ${Number(c.kpi) === Number(c.cuadro) ? 'pill--ok' : 'pill--bad'}`} style={{ fontSize: 10 }}>
+                              <span className={`pill ${Number(c.kpi) === Number(c.cuadro) ? 'pill--ok' : 'pill--bad'}`} style={{ fontSize: 13 }}>
                                 {Number(c.kpi) === Number(c.cuadro) ? '✓ Coincide' : '≠ Difiere'}
                               </span>
                             </span>
@@ -243,7 +253,7 @@ export default function CuadroPage() {
                 <h3 className="panel__title">Royalties</h3>
                 <span className="label">× {money(data.royaltyRate)} por niño activo</span>
               </div>
-              <TableScroller label="Niños por nivel">
+              <TableScroller stickyFirstColumn label="Niños por nivel">
                 <table className="table">
                   <thead><tr>{['Nivel', nuevosLabel, 'Continúan', 'Total niños', 'Royalty'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -265,7 +275,7 @@ export default function CuadroPage() {
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ok)' }}>{data.royalties.totales.totalNuevos}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{data.royalties.totales.totalContinuan}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{data.royalties.totales.totalNinos}</td>
-                          <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ts-green)' }}>{money(data.royalties.totales.totalRoyalty)}</td>
+                          <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ok-text)' }}>{money(data.royalties.totales.totalRoyalty)}</td>
                         </tr>
                       </>
                     )}
@@ -278,16 +288,16 @@ export default function CuadroPage() {
             <div className="panel" style={{ marginBottom: 20 }}>
               <div className="panel__head">
                 <h3 className="panel__title">Control de grupos</h3>
-                <span className="label">Clic en un grupo para ver y gestionar sus niños</span>
+                <span className="label">Selecciona un grupo para ver y gestionar sus niños</span>
               </div>
               <div style={{ padding: '8px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>
                 {congelado ? (
-                  <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(String(data.congeladoAt).slice(0, 10))})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Semanal.</>
+                  <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(data.congeladoAt)})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Semanal.</>
                 ) : (
                   <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
                 )}
               </div>
-              <TableScroller label="Grupos del cuadro">
+              <TableScroller stickyFirstColumn label="Grupos del cuadro">
                 <table className="table">
                   <thead><tr>{['Grupo', 'Mes anterior', nuevosLabel, 'Reincorporados', 'Retirados', 'Total del mes'].map((h, i) => <th key={h} style={i > 0 ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -297,13 +307,13 @@ export default function CuadroPage() {
                       <>
                         {data.controlGrupos.filas.map((f) => (
                           <Fragment key={f.grupo.id}>
-                            <tr onClick={() => setOpenGrupo(openGrupo === f.grupo.id ? null : f.grupo.id)}>
+                            <tr>
                               <td>
-                                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Grupo {f.grupo.numero}</span>
+                                <button type="button" className="btn" aria-expanded={openGrupo===f.grupo.id} aria-controls={`grupo-detalle-${f.grupo.id}`} onClick={()=>setOpenGrupo(openGrupo===f.grupo.id ? null : f.grupo.id)}>Grupo {f.grupo.numero}</button>
                                 {f.grupo.estado !== 'activo' && (
-                                  <span className="pill pill--warn" style={{ fontSize: 10, marginLeft: 8 }}>{f.grupo.estado === 'fusionado' ? 'Fusionado' : 'Cerrado'}</span>
+                                  <span className="pill pill--warn" style={{ fontSize: 13, marginLeft: 8 }}>{f.grupo.estado === 'fusionado' ? 'Fusionado' : 'Cerrado'}</span>
                                 )}
-                                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
+                                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>
                                   {f.grupo.itinerario}{f.coach ? ` · ${f.coach.nombre}` : ' · Sin coach'}{f.horarioTexto ? ` · ${f.horarioTexto}` : ''}
                                 </div>
                               </td>
@@ -314,7 +324,7 @@ export default function CuadroPage() {
                               <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{f.contadores.totalMes}</td>
                             </tr>
                             {openGrupo === f.grupo.id && (
-                              <tr style={{ cursor: 'default' }}>
+                              <tr id={`grupo-detalle-${f.grupo.id}`} style={{ cursor: 'default' }}>
                                 <td colSpan={6} style={{ background: 'var(--surface-2)', padding: 0 }}>
                                   <div style={{ padding: '14px 18px' }}>
                                     <table className="table" style={{ background: 'var(--surface-1)' }}>
@@ -325,19 +335,19 @@ export default function CuadroPage() {
                                             <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
                                             <td className="num" style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
                                             <td>{estadoMesPill(e)}</td>
-                                            <td className="num" style={{ fontSize: 11, color: 'var(--text-dim)' }}>{String(e.status_plataforma || '—').replace('_', ' ')}</td>
+                                            <td className="num" style={{ fontSize: 13, color: 'var(--text-dim)' }}>{String(e.status_plataforma || '—').replace('_', ' ')}</td>
                                             <td className="num" style={{ fontSize: 12 }}>{fmtFecha(e.fecha_cierre_nivel)}</td>
                                             <td style={{ fontSize: 12 }}>{e.representante || '—'}</td>
-                                            <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                                            <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>
                                               {e.telefono || '—'}
-                                              <div style={{ color: 'var(--text-faint)' }}>{e.correo || ''}</div>
+                                              <div style={{ color: 'var(--text-muted)' }}>{e.correo || ''}</div>
                                             </td>
                                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                               {congelado ? null : e.esRetirado ? (
-                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
+                                                <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
                                                   onClick={() => setAccionNino({ tipo: 'reincorporar', nino: e })}>↩ Reincorporar</button>
                                               ) : (
-                                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }}
+                                                <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }}
                                                   onClick={() => setAccionNino({ tipo: 'retirar', nino: e })}>Retirar</button>
                                               )}
                                             </td>
@@ -352,12 +362,12 @@ export default function CuadroPage() {
                           </Fragment>
                         ))}
                         <tr style={{ cursor: 'default', background: 'var(--surface-3)' }}>
-                          <td style={{ fontWeight: 700, color: 'var(--text)' }}>Totales del centro <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-dim)' }}>({t.continuan} continúan)</span></td>
+                          <td style={{ fontWeight: 700, color: 'var(--text)' }}>Totales del centro <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-dim)' }}>({t.continuan} continúan)</span></td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{sumMesAnterior}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ok)' }}>{t.nuevos}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ok)' }}>{t.reincorporados}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--bad)' }}>{t.retirados}</td>
-                          <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ts-green)' }}>{t.aPagar} a pagar</td>
+                          <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--ok-text)' }}>{t.aPagar} a pagar</td>
                         </tr>
                       </>
                     )}
@@ -375,7 +385,7 @@ export default function CuadroPage() {
               {!data.iniciosClase?.length ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin inicios de clase en {NOMBRES_MES[month - 1]} {year}.</div>
               ) : (
-                <TableScroller label="Inicios pendientes">
+                <TableScroller stickyFirstColumn label="Inicios pendientes">
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Fecha de inscripción', 'Inicio del grupo', 'Inicio efectivo', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -384,7 +394,7 @@ export default function CuadroPage() {
                           <td style={{ fontWeight: 600, color: 'var(--text)' }}>{inicio.nombre}</td>
                           <td className="num" style={{ fontSize: 12 }}>
                             {inicio.grupoNumero ? `Grupo ${inicio.grupoNumero}` : 'Sin grupo'}
-                            {inicio.coachNombre && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{inicio.coachNombre}</div>}
+                            {inicio.coachNombre && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{inicio.coachNombre}</div>}
                           </td>
                           <td className="num" style={{ fontSize: 12 }}>{inicio.itinerario || '—'} {inicio.nivel ?? '—'}</td>
                           <td className="num" style={{ fontSize: 12 }}>{fmtFecha(inicio.fechaInscripcion)}</td>
@@ -392,7 +402,7 @@ export default function CuadroPage() {
                           <td className="num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ok)' }}>{fmtFecha(inicio.fechaInicio)}</td>
                           <td style={{ fontSize: 12 }}>
                             {inicio.representante || '—'}
-                            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{[inicio.telefono, inicio.correo].filter(Boolean).join(' · ')}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{[inicio.telefono, inicio.correo].filter(Boolean).join(' · ')}</div>
                           </td>
                         </tr>
                       ))}
@@ -411,7 +421,7 @@ export default function CuadroPage() {
               {data.deserciones.length === 0 ? (
                 <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Sin retiros en {NOMBRES_MES[month - 1]} {year}. 👏</div>
               ) : (
-                <TableScroller label="Deserciones del mes">
+                <TableScroller stickyFirstColumn label="Deserciones del mes">
                   <table className="table">
                     <thead><tr>{['Niño', 'Grupo', 'Nivel', 'Motivo', 'Fecha inicio', 'Fecha retiro', 'Última asistencia', 'Representante'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -420,7 +430,7 @@ export default function CuadroPage() {
                           <td style={{ fontWeight: 600, color: 'var(--text)' }}>{d.nombre}</td>
                           <td className="num" style={{ fontSize: 12 }}>
                             {d.grupo ? `Grupo ${d.grupo}` : '—'}
-                            {d.coach && <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{d.coach}</div>}
+                            {d.coach && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{d.coach}</div>}
                           </td>
                           <td className="num" style={{ fontSize: 12 }}>{d.itinerario} {d.nivel}</td>
                           <td><span className={`pill ${d.motivo === 'GRADUADO' ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{MOTIVOS_RETIRO_LABELS[d.motivo] || d.motivo}</span></td>
@@ -429,7 +439,7 @@ export default function CuadroPage() {
                           <td className="num" style={{ fontSize: 12 }}>{fmtFecha(d.ultimaAsistencia)}</td>
                           <td style={{ fontSize: 12 }}>
                             {d.representante || '—'}
-                            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{[d.telefono, d.correo].filter(Boolean).join(' · ')}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{[d.telefono, d.correo].filter(Boolean).join(' · ')}</div>
                           </td>
                         </tr>
                       ))}
@@ -446,7 +456,7 @@ export default function CuadroPage() {
                 <span className="label">Kits, ábacos y otros del mes (sección de la hoja Royalties)</span>
               </div>
               {data.pedidos.length > 0 && (
-                <TableScroller label="Pedidos de materiales">
+                <TableScroller stickyFirstColumn label="Pedidos de materiales">
                   <table className="table">
                     <thead><tr>{['Fecha', 'N° O/E', 'Producto', 'Grupo', 'Nivel', 'Cantidad', 'Monto', 'Observaciones', ''].map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>
@@ -456,7 +466,7 @@ export default function CuadroPage() {
                           <td className="num" style={{ fontSize: 12 }}>{p.numero_oe || '—'}</td>
                           <td style={{ fontWeight: 600, color: 'var(--text)' }}>
                             {PRODUCTO_LABELS[p.producto] || p.producto}
-                            {p.itinerario && <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-dim)' }}> · {p.itinerario}</span>}
+                            {p.itinerario && <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-dim)' }}> · {p.itinerario}</span>}
                           </td>
                           <td className="num" style={{ fontSize: 12 }}>{numeroGrupo(p.grupo_id)}</td>
                           <td className="num" style={{ fontSize: 12, textAlign: 'center' }}>{p.nivel ?? '—'}</td>
@@ -466,9 +476,9 @@ export default function CuadroPage() {
                           <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                             {!congelado && (
                               <>
-                                <button className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
+                                <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
                                 {rol !== 'asistente' && (
-                                  <button className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }} onClick={() => handleEliminarPedido(p)}>🗑</button>
+                                  <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }} aria-label="Eliminar pedido" onClick={() => setConfirmAction({type:'delete',pedido:p})}>🗑</button>
                                 )}
                               </>
                             )}
@@ -478,7 +488,7 @@ export default function CuadroPage() {
                       <tr style={{ cursor: 'default', background: 'var(--surface-3)' }}>
                         <td colSpan={5} style={{ fontWeight: 700, color: 'var(--text)' }}>Total</td>
                         <td className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{totalCantidad}</td>
-                        <td className="num" style={{ fontWeight: 700, color: 'var(--ts-green)' }}>{money(totalMonto)}</td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--ok-text)' }}>{money(totalMonto)}</td>
                         <td colSpan={2} />
                       </tr>
                     </tbody>
@@ -490,60 +500,68 @@ export default function CuadroPage() {
                   🔒 Mes cerrado: los pedidos quedaron congelados con el cuadro. Reabre el mes en KPI Semanal para modificarlos.
                 </div>
               ) : (
-              <form onSubmit={handleGuardarPedido} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '14px 18px', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
+              <>
+              <button type="button" className="btn" onClick={()=>{setPedido(EMPTY_PEDIDO);setPedidoOpen(true)}}>Nuevo pedido</button>
+              {data.pedidos.length===0 && <p className="h-sub">No hay pedidos este mes.</p>}
+              {pedidoOpen && <Dialog open title={pedido.id?'Editar pedido':'Nuevo pedido'} onClose={()=>setPedidoOpen(false)} closeDisabled={savingPedido} footer={<><button type="button" className="btn" disabled={savingPedido} onClick={()=>setPedidoOpen(false)}>Cancelar</button><button type="submit" form="pedido-form" className="btn btn--primary" disabled={savingPedido}>{savingPedido?'Guardando…':'Guardar pedido'}</button></>}>
+              <form id="pedido-form" onSubmit={handleGuardarPedido} className="reports-pedido-form">
+                {isError && <div role="status" aria-live="polite" className="alert alert--error">{statusText}</div>}
                 <span className="label" style={{ width: '100%' }}>{pedido.id ? 'Editar pedido' : 'Nuevo pedido'} — {NOMBRES_MES[month - 1]} {year}</span>
-                <div className="field" style={{ flex: '0 1 140px', margin: 0 }}>
-                  <label className="label">Fecha</label>
-                  <input type="date" className="input" value={pedido.fecha} onChange={(e) => setP('fecha', e.target.value)} />
-                </div>
-                <div className="field" style={{ flex: '0 1 110px', margin: 0 }}>
-                  <label className="label">N° O/E</label>
-                  <input className="input" value={pedido.numero_oe} onChange={(e) => setP('numero_oe', e.target.value)} placeholder="OE-…" />
-                </div>
-                <div className="field" style={{ flex: '0 1 130px', margin: 0 }}>
-                  <label className="label">Producto</label>
-                  <select className="input" value={pedido.producto} onChange={(e) => setP('producto', e.target.value)}>
+                <label className="field" style={{ flex: '0 1 140px', margin: 0 }}>
+                  <span className="label">Fecha</span>
+                  <input type="date" className="input" name="fecha" autoComplete="off" value={pedido.fecha} onChange={(e) => setP('fecha', e.target.value)} />
+                </label>
+                <label className="field" style={{ flex: '0 1 110px', margin: 0 }}>
+                  <span className="label">N° O/E</span>
+                  <input className="input" name="numero_oe" autoComplete="off" value={pedido.numero_oe} onChange={(e) => setP('numero_oe', e.target.value)} placeholder="OE-…" />
+                </label>
+                <label className="field" style={{ flex: '0 1 130px', margin: 0 }}>
+                  <span className="label">Producto</span>
+                  <select className="input" name="producto" autoComplete="off" value={pedido.producto} onChange={(e) => setP('producto', e.target.value)}>
                     {PRODUCTOS_MATERIAL.map((p) => <option key={p} value={p}>{PRODUCTO_LABELS[p] || p}</option>)}
                   </select>
-                </div>
-                <div className="field" style={{ flex: '0 1 120px', margin: 0 }}>
-                  <label className="label">Itinerario</label>
-                  <select className="input" value={pedido.itinerario} onChange={(e) => setP('itinerario', e.target.value)}>
+                </label>
+                <label className="field" style={{ flex: '0 1 120px', margin: 0 }}>
+                  <span className="label">Itinerario</span>
+                  <select className="input" name="itinerario" autoComplete="off" value={pedido.itinerario} onChange={(e) => setP('itinerario', e.target.value)}>
                     <option value="">—</option>
                     {ITINERARIOS.map((it) => <option key={it} value={it}>{it}</option>)}
                   </select>
-                </div>
-                <div className="field" style={{ flex: '0 1 80px', margin: 0 }}>
-                  <label className="label">Nivel</label>
-                  <input type="number" min="1" max="10" className="input" value={pedido.nivel} onChange={(e) => setP('nivel', e.target.value)} />
-                </div>
-                <div className="field" style={{ flex: '0 1 140px', margin: 0 }}>
-                  <label className="label">Grupo</label>
-                  <select className="input" value={pedido.grupo_id} onChange={(e) => setP('grupo_id', e.target.value)}>
+                </label>
+                <label className="field" style={{ flex: '0 1 80px', margin: 0 }}>
+                  <span className="label">Nivel</span>
+                  <input type="number" min="1" max="10" className="input" name="nivel" autoComplete="off" value={pedido.nivel} onChange={(e) => setP('nivel', e.target.value)} />
+                </label>
+                <label className="field" style={{ flex: '0 1 140px', margin: 0 }}>
+                  <span className="label">Grupo</span>
+                  <select className="input" name="grupo_id" autoComplete="off" value={pedido.grupo_id} onChange={(e) => setP('grupo_id', e.target.value)}>
                     <option value="">—</option>
                     {gruposActivos.map((g) => <option key={g.id} value={String(g.id)}>Grupo {g.numero} · {g.itinerario}</option>)}
                   </select>
-                </div>
-                <div className="field" style={{ flex: '0 1 90px', margin: 0 }}>
-                  <label className="label">Cantidad</label>
-                  <input type="number" min="0" className="input" value={pedido.cantidad} onChange={(e) => setP('cantidad', e.target.value)} />
-                </div>
-                <div className="field" style={{ flex: '0 1 110px', margin: 0 }}>
-                  <label className="label">Monto $</label>
-                  <input type="number" min="0" step="0.01" className="input" value={pedido.monto} onChange={(e) => setP('monto', e.target.value)} />
-                </div>
-                <div className="field" style={{ flex: '1 1 180px', margin: 0 }}>
-                  <label className="label">Observaciones</label>
-                  <input className="input" value={pedido.observaciones} onChange={(e) => setP('observaciones', e.target.value)} placeholder="Ej: repite nivel" />
-                </div>
-                <button type="submit" className="btn btn--primary" disabled={savingPedido}>{savingPedido ? 'Guardando…' : (pedido.id ? 'Guardar cambios' : '+ Agregar pedido')}</button>
-                {pedido.id && <button type="button" className="btn" onClick={() => setPedido(EMPTY_PEDIDO)}>Cancelar</button>}
+                </label>
+                <label className="field" style={{ flex: '0 1 90px', margin: 0 }}>
+                  <span className="label">Cantidad</span>
+                  <input type="number" min="0" className="input" name="cantidad" autoComplete="off" value={pedido.cantidad} onChange={(e) => setP('cantidad', e.target.value)} />
+                </label>
+                <label className="field" style={{ flex: '0 1 110px', margin: 0 }}>
+                  <span className="label">Monto $</span>
+                  <input type="number" min="0" step="0.01" className="input" name="monto" autoComplete="off" value={pedido.monto} onChange={(e) => setP('monto', e.target.value)} />
+                </label>
+                <label className="field" style={{ flex: '1 1 180px', margin: 0 }}>
+                  <span className="label">Observaciones</span>
+                  <input className="input" name="observaciones" autoComplete="off" value={pedido.observaciones} onChange={(e) => setP('observaciones', e.target.value)} placeholder="Ej: repite nivel" />
+                </label>
               </form>
+              </Dialog>}
+              </>
               )}
             </div>
           </>
         )}
 
+        {confirmAction && <Dialog open title={confirmAction.type==='sync'?'Sincronizar KPI':'Eliminar pedido'} onClose={()=>setConfirmAction(null)} closeDisabled={syncing} footer={<><button type="button" className="btn" disabled={syncing} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={syncing} onClick={async()=>{if(confirmAction.type==='sync')await handleSincronizar();else await handleEliminarPedido(confirmAction.pedido);setConfirmAction(null)}}>Confirmar</button></>}>
+          <p>{confirmAction.type==='sync'?'Se sobrescribirán grupos activos, nuevos activos y motivos de deserción en el resumen mensual.':'Se eliminará este pedido. Esta acción no se puede deshacer.'}</p>
+        </Dialog>}
         {accionNino?.tipo === 'retirar' && (
           <RetirarModal centroId={id} nino={accionNino.nino}
             onClose={() => setAccionNino(null)}
@@ -590,20 +608,20 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
     <Modal title={`Retirar a ${nino.nombre}`} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Retirar del cuadro'}</button>
+          <button type="button" className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Retirar del cuadro'}</button>
         </>
       )}>
-      {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div className="dialog-form-grid">
         <Field full label="Motivo del retiro *">
-          <select className="input" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
+          <select className="input" name="motivo" value={f.motivo} onChange={(e) => set('motivo', e.target.value)}>
             <option value="">Selecciona motivo…</option>
             {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m] || m}</option>)}
           </select>
         </Field>
-        <Field label="Fecha de retiro"><input type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
-        <Field label="Última asistencia (opcional)"><input type="date" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
+        <Field label="Fecha de retiro"><input type="date" name="fechaRetiro" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        <Field label="Última asistencia (opcional)"><input type="date" name="ultimaAsistencia" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
         <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
           El niño cae en las deserciones del mes de la fecha de retiro y deja de contar en “a pagar”. Si vuelve, lo reincorporas desde esta misma tabla.
         </div>
@@ -640,8 +658,8 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
     <Modal title={`Reincorporar a ${nino.nombre}`} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
-          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
+          <button type="button" className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Reincorporar'}</button>
         </>
       )}>
       {err && <div className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}

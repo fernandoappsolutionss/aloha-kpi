@@ -2,15 +2,20 @@ import { expect } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
+export async function settleVisuals(page) {
+  await page.evaluate(async()=>{
+    await document.fonts?.ready
+    await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})))
+    await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done)))
+  })
+}
+
 export async function auditPage(page, { mobile, state = 'ready', scope = null }) {
   const main = state === null
     ? page.locator('main')
     : page.locator(`#main-content[data-page-state="${state}"]`)
   await expect(main).toHaveCount(1, { timeout: 15_000 })
-  await page.evaluate(async () => {
-    await document.fonts?.ready
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
-  })
+  await settleVisuals(page)
 
   const result = await page.evaluate(({ mobile, scope }) => {
     const surface = scope ? document.querySelector(scope) : document.body
@@ -96,10 +101,11 @@ export async function auditPage(page, { mobile, state = 'ready', scope = null })
   expect(result, result.join('\n')).toEqual([])
 }
 
-export async function capturePage(page, { name, testInfo }) {
+export async function capturePage(page, { name, testInfo, locator }) {
   if (!process.env.E2E_CAPTURE_DIR) return
   const folder = resolve(process.env.E2E_CAPTURE_DIR, testInfo.project.name)
   await mkdir(folder, { recursive: true })
   const filename = `${name.replaceAll(/[^a-z0-9]+/gi, '-') || 'root'}.png`
-  await page.screenshot({ path: join(folder, filename), fullPage: true })
+  if (locator) await locator.screenshot({ path: join(folder, filename) })
+  else await page.screenshot({ path: join(folder, filename), fullPage: true })
 }

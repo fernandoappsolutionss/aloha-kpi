@@ -57,7 +57,7 @@ const ESTADO_TITULO = {
 const BANDA_PILL = { Alta: 'pill--ok', Media: 'pill--warn', Baja: 'pill--bad', Bloqueado: 'pill--bad' }
 const ORIGEN_LABELS = { clase_prueba: 'Clase de prueba', directo: 'Inscripción directa', traslado: 'Traslado de centro' }
 const ORIGEN_VENTA_LABELS = { referido: 'Referido', marketing: 'Marketing', centro: 'Centro', activaciones: 'Activaciones', medios: 'Medios' }
-const BTN_XS = { padding: '4px 10px', fontSize: 11 }
+const BTN_XS = { padding: '4px 10px', fontSize: 13 }
 
 // Fechas DATE de Postgres llegan como string 'AAAA-MM-DD' o como Date según el driver.
 const isoDia = (d) => {
@@ -87,8 +87,8 @@ function semanaNinoTexto(plan) {
 // `onVer` el chip es la PUERTA al plan individual del niño (PlanNinoModal):
 // botón de verdad, con foco y con un title que invita a abrirlo. Sin `onVer`
 // (fusiones) sigue siendo el mismo texto de solo lectura de siempre.
-const CHIP_PLAN_BASE = { fontSize: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
-function ChipPlanNino({ plan, nombre, onVer }) {
+const CHIP_PLAN_BASE = { fontSize: 13, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+function ChipPlanNino({ plan, nombre, onVer, triggerRef }) {
   if (!plan) return null
   const det = plan.semana?.etiqueta ? ` (${plan.semana.etiqueta})` : ''
   const s = `S${(plan.indiceSemana ?? 0) + 1}`
@@ -112,7 +112,7 @@ function ChipPlanNino({ plan, nombre, onVer }) {
   if (!onVer) return <span className="pill" style={style} title={title}>{texto}</span>
   const quien = nombre || 'este niño'
   return (
-    <button type="button" className="pill pill--link" style={style} onClick={onVer}
+    <button ref={triggerRef} type="button" className="pill pill--link" style={style} onClick={onVer}
       title={`Ver plan de ${quien} — ${title}`} aria-label={`Ver plan de ${quien}`}>{texto}</button>
   )
 }
@@ -275,6 +275,7 @@ export default function GruposPage() {
   const [reincEst, setReincEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
   const [verPlan, setVerPlan] = useState(null) // { nino, grupo } — plan individual del niño (R3)
+  const planReturnFocusRef = useRef(null)
 
   const load = useCallback(async () => {
     try {
@@ -527,6 +528,7 @@ export default function GruposPage() {
     ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
     // El chip del niño abre SU plan (no el del aula): mismo dibujo, distinta ancla.
     verPlanNino: (e, g) => { setStatus(''); setVerPlan({ nino: e, grupo: g }) },
+    planTriggerRef: (node, id) => { if (node && String(verPlan?.nino.id) === String(id)) planReturnFocusRef.current = node },
     editarNino: (e) => { setStatus(''); setEditEst(e) },
     retirar: (e) => { setStatus(''); setRetiroEst(e) },
     programarRetiro: (e) => { setStatus(''); setProgEst(e) },
@@ -669,7 +671,7 @@ export default function GruposPage() {
                     <p style={{ fontSize: 12.5, color: 'var(--text-dim)', maxWidth: 320, lineHeight: 1.65 }}>
                       Su listado de niños y las acciones del grupo aparecen aquí mismo, sin bajar la página.
                     </p>
-                    <span className="label" style={{ fontSize: 10 }}>↑ ↓ para moverte · Esc para cerrar</span>
+                    <span className="label" style={{ fontSize: 13 }}>↑ ↓ para moverte · Esc para cerrar</span>
                   </div>
                 )
               )}
@@ -786,6 +788,7 @@ export default function GruposPage() {
           Si le falta el ancla, ahí mismo se crea (bloque de creación rápida). */}
       {verPlan && ninoPlan && (
         <PlanNinoModal key={ninoPlan.id} nino={ninoPlan} grupo={grupoPlan} hoy={hoy}
+          returnFocusRef={planReturnFocusRef}
           onClose={() => setVerPlan(null)}
           renderCreacion={({ nino, onPlanFijado, onBusyChange }) => (
             <div style={{ padding: '16px 18px' }}>
@@ -839,22 +842,22 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.2 }}>
             Grupo {g.numero}
-            <span className="num" style={{ fontSize: 10.5, color: 'var(--text-dim)', marginLeft: 8, letterSpacing: '0.06em' }}>
+            <span className="num" style={{ fontSize: 13, color: 'var(--text-dim)', marginLeft: 8, letterSpacing: '0.06em' }}>
               {g.itinerario}{g.es_online ? ' · ONLINE' : ''}
             </span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{g.coach?.nombre || 'Sin coach'}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1, lineHeight: 1.45 }}>{horarioTexto(g.horarios)}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 1, lineHeight: 1.45 }}>{horarioTexto(g.horarios)}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
           <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
-          <button className="btn grp-card__edit" style={{ padding: '3px 9px', fontSize: 11 }}
+          <button className="btn grp-card__edit" style={{ padding: '3px 9px', fontSize: 13 }}
             title={`Editar el grupo ${g.numero}`} onClick={(e) => { e.stopPropagation(); onEditar() }}>✎ Editar</button>
         </div>
       </div>
       <div style={{ marginTop: 11 }}><OcupacionBar n={g.estudiantes.length} metas={metas} /></div>
       {llenado && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline', marginTop: 8, fontSize: 11 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline', marginTop: 8, fontSize: 13 }}>
           <span className="num" style={{ fontWeight: 700, color: llenado.ventana.diasHastaLimite != null && llenado.ventana.diasHastaLimite <= 7 ? 'var(--warn)' : 'var(--ts-green)' }}>
             ⏳ {countdownVentana(llenado.ventana)}
           </span>
@@ -866,7 +869,7 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
             )}
         </div>
       )}
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 7 }}>{nivelesTexto(g)}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 7 }}>{nivelesTexto(g)}</div>
     </article>
   )
 }
@@ -1081,12 +1084,12 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
             <span style={{ color: 'var(--text)', fontWeight: 600 }}>
               {idxHoy < 0 ? 'Nivel terminado' : it.semanas[idxHoy].etiqueta}
             </span>
-            <span className="num" style={{ color: 'var(--text-dim)', fontSize: 11.5 }}>
+            <span className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>
               {idxHoy < 0
                 ? `cerró ${fmtDia(it.fecha_cierre_estimada)}`
                 : `${idxHoy + 1} de ${it.semanas.length} · cierra ${fmtDia(it.fecha_cierre_estimada)}`}
             </span>
-            <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 11 }}>Ver itinerario →</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 13 }}>Ver itinerario →</span>
           </button>
         )}
         {n === 0 ? (
@@ -1110,7 +1113,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                  <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} />
+                  <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} triggerRef={node => acciones.planTriggerRef(node, e.id)} />
                   <span className="num" style={{ fontSize: 12, color: 'var(--text-dim)' }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
                     {cierre.fecha ? `cierra ${fmtDia(cierre.fecha)}` : 'sin cierre'}
                   </span>
@@ -1134,14 +1137,14 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                 <tr key={e.id} style={{ cursor: 'default' }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>
                     {e.nombre}
-                    {e.representante && <div style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-faint)' }}>{e.representante}</div>}
+                    {e.representante && <div style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-faint)' }}>{e.representante}</div>}
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="pill" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>{e.itinerario} {e.nivel}</span>
-                      <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} />
+                      <ChipPlanNino plan={e.plan} nombre={e.nombre} onVer={() => acciones.verPlanNino(e, g)} triggerRef={node => acciones.planTriggerRef(node, e.id)} />
                     </div>
-                    <div className="num" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
+                    <div className="num" style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }} title={cierre.origen ? `Cierre ${ORIGEN_CIERRE[cierre.origen]}.` : 'Sin cierre resoluble (sin override ni plan derivable).'}>
                       {cierre.fecha ? fmtDia(cierre.fecha) : 'sin cierre'}
                     </div>
                   </td>
@@ -1203,7 +1206,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
     <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 8 }} data-tour="grupo.llenado">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span className="label" style={{ color: 'var(--ts-green)' }}>Llenado</span>
-        {est && <span className={`pill ${est.pill}`} style={{ fontSize: 10 }}><span className="dot" />{est.t}</span>}
+        {est && <span className={`pill ${est.pill}`} style={{ fontSize: 13 }}><span className="dot" />{est.t}</span>}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
         <b className="num" style={{ color: 'var(--text)' }}>{r.ninos}/{r.meta}</b> niños contra la meta
@@ -1222,7 +1225,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
         <span style={{ color: 'var(--text-dim)' }}> (aprox. con las inscripciones de los últimos 14 días)</span>
       </div>
       {sugerencias.length > 0 && (
-        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, color: 'var(--text-dim)', display: 'grid', gap: 3 }}>
+        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--text-dim)', display: 'grid', gap: 3 }}>
           {sugerencias.map((s, i) => (
             <li key={i}>{s.texto}{s.tope ? <b style={{ color: 'var(--text-muted)' }}> ({s.tope})</b> : null}</li>
           ))}
@@ -1238,7 +1241,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
               {guardando ? 'Guardando…' : 'Extender'}
             </button>
             <button className="btn" style={BTN_XS} onClick={() => { setExtiendo(false); setFechaExt('') }}>Cancelar</button>
-            <span style={{ fontSize: 10.5, color: 'var(--text-dim)' }}>máx. 8 semanas · queda registrado y vence solo</span>
+            <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>máx. 8 semanas · queda registrado y vence solo</span>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1352,7 +1355,7 @@ function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ minWidth: 0 }}>
                 <b style={{ color: 'var(--text)', fontSize: 13 }}>{sub.etiqueta} · {n} niño{n === 1 ? '' : 's'} sin plan</b>
-                <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{sub.ninos.map((x) => x.nombre).join(' · ')}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{sub.ninos.map((x) => x.nombre).join(' · ')}</div>
               </div>
               {!on && (
                 <button className="btn btn--primary" style={BTN_XS} onClick={() => setAbierto(sub.clave)}
@@ -1392,33 +1395,33 @@ function MontonPlan({ m, esReferencia }) {
       <div style={{ padding: '12px 18px 4px', display: 'grid', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--text)' }}>{m.etiqueta}</span>
-          <span className="pill" style={{ fontSize: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+          <span className="pill" style={{ fontSize: 13, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
             {n} niño{n === 1 ? '' : 's'}
           </span>
-          <span className="num" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+          <span className="num" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
             {escalonado
               ? `${m.cohortes.length} fechas de arranque · ${distribucionSemanas(m.ninos)}`
               : `empezó el ${fmtDia(m.ancla)}${it?.fecha_cierre_estimada ? ` → cierra el ${fmtDia(it.fecha_cierre_estimada)}` : ''}`}
           </span>
         </div>
         {!escalonado && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{m.ninos.map((x) => x.nombre).join(' · ')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>{m.ninos.map((x) => x.nombre).join(' · ')}</div>
         )}
       </div>
       {escalonado ? (
         <div style={{ padding: '2px 18px 14px', display: 'grid', gap: 6 }}>
-          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
             Mismo libro, arrancado en fechas distintas: no hay una sola línea de tiempo para el montón. El plan exacto de cada niño está en su chip “va por S{'{x}'}”.
           </div>
           {m.cohortes.map((c) => (
-            <div key={c.clave} style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            <div key={c.clave} style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               <b className="num" style={{ color: 'var(--text)' }}>{fmtDia(c.ancla)}</b> · {c.ninos.length} niño{c.ninos.length === 1 ? '' : 's'} ·{' '}
               {semanaNinoTexto({ estado: c.estado, indiceSemana: c.indiceSemana })} — {c.ninos.map((x) => x.nombre).join(' · ')}
             </div>
           ))}
         </div>
       ) : esReferencia ? (
-        <div style={{ padding: '2px 18px 14px', fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+        <div style={{ padding: '2px 18px 14px', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
           Van por el plan del aula tal cual (misma fecha de inicio y mismo nivel): su línea de tiempo es la de abajo.
         </div>
       ) : (
@@ -1483,7 +1486,7 @@ function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
               {g.itinerario} · Nivel {it.nivel}
             </div>
-            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>
               {fmtDia(it.fecha_inicio)} → {fmtDia(it.fecha_cierre_estimada)} · {total} semanas
               {it.pais === 'VE' || it.con_feriados === false ? ' · fechas patrias de Venezuela' : ''}
             </div>
@@ -1501,7 +1504,7 @@ function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
       )}
 
       {escalonadoUnico && (
-        <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+        <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
           Todos van en <b style={{ color: 'var(--text-muted)' }}>{escalonadoUnico.etiqueta}</b>, pero arrancaron en{' '}
           {escalonadoUnico.cohortes.length} fechas distintas
           {' '}({escalonadoUnico.cohortes.slice(0, 3).map((c) => fmtDia(c.ancla)).join(' · ')}{escalonadoUnico.cohortes.length > 3 ? ' …' : ''}):{' '}
@@ -1517,7 +1520,7 @@ function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
           <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             📚 Este grupo va <b style={{ color: 'var(--text)' }}>mezclado</b>: {montones.length} niveles distintos conviviendo en el salón ·{' '}
             <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas(ninos)}</b>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
               Cada niño va por su propia ancla; el plan del aula (abajo) queda como referencia del grupo.
             </div>
           </div>
@@ -1691,7 +1694,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
           const cierre = cierreNino(e)
           return (
           <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel} · ${e.plan?.estado === 'en_curso' ? `va por S${(e.plan.indiceSemana ?? 0) + 1}` : semanaNinoTexto(e.plan)}${cierre.fecha ? ` · cierra ${fmtDia(cierre.fecha)} (${ORIGEN_CIERRE[cierre.origen]})` : ' · sin cierre resoluble'}`}
-            style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            style={{ fontSize: 13, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
             {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b> <span style={{ color: e.plan?.estado === 'en_curso' ? 'var(--ts-green)' : 'var(--text-dim)' }}>· {semanaNinoTexto(e.plan)}</span>
           </span>
         ) })}
@@ -1716,12 +1719,12 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         {planAviso && (
-          <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 13, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
             <span style={{ color: K_COLOR[planAviso.k], marginRight: 5 }}>{K_ICON[planAviso.k]}</span>{planAviso.t}
           </span>
         )}
         {analisis.reasons.map((r, i) => (
-          <span key={i} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
+          <span key={i} style={{ fontSize: 13, padding: '3px 9px', borderRadius: 'var(--r-pill)', border: '1px solid var(--border-strong)', color: 'var(--text-muted)' }}>
             <span style={{ color: K_COLOR[r.k], marginRight: 5 }}>{K_ICON[r.k]}</span>{r.t}
           </span>
         ))}
@@ -1734,7 +1737,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
       </div>
       {/* Aviso de fusión (R3): distribución de semanas en el DESTINO —
           informativo, cada niño conserva su semana (re-anclaje g1-9). */}
-      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 10 }}
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 10 }}
         title={`Informativo: al fusionar, cada niño conserva su semana del plan (re-anclaje semántico). Así quedaría el aula del grupo ${to.numero}.`}>
         📚 Semanas en destino tras la fusión: <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas([...(from.estudiantes || []), ...(to.estudiantes || [])]) || 'sin niños'}</b>
       </div>
@@ -1916,7 +1919,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
               <tbody>
                 {porLiberarse.map(({ g, lib }) => (
                   <tr key={g.id} style={{ cursor: 'default' }}>
-                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>Grupo {g.numero} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-dim)' }}>{g.itinerario} · {g.estudiantes.length} niños · {g.coach?.nombre || 'sin coach'}</span></td>
+                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>Grupo {g.numero} <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-dim)' }}>{g.itinerario} · {g.estudiantes.length} niños · {g.coach?.nombre || 'sin coach'}</span></td>
                     <td style={{ fontSize: 12 }}>{horarioTexto(g.horarios)}</td>
                     <td className="num" style={{ fontSize: 12, color: 'var(--warn)', fontWeight: 700 }}>{fmtDia(lib.cierre)}</td>
                     <td className="num" style={{ fontSize: 12 }}>{fmtDia(menosDias(lib.cierre, 60))} <span style={{ color: 'var(--text-dim)' }}>(2 meses antes)</span></td>
@@ -1934,7 +1937,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
           <div className="panel__head">
             <div>
               <div className="panel__title">Dónde abrir el próximo grupo</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
                 Siempre optimizando hacia el modelo de horarios del negocio: {RESUMEN_MODELO}. Rankeado con la estadística del propio centro.
               </div>
             </div>
@@ -1947,13 +1950,13 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
               <div key={`${r.tipo}-${r.sesiones[0].inicio}-${r.salon.id}`} className="card" style={{ padding: 12, borderLeft: `3px solid ${ETIQUETA_COLOR[r.etiqueta]}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{i + 1}. {r.titulo}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: ETIQUETA_COLOR[r.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[r.etiqueta]}{r.etiqueta}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>
                   {r.salon.nombre} · {r.tipo === 'LM' || r.tipo === 'MJ' ? '1 h + 1 h (par del modelo)' : 'bloque de 2 h'}
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 5, minHeight: 28 }}>{r.razon}</div>
-                <div style={{ fontSize: 11, color: r.coachesLibres.length ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 5, minHeight: 28 }}>{r.razon}</div>
+                <div style={{ fontSize: 13, color: r.coachesLibres.length ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
                   {r.coachesLibres.length ? `Coaches libres: ${r.coachesLibres.map((c) => c.nombre.split(' ')[0]).join(', ')}` : 'Sin coach libre en esas franjas'}
                 </div>
                 <button className="btn btn--primary" style={{ marginTop: 8, padding: '5px 12px', fontSize: 12 }}
@@ -1970,7 +1973,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text-muted)', display: 'grid', gap: 5 }}>
                   {GUIA_FRANJAS_DIFICILES.map((t, i) => <li key={i}>{t}</li>)}
                 </ul>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 8 }}>
                   Fuentes: “Establecimiento de Calendarios” y “Protocolo de Salida — herramientas de no salida” del manual. Toda promoción nueva debe aprobarla la Administración General (regla de franquicia).
                 </div>
               </div>
@@ -2000,7 +2003,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
             🎯 Clase de prueba este día
           </button>
         )}
-        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+        <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
           Ventana {aHora12(aperturaDia)}–8:30 pm · 15 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
         </span>
       </div>
@@ -2034,7 +2037,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
           {/* Eje de horas */}
           <div style={{ position: 'relative', height: altura }}>
             {horasEje.map((m) => (
-              <div key={m} className="num" style={{ position: 'absolute', top: topDe(m) - 7, right: 6, fontSize: 9.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{aHora12(m)}</div>
+              <div key={m} className="num" style={{ position: 'absolute', top: topDe(m) - 7, right: 6, fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{aHora12(m)}</div>
             ))}
           </div>
 
@@ -2056,15 +2059,15 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                         position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                         background: 'var(--warn-bg, rgba(245,158,11,0.14))', border: '1px solid var(--warn)',
                         borderLeft: '3px solid var(--warn)', borderRadius: 'var(--r-sm)',
-                        padding: '5px 8px', overflow: 'hidden', fontSize: 11.5,
+                        padding: '5px 8px', overflow: 'hidden', fontSize: 13,
                       }}>
                       <div style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         🎯 Clase de prueba
                       </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: 10.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         {rol} · {coachNombre}
                       </div>
-                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
                     </div>
                   )
                 }
@@ -2075,17 +2078,17 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                       position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                       background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
                       borderLeft: `3px solid ${alerta ? 'var(--bad)' : 'var(--ts-green)'}`,
-                      borderRadius: 'var(--r-sm)', padding: corto ? '3px 8px' : '5px 8px', overflow: 'hidden', fontSize: 11.5,
+                      borderRadius: 'var(--r-sm)', padding: corto ? '3px 8px' : '5px 8px', overflow: 'hidden', fontSize: 13,
                     }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, minWidth: 0 }}>
                       <span style={{ fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Grupo {grupo.numero}</span>
                       <span className="num" style={{ color: alerta ? 'var(--bad)' : 'var(--ok)', flexShrink: 0 }}>{grupo.estudiantes.length}</span>
                     </div>
-                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: corto ? 10.5 : 11.5 }}>
+                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: 13 }}>
                       {coach?.nombre?.split(' ')[0] || coachNombre}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
                     </div>
                     {!corto && (
-                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>
+                      <div className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>
                         {aHora12(inicio)}–{aHora12(fin)}
                         {lib?.libera && <span style={{ color: 'var(--warn)', fontWeight: 700 }}> · 📣 libre {fmtDia(lib.cierre)}</span>}
                       </div>
@@ -2108,7 +2111,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(seg.inicio) + 1, height: topDe(seg.fin) - topDe(seg.inicio) - 2,
                       background: 'var(--surface-2)', border: '1px dashed var(--border)', borderRadius: 'var(--r-sm)',
-                      color: 'var(--text-faint)', fontSize: 10.5, fontWeight: 500, padding: 4, overflow: 'hidden',
+                      color: 'var(--text-faint)', fontSize: 13, fontWeight: 500, padding: 4, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                     }}>
                     <span style={{ whiteSpace: 'nowrap' }}>Hora muerta</span>
@@ -2126,14 +2129,14 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
                       background: esKinder ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1.5px dashed ${esKinder ? 'var(--warn-line)' : 'var(--ok-line)'}`, borderRadius: 'var(--r-sm)',
-                      color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
+                      color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
                     }}>
                     <span className="num" style={{ whiteSpace: 'nowrap' }}>＋ {aHora12(sl.inicio)}–{aHora12(sl.fin)}</span>
                     {esKinder
-                      ? <span style={{ fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>Zona Kinder</span>
-                      : <span style={{ fontWeight: 600, fontSize: 10, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>}
-                    {!corto && <span style={{ fontWeight: 500, fontSize: 10, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
+                      ? <span style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>Zona Kinder</span>
+                      : <span style={{ fontWeight: 600, fontSize: 13, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>}
+                    {!corto && <span style={{ fontWeight: 500, fontSize: 13, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
                   </div>
                 )
               })}
@@ -2271,7 +2274,7 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
               </select>
             </div>
           ))}
-          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-dim)' }}>
+          <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-dim)' }}>
             Se necesitan 3 salones a la misma hora: uno para los papás, uno para Tiny y otro para Kids. <b style={{ color: 'var(--text-muted)' }}>Tiny y Kids llevan cada uno su coach</b> (son dos clases simultáneas); a los papás los recibe la administración. Esos salones y esos coaches quedan bloqueados en el calendario. El coach se puede cambiar cuando quieras con “Editar”.
           </div>
         </div>
@@ -2320,7 +2323,7 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>{c.nombre}</td>
                   <td style={{ fontSize: 12 }}>
                     {c.nivel_kids > 0 ? (
-                      <>Kids ≤ {c.nivel_kids}<div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Tiny ≤ {TINYMAP[c.nivel_kids] || 0}</div></>
+                      <>Kids ≤ {c.nivel_kids}<div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Tiny ≤ {TINYMAP[c.nivel_kids] || 0}</div></>
                     ) : <span style={{ color: 'var(--text-dim)' }}>Sin registrar</span>}
                   </td>
                   <td style={{ fontSize: 12 }}>{[c.kinder1 && 'K1', c.kinder23 && 'K2-3'].filter(Boolean).join(' · ') || '—'}</td>
@@ -2648,7 +2651,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
               onClick={() => { setNivel(String(it.nivel + 1)); setInicio(it.inicio_siguiente_nivel); setExc([]) }}>
               ➡️ Pasar al nivel {it.nivel + 1} (arranca el {fmtDia(it.inicio_siguiente_nivel)})
             </button>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 5 }}>
               Cierra este nivel y arma el siguiente desde esa fecha. Las clases suspendidas del nivel anterior no se arrastran.
             </div>
           </div>
@@ -2675,7 +2678,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
             <b style={{ color: movio ? 'var(--warn)' : 'var(--text)' }}>{fmtDia(previo.fecha_cierre_estimada)}</b>
             {movio ? ` (antes ${fmtDia(cierreAntes)})` : ''} · el nivel {previo.nivel + 1} arrancaría el {fmtDia(previo.inicio_siguiente_nivel)}.
             {previo.feriados_saltados.length > 0 && (
-              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Salta {previo.feriados_saltados.length} día(s) por feriados/vacaciones del manual.</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Salta {previo.feriados_saltados.length} día(s) por feriados/vacaciones del manual.</div>
             )}
           </div>
         )}

@@ -1,5 +1,7 @@
 # Coordinador de usuarios y experiencia móvil integral — diseño
 
+> Alcance de verificación vigente: inventario LOCAL de 28 rutas de producto + 1 técnica, con actores correctos y DB disposable. Los snippets de configuración de este documento son históricos; los archivos finales del repositorio y el runbook Task 11 determinan la ejecución. El remoto usa únicamente `playwright.remote.config.mjs` y el rollback actualizado: `public` explícito/por defecto o `authenticated` con ambos actores completos. Nunca config general, capturas, Coach, centro, Growth ni tokens válidos en remoto. El harness local debe devolver 404 remoto. CUA solo repite los casos públicos del helper `remote-readonly.mjs` en inmutables protegidas con SSO existente; no extraer sesiones ni crear bypass.
+
 **Fecha:** 2026-09-02
 
 **Estado:** Diseño aprobado por Fernando en chat el 2 de septiembre de 2026; listo para implementación mediante los planes vinculados.

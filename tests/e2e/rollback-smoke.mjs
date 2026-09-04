@@ -1,69 +1,47 @@
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
-const baseURL = String(process.env.RESPONSIVE_BASE_URL || '').replace(/\/$/, '')
-const required = [
-  'RESPONSIVE_BASE_URL',
-  'E2E_ADMIN_EMAIL',
-  'E2E_ADMIN_PASSWORD',
-  'E2E_CENTER_EMAIL',
-  'E2E_CENTER_PASSWORD',
-  'E2E_CENTRO_ID',
-]
-for (const name of required) assert.ok(process.env[name], `${name} es obligatorio`)
-const parsedBaseURL = new URL(baseURL)
-assert.ok(['http:', 'https:'].includes(parsedBaseURL.protocol), 'RESPONSIVE_BASE_URL debe ser HTTP(S)')
-assert.equal(parsedBaseURL.username, '', 'RESPONSIVE_BASE_URL no admite credenciales')
-assert.equal(parsedBaseURL.password, '', 'RESPONSIVE_BASE_URL no admite credenciales')
-
-async function assertNoRootOverflow(page, label) {
-  const geometry = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }))
-  assert.ok(geometry.scrollWidth <= geometry.clientWidth + 1, `${label}: overflow ${geometry.scrollWidth}/${geometry.clientWidth}`)
-}
-
-async function login(context, email, password, expectedPath) {
-  const page = await context.newPage()
-  await page.goto(`${baseURL}/login`, { waitUntil: 'networkidle' })
-  await page.locator('input[type="email"]').fill(email)
-  await page.locator('input[type="password"]').fill(password)
-  await page.locator('button[type="submit"]').click()
-  await page.waitForURL((url) => expectedPath.test(url.pathname), { timeout: 15_000 })
-  return page
-}
-
-const browser = await chromium.launch({ channel: 'chrome' })
+// Deliberately standalone: a copy in mktemp resolves Chromium from the checkout.
+const mode=process.env.REMOTE_READONLY_MODE||'public'
+assert.ok(['public','authenticated'].includes(mode),'Modo inválido')
+const allowedCredentials=['E2E_ADMIN_EMAIL','E2E_ADMIN_PASSWORD','E2E_COORDINATOR_EMAIL','E2E_COORDINATOR_PASSWORD']
+for(const key of Object.keys(process.env))assert.ok(!((key.startsWith('E2E_')&&!allowedCredentials.includes(key))||/^(DATABASE_URL|USUARIOS_TEST_DATABASE_URL|PETICIONES_TEST_DATABASE_URL|SESSION_SECRET|CRM_SERVICE_TOKEN|BLOB_READ_WRITE_TOKEN|VERCEL_AUTOMATION_BYPASS_SECRET)$/.test(key)),'Entorno prohibido')
+const base=new URL(process.env.RESPONSIVE_BASE_URL)
+assert.ok(['http:','https:'].includes(base.protocol)&&!base.username&&!base.password&&base.pathname==='/'&&!base.search&&!base.hash,'Origen inválido')
+if(mode==='authenticated')assert.ok(process.env.E2E_ADMIN_EMAIL&&process.env.E2E_ADMIN_PASSWORD,'Admin completo obligatorio')
+const {chromium}=await import(pathToFileURL(resolve(process.cwd(),'node_modules/playwright/index.mjs')).href)
 try {
-  const publicContext = await browser.newContext({ viewport: { width: 390, height: 844 } })
+const browser=await chromium.launch({channel:'chrome'})
+try {
+  const context=await browser.newContext({baseURL:base.origin,viewport:{width:390,height:844}})
   try {
-    const publicPage = await publicContext.newPage()
-    await publicPage.goto(`${baseURL}/login`, { waitUntil: 'networkidle' })
-    assert.ok(await publicPage.locator('input[type="email"]').isVisible())
-    await assertNoRootOverflow(publicPage, 'login')
-  } finally {
-    await publicContext.close()
-  }
-
-  const adminContext = await browser.newContext({ viewport: { width: 390, height: 844 } })
-  try {
-    const adminPage = await login(adminContext, process.env.E2E_ADMIN_EMAIL, process.env.E2E_ADMIN_PASSWORD, /^\/dashboard/)
-    await assertNoRootOverflow(adminPage, 'dashboard gerencia')
-  } finally {
-    await adminContext.close()
-  }
-
-  const centerContext = await browser.newContext({ viewport: { width: 390, height: 844 } })
-  try {
-    const centerPath = new RegExp(`^/centro/${Number(process.env.E2E_CENTRO_ID)}(?:/|$)`)
-    const centerPage = await login(centerContext, process.env.E2E_CENTER_EMAIL, process.env.E2E_CENTER_PASSWORD, centerPath)
-    await assertNoRootOverflow(centerPage, 'inicio centro')
-    await centerPage.goto(`${baseURL}/dashboard/usuarios`, { waitUntil: 'domcontentloaded' })
-    await centerPage.waitForURL((url) => url.pathname !== '/dashboard/usuarios', { timeout: 15_000 })
-  } finally {
-    await centerContext.close()
-  }
-} finally {
-  await browser.close()
-}
+    const page=await context.newPage()
+    await page.route('**/*',route=>{
+      const url=new URL(route.request().url())
+      if(url.origin!==base.origin||url.searchParams.has('token'))return route.abort('blockedbyclient')
+      if(['/','/login','/dashboard','/dashboard/usuarios'].includes(url.pathname)||url.pathname.startsWith('/_next/')||/\.(png|svg|ico|woff2?|ttf)$/.test(url.pathname))return route.continue()
+      return route.abort('blockedbyclient')
+    })
+    const geometry=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1),false,'Overflow')
+    await page.goto('/login',{waitUntil:'networkidle'})
+    assert.equal(new URL(page.url()).origin,base.origin,'Origen inesperado')
+    assert.ok(await page.locator('input[type=email]').isVisible())
+    await geometry()
+    await page.goto('/dashboard/usuarios')
+    await page.waitForURL(url=>url.origin===base.origin&&url.pathname==='/login')
+    if(mode==='authenticated') {
+      assert.equal(new URL(page.url()).origin,base.origin)
+      assert.equal(new URL(page.url()).pathname,'/login')
+      assert.equal(await page.locator('form input[type=email]').count(),1)
+      assert.equal(await page.locator('form input[type=password]').count(),1)
+      await page.locator('form input[type=email]').fill(process.env.E2E_ADMIN_EMAIL)
+      await page.locator('form input[type=password]').fill(process.env.E2E_ADMIN_PASSWORD)
+      await page.locator('form button[type=submit]').click()
+      await page.waitForURL(url=>url.origin===base.origin&&url.pathname==='/dashboard')
+      await page.waitForLoadState('networkidle');await geometry()
+    }
+    console.log('Rollback smoke '+mode+': passed')
+  } finally {await context.close()}
+} finally {await browser.close()}
+} catch { console.error('Rollback smoke '+mode+': failed'); process.exitCode=1 }

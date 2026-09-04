@@ -48,6 +48,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const drawerRef = useRef(null)
   const previousPathRef = useRef(path)
   const restoreEnvironmentRef = useRef(null)
+  const breakpointFocusRef = useRef(null)
 
   const closeDrawer = useCallback(({ restoreFocus = true } = {}) => {
     restoreEnvironmentRef.current?.()
@@ -57,14 +58,36 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1024px)')
+    let lastFocus = document.activeElement
+    const rememberFocus = event => { lastFocus = event.target }
+    document.addEventListener('focusin', rememberFocus)
     const sync = () => {
+      const active = document.activeElement === document.body ? lastFocus : document.activeElement
+      const focusInSidebar = drawerRef.current?.contains(active)
+      const focusInMobileBar = triggerRef.current?.closest('.mobile-bar')?.contains(active)
       setIsMobile(media.matches)
       if (!media.matches) closeDrawer({ restoreFocus: false })
+      if (media.matches && focusInSidebar) {
+        breakpointFocusRef.current = 'trigger'
+      } else if (!media.matches && (focusInMobileBar || focusInSidebar)) {
+        breakpointFocusRef.current = 'sidebar'
+      }
     }
     sync()
     media.addEventListener('change', sync)
-    return () => media.removeEventListener('change', sync)
+    return () => { media.removeEventListener('change', sync); document.removeEventListener('focusin', rememberFocus) }
   }, [closeDrawer])
+
+  useEffect(() => {
+    const destination = breakpointFocusRef.current
+    breakpointFocusRef.current = null
+    if (destination === 'trigger') triggerRef.current?.focus()
+    if (destination === 'sidebar') {
+      const drawer = drawerRef.current
+      const target = drawer?.querySelector('a[aria-current="page"]') || drawer?.querySelector('a[href]') || drawer
+      target?.focus()
+    }
+  }, [isMobile])
 
   useEffect(() => {
     if (previousPathRef.current !== path) {
@@ -198,7 +221,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     localStorage.clear()
     router.push('/login')
   }
-  const isActive = (href) => path === href
+  const isActive = (href) => path === href || (href.endsWith('/entrenamiento') && path.startsWith(`${href}/`))
   const isCenterActive = (centerId) => {
     const prefix = `/centro/${centerId}`
     return path === prefix || path.startsWith(`${prefix}/`)
@@ -210,7 +233,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       aria-current={isActive(item.href) ? 'page' : undefined}
       className={`sb__item${extraClass}${isActive(item.href) ? ' sb__item--active' : ''}`}>
       <Icon name={item.icon} /><span>{item.label}</span>
-      {item.badge && <span className="sb__badge">{item.badge}</span>}
+      {item.badge && <span className="sb__badge" style={{ color: 'var(--text)' }}>{item.badge}</span>}
     </Link>
   )
 
@@ -232,7 +255,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
         aria-label="Navegación principal" role={isMobile ? 'dialog' : undefined}
         aria-modal={isMobile ? 'true' : undefined}
         aria-hidden={isMobile ? !drawerOpen : undefined}
-        inert={isMobile && !drawerOpen ? '' : undefined} tabIndex={-1}>
+        inert={isMobile && !drawerOpen ? true : undefined} tabIndex={-1} data-navigation-state={loading ? 'loading' : 'ready'}>
       <button type="button" className="sb__close" aria-label="Cerrar menú" onClick={() => closeDrawer()}>×</button>
       {/* Brand */}
       <div className="sb__brand">

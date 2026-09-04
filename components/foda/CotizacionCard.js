@@ -1,4 +1,5 @@
 'use client'
+import Dialog from '../Dialog'
 import { useEffect, useState } from 'react'
 import { upload } from '@vercel/blob/client'
 import { prepareCotizacionUpload, getCotizacionUploadStatus, discardCotizacionAttempt } from '../../app/actions/peticiones'
@@ -33,6 +34,7 @@ function fieldsFromQuote(quote) {
 // carga del PDF. El servidor sigue siendo la autoridad de validación — esto
 // solo evita subidas condenadas a fallar (país inválido, PDF de más de 10MB).
 export default function CotizacionCard({ centroId, peticionId, quote, index, onValidated, onStatus }) {
+  const [confirmRemove,setConfirmRemove]=useState(false)
   const [cotizacionId, setCotizacionId] = useState(quote?.id || null)
   const [values, setValues] = useState(fieldsFromQuote(quote))
   const [progress, setProgress] = useState(0)
@@ -141,6 +143,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
 
   return (
     <div className="foda-quote-card">
+      {confirmRemove && <Dialog open title="Quitar cotización" onClose={()=>setConfirmRemove(false)} closeDisabled={busy} footer={<><button type="button" className="btn" disabled={busy} onClick={()=>setConfirmRemove(false)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busy} onClick={async()=>{await quitarIntento();setConfirmRemove(false)}}>Quitar</button></>}><p>Se quitará este intento de cotización. Confirma que deseas continuar.</p></Dialog>}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span className="label">{titulo}</span>
         {quote?.upload_attempts ? <span className="label" style={{ color: 'var(--text-dim)' }}>Intento {quote.upload_attempts} de 5</span> : null}
@@ -190,16 +193,16 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
           </label>
           <label className="field" style={{ marginTop: 10 }}>
             <span className="label">PDF de la cotización (1 byte – 10 MB)</span>
-            <input type="file" accept="application/pdf,.pdf" onChange={handleFile}
+            <input type="file" name="cotizacionPdf" accept="application/pdf,.pdf" onChange={handleFile}
               disabled={!supplierComplete || busy} />
           </label>
           {busy && <p className="h-sub">Subiendo… {progress}%</p>}
-          {error && <p style={{ color: 'var(--bad)', fontSize: 12, marginTop: 6 }}>{error}</p>}
+          {error && <p role="alert" style={{ color: 'var(--bad)', fontSize: 12, marginTop: 6 }}>{error}</p>}
         </div>
       )}
 
       {(isPending || isInvalid) && (
-        <button type="button" className="btn" style={{ marginTop: 8 }} disabled={busy} onClick={quitarIntento}>
+        <button type="button" className="btn" style={{ marginTop: 8 }} disabled={busy} onClick={()=>setConfirmRemove(true)}>
           Quitar intento
         </button>
       )}

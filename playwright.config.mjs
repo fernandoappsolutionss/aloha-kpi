@@ -17,6 +17,7 @@ function parseBaseURL(value) {
 }
 
 const remoteRun = Boolean(process.env.RESPONSIVE_BASE_URL)
+if (process.env.E2E_R10_AUDIT) throw new Error('R10 exige su configuración local dedicada.')
 const dialogsRun = process.env.E2E_R3_DIALOGS === '1'
 const comparisonsRun = process.env.E2E_R6_COMPARISONS === '1'
 const operationsRun = process.env.E2E_R9_OPERATIONS === '1'
@@ -100,11 +101,15 @@ const serverEnv = remoteRun ? undefined : {
   } : {}),
 }
 
+const dedicatedSpecs = /(r10-|center-reports|center-user|full-route-audit|responsive-states|accessibility|remote-readonly).*\.(spec|setup)\.js$/
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1'
+
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: dedicatedSpecs,
   outputDir: mutationRun ? 'test-results/r7-users-mutations' : 'test-results',
-  preserveOutput: mutationRun || operationsRun ? 'never' : 'always',
-  reporter: operationsRun ? [['./tests/e2e/helpers/r9-reporter.mjs']] : mutationRun ? [['line']] : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
+  preserveOutput: 'never',
+  reporter: operationsRun ? [['./tests/e2e/helpers/r9-reporter.mjs']] : mutationRun ? [['line']] : [['./tests/e2e/helpers/r10-reporter.mjs']],
   expect: { timeout: 10_000 },
   globalSetup: operationsRun ? './tests/e2e/helpers/r9-global-setup.mjs' : centerCoreRun ? './tests/e2e/helpers/r8-global-setup.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
   globalTeardown: operationsRun ? './tests/e2e/helpers/r9-global-teardown.mjs' : centerCoreRun ? './tests/e2e/helpers/r8-global-teardown.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
@@ -114,7 +119,7 @@ export default defineConfig({
     channel: 'chrome',
     ...(operationsRun ? {actionTimeout:15_000,navigationTimeout:45_000} : {}),
     trace: 'off',
-    screenshot: operationsRun ? 'off' : 'only-on-failure',
+    screenshot: 'off',
     video: 'off',
   },
   webServer: remoteRun ? undefined : [
@@ -176,7 +181,7 @@ export default defineConfig({
       name,
       dependencies: ['setup'],
       grepInvert: /@coordinator/,
-      testIgnore: new RegExp(`(r9-auth\\.setup|center-operations\\.spec|auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|center-core\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
+      testIgnore: new RegExp(`${dedicatedSpecs.source}|(r9-auth\\.setup|center-operations\\.spec|auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|center-core\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
     {
@@ -193,12 +198,6 @@ export default defineConfig({
       grep: /@coordinator|^(?!.*dashboard-operations)/,
       dependencies: ['setup'],
       use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/coordinator.json' },
-    },
-    {
-      name: 'center-audit',
-      testMatch: /center-user\.spec\.js/,
-      dependencies: ['setup'],
-      use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/center.json' },
     },
   ],
 })

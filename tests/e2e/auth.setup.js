@@ -46,6 +46,11 @@ async function authenticate({ browser, baseURL, emailName, passwordName, expecte
     }))
     expect(allowedRoles).toContain(sessionView.role)
     if (expectedCenterId !== undefined) expect(sessionView.centerId).toBe(String(expectedCenterId))
+    const readyStarted = Date.now()
+    await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 45_000 })
+    console.log('Setup local ready tras ms:', Date.now() - readyStarted)
+    await expect(page.locator('[data-navigation-state="ready"]')).toHaveCount(1)
+    await page.waitForLoadState('networkidle')
     await context.storageState({ path: statePath })
   } finally {
     await context.close()

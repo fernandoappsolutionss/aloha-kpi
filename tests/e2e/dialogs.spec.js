@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-import { auditPage } from './helpers/audit-page.js'
+import { auditPage, capturePage } from './helpers/audit-page.js'
 import { readR3GrowthReceipt, readR3Manifest } from './helpers/r3-fixture.mjs'
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -101,8 +101,10 @@ const INVENTORY = [
     prepare: async (page) => {
       const group = page.locator('[data-grupo="930002"]')
       await expect(group, 'E2E_CENTRO_ID no cumple fixture para Grupo R3').toContainText('Grupo R3')
-      await group.focus()
-      await group.click()
+      const open = group.getByRole('button', { name: 'Abrir grupo R3', exact: true })
+      await open.focus()
+      await open.press('Enter')
+      await expect(open).toHaveAttribute('aria-expanded', 'true')
       const sheet = page.getByRole('dialog', { name: /Grupo R3/i })
       await expect(sheet).toBeVisible()
       const trigger = sheet.getByRole('button', { name: /Ver plan de Niño Fixture R3/i })
@@ -128,9 +130,11 @@ const INVENTORY = [
     path: '/centro/2/eventos',
     dialogName: 'Inscribir niño',
     prepare: async (page) => {
-      const eventRow = page.getByRole('row', { name: /Clase Fixture R3/i }).first()
-      await expect(eventRow, 'E2E_CENTRO_ID no cumple fixture para Clase Fixture R3').toBeVisible()
-      await eventRow.click()
+      const open = page.getByRole('button', { name: 'Ver registros de Clase Fixture R3', exact: true })
+      await expect(open, 'E2E_CENTRO_ID no cumple fixture para Clase Fixture R3').toBeVisible()
+      await open.focus()
+      await open.press('Enter')
+      await expect(open).toHaveAttribute('aria-expanded', 'true')
       await expect(page.getByText('Niño Registro R3')).toBeVisible()
       const trigger = page.getByRole('button', { name: 'Inscribir', exact: true })
       await expect(trigger, 'E2E_CENTRO_ID no cumple fixture para registro pendiente').toBeVisible()
@@ -143,9 +147,11 @@ const INVENTORY = [
     path: '/centro/2/cuadro',
     dialogName: 'Retirar a Niño Fixture R3',
     prepare: async (page) => {
-      const groupRow = page.getByRole('row', { name: /Grupo R3/i }).first()
-      await expect(groupRow, 'E2E_CENTRO_ID no cumple fixture para Grupo R3 en Cuadro').toBeVisible()
-      await groupRow.click()
+      const open = page.getByRole('button', { name: 'Grupo R3', exact: true })
+      await expect(open, 'E2E_CENTRO_ID no cumple fixture para Grupo R3 en Cuadro').toBeVisible()
+      await open.focus()
+      await open.press('Enter')
+      await expect(open).toHaveAttribute('aria-expanded', 'true')
       const trigger = page.getByRole('button', { name: 'Retirar', exact: true })
       await expect(trigger, 'E2E_CENTRO_ID no cumple fixture para Retirar').toBeVisible()
       return { trigger }
@@ -190,11 +196,14 @@ for (const item of INVENTORY) {
       await expect.poll(() => page.locator('body').evaluate((node) => node.style.overflow)).toBe(originalOverflow)
 
       await page.setViewportSize({ width: 390, height: 844 })
+      const remountsTrigger = ['Plan del niño', 'Inscribir registro de evento'].includes(item.label)
+      const originalTrigger = remountsTrigger ? await trigger.elementHandle() : null
       dialog = await openInventoryDialog(page, item, trigger)
       const assertDraft = item.draft ? await item.draft(dialog) : null
       const eventTab = item.label === 'Crear clase de prueba' ? dialog.getByRole('tab', { name: 'Precio y Pago' }) : null
       if (eventTab) await eventTab.click()
       await page.setViewportSize({ width: 844, height: 390 })
+      if (originalTrigger) await expect.poll(() => originalTrigger.evaluate(node => node.isConnected)).toBe(false)
       if (eventTab) {
         await expect(eventTab).toHaveAttribute('aria-selected', 'true')
         await dialog.getByRole('tab', { name: 'Información' }).click()
@@ -221,7 +230,8 @@ test('menú de Eventos se mide, queda acotado y restaura el foco', async ({ page
   await page.goto('/centro/2/eventos')
   const trigger = page.getByRole('button', { name: 'Acciones de Clase Fixture R3' })
   await expect(trigger).toBeVisible()
-  await trigger.click()
+  await trigger.focus()
+  await trigger.press('Enter')
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
   const menu = page.getByRole('menu', { name: 'Acciones de Clase Fixture R3' })
@@ -244,7 +254,7 @@ test('menú de Eventos se mide, queda acotado y restaura el foco', async ({ page
 test('sheet modal conserva vista, foco, inert y locks apilados al rotar', async ({ page }) => {
   const { trigger } = await loadCase(page, INVENTORY[2])
   const sheet = page.getByRole('dialog', { name: /Grupo R3/i })
-  const groupTrigger = page.locator('[data-grupo="930002"]')
+  const groupTrigger = page.getByRole('button', { name: 'Abrir grupo R3', exact: true })
   const close = sheet.getByRole('button', { name: 'Cerrar el detalle' })
   await expect(close).toBeFocused()
   await expectInsideViewport(sheet, page, 'sheet 320×568')
@@ -358,7 +368,12 @@ test('Escape cierra primero el formulario y después el tour', async ({ page }) 
 })
 
 test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown', async ({ page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
+  const warnings = []
+  page.on('console', message => {
+    if (!['warning', 'error'].includes(message.type())) return
+    warnings.push(message.text().split('\n')[0].replace(/(?:https?|postgres(?:ql)?):\/\/\S+/g, '[URL]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]+/g, '[EMAIL]').replace(/\b[0-9a-f]{32,}\b/gi, '[TOKEN]').slice(0, 400))
+  })
   const manifest = await readR3Manifest()
   expect(manifest.ids.centerGrowth).toBe(3)
 
@@ -366,7 +381,8 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
     const observer = new MutationObserver(() => {
       const trigger = document.querySelector('.skip-link')
       if (trigger && !document.querySelector('[role="dialog"]')) {
-        document.body.style.overflow = 'clip'
+        // Observe the original value without changing server-rendered attributes.
+        window.__r3OriginalBodyOverflow = document.body.style.overflow
         trigger.focus()
         observer.disconnect()
       }
@@ -377,11 +393,40 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
 
   const dialog = page.getByRole('dialog', { name: /Faltarían.*al cierre|El reto ahora/i })
   await expect(dialog).toBeVisible({ timeout: 60_000 })
+  const originalOverflow = await page.evaluate(() => window.__r3OriginalBodyOverflow)
+  expect(typeof originalOverflow).toBe('string')
   const title = dialog.getByRole('heading')
   await expect(title.locator('[tabindex="-1"]')).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(dialog.getByRole('button', { name: 'Ver plan', exact: true })).toBeFocused()
   await expectDialogContract(page, dialog, 'GrowthBriefing', null, '.growth-briefing')
+  for (const width of [320, 390, 767, 768]) {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })
+    await dialog.locator('.dialog__body').evaluate(node => { node.scrollTop = 0 })
+    await settleLayout(page)
+    const labels = await dialog.locator('.growth-briefing__equation small').evaluateAll(nodes => nodes.map(node => {
+      const cell = node.parentElement.getBoundingClientRect()
+      const text = node.firstChild
+      const words = [...text.textContent.matchAll(/\S+/g)].map(match => {
+        const range = document.createRange()
+        range.setStart(text, match.index)
+        range.setEnd(text, match.index + match[0].length)
+        const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+        return { word: match[0], contained: rects.every(rect => rect.left >= cell.left - 1 && rect.right <= cell.right + 1), lines: new Set(rects.map(rect => Math.round(rect.top))).size }
+      })
+      return { label: node.textContent, width: cell.width, words }
+    }))
+    expect(labels).toHaveLength(4)
+    expect(labels.flatMap(label => label.words.filter(word => !word.contained || word.lines !== 1)), 'Cada palabra queda completa dentro de su celda: '+JSON.stringify({ width, labels })).toEqual([])
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
+      await settleLayout(page)
+      await expectAxeClean(page, '.growth-briefing')
+      await capturePage(page, { name: 'growth-equation-'+width+'-'+theme, testInfo: test.info(), locator: dialog })
+    }
+  }
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+  await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.locator('main').evaluate((node) => Boolean(node.closest('[inert]')))).toBe(true)
   const backgroundOverflow = await page.locator('main').evaluate((node) => ({
     selector: 'main.main', clientWidth: node.clientWidth, scrollWidth: node.scrollWidth,
@@ -402,11 +447,13 @@ test('@growth-local GrowthBriefing usa cierre neutral y conserva el recibo shown
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(previous).toBeFocused()
-  await expect.poll(() => page.locator('body').evaluate((node) => node.style.overflow)).toBe('clip')
+  await expect.poll(() => page.locator('body').evaluate((node) => node.style.overflow)).toBe(originalOverflow)
   const neutral = await receipt()
   expect(neutral?.shown_at).toBeTruthy()
   expect(neutral?.acknowledged_at).toBeNull()
   expect(neutral?.snoozed_until).toBeNull()
+  console.log('Diagnóstico seguro de avisos Growth:', [...new Set(warnings)])
+  expect(warnings.filter(message => /hydrat|server rendered HTML/i.test(message))).toEqual([])
 })
 
 for (const scenario of [

@@ -52,7 +52,7 @@ function Kpi({ l, v }) {
 // Indicador de cumplimiento (Sí / No / Sin datos) para los KPI por rol.
 function CumplePill({ ok, evaluar }) {
   if (!evaluar) return <span className="pill" style={{ background: 'var(--surface-3)', borderColor: 'var(--border-strong)', color: 'var(--text-dim)' }}><span className="dot" />Sin datos</span>
-  return <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Cumple' : 'No cumple'}</span>
+  return <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`} style={ok ? { color: 'var(--text)' } : undefined}><span className="dot" />{ok ? 'Cumple' : 'No cumple'}</span>
 }
 
 // Tarjeta de KPI trimestral segmentada por rol (Administrador / Asistente).

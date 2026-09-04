@@ -29,8 +29,10 @@ export default function ComentarioForm({ centroId, anio, trimestre, disabled, on
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'flex-start' }}>
+    <div className="foda-comment-form" style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'flex-start' }}>
+      <label className="field" style={{flex:1}}><span className="label">Comentario</span>
       <textarea
+        name="comentario" autoComplete="off"
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         onKeyDown={onKeyDown}
@@ -39,6 +41,7 @@ export default function ComentarioForm({ centroId, anio, trimestre, disabled, on
         className="input"
         style={{ flex: 1, minHeight: 60, resize: 'vertical' }}
       />
+      </label>
       <button type="button" onClick={submit} disabled={busy || disabled || !texto.trim()} className="btn btn--primary" style={{ whiteSpace: 'nowrap' }}>
         {busy ? 'Enviando…' : '+ Comentario'}
       </button>

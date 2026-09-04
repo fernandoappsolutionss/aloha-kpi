@@ -77,7 +77,7 @@ export default function SelectorAncla({
 
   return (
     <div className="anchor-selector" style={{ display: 'grid', gap: 10 }}>
-      {nota && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>{nota}</div>}
+      {nota && <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>{nota}</div>}
 
       <fieldset disabled={guardando} style={{ display: 'grid', gap: 8, border: 0, padding: 0, margin: 0, minWidth: 0 }}><legend className="label">Cuándo empezó el nivel</legend>
         {opciones.map((o) => {
@@ -100,12 +100,12 @@ export default function SelectorAncla({
                 {/* La marca es de PROBABILIDAD: escribir a mano nunca lo es,
                     aunque sea lo único que quede. */}
                 {o.clave === recomendada && o.clave !== 'manual' && (
-                  <span className="pill" style={{ fontSize: 9.5, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                  <span className="pill" style={{ fontSize: 13, background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
                     la más probable
                   </span>
                 )}
               </label>
-              <div style={{ fontSize: 11.5, lineHeight: 1.6, color: 'var(--text-muted)', paddingLeft: 20 }}>{o.explicacion}</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)', paddingLeft: 20 }}>{o.explicacion}</div>
               {o.clave === 'manual' && on && (
                 <div style={{ paddingLeft: 20, marginTop: 3 }}>
                   <label htmlFor={`${choiceId}-date`}>Fecha manual de inicio</label>
@@ -124,7 +124,7 @@ export default function SelectorAncla({
       {/* Lo que NO se puede aplicar al lote, con su motivo: el bloque no
           promedia fechas ajenas — esos niños se resuelven uno por uno. */}
       {descartadas.length > 0 && (
-        <ul style={{ margin: 0, paddingLeft: 16, display: 'grid', gap: 3, fontSize: 11, color: 'var(--text-dim)' }}>
+        <ul style={{ margin: 0, paddingLeft: 16, display: 'grid', gap: 3, fontSize: 13, color: 'var(--text-dim)' }}>
           {descartadas.map((d) => (
             <li key={d.clave}><b style={{ color: 'var(--text-muted)' }}>{d.etiqueta}</b> no aplica en lote: {d.motivo}</li>
           ))}

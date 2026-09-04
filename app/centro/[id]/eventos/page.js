@@ -169,7 +169,7 @@ export default function EventosPage() {
       window.visualViewport?.removeEventListener('resize', position)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [menuId, closeActionMenu])
+  }, [menuId, mobileCards, closeActionMenu])
 
   const menuVisible = menuPos !== null
   useEffect(() => {
@@ -208,10 +208,10 @@ export default function EventosPage() {
     { l: 'Asistieron', v: `${pct(agg.attended, agg.total)}%`, s: `${agg.attended}`, c: 'var(--ok)' },
     { l: 'No asistieron', v: `${pct(agg.not_attended, agg.total)}%`, s: `${agg.not_attended}`, c: 'var(--bad)' },
     { l: 'Pendientes', v: `${pct(agg.pending, agg.total)}%`, s: `${agg.pending}`, c: 'var(--warn)' },
-    { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ts-green)' },
+    { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ok-text)' },
     { l: 'En compras', v: `$${agg.revenue.toLocaleString()}`, c: 'var(--text)' },
   ]
-  const eventActions = ev => <button type="button" onClick={e=>toggleActionMenu(e,ev)} className="btn" style={{padding:'3px 10px',fontSize:16,lineHeight:1,minWidth:44}} aria-label={`Acciones de ${ev.name}`} aria-haspopup="menu" aria-expanded={menuId===ev.id}>⋯</button>
+  const eventActions = ev => <button type="button" ref={node=>{if(node && menuId===ev.id)menuTriggerRef.current=node}} onClick={e=>toggleActionMenu(e,ev)} className="btn" style={{padding:'3px 10px',fontSize:16,lineHeight:1,minWidth:44}} aria-label={`Acciones de ${ev.name}`} aria-haspopup="menu" aria-expanded={menuId===ev.id}>⋯</button>
   const registrationButton = ev => <button type="button" className="btn" aria-label={`Ver registros de ${ev.name}`} aria-expanded={openId===ev.id} aria-controls={`registros-${ev.id}`} onClick={()=>setOpenId(openId===ev.id?null:ev.id)}>Ver registros</button>
   const menuEvent = menuId ? events.find((ev) => ev.id === menuId) : null
 
@@ -283,21 +283,21 @@ export default function EventosPage() {
                       <tr>
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
                           {ev.name}<div>{registrationButton(ev)}</div>
-                          {ev.location && <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-faint)' }}>📍 {ev.location}</div>}
+                          {ev.location && <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>📍 {ev.location}</div>}
                           {ev.grupo ? (
                             <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>
                               Grupo {ev.grupo.numero}{ev.grupo.horarioTexto ? ` · ${ev.grupo.horarioTexto}` : ''} · <span style={{ color: cupoColor(ev.grupo.cupos), fontWeight: 600 }}>{ev.grupo.cerrado ? '🔒 grupo cerrado a inscripciones' : cupoTexto(ev.grupo.cupos)}</span>
                             </div>
                           ) : (
-                            <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-faint)' }}>Sin grupo relacionado</div>
+                            <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}>Sin grupo relacionado</div>
                           )}
                         </td>
                         <td className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>{fmtFecha(ev.start_date)}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{ev.event_type === 'online' ? 'Online' : 'Presencial'}</td>
                         <td><span className={`pill ${ESTADO_PILL[ev.status] || 'pill--warn'}`}><span className="dot" />{ESTADO_TXT[ev.status] || ev.status}</span></td>
                         <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{count}{ev.max_capacity ? `/${ev.max_capacity}` : ''}</td>
-                        <td style={{ fontSize: 13 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 10 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
-                        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <td style={{ fontSize: 13 }}>{ev.is_free ? <span className="pill pill--ok" style={{ fontSize: 13 }}>Gratis</span> : `$${ev.price} ${ev.currency}`}</td>
+                        <td style={{ textAlign: 'right' }}>
                           {eventActions(ev)}
                         </td>
                       </tr>
@@ -544,6 +544,8 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [saving, setSaving] = useState(false)
   const [inscribir, setInscribir] = useState(null) // registro a inscribir como estudiante
+  const inscribirReturnFocusRef = useRef(null)
+  const inscribirTriggerRef = (node, id) => { if (node && String(inscribir?.id) === String(id)) inscribirReturnFocusRef.current = node }
 
   const load = useCallback(async () => {
     try {
@@ -600,7 +602,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
         : status.includes('❌') ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
           : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={<>
             <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
-            <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
+            <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button ref={node => inscribirTriggerRef(node, r.id)} type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
           </>}/>)}</div> : (
             <TableScroller label="Inscritos en la clase"><table className="table" style={{ background: 'var(--surface)' }}>
               <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
@@ -617,15 +619,15 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                     <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>
                       {tel
                         ? <a href={`tel:${tel.replace(/[^\d+]/g, '')}`} style={{ color: 'var(--text)', fontWeight: 600 }}>{tel}</a>
-                        : <span style={{ color: 'var(--text-faint)' }}>Sin teléfono</span>}
-                      <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>{r.email || '—'}</div>
+                        : <span style={{ color: 'var(--text-muted)' }}>Sin teléfono</span>}
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.email || '—'}</div>
                     </td>
                     <td style={{ color: 'var(--text-muted)', fontSize: 12 }} title={origen.detalle}>
                       <span style={{ fontSize: 13, marginRight: 4 }}>{origen.icono}</span>{origen.nombre}
                     </td>
                     <td>
                       <button onClick={() => setPagoR(r, r.payment_status !== 'paid')} disabled={busy === r.id + 'p'}
-                        className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 10, cursor: 'pointer', border: 'none' }}>
+                        className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 13, cursor: 'pointer', border: 'none' }}>
                         {r.payment_status === 'paid' ? 'Pagado' : r.payment_status === 'waived' ? 'Gratis' : 'Pendiente'}
                       </button>
                     </td>
@@ -634,7 +636,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                         {/* Cancelado conserva su etiqueta (cuenta como no asistió en las stats);
                             los botones quedan por si el niño igual se presentó. */}
                         {r.attendance_status === 'cancelled' && (
-                          <span className="pill pill--bad" style={{ fontSize: 10 }}>Cancelado</span>
+                          <span className="pill pill--bad" style={{ fontSize: 13 }}>Cancelado</span>
                         )}
                         <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
@@ -643,7 +645,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>
+                      <button ref={node => inscribirTriggerRef(node, r.id)} onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>
                     </td>
                   </tr>
                   )
@@ -653,6 +655,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
           )}
       {inscribir && (
         <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
+          returnFocusRef={inscribirReturnFocusRef}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
       )}
@@ -673,7 +676,7 @@ const desdeGrupo = (g) => {
 // estudiante con origen 'clase_prueba' y el crm_registration_id del registro
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
 // de prueba tiene grupo por aperturar, viene preseleccionado en el select.
-function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
+function InscribirModal({ centroId, reg, grupoId, onClose, onSaved, returnFocusRef }) {
   const complete = useDialogCallback(onSaved, centroId)
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
@@ -734,6 +737,7 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved }) {
     <Dialog
       open
       title="Inscribir niño"
+      returnFocusRef={returnFocusRef}
       width={480}
       onClose={onClose}
       closeDisabled={saving}

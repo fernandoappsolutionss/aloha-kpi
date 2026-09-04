@@ -13,6 +13,7 @@ export default function ThemeToggle() {
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'dark' ? '#012B36' : '#FBFAF8')
     try { localStorage.setItem('aloha_theme', next) } catch {}
     setTheme(next)
   }

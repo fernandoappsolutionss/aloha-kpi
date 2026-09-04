@@ -116,7 +116,7 @@ export function LineaTiempoPlan({ it, estado, indice, onFecha, tour }) {
               <div key={i} className={`itin-fila${hoy ? ' itin-fila--hoy' : ''}`} style={pasada ? { opacity: 0.55 } : undefined}>
                 <span className="itin-fila__chip" style={{ background: est.bg, borderColor: est.line, color: est.fg }}>{s.corto}</span>
                 <span style={{ color: hoy ? 'var(--text)' : 'var(--text-muted)', fontWeight: hoy ? 600 : 400 }}>{s.etiqueta}</span>
-                {hoy && <span className="pill pill--ok" style={{ fontSize: 10 }}><span className="dot" />Hoy</span>}
+                {hoy && <span className="pill pill--ok" style={{ fontSize: 13 }}><span className="dot" />Hoy</span>}
                 <span className="num itin-fila__fechas">
                   {(s.saltadas || []).map((k) => (
                     <span key={k.fecha} className="itin-fecha itin-fecha--out" title={`${fmtDia(k.fecha)}: ${k.motivo} — por eso corrió el plan`}>
@@ -180,7 +180,7 @@ const ORIGEN_CIERRE = { manual: 'override manual', derivado: 'derivado de su pro
 //     modal explica qué falta y por qué el sistema no lo adivina.
 //   onCambio(plan) — avisa a la pantalla que el ancla cambió (para refrescar
 //     el roster); el modal ya repinta solo con el plan que devuelve el server.
-export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion, onCambio }) {
+export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion, onCambio, returnFocusRef }) {
   const [planFijado, setPlanFijado] = useState(null)
   const [closeDisabled, setCloseDisabled] = useState(false)
 
@@ -242,6 +242,7 @@ export function PlanNinoModal({ nino, grupo = null, hoy, onClose, renderCreacion
     <Dialog
       open
       title={titulo}
+      returnFocusRef={returnFocusRef}
       onClose={onClose}
       closeDisabled={closeDisabled}
       width={640}

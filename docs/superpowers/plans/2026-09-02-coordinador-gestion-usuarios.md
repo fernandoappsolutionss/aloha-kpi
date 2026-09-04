@@ -285,7 +285,7 @@ import assert from 'node:assert/strict'
 import { accessPurpose, createAccessTokenService } from '../lib/access-tokens.mjs'
 
 function fakeRepo(seed = {}) {
-  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.com' }]]), tokens: new Map(), ...seed }
+  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.invalid' }]]), tokens: new Map(), ...seed }
   return {
     state,
     transaction: async (work) => work('query'),
@@ -519,8 +519,8 @@ import { createUsuariosService } from '../lib/usuarios-service.mjs'
 
 const coord = { id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'hash' }
 const rows = [
-  { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, centro_nombre: 'ANCLAS', centros: [], centros_nombres: [], activo: true },
-  { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, centro_nombre: 'DAVID', centros: [], centros_nombres: [], activo: false },
+  { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, centro_nombre: 'ANCLAS', centros: [], centros_nombres: [], activo: true },
+  { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, centro_nombre: 'DAVID', centros: [], centros_nombres: [], activo: false },
 ]
 
 function readRepo(actor = coord, users = rows) {
@@ -670,33 +670,33 @@ Agregar casos con un repositorio fake que cuente escrituras:
 test('coordinador crea rol operativo en centro propio y recibe invitación', async () => {
   const fx = writeFixture()
   const result = await fx.service.create({ uid: 2 }, {
-    nombre: ' Laura ', email: 'LAURA@ALOHA.COM', rol: 'asistente', centro_id: 10,
+    nombre: ' Laura ', email: 'LAURA@ALOHA.INVALID', rol: 'asistente', centro_id: 10,
   })
   assert.equal(result.kind, 'invitation')
   assert.equal(result.link, 'https://app/set-password?token=t-1')
-  assert.deepEqual(fx.inserted, [{ nombre: 'Laura', email: 'laura@aloha.com', rol: 'asistente', centro_id: 10 }])
+  assert.deepEqual(fx.inserted, [{ nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'asistente', centro_id: 10 }])
 })
 
 test('fallo del transporte no revierte la cuenta ni filtra el error', async () => {
-  const fx = writeFixture({ deliveryError: Object.assign(new Error('SMTP: laura@aloha.com'), { code: 'ETIMEDOUT' }) })
+  const fx = writeFixture({ deliveryError: Object.assign(new Error('SMTP: laura@aloha.invalid'), { code: 'ETIMEDOUT' }) })
   const result = await fx.service.create({ uid: 2 }, validInput())
   assert.equal(fx.inserted.length, 1)
   assert.equal(fx.tokens.length, 1)
   assert.deepEqual(result, {
     ok: true, kind: 'invitation', emailSent: false, link: null, deliveryError: 'delivery_failed',
   })
-  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.com|SMTP|t-1/)
+  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.invalid|SMTP|t-1/)
 })
 
 test('crear rechaza centro ajeno, rol privilegiado y payload inválido sin escribir', async () => {
   for (const input of [
-    { nombre: 'A', email: 'a@a.com', rol: 'asistente', centro_id: 11 },
+    { nombre: 'A', email: 'a@a.invalid', rol: 'asistente', centro_id: 11 },
     ...['coordinador', 'supervisor', 'admin_general'].map((rol) => ({
-      nombre: 'A', email: 'a@a.com', rol, centros: [10], centro_id: 10,
+      nombre: 'A', email: 'a@a.invalid', rol, centros: [10], centro_id: 10,
     })),
-    { nombre: ' ', email: 'a@a.com', rol: 'asistente', centro_id: 10 },
+    { nombre: ' ', email: 'a@a.invalid', rol: 'asistente', centro_id: 10 },
     { nombre: 'A', email: 'correo-inválido', rol: 'asistente', centro_id: 10 },
-    { nombre: 'A', email: 'a@a.com', rol: 'asistente', centro_id: null },
+    { nombre: 'A', email: 'a@a.invalid', rol: 'asistente', centro_id: null },
   ]) {
     const fx = writeFixture()
     await assert.rejects(() => fx.service.create({ uid: 2 }, input))
@@ -785,7 +785,7 @@ Definir antes de esos tests:
 
 ```js
 function validInput() {
-  return { nombre: 'Laura', email: 'laura@aloha.com', rol: 'asistente', centro_id: 10 }
+  return { nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'asistente', centro_id: 10 }
 }
 
 function writeFixture({ actor = coord, actorAfterError = null, duplicate = null, duplicateAfterError = null, insertError = null, deliveryError = null } = {}) {
@@ -798,9 +798,9 @@ function writeFixture({ actor = coord, actorAfterError = null, duplicate = null,
   const coordinatorCenters = []
   const targets = new Map([
     [1, { id: 1, rol: 'admin_general', centro_id: null, password_hash: 'x' }],
-    [8, { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'x' }],
-    [9, { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, password_hash: null }],
-    [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.com', rol: 'admin_general', centro_id: null, password_hash: 'x' }],
+    [8, { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, password_hash: 'x' }],
+    [9, { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, password_hash: null }],
+    [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.invalid', rol: 'admin_general', centro_id: null, password_hash: 'x' }],
   ])
   let writeCount = 0
   let duplicateReads = 0

@@ -67,7 +67,7 @@ export default function HistorialAdminPage() {
           <div role="status" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando historial…</div>
         ) : error ? <div role="alert" className="alert alert--error">{error}</div> : datos.length === 0 ? (
           <div className="card" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 14px', display: 'block', color: 'var(--text-faint)' }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 14px', display: 'block', color: 'var(--text-muted)' }}>
               <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
             </svg>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>No hay registros con los filtros seleccionados</div>
@@ -106,7 +106,7 @@ export default function HistorialAdminPage() {
                         ))}
                       </div>
                     ) : (
-                      <div style={{ color: 'var(--text-faint)', fontSize: 12, padding: '8px 0' }}>Sin datos registrados</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>Sin datos registrados</div>
                     )}
                   </div>
                 )

@@ -2,6 +2,9 @@ import { createServer } from 'node:http'
 import { R8_EVENT, R8_REGISTRATION, requireR8Gate } from './r8-fixture.mjs'
 
 import { R9_EVENT_ID, R9_ACCOUNT, requireR9Gate } from './r9-fixture.mjs'
+import { R10_EVENT_ID, requireR10Gate } from './r10-fixture.mjs'
+const r10=process.env.E2E_R10_AUDIT==='1'
+if(r10) requireR10Gate()
 const r9 = process.env.E2E_R9_OPERATIONS === '1'
 if (r9) requireR9Gate()
 let mutatingAttempts = 0
@@ -13,7 +16,7 @@ const token = process.env.CRM_SERVICE_TOKEN
 
 const r8 = process.env.E2E_R8_CENTER_CORE === '1'
 if (r8) requireR8Gate()
-if ((!r9 && !r8 && process.env.E2E_R3_DIALOGS !== '1') || !token) {
+if ((!r10 && !r9 && !r8 && process.env.E2E_R3_DIALOGS !== '1') || !token) {
   throw new Error('El CRM stub R3 exige gate local y token dummy explícitos.')
 }
 
@@ -26,7 +29,7 @@ const panamaToday = () => {
 }
 
 const fixtureEvent = () => ({
-  id: r9 ? R9_EVENT_ID : 'e2e-r3-event-930032',
+  id: r10 ? R10_EVENT_ID : r9 ? R9_EVENT_ID : 'e2e-r3-event-930032',
   account_id: 'c0c81438-bb54-4ae0-a019-b54e0bfcf870',
   name: r9 ? 'Clase R9 Aprendizaje Integral' : 'Clase Fixture R3',
   description: 'Fixture local de solo lectura para diálogos responsive.',
@@ -49,7 +52,7 @@ const fixtureEvent = () => ({
 
 const fixtureRegistration = () => ({
   id: 'e2e-r3-registration-930042',
-  event_id: r9 ? R9_EVENT_ID : 'e2e-r3-event-930032',
+  event_id: r10 ? R10_EVENT_ID : r9 ? R9_EVENT_ID : 'e2e-r3-event-930032',
   first_name: 'Niño',
   last_name: r9 ? 'Registro R9 de Apellido Extraordinariamente Largo' : 'Registro R3',
   email: 'registro-r3@example.invalid',
@@ -78,7 +81,7 @@ const READ_ACTIONS = new Set([
 ])
 
 const server = createServer((request, response) => {
-  if (r9 && request.method === 'GET' && request.url === '/stats') { send(response,200,{mutatingAttempts,readCalls});return }
+  if ((r9 || r10) && request.method === 'GET' && request.url === '/stats') { send(response,200,{mutatingAttempts,readCalls});return }
   if (request.method === 'GET' && request.url === '/health') {
     send(response, 200, { ok: true, mode: 'readonly' })
     return
@@ -120,7 +123,7 @@ const server = createServer((request, response) => {
       return
     }
     if (body.action === 'list_registrations') {
-      if (String(body.event_id) !== (r9 ? R9_EVENT_ID : 'e2e-r3-event-930032')) {
+      if (String(body.event_id) !== (r10 ? R10_EVENT_ID : r9 ? R9_EVENT_ID : 'e2e-r3-event-930032')) {
         send(response, 200, { registrations: [] })
         return
       }
@@ -129,7 +132,7 @@ const server = createServer((request, response) => {
     }
     const requested = new Set((body.event_ids || []).map(String))
     send(response, 200, {
-      registrations: r8 ? (requested.has(R8_EVENT.id) ? [R8_REGISTRATION] : []) : requested.has(r9 ? R9_EVENT_ID : 'e2e-r3-event-930032') ? [fixtureRegistration()] : [],
+      registrations: r8 ? (requested.has(R8_EVENT.id) ? [R8_REGISTRATION] : []) : requested.has(r10 ? R10_EVENT_ID : r9 ? R9_EVENT_ID : 'e2e-r3-event-930032') ? [fixtureRegistration()] : [],
     })
   })
 })

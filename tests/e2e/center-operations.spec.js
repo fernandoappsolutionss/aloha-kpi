@@ -10,10 +10,10 @@ test('operaciones R9 accesibles y exclusivamente de lectura',async ({page,reques
   async function audit(scope=null) {
     await expect(page.locator('main')).toHaveCount(1)
     await auditPage(page,{mobile,scope})
-    const builder=new AxeBuilder({page}).disableRules(['color-contrast'])
+    const builder=new AxeBuilder({page})
     if(scope) builder.include(scope)
     const results=await builder.analyze()
-    expect(results.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)}))).toEqual([])
+    expect(results.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))).toEqual([])
   }
   try {
     await page.goto('/centro/2/grupos',{waitUntil:'networkidle'})
@@ -105,8 +105,8 @@ for (const finding of ['horarios','coach','contactos']) test(`R9 revisión resta
   const soft=expect.configure({soft:true,timeout:1000})
   async function audit() {
     await auditPage(page,{mobile:page.viewportSize().width<=1024})
-    const result=await new AxeBuilder({page}).disableRules(['color-contrast']).analyze()
-    expect(result.violations.map(v=>v.id)).toEqual([])
+    const result=await new AxeBuilder({page}).analyze()
+    expect(result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))).toEqual([])
   }
   try {
     if(finding==='coach') {

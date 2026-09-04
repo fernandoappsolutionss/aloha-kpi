@@ -1,4 +1,5 @@
 'use client'
+import Dialog from '../Dialog'
 import { useEffect, useRef, useState } from 'react'
 import { createPeticionDraft, updatePeticionDraft, submitPeticion, discardPeticionDraft } from '../../app/actions/peticiones'
 import { PETICION_CATEGORIAS } from '../../lib/peticiones-domain.mjs'
@@ -13,6 +14,7 @@ function categoriaLabel(value) {
 // con vencimiento) hasta que se envía; el servidor sigue siendo la autoridad
 // final sobre distinción de proveedores y PDFs.
 export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, uploadsAvailable, onRefresh, onStatus }) {
+  const [discardId,setDiscardId]=useState(null)
   const [selectedDraftId, setSelectedDraftId] = useState(null)
   const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
@@ -143,6 +145,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
 
   return (
     <div>
+      {discardId && <Dialog open title="Descartar borrador" onClose={()=>setDiscardId(null)} closeDisabled={busy} footer={<><button type="button" className="btn" disabled={busy} onClick={()=>setDiscardId(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busy} onClick={async()=>{await handleDiscard(discardId);setDiscardId(null)}}>Descartar</button></>}><p>Se descartará este borrador y su documentación. Esta acción no se puede deshacer.</p></Dialog>}
       {!uploadsAvailable && (
         <p id="peticion-storage-status" className="form-error" role="alert">
           Carga de cotizaciones no disponible. Configura el almacenamiento privado antes de registrar una petición.
@@ -166,7 +169,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button type="button" className="btn" onClick={() => handleContinuar(draft)}>Continuar</button>
-                  <button type="button" className="btn" disabled={busy} onClick={() => handleDiscard(draft.id)}>Descartar borrador</button>
+                  <button type="button" className="btn" disabled={busy} onClick={() => setDiscardId(draft.id)}>Descartar borrador</button>
                 </div>
               </div>
             ))}
@@ -180,7 +183,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
             <div className="foda-quote-fields">
               <label className="field">
                 <span className="label">Categoría</span>
-                <select className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                <select name="categoria" className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">Selecciona…</option>
                   {PETICION_CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
@@ -188,7 +191,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
             </div>
             <label className="field" style={{ marginTop: 8 }}>
               <span className="label">Descripción</span>
-              <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)}
+              <textarea name="descripcion" autoComplete="off" className="input" value={description} onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe la petición…" style={{ minHeight: 70, resize: 'vertical' }} />
             </label>
             <button type="button" className="btn btn--primary" style={{ marginTop: 10 }}
@@ -208,7 +211,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
             <div className="foda-quote-fields" style={{ marginBottom: 10 }}>
               <label className="field">
                 <span className="label">Categoría</span>
-                <select className="select" value={category} onChange={onCategoryChange} disabled={activeDraft.expired}>
+                <select name="categoria" className="select" value={category} onChange={onCategoryChange} disabled={activeDraft.expired}>
                   <option value="">Selecciona…</option>
                   {PETICION_CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
@@ -222,7 +225,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
             </div>
             <label className="field">
               <span className="label">Descripción</span>
-              <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)}
+              <textarea name="descripcion" autoComplete="off" className="input" value={description} onChange={(e) => setDescription(e.target.value)}
                 onBlur={onDescriptionBlur} disabled={activeDraft.expired} style={{ minHeight: 70, resize: 'vertical' }} />
             </label>
 
@@ -260,7 +263,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
               </>
             )}
             <div style={{ marginTop: 10 }}>
-              <button type="button" className="btn" onClick={() => handleDiscard(activeDraft.id)}>
+              <button type="button" className="btn" onClick={() => setDiscardId(activeDraft.id)}>
                 Descartar borrador
               </button>
             </div>

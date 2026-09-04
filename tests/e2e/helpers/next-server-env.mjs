@@ -28,6 +28,7 @@ const PROFILE_KEYS = {
   'center-operations': [
     'DATABASE_URL','USUARIOS_TEST_DATABASE_URL','E2E_DATABASE_CONFIRM','E2E_NEON_HTTP','E2E_NEON_WSPROXY','E2E_DELIVERY_MODE','SESSION_SECRET','CRM_API_URL','CRM_SERVICE_TOKEN','E2E_R9_OPERATIONS',
   ],
+  'center-reports': ['DATABASE_URL','USUARIOS_TEST_DATABASE_URL','E2E_DATABASE_CONFIRM','E2E_NEON_HTTP','E2E_NEON_WSPROXY','E2E_DELIVERY_MODE','SESSION_SECRET','CRM_API_URL','CRM_SERVICE_TOKEN','E2E_R10_AUDIT'],
   'center-core': [
     'DATABASE_URL', 'USUARIOS_TEST_DATABASE_URL', 'E2E_DATABASE_CONFIRM',
     'E2E_NEON_HTTP', 'E2E_NEON_WSPROXY', 'E2E_DELIVERY_MODE', 'SESSION_SECRET',
@@ -44,7 +45,7 @@ export function buildNextEnvironment(source, profile) {
   if (profile !== 'ungated' && source.E2E_DATABASE_CONFIRM !== 'disposable') {
     throw new Error('El servidor E2E exige confirmación disposable.')
   }
-  if (['authenticated', 'dialogs', 'center-core', 'center-operations'].includes(profile) && source.DATABASE_URL !== source.USUARIOS_TEST_DATABASE_URL) {
+  if (['authenticated', 'dialogs', 'center-core', 'center-operations', 'center-reports'].includes(profile) && source.DATABASE_URL !== source.USUARIOS_TEST_DATABASE_URL) {
     throw new Error('Las bases E2E declaradas no coinciden.')
   }
 

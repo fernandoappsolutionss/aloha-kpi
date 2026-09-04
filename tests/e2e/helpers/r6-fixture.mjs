@@ -99,7 +99,12 @@ export async function cleanupR6Fixture() {
     || !manifest.progressIds.every(id => Number.isSafeInteger(id) && id > 0)) throw new Error('Claves de manifest R6 inválidas.')
   await transaction(async query => {
     if (!await owned(query)) {
-      if (manifest.phase !== 'preparing') throw new Error('Fixture R6 ausente inesperadamente.')
+      if (!['preparing','cleaned-own-fixture-base-preserved'].includes(manifest.phase)) throw new Error('Fixture R6 ausente inesperadamente.')
+      for(const [table,ids] of [['entrenamiento_progreso',manifest.progressIds],['growth_snapshots',manifest.growth.snapshotIds||[]],['growth_recommendations',manifest.growth.recommendationIds||[]],['growth_notification_receipts',manifest.growth.receiptIds||[]]]) {
+        if(!Array.isArray(ids)||!ids.every(id=>Number.isSafeInteger(id)&&id>0))throw new Error('PK recuperada de R6 inválida.')
+        if((await query(`SELECT 1 FROM ${table} WHERE id=ANY($1::bigint[])`,[ids])).length)throw new Error('R6 parcialmente presente o PK reutilizada; abortando recuperación.')
+      }
+      for(const table of ['resumen_mes','mes_kpi','kpi_semanas','growth_snapshots','growth_recommendations']) if((await query(`SELECT 1 FROM ${table} WHERE centro_id=$1`,[R6_IDS.center])).length)throw new Error('R6 conserva filas dependientes; no es una limpieza completada.')
       return
     }
     await owned(query, true)
