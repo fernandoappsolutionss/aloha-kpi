@@ -1,8 +1,25 @@
 import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { realpathSync } from 'node:fs'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
 // Deliberately standalone: a copy in mktemp resolves Chromium from the checkout.
+// No candidate-only marker required: the preceding release has no page-state.
+export function dashboardIsOperational({origin}) {
+ if(location.origin!==origin||location.pathname!=='/dashboard')return false
+ const mains=document.querySelectorAll('main')
+ if(mains.length!==1)return false
+ const main=mains[0],state=main.getAttribute('data-page-state')
+ if(!main.getClientRects().length||getComputedStyle(main).visibility!=='visible'||(state!==null&&state!=='ready'))return false
+ const text=main.innerText
+ return /^Hola,/.test(main.querySelector('h1')?.textContent.trim()||'')
+  && /\d+ centros activos · seguimiento en tiempo real/.test(text)
+  && [...main.querySelectorAll('h2')].some(node=>node.textContent.trim()==='Evolución de niños activos')
+  && !/Cargando (?:panel|centros)|No se pudo cargar/i.test(text)
+  && !main.querySelector('[role="alert"]')
+}
+
+async function runRollbackSmoke() {
 const mode=process.env.REMOTE_READONLY_MODE||'public'
 assert.ok(['public','authenticated'].includes(mode),'Modo inválido')
 const allowedCredentials=['E2E_ADMIN_EMAIL','E2E_ADMIN_PASSWORD','E2E_COORDINATOR_EMAIL','E2E_COORDINATOR_PASSWORD']
@@ -39,9 +56,16 @@ try {
       await page.locator('form input[type=password]').fill(process.env.E2E_ADMIN_PASSWORD)
       await page.locator('form button[type=submit]').click()
       await page.waitForURL(url=>url.origin===base.origin&&url.pathname==='/dashboard')
-      await page.waitForLoadState('networkidle');await geometry()
+      await page.waitForLoadState('networkidle')
+      await page.waitForFunction(dashboardIsOperational,{origin:base.origin},{timeout:45000})
+      await geometry()
     }
     console.log('Rollback smoke '+mode+': passed')
   } finally {await context.close()}
 } finally {await browser.close()}
 } catch { console.error('Rollback smoke '+mode+': failed'); process.exitCode=1 }
+}
+
+if(process.argv[1]&&fileURLToPath(import.meta.url)===realpathSync(process.argv[1])) {
+ runRollbackSmoke().catch(()=>{console.error('Rollback smoke: failed');process.exitCode=1})
+}

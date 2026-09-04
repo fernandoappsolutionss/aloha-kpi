@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { accessPurpose, createAccessTokenService } from '../lib/access-tokens.mjs'
 
 function fakeRepo(seed = {}) {
-  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.com' }]]), tokens: new Map(), calls: [], ...seed }
+  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.invalid' }]]), tokens: new Map(), calls: [], ...seed }
   const transactionQuery = { transaction: true }
   const record = (method, query) => state.calls.push({ method, query })
   return {
@@ -160,7 +160,7 @@ test('deliverAccess construye y envía el correo sin crear tokens', async () => 
     const invitations = await import('../lib/invitations.js')
     assert.equal(typeof invitations.deliverAccess, 'function')
     const result = await invitations.deliverAccess({
-      user: { id: 8, nombre: 'Ana', email: 'ana@aloha.com' },
+      user: { id: 8, nombre: 'Ana', email: 'ana@aloha.invalid' },
       purpose: 'reset',
       token: 'token-seguro',
       hours: 2,
@@ -172,7 +172,7 @@ test('deliverAccess construye y envía el correo sin crear tokens', async () => 
     })
     assert.equal(requests.length, 1)
     const payload = JSON.parse(requests[0].options.body)
-    assert.deepEqual(payload.to, ['ana@aloha.com'])
+    assert.deepEqual(payload.to, ['ana@aloha.invalid'])
     assert.equal(payload.subject, 'Restablece tu contraseña · ALOHA KPI')
     assert.match(payload.html, /Restablece tu contraseña/)
     assert.match(payload.html, /https:\/\/kpi\.aloha\.test\/set-password\?token=token-seguro/)

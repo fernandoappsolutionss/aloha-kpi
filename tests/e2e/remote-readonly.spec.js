@@ -1,5 +1,5 @@
 import { test,expect } from '@playwright/test'
-import { PUBLIC_CASES,ADMIN_PATHS,COORDINATOR_PATHS,remoteSettings,allowedPath } from './helpers/remote-readonly.mjs'
+import { PUBLIC_CASES,ADMIN_PATHS,COORDINATOR_PATHS,remoteSettings,allowedPath,publicPageIsReady } from './helpers/remote-readonly.mjs'
 const settings=remoteSettings()
 test.beforeEach(async({page})=>{
   await page.route('**/*',route=>{
@@ -28,8 +28,11 @@ async function login(page,actor){
 }
 for(const item of PUBLIC_CASES)test(item.id,async({page})=>{
   for(const viewport of [{width:390,height:844},{width:1440,height:900}]){
-    await page.setViewportSize(viewport);await page.goto(item.path,{waitUntil:'networkidle'});expect(new URL(page.url()).origin).toBe(settings.baseURL);await measure(page)
-    if(item.path==='/'||item.path==='/login')await expect(page.locator('input[type=email]')).toBeVisible()
+    await page.setViewportSize(viewport)
+    const response=await page.goto(item.path,{waitUntil:'networkidle'})
+    expect(response.status()).toBe(200)
+    await page.waitForFunction(publicPageIsReady,{criteria:item,origin:settings.baseURL},{timeout:30000})
+    await measure(page)
   }
 })
 test('P05',async({page})=>{await page.goto('/dashboard/usuarios');await page.waitForURL(url=>url.origin===settings.baseURL&&url.pathname==='/login');await measure(page)})

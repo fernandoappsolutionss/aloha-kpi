@@ -2,6 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {execFileSync} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
+test('criterios públicos distinguen identidad, estado final y formulario sin token',async()=>{
+ const {PUBLIC_CASES}=await import('../tests/e2e/helpers/remote-readonly.mjs')
+ assert.deepEqual(PUBLIC_CASES.map(({id,finalPath,state})=>({id,finalPath,state})),[
+  {id:'P01',finalPath:'/login',state:'ready'},{id:'P02',finalPath:'/login',state:'ready'},
+  {id:'P03',finalPath:'/forgot-password',state:'ready'},{id:'P04',finalPath:'/set-password',state:'error'},
+ ])
+ assert.deepEqual(PUBLIC_CASES[2].fields,['email'])
+ assert.equal(PUBLIC_CASES[2].submit,'Enviar enlace')
+ assert.equal(PUBLIC_CASES[3].heading,'Enlace no válido')
+ assert.equal(PUBLIC_CASES[3].forbidForm,true)
+})
 test('remoto solo acepta origen limpio y modos explícitos; authenticated nunca omite actores',async()=>{
   const m=await import('../tests/e2e/helpers/remote-readonly.mjs').catch(()=>null)
   assert.ok(m,'Existe un contrato remoto independiente')

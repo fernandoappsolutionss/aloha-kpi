@@ -44,7 +44,7 @@ for (const route of PUBLIC_PAGES) {
       const page = await context.newPage()
       await page.goto(route.path, { waitUntil: 'domcontentloaded' })
       if (route.redirectedTo) await expect(page).toHaveURL(route.redirectedTo)
-      await auditPage(page, { mobile: true, state: route.state })
+      await auditPage(page, { mobile: page.viewportSize().width <= 1024, state: route.state })
       await expectAxeClean(page)
     } finally {
       await context.close()
@@ -106,9 +106,11 @@ test('set-password-valid muestra formulario sin consumir el token fixture', asyn
     await page.goto(`/set-password?token=${encodeURIComponent(token)}`, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 30_000 })
     const password = page.getByLabel('Nueva contraseña')
-    await expect(password).toHaveCSS('font-size', '16px')
+    const mobile = page.viewportSize().width <= 1024
+    if (page.viewportSize().width < 768) await expect(password).toHaveCSS('font-size', '16px')
+    else expect(await password.evaluate(node => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(13)
     await expectInsideViewport(page, page.getByRole('button', { name: /contraseña y entrar/i }), 'CTA de set-password-valid')
-    await auditPage(page, { mobile: true, state: 'ready' })
+    await auditPage(page, { mobile, state: 'ready' })
     await expectAxeClean(page)
   } finally {
     await context.close()
@@ -184,7 +186,7 @@ test('set-password-valid cambia a error ante respuesta 500 sin consumir la fixtu
 test('perfil espera hidratación y conserva el correo dentro de la pantalla', async ({ page }) => {
   await page.goto('/perfil', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1)
-  await auditPage(page, { mobile: true, state: 'ready' })
+  await auditPage(page, { mobile: page.viewportSize().width <= 1024, state: 'ready' })
   await expectAxeClean(page)
 })
 

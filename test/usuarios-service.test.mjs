@@ -9,12 +9,12 @@ const { createUsuariosService } = usuariosServiceModule
 
 const coord = { id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'hash' }
 const rows = [
-  { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, centro_nombre: 'ANCLAS', centros: [], centros_nombres: [], activo: true },
-  { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, centro_nombre: 'DAVID', centros: [], centros_nombres: [], activo: false },
+  { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, centro_nombre: 'ANCLAS', centros: [], centros_nombres: [], activo: true },
+  { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, centro_nombre: 'DAVID', centros: [], centros_nombres: [], activo: false },
 ]
 
 function validInput() {
-  return { nombre: 'Laura', email: 'laura@aloha.com', rol: 'asistente', centro_id: 10 }
+  return { nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'asistente', centro_id: 10 }
 }
 
 function writeFixture({
@@ -44,9 +44,9 @@ function writeFixture({
   const transactionOptions = []
   const targets = new Map([
     [1, { id: 1, rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
-    [8, { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, centros: [], password_hash: 'x' }],
-    [9, { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, centros: [], password_hash: null }],
-    [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.com', rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
+    [8, { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, centros: [], password_hash: 'x' }],
+    [9, { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, centros: [], password_hash: null }],
+    [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.invalid', rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
   ])
   const centerState = new Map([...targets].map(([id, user]) => [id, [...(user.centros || [])]]))
   const tokenState = new Map([[8, ['old-8']], [9, ['old-9']]])
@@ -284,7 +284,7 @@ test('rol sin gestión queda denegado antes de listar', async () => {
 
 test('cuenta pendiente devuelve invitación de 48 horas y enlace copiable', async () => {
   const fx = accessFixture({
-    target: { id: 9, nombre: 'B', email: 'b@aloha.com', rol: 'asistente', centro_id: 12, password_hash: null },
+    target: { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, password_hash: null },
   })
   const result = await fx.service.resendAccess({ uid: 2 }, 9)
   assert.deepEqual(result, {
@@ -295,17 +295,17 @@ test('cuenta pendiente devuelve invitación de 48 horas y enlace copiable', asyn
 
 test('cuenta activa recibe reset de dos horas sin secreto en la respuesta', async () => {
   const fx = accessFixture({
-    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+    target: { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
   })
   const result = await fx.service.resendAccess({ uid: 2 }, 8)
   assert.deepEqual(result, { ok: true, kind: 'reset', emailSent: true })
   assert.deepEqual(fx.tokens, [{ userId: 8, purpose: 'reset', hours: 2 }])
-  assert.doesNotMatch(JSON.stringify(result), /set-password|t-1|a@aloha\.com/)
+  assert.doesNotMatch(JSON.stringify(result), /set-password|t-1|a@aloha\.invalid/)
 })
 
 test('fallo resuelto del correo de reset activo no degrada a enlace copiable', async () => {
   const fx = accessFixture({
-    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+    target: { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
     delivery: {
       emailSent: false,
       emailReason: '/set-password?token=secreto-del-proveedor',
@@ -319,7 +319,7 @@ test('fallo resuelto del correo de reset activo no degrada a enlace copiable', a
 
 test('throw del transporte de reset se normaliza sin exponer secreto', async () => {
   const fx = accessFixture({
-    target: { id: 8, nombre: 'A', email: 'a@aloha.com', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
+    target: { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, password_hash: 'hash' },
     deliveryError: Object.assign(new Error('SMTP t-1'), { code: 'ETIMEDOUT' }),
   })
   const result = await fx.service.resendAccess({ uid: 2 }, 8)
@@ -347,7 +347,7 @@ test('reset público aplica cooldown y conserva una respuesta uniforme', async (
     transaction: async (work) => work(repository),
     findUserByEmail: async (_query, email) => {
       calls.push(['find', email])
-      return email === 'activa@aloha.com'
+      return email === 'activa@aloha.invalid'
         ? { id: 8, nombre: 'A', email, password_hash: 'hash' }
         : null
     },
@@ -355,7 +355,7 @@ test('reset público aplica cooldown y conserva una respuesta uniforme', async (
   const accessTokens = {
     replace: async (_query, row) => {
       calls.push(['replace', row])
-      return { suppressed: true, user: { id: 8, nombre: 'A', email: 'activa@aloha.com' } }
+      return { suppressed: true, user: { id: 8, nombre: 'A', email: 'activa@aloha.invalid' } }
     },
   }
   const deliverAccess = async (prepared) => calls.push(['delivery', prepared])
@@ -363,8 +363,8 @@ test('reset público aplica cooldown y conserva una respuesta uniforme', async (
     repository, accessTokens, deliverAccess, schedule: () => {}, logError: () => {},
   })
 
-  const existing = await requestReset(' ACTIVA@ALOHA.COM ')
-  const missing = await requestReset('nadie@aloha.com')
+  const existing = await requestReset(' ACTIVA@ALOHA.INVALID ')
+  const missing = await requestReset('nadie@aloha.invalid')
   const empty = await requestReset(' ')
 
   assert.deepEqual(existing, { ok: true })
@@ -383,14 +383,14 @@ test('reset público agenda el correo sin esperarlo y absorbe el fallo del callb
   const repository = {
     transaction: async (work) => work(repository),
     findUserByEmail: async () => ({
-      id: 8, nombre: 'A', email: 'activa@aloha.com', password_hash: 'hash',
+      id: 8, nombre: 'A', email: 'activa@aloha.invalid', password_hash: 'hash',
     }),
   }
   const accessTokens = {
     replace: async () => ({
       suppressed: false,
       token: 'token-secreto',
-      user: { id: 8, nombre: 'A', email: 'activa@aloha.com' },
+      user: { id: 8, nombre: 'A', email: 'activa@aloha.invalid' },
     }),
   }
   const requestReset = usuariosServiceModule.createPublicPasswordReset({
@@ -399,12 +399,12 @@ test('reset público agenda el correo sin esperarlo y absorbe el fallo del callb
     schedule: (callback) => callbacks.push(callback),
     deliverAccess: async () => {
       deliveryStarted = true
-      throw Object.assign(new Error('SMTP token-secreto activa@aloha.com'), { code: 'ETIMEDOUT' })
+      throw Object.assign(new Error('SMTP token-secreto activa@aloha.invalid'), { code: 'ETIMEDOUT' })
     },
     logError: (...args) => logs.push(args),
   })
 
-  const result = await requestReset('activa@aloha.com')
+  const result = await requestReset('activa@aloha.invalid')
 
   assert.deepEqual(result, { ok: true })
   assert.equal(deliveryStarted, false)
@@ -412,7 +412,7 @@ test('reset público agenda el correo sin esperarlo y absorbe el fallo del callb
   await assert.doesNotReject(callbacks[0])
   assert.equal(deliveryStarted, true)
   assert.deepEqual(logs, [['[password:request-reset]', { code: 'ETIMEDOUT' }]])
-  assert.doesNotMatch(JSON.stringify(logs), /token-secreto|activa@aloha\.com|SMTP/)
+  assert.doesNotMatch(JSON.stringify(logs), /token-secreto|activa@aloha\.invalid|SMTP/)
 })
 
 test('Actions de contraseña no actualizan usuarios ni tokens directamente', () => {
@@ -461,11 +461,11 @@ test('repositorio bloquea actor antes de leer sus centros ordenados', async () =
 test('coordinador crea rol operativo en centro propio y recibe invitación', async () => {
   const fx = writeFixture()
   const result = await fx.service.create({ uid: 2 }, {
-    nombre: ' Laura ', email: 'LAURA@ALOHA.COM', rol: 'asistente', centro_id: 10,
+    nombre: ' Laura ', email: 'LAURA@ALOHA.INVALID', rol: 'asistente', centro_id: 10,
   })
   assert.equal(result.kind, 'invitation')
   assert.equal(result.link, 'https://app/set-password?token=t-1')
-  assert.deepEqual(fx.inserted, [{ nombre: 'Laura', email: 'laura@aloha.com', rol: 'asistente', centro_id: 10 }])
+  assert.deepEqual(fx.inserted, [{ nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'asistente', centro_id: 10 }])
   assert.deepEqual(fx.transactionOptions, [{ isolationLevel: 'Serializable' }])
   assert.ok(fx.events.indexOf('tx:1:commit') < fx.events.indexOf('delivery:30'))
   assert.deepEqual(fx.events.slice(1, 5), ['actor:1:true', 'duplicate:1', 'insert:1', 'token:1:30'])
@@ -499,7 +499,7 @@ test('crear entrega invite al transporte live y compone correo sin red real', as
     assert.equal(fx.deliveries[0].purpose, 'invite')
     assert.equal(result.link, 'https://aloha.test.invalid/set-password?token=t-1')
     assert.equal(messages.length, 1)
-    assert.deepEqual(messages[0].to, ['laura@aloha.com'])
+    assert.deepEqual(messages[0].to, ['laura@aloha.invalid'])
     assert.equal(messages[0].subject, 'Crea tu contraseña · ALOHA KPI')
     assert.match(messages[0].html, /Crear mi contraseña/)
   } finally {
@@ -512,21 +512,21 @@ test('crear entrega invite al transporte live y compone correo sin red real', as
 })
 
 test('fallo del transporte no revierte la cuenta ni filtra el error', async () => {
-  const fx = writeFixture({ deliveryError: Object.assign(new Error('SMTP: laura@aloha.com'), { code: 'ETIMEDOUT' }) })
+  const fx = writeFixture({ deliveryError: Object.assign(new Error('SMTP: laura@aloha.invalid'), { code: 'ETIMEDOUT' }) })
   const result = await fx.service.create({ uid: 2 }, validInput())
   assert.equal(fx.inserted.length, 1)
   assert.equal(fx.tokens.length, 1)
   assert.deepEqual(result, {
     ok: true, kind: 'invitation', emailSent: false, link: null, deliveryError: 'delivery_failed',
   })
-  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.com|SMTP|t-1/)
+  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.invalid|SMTP|t-1/)
 })
 
 test('respuesta fallida resuelta del transporte también elimina razón y enlace', async () => {
   const fx = writeFixture({
     deliveryResult: {
       emailSent: false,
-      emailReason: 'SMTP rechazó laura@aloha.com',
+      emailReason: 'SMTP rechazó laura@aloha.invalid',
       link: 'https://app/set-password?token=t-1',
     },
   })
@@ -534,18 +534,18 @@ test('respuesta fallida resuelta del transporte también elimina razón y enlace
   assert.deepEqual(result, {
     ok: true, kind: 'invitation', emailSent: false, link: null, deliveryError: 'delivery_failed',
   })
-  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.com|SMTP|t-1/)
+  assert.doesNotMatch(JSON.stringify(result), /laura@aloha\.invalid|SMTP|t-1/)
 })
 
 test('crear rechaza centro ajeno, rol privilegiado y payload inválido sin escribir', async () => {
   for (const input of [
-    { nombre: 'A', email: 'a@a.com', rol: 'asistente', centro_id: 11 },
+    { nombre: 'A', email: 'a@a.invalid', rol: 'asistente', centro_id: 11 },
     ...['coordinador', 'supervisor', 'admin_general'].map((rol) => ({
-      nombre: 'A', email: 'a@a.com', rol, centros: [10], centro_id: 10,
+      nombre: 'A', email: 'a@a.invalid', rol, centros: [10], centro_id: 10,
     })),
-    { nombre: ' ', email: 'a@a.com', rol: 'asistente', centro_id: 10 },
+    { nombre: ' ', email: 'a@a.invalid', rol: 'asistente', centro_id: 10 },
     { nombre: 'A', email: 'correo-inválido', rol: 'asistente', centro_id: 10 },
-    { nombre: 'A', email: 'a@a.com', rol: 'asistente', centro_id: null },
+    { nombre: 'A', email: 'a@a.invalid', rol: 'asistente', centro_id: null },
   ]) {
     const fx = writeFixture()
     await assert.rejects(() => fx.service.create({ uid: 2 }, input))
@@ -578,7 +578,7 @@ test('update mantiene el correo inmutable y elimina relaciones N:N residuales', 
   await fx.service.update(
     { uid: 2 },
     8,
-    { nombre: ' Nueva ', email: 'intruso@aloha.com', rol: 'asistente', centro_id: 10, centros: [12] },
+    { nombre: ' Nueva ', email: 'intruso@aloha.invalid', rol: 'asistente', centro_id: 10, centros: [12] },
   )
   assert.deepEqual(fx.updated, [{ id: 8, nombre: 'Nueva', rol: 'asistente', centro_id: 10 }])
   assert.deepEqual(fx.coordinatorCenters, [{ userId: 8, ids: [] }])
@@ -778,8 +778,8 @@ test('duplicado ya visible puede identificarse sin revelar datos adicionales', a
 
 test('repositorio escribe usuarios y centros con valores parametrizados y orden canónico', async () => {
   const { calls, query } = queryRecorder([
-    [{ id: 30, nombre: 'Laura', email: 'laura@aloha.com', rol: 'asistente', centro_id: 10 }],
-    [{ id: 30, nombre: 'Laura', email: 'laura@aloha.com', rol: 'administradora', centro_id: 12 }],
+    [{ id: 30, nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'asistente', centro_id: 10 }],
+    [{ id: 30, nombre: 'Laura', email: 'laura@aloha.invalid', rol: 'administradora', centro_id: 12 }],
     [],
     [],
   ])
@@ -787,7 +787,7 @@ test('repositorio escribe usuarios y centros con valores parametrizados y orden 
   await usuariosRepository.updateUser(query, 30, { nombre: 'Laura', rol: 'administradora', centro_id: 12 })
   await usuariosRepository.replaceCoordinatorCenters(query, 30, [12, 10, 12])
   assert.match(calls[0].text, /VALUES \(\$1, \$2, \$3, \$4\)/)
-  assert.deepEqual(calls[0].values, ['Laura', 'laura@aloha.com', 'asistente', 10])
+  assert.deepEqual(calls[0].values, ['Laura', 'laura@aloha.invalid', 'asistente', 10])
   assert.doesNotMatch(calls[1].text, /SET[^\n]*email/)
   assert.deepEqual(calls[1].values, ['Laura', 'administradora', 12, 30])
   assert.match(calls[2].text, /DELETE FROM usuario_centros WHERE usuario_id = \$1/)
@@ -798,10 +798,10 @@ test('repositorio escribe usuarios y centros con valores parametrizados y orden 
 
 test('repositorio relee duplicado y bloquea objetivo sin interpolar entradas', async () => {
   const { calls, query } = queryRecorder([[{ id: 8 }], [{ id: 9 }], [{ centro_id: 10 }, { centro_id: 12 }], []])
-  assert.deepEqual(await usuariosRepository.findByEmail(query, 'A@ALOHA.COM'), { id: 8 })
+  assert.deepEqual(await usuariosRepository.findByEmail(query, 'A@ALOHA.INVALID'), { id: 8 })
   assert.deepEqual(await usuariosRepository.lockUser(query, 9), { id: 9, centros: [10, 12] })
   await usuariosRepository.deleteUser(query, 9)
-  assert.deepEqual(calls.map((call) => call.values), [['A@ALOHA.COM'], [9], [9], [9]])
+  assert.deepEqual(calls.map((call) => call.values), [['A@ALOHA.INVALID'], [9], [9], [9]])
   assert.match(calls[1].text, /FOR UPDATE/)
   assert.match(calls[2].text, /ORDER BY centro_id FOR SHARE/)
 })

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { presentAccessNotice } from '../lib/access-presentation.mjs'
 
-const user = { nombre: 'Ana', email: 'ana@aloha.com' }
+const user = { nombre: 'Ana', email: 'ana@aloha.invalid' }
 
 test('reset confirma el correo sin convertir un link recibido en copiable', () => {
   assert.deepEqual(presentAccessNotice({
@@ -16,7 +16,7 @@ test('reset confirma el correo sin convertir un link recibido en copiable', () =
   }), {
     kind: 'reset',
     nombre: 'Ana',
-    email: 'ana@aloha.com',
+    email: 'ana@aloha.invalid',
     emailSent: true,
     link: null,
     canCopy: false,
@@ -35,7 +35,7 @@ test('invitación conserva el enlace copiable emitido por el servicio', () => {
   }), {
     kind: 'invitation',
     nombre: 'Ana',
-    email: 'ana@aloha.com',
+    email: 'ana@aloha.invalid',
     emailSent: true,
     link: 'https://kpi.aloha.test/set-password?token=invite-1',
     canCopy: true,

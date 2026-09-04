@@ -2048,6 +2048,30 @@ git commit -m "feat(ui): completar reportes formación y auditoría móvil"
 
 Los comandos remotos heredados de las tareas anteriores están sustituidos por este procedimiento. Los reemplazos seguros R10 sí están autorizados para R11; no ejecutar R11 durante R10.
 
+Los criterios públicos reutilizables están en `PUBLIC_CASES` de
+`tests/e2e/helpers/remote-readonly.mjs`; CLI y CUA deben verificar los mismos
+destinos, estados y contenido, además de un main único y cero overflow en
+390 y 1440. La CLI exige respuesta final 200. No basta `networkidle` ni un
+main de carga; una redirección inesperada no acredita la ruta solicitada.
+
+| Caso | Pathname final y estado | Contenido obligatorio, sin enviar |
+| --- | --- | --- |
+| P01 raíz / P02 login | /login, ready | Bienvenido de nuevo; formulario email/contraseña e Ingresar al sistema |
+| P03 recuperación | /forgot-password, ready | ¿Olvidaste tu contraseña?; email y Enviar enlace; regreso al login |
+| P04 invitación inválida sin token | /set-password, error | Enlace no válido; regreso al login; SIN formulario ni input contraseña |
+
+P05 conserva la guarda Usuarios anónimo→login y P06 exige HTTP 404 del
+harness local. CUA sobre inmutables protegidas usa esos mismos criterios
+observables, sin screenshots/exportar DOM/sesiones ni afirmar CLI ejecutado.
+El rollback autónomo autenticado exige pathname /dashboard, main único,
+saludo Hola, resumen de centros activos y Evolución de niños activos;
+ningún loading/error de carga ni alerta fatal. Exige ready cuando exista
+el marcador; acepta la versión anterior sin ese atributo solo con el mismo
+contenido operativo y ausencia de Cargando centros. Login+URL+overflow no
+son suficientes para declarar recuperación. Los negativos DOM locales
+prueban los mismos predicates del smoke; no sustituyen render real local
+ni los gates remotos del SHA autorizado.
+
 ## Criterio de salida de este plan
 
 - Las 27 páginas reales están registradas y auditadas; ninguna ruta visible queda fuera.

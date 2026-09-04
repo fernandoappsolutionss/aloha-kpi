@@ -1,6 +1,52 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { auditPage } from './helpers/audit-page'
+import { PUBLIC_CASES, publicPageIsReady } from './helpers/remote-readonly.mjs'
+
+test('criterios públicos reales rechazan redirect, loading y formulario incorrecto en DOM ficticio', async ({ page }) => {
+  const origin = new URL(test.info().project.use.baseURL || 'http://127.0.0.1:3011').origin
+  await page.route('**/*', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<main></main>' }))
+  for (const criteria of PUBLIC_CASES.slice(2)) {
+    const args = { criteria, origin }
+    const content = criteria.id === 'P03'
+      ? '<h1>¿Olvidaste tu contraseña?</h1><form><input type="email"><button type="submit">Enviar enlace</button></form>'
+      : '<h1>Enlace no válido</h1>'
+    const html = state => `<main data-page-state="${state}">${content}<a href="/login">Volver al inicio de sesión</a></main>`
+    await page.goto('/login')
+    await page.setContent(html(criteria.state))
+    await expect(page.waitForFunction(publicPageIsReady, args, { timeout: 100 })).rejects.toThrow(/Timeout/)
+    await page.goto(criteria.path)
+    await page.setContent(html('loading'))
+    await expect(page.waitForFunction(publicPageIsReady, args, { timeout: 100 })).rejects.toThrow(/Timeout/)
+    await page.setContent(html(criteria.state))
+    await page.waitForFunction(publicPageIsReady, args)
+    if (criteria.id === 'P03') await page.locator('input').evaluate(node => node.remove())
+    else await page.locator('main').evaluate(node => { node.insertAdjacentHTML('beforeend', '<form><input type="password"></form>') })
+    await expect(page.waitForFunction(publicPageIsReady, args, { timeout: 100 })).rejects.toThrow(/Timeout/)
+  }
+})
+
+test('rollback usa el predicate real: rechaza Dashboard detenido/error y acepta anterior/candidato ficticios', async ({ page }) => {
+  const { dashboardIsOperational } = await import('./rollback-smoke.mjs')
+  const origin = new URL(test.info().project.use.baseURL || 'http://127.0.0.1:3011').origin
+  await page.route('**/*', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<main></main>' }))
+  await page.goto('/dashboard')
+  const content = '<h1>Hola, Fixture.</h1><p>2 centros activos · seguimiento en tiempo real</p><h2>Evolución de niños activos</h2>'
+  for (const html of [
+    '<main></main>',
+    `<main data-page-state="loading">${content}</main>`,
+    `<main data-page-state="error">${content}</main>`,
+    `<main>${content}<p>Cargando centros…</p></main>`,
+    `<main>${content}<p role="alert">No se pudo cargar el panel.</p></main>`,
+  ]) {
+    await page.setContent(html)
+    await expect(page.waitForFunction(dashboardIsOperational, { origin }, { timeout: 100 })).rejects.toThrow(/Timeout/)
+  }
+  for (const attribute of ['', 'data-page-state="ready"']) {
+    await page.setContent(`<main ${attribute}>${content}</main>`)
+    await page.waitForFunction(dashboardIsOperational, { origin })
+  }
+})
 
 async function openHarness(page) {
   const response = await page.goto('/e2e-primitives')
