@@ -432,7 +432,7 @@ export default function KPIPage() {
         {/* Clase de prueba / Motivos / Origen */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde Clases de Prueba.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? (autoIngDes && cpDerivado == null ? 'Invitados y asistentes sincronizados. Matrículas: valor guardado mientras se completa la clasificación.' : 'Datos sincronizados desde Clases de Prueba.') : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
             {title:'Motivo Deserción', accent:'var(--bad)', auto:autoPeriod || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
             {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
           ].map(({title,accent,fields,auto,source}) => (
@@ -474,6 +474,12 @@ export default function KPIPage() {
                             ) : (
                               <span>🔗 del módulo</span>
                             )}
+                          </div>
+                        )}
+                        {autoIngDes && cpDerivado == null && (
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
+                            {tieneOverride ? 'Se conserva tu ajuste manual. ' : 'Se conserva el valor guardado. '}
+                            Falta clasificar el origen de algunas ventas para calcular las matrículas de prueba.
                           </div>
                         )}
                       </div>

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buildGrowthMetrics, median, percentile } from '../lib/growth/metrics.mjs'
+import * as growthMetrics from '../lib/growth/metrics.mjs'
 
 function month(index, overrides = {}) {
   const year = 2026
@@ -10,8 +11,8 @@ function month(index, overrides = {}) {
     year,
     month,
     closed: true,
-    ninos_inicio_mes: 100 + index,
-    ninos_final_mes: 102 + index,
+    ninos_inicio_mes: 100 + index * 3,
+    ninos_final_mes: 103 + index * 3,
     grupos_activos: 12,
     nuevos_activos_mes: 8,
     ventas: 10,
@@ -141,4 +142,72 @@ test('flags impossible funnel ordering without mutating the source rows', () => 
 
   assert.ok(metrics.issues.some((issue) => issue.code === 'invalid_funnel'))
   assert.deepEqual(row, original)
+})
+
+test('uses six calendar months before currentPeriod and reports open months as gaps', () => {
+  const rows = Array.from({ length: 8 }, (_, i) => month(i, { closed: i !== 4 }))
+  const metrics = buildGrowthMetrics(rows, { currentPeriod: '2026-09' })
+  assert.deepEqual(metrics.months.map((m) => m.month), [3, 4, 6, 7, 8])
+  assert.deepEqual(metrics.window.missingPeriods, ['2026-05'])
+  assert.equal(metrics.confidence.level, 'medium')
+})
+
+test('calendar window excludes present and future rows and derives fallback from latest month', () => {
+  const rows = Array.from({ length: 8 }, (_, i) => month(i))
+  assert.deepEqual(buildGrowthMetrics(rows, { currentPeriod: '2026-07' }).months.map((m) => m.month), [1, 2, 3, 4, 5, 6])
+  assert.equal(buildGrowthMetrics(rows).monthsUsed, 6)
+})
+
+test('invalid funnel, stock imbalance and external quality issues force low confidence', () => {
+  const rows = Array.from({ length: 6 }, (_, i) => month(i))
+  for (const changed of [
+    rows.map((r, i) => i === 2 ? { ...r, cp_asistieron: 30 } : r),
+    rows.map((r, i) => i === 2 ? { ...r, ninos_final_mes: 999 } : r),
+  ]) {
+    const metrics = buildGrowthMetrics(changed)
+    assert.equal(metrics.confidence.level, 'low')
+    assert.ok(metrics.issues.length)
+  }
+  const metrics = buildGrowthMetrics(rows, { issues: [{ code: 'population_mismatch', message: 'Diferencia de población.' }] })
+  assert.equal(metrics.confidence.level, 'low')
+  assert.equal(metrics.precision.status, 'unvalidated')
+  assert.equal(metrics.quality.kind, 'data_quality')
+})
+
+test('checks continuity only across adjacent calendar months', () => {
+  const rows = [month(0), month(1, { ninos_inicio_mes: 200, ninos_final_mes: 203 }), month(3)]
+  const metrics = buildGrowthMetrics(rows)
+  assert.equal(metrics.issues.filter((i) => i.code === 'stock_discontinuity').length, 1)
+})
+
+test('retains source quality issues only from the selected calendar window', () => {
+  const rows = Array.from({ length: 8 }, (_, i) => month(i))
+  rows[0].issues = [{ code: 'old_conflict', message: 'Conflicto antiguo.' }]
+  rows[7].issues = [{ code: 'cp_enrollment_conflict', message: 'Matrícula declarada y derivada difieren.', severity: 'warning' }]
+  const result = buildGrowthMetrics(rows, { currentPeriod: '2026-09' })
+  assert.ok(!result.issues.some((issue) => issue.code === 'old_conflict'))
+  assert.ok(result.issues.some((issue) => issue.code === 'cp_enrollment_conflict'))
+  assert.equal(result.confidence.level, 'low')
+  assert.ok(result.confidence.score < 0.5)
+})
+
+test('an unresolved open month balance is not hidden by filtering closed rows', () => {
+  const rows = Array.from({ length: 6 }, (_, i) => month(i))
+  rows[4] = { ...rows[4], closed: false, ninos_final_mes: 150 }
+  rows[5] = { ...rows[5], ninos_inicio_mes: 163, ninos_final_mes: 166 }
+  const result = buildGrowthMetrics(rows, { currentPeriod: '2026-07' })
+  assert.equal(result.confidence.level, 'low')
+  assert.ok(result.issues.some((issue) => issue.code === 'open_month_discontinuity'))
+})
+
+test('resolved trial corrections and legacy classification gaps permit provisional acquisition hypotheses', () => {
+  assert.equal(typeof growthMetrics.acquisitionModelStatus, 'function')
+  const result = growthMetrics.acquisitionModelStatus({ rates: { activePerSale: 0.8, attendance: 0.5, enrollment: 0.5 }, issues: [
+    { code: 'cp_classification_incomplete', severity: 'warning', message: 'Clasificación incompleta.' },
+    { code: 'cp_enrollment_conflict', severity: 'warning', resolved: true, message: 'Se usa el conteo clasificado.' },
+  ] })
+  assert.equal(result.blocked, false)
+  assert.equal(result.provisional, true)
+  assert.ok(result.reasons.length)
+  assert.equal(growthMetrics.acquisitionModelStatus({ rates: { activePerSale: 1, attendance: 2 }, issues: [] }).blocked, true)
 })
