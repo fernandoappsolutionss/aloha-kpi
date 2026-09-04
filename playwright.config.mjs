@@ -145,7 +145,7 @@ export default defineConfig({
     ...sizes.map(([name, width, height]) => ({
       name,
       dependencies: ['setup'],
-      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|public-responsive\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
+      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
     {

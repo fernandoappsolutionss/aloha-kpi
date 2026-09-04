@@ -1,12 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { tienePanel, ETIQUETA_ROL } from '../../components/useRol'
-import { useRouter } from 'next/navigation'
 import { changePassword } from '../actions/auth'
 import Sidebar from '../../components/Sidebar'
 
 export default function PerfilPage() {
-  const router = useRouter()
   const [rol, setRol] = useState('')
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
@@ -14,12 +12,14 @@ export default function PerfilPage() {
   const [form, setForm] = useState({ actual: '', nueva: '', confirmar: '' })
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     setRol(localStorage.getItem('aloha_rol') || '')
     setNombre(localStorage.getItem('aloha_nombre') || '')
     setEmail(localStorage.getItem('aloha_email') || '')
     setCentroId(localStorage.getItem('aloha_centro_id') || '')
+    setHydrated(true)
   }, [])
 
   async function cambiarPassword(e) {
@@ -45,7 +45,7 @@ export default function PerfilPage() {
   return (
     <div className="shell">
       <Sidebar rol={rol} centroNombre={nombre} centroId={centroId}/>
-      <main className="main" style={{ maxWidth: 640 }}>
+      <main id="main-content" className="main profile-page" data-page-state={hydrated ? 'ready' : 'loading'}>
 
         {/* Header */}
         <div className="main__head">
@@ -57,14 +57,14 @@ export default function PerfilPage() {
         </div>
 
         {/* Info de usuario */}
-        <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="card profile-page__card">
+          <div className="profile-page__identity">
             <div style={{ width: 56, height: 56, borderRadius: 28, background: 'var(--ts-green-soft)', border: '1px solid var(--ts-green-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: 'var(--ts-green)', fontFamily: 'var(--font-serif)', flexShrink: 0 }}>
               {nombre.charAt(0).toUpperCase()}
             </div>
-            <div>
+            <div className="profile-page__identity-copy">
               <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-serif)' }}>{nombre}</div>
-              <div className="num" style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>{email}</div>
+              <div className="num profile-page__email">{email}</div>
               <span className={`pill ${isAdmin ? 'pill--ok' : 'pill--ok'}`} style={{ marginTop: 9 }}>
                 <span className="dot" />{ETIQUETA_ROL[rol] || 'Usuario'}
               </span>
@@ -73,20 +73,20 @@ export default function PerfilPage() {
         </div>
 
         {/* Cambio de contraseña */}
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card profile-page__card">
           <h3 className="panel__title" style={{ fontSize: 17, marginBottom: 4 }}>Cambiar contraseña</h3>
           <p className="h-sub" style={{ marginTop: 0, marginBottom: 22 }}>Usa mínimo 8 caracteres. Te recomendamos usar letras, números y símbolos.</p>
 
-          <form onSubmit={cambiarPassword} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <form onSubmit={cambiarPassword} className="profile-page__form">
             <div className="field">
               <label className="label" htmlFor="nueva">Nueva contraseña</label>
-              <input id="nueva" className="input" type="password" value={form.nueva}
+              <input id="nueva" name="new-password" className="input" type="password" autoComplete="new-password" value={form.nueva}
                 onChange={e=>setForm({...form,nueva:e.target.value})}
                 placeholder="Mínimo 8 caracteres" required />
             </div>
             <div className="field">
               <label className="label" htmlFor="confirmar">Confirmar contraseña</label>
-              <input id="confirmar" className="input" type="password" value={form.confirmar}
+              <input id="confirmar" name="confirm-new-password" className="input" type="password" autoComplete="new-password" value={form.confirmar}
                 onChange={e=>setForm({...form,confirmar:e.target.value})}
                 placeholder="Repite la nueva contraseña" required />
             </div>
@@ -99,14 +99,14 @@ export default function PerfilPage() {
             )}
 
             {status && (
-              <div className={`alert ${isError ? 'alert--error' : ''}`}
+              <div className={`alert ${isError ? 'alert--error' : ''}`} role={isError ? 'alert' : 'status'} aria-live="polite"
                 style={isError ? undefined : { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
                 {status}
               </div>
             )}
 
             <button type="submit" disabled={loading||form.nueva!==form.confirmar||form.nueva.length<8}
-              className="btn btn--primary btn--block" style={{ marginTop: 6, padding: '13px' }}>
+              className="btn btn--primary btn--block profile-page__submit">
               {loading ? 'Actualizando…' : 'Actualizar contraseña'}
             </button>
           </form>

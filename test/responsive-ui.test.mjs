@@ -9,6 +9,9 @@ import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
+export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
+export const AUTH_ACCOUNT_ROUTES = ['/perfil']
+
 test('respuesta tardía de una instancia desmontada no cierra el diálogo nuevo del mismo dueño', async () => {
   let surface = 'primera'
   let resolveSave
@@ -210,4 +213,37 @@ test('los diálogos con fixture nunca entran al smoke remoto', () => {
     env: { RESPONSIVE_BASE_URL: 'https://readonly.invalid' },
   })
   assert.deepEqual(JSON.parse(output), [true, true, true, true])
+})
+
+test('acceso y perfil declaran el contrato responsive de estados y campos', () => {
+  const home = read('../app/page.js')
+  const login = read('../app/login/page.js')
+  const forgot = read('../app/forgot-password/page.js')
+  const setPassword = read('../app/set-password/page.js')
+  const profile = read('../app/perfil/page.js')
+  const panelFilter = read('../components/PanelFilter.js')
+  const period = read('../components/PeriodSelector.js')
+
+  assert.match(home, /redirect\('\/login'\)/)
+  assert.doesNotMatch(home, /useRouter|useEffect|['"]use client['"]/)
+  for (const [name, source] of Object.entries({ login, forgot, setPassword, profile })) {
+    assert.match(source, /<main\b|role="main"/, `${name} expone contenido principal`)
+    assert.match(source, /id="main-content"/, `${name} identifica el contenido principal`)
+    assert.match(source, /data-page-state=/, `${name} declara su estado de página`)
+  }
+  for (const source of [login, forgot, setPassword, profile]) {
+    assert.match(source, /name=/)
+    assert.match(source, /autoComplete=/)
+  }
+  assert.match(login, /spellCheck=\{false\}/)
+  assert.match(login, /role="alert"/)
+  assert.match(login, /pending \? 'loading' : error \? 'error' : 'ready'/)
+  assert.match(setPassword, /data-page-state="loading"/)
+  assert.match(setPassword, /data-page-state=\{info === null \? 'loading' : info\.valid \? 'ready' : 'error'\}/)
+  assert.match(profile, /hydrated/)
+  assert.match(read('../app/globals.css'), /\.profile-page__email[^}]*overflow-wrap:\s*anywhere/s)
+  assert.match(panelFilter, /panel-filter__modes/)
+  assert.match(panelFilter, /aria-pressed/)
+  assert.match(panelFilter, /panel-filter__range/)
+  assert.match(period, /role="group"/)
 })

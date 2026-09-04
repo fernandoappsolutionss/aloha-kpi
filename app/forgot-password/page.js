@@ -18,33 +18,33 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="login">
-      <main className="login__panel" style={{ width: '100%' }}>
+      <main id="main-content" className="login__panel login__panel--single" data-page-state={loading ? 'loading' : 'ready'}>
         <div className="login__card">
           <div className="login__cardhead">
             <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
-            <h2 className="login__welcome">¿Olvidaste tu contraseña?</h2>
+            <h1 className="login__welcome">¿Olvidaste tu contraseña?</h1>
             <p className="login__cardsub">Te enviaremos un enlace para restablecerla.</p>
           </div>
 
           {sent ? (
-            <div className="alert" style={{ background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)', marginBottom: 8 }}>
+            <div className="alert login__success" role="status" aria-live="polite">
               Si existe una cuenta con ese correo, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada (y spam).
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="login__form">
               <div className="field">
                 <label className="label" htmlFor="email">Correo electrónico</label>
-                <input id="email" className="input" type="email" required autoComplete="email"
+                <input id="email" name="email" className="input" type="email" required autoComplete="email" spellCheck={false}
                   value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@correo.com" />
               </div>
-              <button type="submit" disabled={loading} className="btn btn--primary btn--block" style={{ marginTop: 6, padding: '13px' }}>
+              <button type="submit" disabled={loading} className="btn btn--primary btn--block login__submit">
                 {loading ? 'Enviando…' : 'Enviar enlace'}
               </button>
             </form>
           )}
 
           <p className="login__help">
-            <Link href="/login" style={{ color: 'var(--ts-green)', fontWeight: 600 }}>← Volver al inicio de sesión</Link><br />
+            <Link href="/login" className="login__link">← Volver al inicio de sesión</Link><br />
             <a href="https://www.desarrolloweb.com.pa/" target="_blank" rel="noopener noreferrer" className="login__credit">Desarrollado por Appsolutionss</a>
           </p>
         </div>

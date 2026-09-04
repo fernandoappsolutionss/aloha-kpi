@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { login } from '../actions/auth'
 import { getPublicStats } from '../actions/public'
 import Logo from '../../components/Logo'
@@ -8,16 +9,20 @@ import { getCurrentPeriod } from '../../lib/period'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
+  const [hydrated, setHydrated] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const { year, quarter } = getCurrentPeriod()
   const [stats, setStats] = useState(null)
-  useEffect(() => { getPublicStats().then(setStats).catch(() => {}) }, [])
+  useEffect(() => {
+    setHydrated(true)
+    getPublicStats().then(setStats).catch(() => {})
+  }, [])
 
   async function handleLogin(e) {
     e.preventDefault()
-    setLoading(true); setError('')
+    setPending(true); setError('')
     try {
       const res = await login(form.email, form.password)
       if (res.error) throw new Error(res.error)
@@ -33,7 +38,7 @@ export default function LoginPage() {
         router.push('/centro/' + res.centro_id)
       }
     } catch (err) { setError(err.message) }
-    finally { setLoading(false) }
+    finally { setPending(false) }
   }
 
   return (
@@ -74,7 +79,7 @@ export default function LoginPage() {
       </aside>
 
       {/* ---- Login card ---- */}
-      <main className="login__panel">
+      <main id="main-content" className="login__panel" data-page-state={pending ? 'loading' : error ? 'error' : 'ready'} data-hydrated={hydrated ? 'true' : 'false'}>
         <div className="login__card">
           <div className="login__cardhead">
             <div style={{ marginBottom: 22 }}><Logo size={44} /></div>
@@ -85,41 +90,43 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="login__form">
             <div className="field">
               <label className="label" htmlFor="email">Correo electrónico</label>
-              <input id="email" className="input" type="email" required autoComplete="email"
+              <input id="email" name="email" className="input" type="email" required autoComplete="email" spellCheck={false}
                 value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                 placeholder="tu@correo.com" />
             </div>
 
             <div className="field">
               <label className="label" htmlFor="password">Contraseña</label>
-              <input id="password" className="input" type="password" required autoComplete="current-password"
+              <input id="password" name="password" className="input" type="password" required autoComplete="current-password"
                 value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                 placeholder="••••••••" />
               <div style={{ textAlign: 'right', marginTop: 8 }}>
-                <a href="/forgot-password" className="label" style={{ color: 'var(--ts-green)', fontWeight: 600, textDecoration: 'none' }}>
+                <Link href="/forgot-password" className="label login__link">
                   ¿Olvidaste tu contraseña?
-                </a>
+                </Link>
               </div>
             </div>
 
             {error && (
               <div className="alert alert--error" role="alert">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn btn--primary btn--block" style={{ marginTop: 6, padding: '13px' }}>
-              {loading ? 'Verificando…' : 'Ingresar al sistema'}
-              {!loading && (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <button type="submit" disabled={pending} className="btn btn--primary btn--block login__submit">
+              {pending ? 'Verificando…' : 'Ingresar al sistema'}
+              {!pending && (
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
                 </svg>
               )}
             </button>
           </form>
+
+          {pending && <p className="sr-only" role="status" aria-live="polite">Verificando credenciales…</p>}
 
           <p className="login__help">
             ¿Problemas para acceder? Contacta a tu administrador.<br />
