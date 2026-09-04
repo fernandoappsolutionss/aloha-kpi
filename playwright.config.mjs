@@ -145,6 +145,7 @@ export default defineConfig({
     ...sizes.map(([name, width, height]) => ({
       name,
       dependencies: ['setup'],
+      grepInvert: /@coordinator/,
       testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
@@ -157,7 +158,8 @@ export default defineConfig({
     },
     {
       name: 'coordinator-audit',
-      testMatch: /users-coordinator\.spec\.js/,
+      testMatch: /(users-coordinator|dashboard-operations)\.spec\.js/,
+      grep: /@coordinator|^(?!.*dashboard-operations)/,
       dependencies: ['setup'],
       use: { viewport: { width: 390, height: 844 }, storageState: 'tests/e2e/.auth/coordinator.json' },
     },

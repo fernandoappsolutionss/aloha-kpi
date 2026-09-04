@@ -12,6 +12,36 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
+test('operación administrativa declara estados explícitos y tablas con alternativas móviles', () => {
+  for (const path of ['page.js', 'ranking/page.js', 'alertas/page.js', 'reporte/page.js', 'metas/page.js', 'centros/page.js', 'zoho/page.js']) {
+    const source = read(`../app/dashboard/${path}`)
+    assert.match(source, /id="main-content"/, path)
+    assert.match(source, /data-page-state=/, path)
+    assert.match(source, /role="alert"|role=\{.*'alert'/, path)
+    assert.doesNotMatch(source, /catch\(\(\) => \{\}\)/, path)
+  }
+  for (const path of ['page.js', 'ranking/page.js', 'reporte/page.js', 'centros/page.js']) {
+    const source = read(`../app/dashboard/${path}`)
+    assert.match(source, /<TableScroller/, path)
+    assert.match(source, /<OperationalCard/, path)
+    assert.match(source, /<caption/, path)
+    assert.doesNotMatch(source, /overflowX:\s*['"]auto/, path)
+  }
+})
+
+test('auditoría R5 separa actor coordinador y no entra en los modos mutantes', () => {
+  const script = `import('./playwright.config.mjs').then(({default:c}) => {
+    const admin = c.projects.find(p=>p.name==='phone-390');
+    const coord = c.projects.find(p=>p.name==='coordinator-audit');
+    console.log(JSON.stringify([!admin.testIgnore.test('dashboard-operations.spec.js'), admin.grepInvert.test('@coordinator'), coord.testMatch.test('dashboard-operations.spec.js'), coord.grep.test('coordinator-audit dashboard-operations.spec.js @coordinator acceso'), !coord.grep.test('coordinator-audit dashboard-operations.spec.js lectura'), coord.grep.test('coordinator-audit users-coordinator.spec.js acceso')]));
+  })`
+  const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8',
+    env: { RESPONSIVE_BASE_URL: 'https://readonly.invalid' },
+  })
+  assert.deepEqual(JSON.parse(output), [true, true, true, true, true, true])
+})
+
 test('respuesta tardía de una instancia desmontada no cierra el diálogo nuevo del mismo dueño', async () => {
   let surface = 'primera'
   let resolveSave

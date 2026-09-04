@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import PeriodSelector from '../../../components/PeriodSelector'
+import TableScroller from '../../../components/TableScroller'
+import OperationalCard from '../../../components/OperationalCard'
 import { getCentrosKpi } from '../../actions/dashboard'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
@@ -10,17 +12,20 @@ const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var
 export default function ReportePage() {
   const [centros, setCentros] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [period, setPeriod] = useState(getCurrentPeriod())
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
-    setLoading(true)
+    let active = true
+    setLoading(true); setError('')
     getCentrosKpi(period.year, period.quarter)
-      .then((data) => setCentros(data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .then((data) => { if (active) setCentros(data || []) })
+      .catch(() => { if (active) setError('No se pudo cargar reporte. Intenta de nuevo.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [period])
 
   const tot = centros.reduce((a, c) => ({ ninos: a.ninos + c.ninos, nuevos: a.nuevos + c.nuevos, desercion: a.desercion + c.desercion }), { ninos: 0, nuevos: 0, desercion: 0 })
@@ -41,29 +46,29 @@ export default function ReportePage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
 
         {/* Header */}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Reporte · {label}</div>
             <h1 className="h-title">Reporte trimestral</h1>
-            <p className="h-sub">Resumen consolidado {label} · {centros.length} centros</p>
+            {!loading && !error && <p role="status" className="h-sub">Resumen consolidado {label} · {centros.length} centros</p>}
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="page-actions operations-actions">
             <PeriodSelector value={period} onChange={changePeriod} />
-            <button onClick={exportCSV} disabled={loading||centros.length===0} className="btn btn--primary">
+            <button onClick={exportCSV} disabled={loading||!!error||centros.length===0} className="btn btn--primary operations-export">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar CSV
             </button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando reporte...</div>
+        {error ? <p role="alert" className="alert alert--error">{error}</p> : loading ? (
+          <div role="status" className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando reporte...</div>
         ) : (
           <>
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+            <div className="responsive-grid operations-grid--four">
               {[{l:'Total niños activos',v:tot.ninos.toLocaleString()},{l:'Nuevos ingresos',v:tot.nuevos,color:'var(--ts-green)'},{l:'Deserción total',v:tot.desercion},{l:'Prom. cumplimiento',v:promCumpl+'%',color:cumplColor(promCumpl)}]
                 .map((m,i)=>(
                   <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s`, ['--accent']: m.color || 'var(--ts-green)' }}>
@@ -78,14 +83,17 @@ export default function ReportePage() {
                 <h2 className="panel__title">Detalle por centro</h2>
                 <span className="label">{label}</span>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table">
+              <div className="desktop-only operational-table">
+              <TableScroller label="Detalle por centro">
+                <table className="table operations-table--report">
+                  <caption className="sr-only">Detalle por centro · {label}</caption>
                   <thead>
                     <tr>{['Centro','Niños activos','Nuevos ingresos','Meta','Deserción','% Cumplimiento'].map(h=>
                       <th key={h}>{h}</th>
                     )}</tr>
                   </thead>
                   <tbody>
+                    {centros.length === 0 && <tr><td colSpan={6}>No hay centros para este período.</td></tr>}
                     {centros.map((c,i)=>(
                       <tr key={i} style={{ cursor: 'default' }}>
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
@@ -115,6 +123,19 @@ export default function ReportePage() {
                     )}
                   </tbody>
                 </table>
+              </TableScroller>
+              </div>
+              <div className="mobile-only operational-list">
+                {centros.map(c => <OperationalCard key={c.id} headingLevel={3} title={c.nombre}
+                  fields={[
+                    { label: 'Niños activos', value: c.ninos }, { label: 'Nuevos ingresos', value: c.nuevos },
+                    { label: 'Meta', value: c.nuevos >= c.meta ? 'Meta cumplida' : 'No cumplida' },
+                    { label: 'Deserción', value: c.desercion }, { label: 'Cumplimiento', value: `${c.cumpl}%` },
+                  ]} />)}
+                {centros.length > 0 ? <OperationalCard headingLevel={3} title="TOTALES" fields={[
+                  { label: 'Niños activos', value: tot.ninos }, { label: 'Nuevos ingresos', value: tot.nuevos },
+                  { label: 'Deserción', value: tot.desercion }, { label: 'Cumplimiento promedio', value: `${promCumpl}%` },
+                ]} /> : <p>No hay centros para este período.</p>}
               </div>
             </div>
           </>

@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
 import PanelFilter from '../../components/PanelFilter'
 import NivelBadge from '../../components/NivelBadge'
 import TableScroller from '../../components/TableScroller'
+import OperationalCard from '../../components/OperationalCard'
 import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -15,7 +16,7 @@ const MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'
 const NinosTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 12px', fontSize: 12, boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 12px', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
       <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</div>
       <div style={{ color: 'var(--ts-green)' }}>Niños: <b>{payload[0].value}</b></div>
     </div>
@@ -33,7 +34,8 @@ const ic = {
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [centros, setCentros] = useState([])
   const [prev, setPrev] = useState([])
   const [nombre, setNombre] = useState('')
@@ -44,12 +46,20 @@ export default function DashboardPage() {
 
   useEffect(() => { setNombre(localStorage.getItem('aloha_nombre') || 'Administrador'); setFilter(readPanelFilter()) }, [])
   useEffect(() => {
+    let active = true
+    setLoading(true); setError('')
     const r = resolvePanelRange(filter)
-    getCentrosKpiRango(r.fromY, r.fromM, r.toY, r.toM).then((data) => setCentros(data || [])).catch(() => {})
-    getCentrosKpiRango(r.prev.fromY, r.prev.fromM, r.prev.toY, r.prev.toM).then((data) => setPrev(data || [])).catch(() => setPrev([]))
-    getNinosSerie(r.fromY, r.fromM, r.toY, r.toM)
-      .then((rows) => setSerie((rows || []).map((row) => ({ ...row, label: MES_CORTO[row.month - 1] + " '" + String(row.year).slice(2) }))))
-      .catch(() => setSerie([]))
+    Promise.all([
+      getCentrosKpiRango(r.fromY, r.fromM, r.toY, r.toM),
+      getCentrosKpiRango(r.prev.fromY, r.prev.fromM, r.prev.toY, r.prev.toM),
+      getNinosSerie(r.fromY, r.fromM, r.toY, r.toM),
+    ]).then(([data, previous, rows]) => {
+      if (!active) return
+      setCentros(data || []); setPrev(previous || [])
+      setSerie((rows || []).map(row => ({ ...row, label: MES_CORTO[row.month - 1] + " '" + String(row.year).slice(2) })))
+    }).catch(() => { if (active) setError('No se pudo cargar el panel. Intenta de nuevo.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [filter])
 
   const label = range.label
@@ -89,25 +99,25 @@ export default function DashboardPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general" />
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
 
         {/* Header */}
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Panel general · {label}</div>
             <h1 className="h-title">Hola, {(nombre.split(' ')[0]) || '—'}.</h1>
-            <p className="h-sub">{centros.length} centros activos · seguimiento en tiempo real</p>
+            {!loading && !error && <p className="h-sub">{centros.length} centros activos · seguimiento en tiempo real</p>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
             <PanelFilter value={filter} onChange={changeFilter} />
-            {criticos > 0 && (
+            {!loading && !error && criticos > 0 && (
               <div className="alert alert--error" style={{ alignItems: 'flex-start' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
                   <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
                 <div>
                   <div style={{ fontWeight: 600 }}>{criticos} centro{criticos > 1 ? 's' : ''} en estado crítico</div>
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>Requiere atención inmediata</div>
+                  <div>Requiere atención inmediata</div>
                 </div>
               </div>
             )}
@@ -115,6 +125,8 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI cards */}
+        {loading ? <p role="status">Cargando panel…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <>
+        <p role="status" className="sr-only">{centros.length} centros cargados</p>
         <div className="kpi-grid">
           {cards.map((m, i) => (
             <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s` }}>
@@ -125,9 +137,9 @@ export default function DashboardPage() {
               <div className="kpi__value" style={m.color ? { color: m.color } : undefined}>{m.value}</div>
               <div className="kpi__sub">{m.sub}</div>
               {m.yoy && m.yoy.delta != null && (
-                <div style={{ marginTop: 7, fontSize: 11.5, fontFamily: 'var(--font-mono)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
+                <div style={{ marginTop: 7, fontFamily: 'var(--font-mono)', fontWeight: 600, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
                   color: m.yoy.delta === 0 ? 'var(--text-dim)' : ((m.yoy.delta > 0) === m.yoy.upGood ? 'var(--ok)' : 'var(--bad)') }}>
-                  <span>{m.yoy.delta > 0 ? '▲' : m.yoy.delta < 0 ? '▼' : '—'} {Math.abs(m.yoy.delta)}%</span>
+                  <span>{m.yoy.delta > 0 ? 'Al alza' : m.yoy.delta < 0 ? 'A la baja' : 'Estable'} · {Math.abs(m.yoy.delta)}%</span>
                   <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>vs {prevLabel}</span>
                 </div>
               )}
@@ -145,7 +157,7 @@ export default function DashboardPage() {
               <div style={{ fontWeight: 600, color: 'var(--text)' }}>
                 {centrosBajoGpn} centro{centrosBajoGpn > 1 ? 's' : ''} por debajo de {metaGpn} niños por grupo
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 780 }}>
+              <div style={{ color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.5, maxWidth: 780 }}>
                 La baja ocupación de grupos golpea directo la rentabilidad: un grupo cuesta casi lo mismo con 4 que con 8 niños. Prioriza <b style={{ color: 'var(--text)' }}>llenar los grupos actuales</b> antes de abrir nuevos.
               </div>
             </div>
@@ -158,8 +170,10 @@ export default function DashboardPage() {
             <h2 className="panel__title">Estado de todos los centros</h2>
             <span className="label">{label}</span>
           </div>
+          <div className="desktop-only operational-table">
           <TableScroller label="Estado de todos los centros" stickyFirstColumn>
-            <table className="table" style={{ minWidth: 980 }}>
+            <table className="table operations-table--dashboard">
+              <caption className="sr-only">Estado de todos los centros · {label}</caption>
               <thead>
                 <tr>
                   {['Centro', 'Administradora', 'Niños', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
@@ -168,8 +182,8 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 {centros.map((c, i) => (
-                  <tr key={i} onClick={() => router.push('/dashboard/ranking')}>
-                    <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
+                  <tr key={i}>
+                    <td><Link className="operations-link" href="/dashboard/ranking" aria-label={`Ver ranking de ${c.nombre}`}>{c.nombre}</Link></td>
                     <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
                     <td className="num" style={{ color: 'var(--text)' }}>{c.ninos}</td>
                     <td className="num" style={{ fontWeight: 600, color: c.grupos > 0 ? (c.ninosGrupo >= c.metaGpn ? 'var(--ok)' : 'var(--bad)') : 'var(--text-faint)' }} title={c.grupos > 0 ? `${c.grupos} grupos · meta ≥ ${c.metaGpn}` : 'sin datos de grupos'}>{c.grupos > 0 ? c.ninosGrupo.toFixed(1) : '—'}</td>
@@ -187,6 +201,7 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td style={{ textAlign: 'center', color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
+                      <span>{c.nuevos >= c.meta ? 'Al alza' : 'A la baja'}</span>
                       {c.nuevos >= c.meta
                         ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
                         : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="18 13 12 19 6 13" /></svg>}
@@ -200,11 +215,28 @@ export default function DashboardPage() {
                   </tr>
                 ))}
                 {centros.length === 0 && (
-                  <tr style={{ cursor: 'default' }}><td colSpan={11} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>Cargando centros…</td></tr>
+                  <tr><td colSpan={11}>No hay centros para este período.</td></tr>
                 )}
               </tbody>
             </table>
           </TableScroller>
+          </div>
+          <div className="mobile-only operational-list">
+            {centros.map(c => <OperationalCard key={c.id} headingLevel={3} title={c.nombre}
+              status={<span className={`pill ${ESTADO_PILL[c.estado] || 'pill--warn'}`}>{c.estado}</span>}
+              fields={[
+                { label: 'Administradora', value: c.admin || '—' },
+                { label: 'Niños', value: c.ninos },
+                { label: 'N/grupo', value: c.grupos > 0 ? `${c.ninosGrupo.toFixed(1)} · ${c.grupos} grupos · meta ≥ ${c.metaGpn}` : 'Sin datos de grupos' },
+                { label: 'Nuevos', value: `${c.nuevos} / ${c.meta}` },
+                { label: 'Deserción', value: c.desercion },
+                { label: 'Cobranza', value: c.cobranza },
+                { label: 'Cumplimiento', value: `${c.cumpl}%` },
+                { label: 'Tendencia', value: c.nuevos >= c.meta ? 'Al alza' : 'A la baja' },
+                { label: 'Nivel', value: <NivelBadge nivel={c.nivel} /> },
+              ]} actions={<Link className="btn" href="/dashboard/ranking" aria-label={`Ver ranking de ${c.nombre}`}>Ver ranking</Link>} />)}
+            {centros.length === 0 && <p>No hay centros para este período.</p>}
+          </div>
         </div>
 
         {/* Gráfico general de niños + filtros rápidos (al final del panel) */}
@@ -226,8 +258,8 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <XAxis dataKey="label" tick={{ fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
                   <Tooltip content={<NinosTooltip />} />
                   <Area type="monotone" dataKey="ninos" name="Niños" stroke="var(--ts-green)" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: 'var(--ts-green)' }} activeDot={{ r: 5 }} />
                 </AreaChart>
@@ -235,6 +267,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        </>}
       </main>
     </div>
   )

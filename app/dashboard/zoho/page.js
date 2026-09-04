@@ -17,10 +17,17 @@ const fecha = (ts) => ts ? new Date(ts).toLocaleDateString('es-PA', { day: 'nume
 
 export default function ZohoPage() {
   const [estado, setEstado] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [aviso, setAviso] = useState(null) // { tipo: 'ok'|'error', texto }
 
   useEffect(() => {
-    getZohoEstado().then((r) => { if (!r?.error) setEstado(r) })
+    let active = true
+    getZohoEstado().then((r) => {
+      if (!r || r.error) throw new Error('No se pudo leer Zoho')
+      if (active) setEstado(r)
+    }).catch(() => { if (active) setError('No se pudo cargar el estado de Zoho. Intenta de nuevo.') })
+      .finally(() => { if (active) setLoading(false) })
     const q = new URLSearchParams(window.location.search)
     if (q.get('ok')) setAviso({ tipo: 'ok', texto: '✅ Zoho quedó conectado. La cobranza se sincroniza sola cada tarde (lun-vie, 7pm).' })
     const err = q.get('error')
@@ -28,6 +35,7 @@ export default function ZohoPage() {
       const extra = err === 'usuario' && q.get('email') ? ` (se logueó: ${q.get('email')})` : ''
       setAviso({ tipo: 'error', texto: `❌ ${ERRORES[err] || 'Error desconocido.'}${extra}` })
     }
+    return () => { active = false }
   }, [])
 
   const conexion = estado?.conexion
@@ -35,7 +43,7 @@ export default function ZohoPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general" />
-      <main className="main">
+      <main id="main-content" data-page-state={loading ? 'loading' : error || aviso?.tipo === 'error' ? 'error' : 'ready'} className="main operations-page operations-zoho">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Configuración · Zoho Books</div>
@@ -45,16 +53,18 @@ export default function ZohoPage() {
         </div>
 
         {aviso && (
-          <div className="alert" style={{ marginBottom: 16, ...(aviso.tipo === 'ok'
+          <div role={aviso.tipo === 'ok' ? 'status' : 'alert'} className="alert" style={{ marginBottom: 16, ...(aviso.tipo === 'ok'
             ? { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: '#6EE7B7' }
             : { background: 'var(--bad-bg, rgba(239,68,68,0.08))', border: '1px solid var(--bad, #ef4444)', color: 'var(--bad, #ef4444)' }) }}>
             {aviso.texto}
           </div>
         )}
 
+        {loading ? <p role="status">Cargando conexión…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <>
+        <p role="status">{conexion ? 'Conectado' : 'Desconectado'}</p>
         {estado && !estado.clientConfigurado && (
           <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Falta el registro de la app en Zoho (una sola vez)</h3>
+            <h2 style={{ marginTop: 0 }}>Falta el registro de la app en Zoho (una sola vez)</h2>
             <ol style={{ lineHeight: 1.9, margin: 0, paddingLeft: 20 }}>
               <li>Entra a <b>api-console.zoho.com</b> → Add Client → <b>Server-based Applications</b>.</li>
               <li>Homepage: <code>{typeof window !== 'undefined' ? window.location.origin : ''}</code> · Redirect URI: <code>{typeof window !== 'undefined' ? `${window.location.origin}/api/zoho/callback` : ''}</code></li>
@@ -87,6 +97,7 @@ export default function ZohoPage() {
             </>
           )}
         </div>
+        </>}
       </main>
     </div>
   )

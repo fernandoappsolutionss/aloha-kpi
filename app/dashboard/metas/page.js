@@ -17,11 +17,18 @@ export default function MetasPage() {
   const [metas, setMetas] = useState(METAS_INIT)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [dirty, setDirty] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
 
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
+    let active = true
+    setLoading(true); setError(''); setSaveError(''); setSaved(false); setDirty(false)
     getMetas(period.year, period.quarter).then((m) => {
+      if (!active) return
       if (m) setMetas({
         nuevos_mes: m.meta_nuevos_ingresos_mes ?? 20,
         desercion_mes: Number(m.meta_desercion_mes ?? 8),
@@ -30,14 +37,16 @@ export default function MetasPage() {
         cp_conversion: Number(m.cp_conversion ?? 50),
       })
       else setMetas(METAS_INIT)
-    }).catch(() => {})
+    }).catch(() => { if (active) setError('No se pudieron cargar las metas. Intenta de nuevo.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [period])
 
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   async function save() {
-    setSaving(true)
+    setSaving(true); setSaveError('')
     try {
       const res = await saveMetas(period.year, period.quarter, {
         meta_nuevos_ingresos_mes: metas.nuevos_mes,
@@ -46,8 +55,9 @@ export default function MetasPage() {
         gpn_min: metas.gpn_min,
         cp_conversion: metas.cp_conversion,
       })
-      if (!res.error) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
-    } catch {}
+      if (res.error) throw new Error(res.error)
+      setSaved(true); setDirty(false)
+    } catch { setSaveError('No se pudieron guardar las metas. Intenta de nuevo.') }
     setSaving(false)
   }
 
@@ -62,43 +72,46 @@ export default function MetasPage() {
   return (
     <div className="shell">
       <Sidebar rol="admin_general"/>
-      <main className="main">
+      <main id="main-content" data-page-state={loading || saving ? 'loading' : error || saveError ? 'error' : 'ready'} className="main operations-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Configuración · {label}</div>
             <h1 className="h-title">Metas globales</h1>
             <p className="h-sub">Estas metas aplican a todos los centros · {label}</p>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="page-actions operations-actions">
             <PeriodSelector value={period} onChange={changePeriod} />
-            {saved && (
-              <span className="pill pill--ok"><span className="dot" />Metas guardadas</span>
-            )}
-            <button onClick={save} disabled={saving} className="btn btn--primary">
+            <button onClick={save} disabled={saving || loading || !!error} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar metas'}
             </button>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '13px 18px', marginBottom: 22, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6, borderLeft: '2px solid var(--ts-green)' }}>
+        {loading ? <p role="status">Cargando metas…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <>
+        <p role="status">{saving ? 'Guardando metas…' : saved ? 'Metas guardadas' : dirty ? 'Cambios sin guardar' : 'Metas cargadas'}</p>
+        {saveError && <p role="alert" className="alert alert--error">{saveError}</p>}
+
+        <div className="card" style={{ padding: '13px 18px', marginBottom: 22, color: 'var(--text-muted)', lineHeight: 1.6, borderLeft: '2px solid var(--ts-green)' }}>
           <strong style={{ color: 'var(--text)' }}>Nota:</strong> Los cambios en estas metas se aplicarán al cálculo de cumplimiento de todos los centros a partir del siguiente registro semanal.
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {campos.map(f => (
-            <div key={f.k} className="card" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div key={f.k} className="card form-grid operations-meta">
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 5, color: 'var(--text)' }}>{f.l}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.5 }}>{f.desc}</div>
+                <label htmlFor={`meta-${f.k}`} style={{ fontWeight: 600, color: 'var(--text)' }}>{f.l}</label>
+                <p id={`meta-${f.k}-help`} className="caption" style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{f.desc}</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+              <div className="operations-meta__control">
                 <input
+                  id={`meta-${f.k}`} name={f.k} autoComplete="off" inputMode={f.k === 'desercion_mes' ? 'decimal' : 'numeric'} aria-describedby={`meta-${f.k}-help`}
                   type={f.tipo}
                   className="input num"
                   value={metas[f.k]}
                   min="0"
                   step={f.k === 'desercion_mes' ? '0.1' : '1'}
-                  onChange={e => setMetas({ ...metas, [f.k]: parseFloat(e.target.value) || 0 })}
+                  disabled={saving}
+                  onChange={e => { setMetas({ ...metas, [f.k]: parseFloat(e.target.value) || 0 }); setDirty(true); setSaved(false); setSaveError('') }}
                   style={{ width: 96, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--ts-green)' }}
                 />
                 <span className="label" style={{ minWidth: 84, color: 'var(--text-dim)' }}>{f.suffix}</span>
@@ -109,9 +122,9 @@ export default function MetasPage() {
 
         <div className="panel" style={{ marginTop: 22 }}>
           <div className="panel__head">
-            <h3 className="panel__title">Resumen de metas actuales</h3>
+            <h2 className="panel__title">Resumen de metas actuales</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, padding: 22 }}>
+          <div className="responsive-grid operations-grid--five">
             {campos.map(f => (
               <div key={f.k} style={{ textAlign: 'center', background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '16px 8px' }}>
                 <div className="num" style={{ fontSize: 24, fontWeight: 700, color: 'var(--ts-green)', fontFamily: 'var(--font-serif)' }}>{metas[f.k]}</div>
@@ -120,6 +133,7 @@ export default function MetasPage() {
             ))}
           </div>
         </div>
+        </>}
       </main>
     </div>
   )

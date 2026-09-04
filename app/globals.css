@@ -1266,6 +1266,54 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .mobile-only { display: none !important; }
 .desktop-only { display: block; }
 
+/* Operación administrativa: la tabla compara; la tarjeta conserva el detalle. */
+.nivel-badge { font-size: 12px; }
+.operations-page {
+  min-width: 0;
+  --ts-green: var(--ok);
+  --text-dim: var(--text-muted);
+  --text-faint: var(--text-muted);
+}
+.operations-page .panel__head { flex-wrap: wrap; gap: 10px; }
+.operations-page .panel__head > *, .operations-page .main__head > * { min-width: 0; }
+.operations-page .operational-list { padding: 12px; }
+.operations-page .operational-card__header > * { min-width: 0; }
+.operations-page .operational-card__header { flex-wrap: wrap; }
+.operations-table--dashboard { min-width: 1080px; }
+.operations-table--ranking { min-width: 860px; }
+.operations-table--report { min-width: 720px; }
+.operations-table--centers { min-width: 900px; }
+.operations-link { display: inline-flex; align-items: center; min-height: 44px; padding: 4px; color: var(--text); text-decoration: underline; }
+.operations-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 26px; }
+.operations-grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 26px; }
+.operations-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 22px; }
+.operations-alert { overflow-wrap: anywhere; }
+.operations-alert__head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+.operations-alert__head h3 { font-size: 15px; margin: 0; }
+.operations-center-form { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 18px; }
+.operations-meta { padding: 20px 24px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.operations-meta__control { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.operations-meta .caption { font-size: 13px; margin-top: 5px; }
+.center-team { display: grid; gap: 12px; }
+.center-team__member { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.center-team__email { width: 100%; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
+.operations-zoho :is(code, p, li, h2) { overflow-wrap: anywhere; }
+@media (min-width: 768px) and (max-width: 1024px) {
+  .operations-center-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .operations-page :is(.responsive-grid, .form-grid) { grid-template-columns: minmax(0, 1fr); }
+  .operations-page { font-size: 15px; }
+  .operations-page :is(.label, .h-sub, .kpi__sub, .caption, .nivel-badge) { font-size: 13px; }
+  .operations-page p:not(.caption):not(.h-sub):not(.table-scroller__hint) { font-size: 15px; }
+  .operations-page .operations-actions { width: 100%; }
+  .operations-page .operations-export { width: 100%; }
+  .operations-page .center-team__member { font-size: 13px; }
+  .operations-page .operations-meta { padding: 18px; }
+  .operations-page .operations-center-actions { width: 100%; flex-wrap: nowrap; }
+  .operations-page .operations-center-actions .btn { flex: none; }
+}
+
 .dialog-backdrop {
   position: fixed;
   inset: 0;

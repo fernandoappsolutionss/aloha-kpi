@@ -5,6 +5,30 @@ import { soloDeMisCentros } from '../lib/current-user.mjs'
 
 const fuente = (ruta) => readFileSync(new URL(ruta, import.meta.url), 'utf8')
 
+test('configuración global rechaza actor no vigente antes de consultar o mutar SQL', async () => {
+  for (const [path, names] of [
+    ['../app/actions/metas.js', ['getMetas', 'saveMetas']],
+    ['../app/actions/centros.js', ['listCentrosConUsuarios', 'createCentro', 'updateCentro', 'deleteCentro']],
+  ]) {
+    let queries = 0
+    let freshChecks = 0
+    const source = fuente(path).replace(/^import .*\n/gm, '').replace(/export async function/g, 'async function')
+    const actions = new Function('sql', 'requireCurrentAdmin', 'requireAdmin', 'requireSession', 'fallo',
+      `${source}\nreturn { ${names.join(', ')} }`)(
+      () => { queries++; return [] },
+      async () => { freshChecks++; throw new Error('Actor vigente sin permiso') },
+      async () => ({}), async () => ({}), (_name, error) => ({ error: error.message }),
+    )
+    for (const name of names) {
+      const args = name === 'createCentro' ? [{ nombre: 'Prueba', pais: 'PA' }] : [2026, { nombre: 'Prueba', pais: 'PA' }, {}]
+      if (name === 'deleteCentro') assert.equal((await actions[name](...args)).error, 'Actor vigente sin permiso')
+      else await assert.rejects(actions[name](...args), /Actor vigente sin permiso/)
+    }
+    assert.equal(freshChecks, names.length)
+    assert.equal(queries, 0, 'una denegación nunca debe llegar a SQL')
+  }
+})
+
 test('soloDeMisCentros recorta al alcance del coordinador', () => {
   const filas = [{ centro_id: 10, n: 1 }, { centro_id: 11, n: 2 }, { centro_id: 12, n: 3 }]
   assert.deepEqual(soloDeMisCentros(filas, [10, 12]).map((f) => f.n), [1, 3])
@@ -62,7 +86,7 @@ test('Gestión de usuarios usa actor fresco y servicio; centros sigue solo en ge
   assert.match(sidebar, /viewCenters/)
 
   const centros = fuente('../app/actions/centros.js')
-  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 240), /requireAdmin\(\)/)
+  assert.match(centros.slice(centros.indexOf('export async function createCentro')).slice(0, 240), /requireCurrentAdmin\(\)/)
 })
 
 test('la página conserva props frescas, una sola mutación y la confirmación de acceso', () => {
