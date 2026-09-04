@@ -1001,6 +1001,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .growth-admin-table .label { letter-spacing: 0; }
   .comparisons-page .table td, .comparisons-page label { font-size: 13px; }
   .growth-admin-controls .input, .growth-admin-controls .select, .history-filters .select { font-size: 16px; }
+  .growth-admin-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .growth-admin-controls .input, .growth-admin-controls .select { width: 100%; min-width: 0; }
   .training-filter { width: 100%; }
 }
 
@@ -1072,7 +1074,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .growth-admin-stat { border-right: 0; }
   .growth-model-band__metrics { grid-template-columns: repeat(2, 1fr); }
   .growth-model-band__metrics span { padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  .growth-admin-controls .select { flex: 1 1 calc(50% - 8px); min-width: 0; }
 }
 
 /* ---------------------------------------------------------------- */

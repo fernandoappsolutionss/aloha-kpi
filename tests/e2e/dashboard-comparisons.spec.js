@@ -49,6 +49,54 @@ test('Crecimiento mantiene única tabla local, controles y banda del motor dentr
   await audit(page, page.viewportSize().width)
 })
 
+test('Crecimiento muestra opciones largas completas y apila los filtros en móvil', async ({ page }) => {
+  await page.goto('/dashboard/crecimiento')
+  await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1)
+  await page.evaluate(async () => { await document.fonts.ready })
+  for (const [name, value, text] of [
+    ['Filtrar por confianza', 'medium', 'Confianza media'],
+    ['Filtrar por prioridad', 'capacity', 'Revisar capacidad'],
+    ['Ordenar centros', 'growth', 'Mayor crecimiento'],
+  ]) {
+    const select = page.getByRole('combobox', { name, exact: true })
+    await select.selectOption(value)
+    await expect(select).toHaveValue(value)
+    const rendered = await select.evaluate(el => {
+      const style = getComputedStyle(el)
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+      const text = el.selectedOptions[0].textContent
+      const letterSpacing = parseFloat(style.letterSpacing) || 0
+      return {
+        text,
+        required: context.measureText(text).width + letterSpacing * Math.max(0, text.length - 1),
+        available: el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+      }
+    })
+    expect(rendered.text).toBe(text)
+    expect(rendered.available, `${text}: el texto cabe sin invadir el padding de la flecha`).toBeGreaterThanOrEqual(rendered.required)
+  }
+  const controls = page.locator('.growth-admin-controls')
+  if (page.viewportSize().width < 768) {
+    const container = await controls.boundingBox()
+    const boxes = await controls.locator('input, select').evaluateAll(els => els.map(el => {
+      const box = el.getBoundingClientRect()
+      return { x: box.x, y: box.y, width: box.width, bottom: box.bottom }
+    }))
+    expect(boxes).toHaveLength(4)
+    for (let i = 0; i < boxes.length; i++) {
+      expect(Math.abs(boxes[i].x - container.x)).toBeLessThanOrEqual(1)
+      expect(Math.abs(boxes[i].width - container.width), 'cada filtro ocupa el ancho completo').toBeLessThanOrEqual(1)
+      if (i) expect(boxes[i].y, 'los filtros no comparten fila').toBeGreaterThanOrEqual(boxes[i - 1].bottom)
+    }
+  }
+  await auditPage(page, { mobile: true })
+  await controls.scrollIntoViewIfNeeded()
+  await page.evaluate(() => document.activeElement?.blur())
+  await capturePage(page, { name: 'crecimiento-filtros-largos', testInfo: test.info() })
+})
+
 test('Historial presenta tres meses cerrados y filtros con etiquetas, sin tabla artificial', async ({ page }) => {
   await page.goto('/dashboard/historial')
   await page.getByLabel('Centro', { exact: true }).selectOption('910006')
