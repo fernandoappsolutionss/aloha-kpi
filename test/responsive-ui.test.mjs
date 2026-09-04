@@ -7,6 +7,19 @@ import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
 import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
 import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
+import { requireR8Gate } from '../tests/e2e/helpers/r8-fixture.mjs'
+
+test('R8 mantiene fixture, autenticación propia y rutas escritoras fuera del gate remoto', () => {
+  const env = { E2E_R8_CENTER_CORE:'1', E2E_DATABASE_CONFIRM:'disposable', DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', USUARIOS_TEST_DATABASE_URL:'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', E2E_NEON_HTTP:'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY:'127.0.0.1:5435', SESSION_SECRET:'dummy-long-session' }
+  assert.doesNotThrow(()=>requireR8Gate(env))
+  for (const overrides of [{RESPONSIVE_BASE_URL:'https://remote.invalid'},{E2E_R3_DIALOGS:'1'},{E2E_R6_COMPARISONS:'1'},{E2E_RUN_MUTATIONS:'1'},{E2E_DATABASE_CONFIRM:''}]) assert.throws(()=>requireR8Gate({...env,...overrides}))
+  const inspect = (env, expression) => JSON.parse(execFileSync(process.execPath,['--input-type=module','--eval',`import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify(${expression})))`],{cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:'utf8',env}))
+  const local = inspect(env,'({workers:c.workers,projects:c.projects.map(p=>({name:p.name,storage:p.use?.storageState}))})')
+  assert.equal(local.workers,1)
+  assert.equal(local.projects.length,8)
+  assert.ok(local.projects.slice(1).every(p=>p.storage === 'tests/e2e/.auth/r8-center.json'))
+  assert.equal(inspect({RESPONSIVE_BASE_URL:'https://remote.invalid'},"c.projects.find(p=>p.name==='phone-390').testIgnore.test('center-core.spec.js')"),true)
+})
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 

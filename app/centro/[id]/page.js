@@ -1,6 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import TableScroller from '../../../components/TableScroller'
+import OperationalCard from '../../../components/OperationalCard'
 import Sidebar from '../../../components/Sidebar'
 import { tienePanel } from '../../../components/useRol'
 import { getCentroResumen } from '../../actions/centro'
@@ -40,7 +43,7 @@ function Card({ l, v, s, warn }) {
 function Kpi({ l, v }) {
   return (
     <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '10px 14px' }}>
-      <div className="label" style={{ fontSize: 10 }}>{l}</div>
+      <div className="label" style={{ fontSize: 13 }}>{l}</div>
       <div className="num" style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginTop: 3 }}>{v}</div>
     </div>
   )
@@ -58,14 +61,14 @@ function RoleKpi({ rol, sub, items }) {
     <div className="card" style={{ padding: 20 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
         <h3 style={sectionTitle} >{rol}</h3>
-        <span className="h-sub" style={{ margin: 0, fontSize: 11 }}>{sub}</span>
+        <span className="h-sub" style={{ margin: 0, fontSize: 13 }}>{sub}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {items.map((it, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{it.l}</div>
-              <div className="label" style={{ fontSize: 10, marginTop: 3 }}>{it.meta}</div>
+              <div className="label" style={{ fontSize: 13, marginTop: 3 }}>{it.meta}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span className="num" style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)' }}>{it.v}</span>
@@ -80,7 +83,7 @@ function RoleKpi({ rol, sub, items }) {
 
 const sectionTitle = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10.5,
+  fontSize: 13,
   fontWeight: 500,
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -93,6 +96,8 @@ export default function CentroPage() {
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
+  const [periodReady, setPeriodReady] = useState(false)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [nombre, setNombre] = useState('')
   const [meses, setMeses] = useState([])
@@ -110,6 +115,7 @@ export default function CentroPage() {
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
+    setPeriodReady(true)
     const r = localStorage.getItem('aloha_rol')
     const admin = tienePanel(r)
     setIsAdmin(admin)
@@ -118,98 +124,112 @@ export default function CentroPage() {
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
   useEffect(() => {
-    (async () => {
+    if (!periodReady) return
+    let active = true
+    ;(async () => {
       setLoading(true)
-      const year = period.year
-      const trimestre = period.quarter
-      const months = Q_MONTHS[trimestre] || [1, 2, 3]
+      setError('')
+      try {
+        const year = period.year
+        const trimestre = period.quarter
+        const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-      const [summary, growthData] = await Promise.all([
-        getCentroResumen(id, year, trimestre),
-        getCentroGrowth(id).catch((error) => {
-          console.error('[CentroPage] no se pudo cargar la ruta de nivel:', error)
-          return null
-        }),
-      ])
-      const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, cumplimientoPct, graduacion: grad } = summary
-      if (cNombre) setNombre(cNombre)
-      setCumplReal(cumplimientoPct ?? null)
-      setGraduacion(grad || null)
-      setGrowth(growthData)
+        const [summary, growthData] = await Promise.all([
+          getCentroResumen(id, year, trimestre),
+          getCentroGrowth(id).catch((error) => {
+            console.error('[CentroPage] no se pudo cargar la ruta de nivel:', error)
+            return null
+          }),
+        ])
+        if (!active) return
+        if (!summary || summary.error) throw new Error(summary?.error || 'No se pudo cargar el resumen.')
+        const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, cumplimientoPct, graduacion: grad } = summary
+        if (cNombre) setNombre(cNombre)
+        setCumplReal(cumplimientoPct ?? null)
+        setGraduacion(grad || null)
+        setGrowth(growthData)
 
-      const metaFetched = {
-        nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
-        desercion: Number(m?.meta_desercion_mes ?? 8),
-        cobranza: m?.meta_cobranza_max ?? 1,
-      }
-      setMeta(metaFetched)
-
-      const mensual = months.map(mo => {
-        const r = (rs || []).find(x => x.month === mo)
-        const ws = (ks || []).filter(x => x.month === mo)
-        const nuevos = ws.reduce((s, w) => s + (w.ing_d1 || 0) + (w.ing_d2 || 0) + (w.ing_d3 || 0) + (w.ing_d4 || 0) + (w.ing_d5 || 0), 0)
-        const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
-        let cobMes = 0
-        if (ws.length) {
-          const lastSem = [...ws].sort((a, b) => b.semana - a.semana)[0]
-          cobMes = lastSem.cob_d5 || lastSem.cob_d4 || lastSem.cob_d3 || lastSem.cob_d2 || lastSem.cob_d1 || 0
+        const metaFetched = {
+          nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
+          desercion: Number(m?.meta_desercion_mes ?? 8),
+          cobranza: m?.meta_cobranza_max ?? 1,
         }
-        // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
-        // heredado del cierre anterior y cierre real del mes cuando existe.
-        const calc = (mesesCalc || []).find(x => x.mo === mo)
-        const desercion = r?.retiros_operativos_mes ?? desercionSemanal
-        const ninosInicio = calc ? calc.ninosInicio : (r?.ninos_inicio_mes || 0)
-        const nuevosActivosMes = r?.nuevos_activos_mes || 0
-        const ninosFin = calc ? calc.ninosFinal : Math.max(0, ninosInicio + nuevosActivosMes - desercion)
-        const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
-        const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
-        return {
-          mes: NOMBRES_MES[mo - 1],
-          mesNum: mo,
-          nuevos, desercion, desPct: desPctMes, cobranza: cobMes, ninos: ninosFin,
-          ninosInicio, nuevosActivos: nuevosActivosMes,
-          cumpl: cumple ? 'Sí' : 'No'
-        }
-      })
-      setMeses(mensual)
+        setMeta(metaFetched)
 
-      const conDatosMes = mensual.filter(mm => mm.ninosInicio > 0 || mm.nuevos > 0 || mm.desercion > 0 || mm.nuevosActivos > 0)
-      const lastMonth = conDatosMes.length ? conDatosMes[conDatosMes.length - 1] : mensual[mensual.length - 1]
-      const ultResumen = (rs || [])[(rs || []).length - 1]
-      setTotals({
-        ninosActivos: lastMonth.ninos,
-        nuevosIngresos: mensual.reduce((s, mm) => s + mm.nuevos, 0),
-        nuevosActivos: mensual.reduce((s, mm) => s + mm.nuevosActivos, 0),
-        desercion: mensual.reduce((s, mm) => s + mm.desercion, 0),
-        grupos: ultResumen?.grupos_activos || 0,
-        cpInv: (rs || []).reduce((s, r) => s + (r.cp_invitados || 0), 0),
-        cpAsi: (rs || []).reduce((s, r) => s + (r.cp_asistieron || 0), 0),
-        cpMat: (rs || []).reduce((s, r) => s + (r.cp_matriculados || 0), 0),
-        motivos: {
-          tecnica: (rs || []).reduce((s, r) => s + (r.mot_tecnica || 0), 0),
-          perdida: (rs || []).reduce((s, r) => s + (r.mot_perdida_clase || 0), 0),
-          economico: (rs || []).reduce((s, r) => s + (r.mot_economico || 0), 0),
-          horario: (rs || []).reduce((s, r) => s + (r.mot_horario || 0), 0),
-          graduado: (rs || []).reduce((s, r) => s + (r.mot_graduado || 0), 0),
-        },
-        origen: {
-          marketing: (rs || []).reduce((s, r) => s + (r.orig_marketing || 0), 0),
-          centro: (rs || []).reduce((s, r) => s + (r.orig_centro || 0), 0),
-          activaciones: (rs || []).reduce((s, r) => s + (r.orig_activaciones || 0), 0),
-          referidos: (rs || []).reduce((s, r) => s + (r.orig_referido || 0), 0),
-          medios: (rs || []).reduce((s, r) => s + (r.orig_medios || 0), 0),
-        },
-      })
-      setLoading(false)
+        const mensual = months.map(mo => {
+          const r = (rs || []).find(x => x.month === mo)
+          const ws = (ks || []).filter(x => x.month === mo)
+          const nuevos = ws.reduce((s, w) => s + (w.ing_d1 || 0) + (w.ing_d2 || 0) + (w.ing_d3 || 0) + (w.ing_d4 || 0) + (w.ing_d5 || 0), 0)
+          const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+          let cobMes = 0
+          if (ws.length) {
+            const lastSem = [...ws].sort((a, b) => b.semana - a.semana)[0]
+            cobMes = lastSem.cob_d5 || lastSem.cob_d4 || lastSem.cob_d3 || lastSem.cob_d2 || lastSem.cob_d1 || 0
+          }
+          // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
+          // heredado del cierre anterior y cierre real del mes cuando existe.
+          const calc = (mesesCalc || []).find(x => x.mo === mo)
+          const desercion = r?.retiros_operativos_mes ?? desercionSemanal
+          const ninosInicio = calc ? calc.ninosInicio : (r?.ninos_inicio_mes || 0)
+          const nuevosActivosMes = r?.nuevos_activos_mes || 0
+          const ninosFin = calc ? calc.ninosFinal : Math.max(0, ninosInicio + nuevosActivosMes - desercion)
+          const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
+          const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
+          return {
+            mes: NOMBRES_MES[mo - 1],
+            mesNum: mo,
+            nuevos, desercion, desPct: desPctMes, cobranza: cobMes, ninos: ninosFin,
+            ninosInicio, nuevosActivos: nuevosActivosMes,
+            cumpl: cumple ? 'Sí' : 'No'
+          }
+        })
+        setMeses(mensual)
+
+        const conDatosMes = mensual.filter(mm => mm.ninosInicio > 0 || mm.nuevos > 0 || mm.desercion > 0 || mm.nuevosActivos > 0)
+        const lastMonth = conDatosMes.length ? conDatosMes[conDatosMes.length - 1] : mensual[mensual.length - 1]
+        const ultResumen = (rs || [])[(rs || []).length - 1]
+        setTotals({
+          ninosActivos: lastMonth.ninos,
+          nuevosIngresos: mensual.reduce((s, mm) => s + mm.nuevos, 0),
+          nuevosActivos: mensual.reduce((s, mm) => s + mm.nuevosActivos, 0),
+          desercion: mensual.reduce((s, mm) => s + mm.desercion, 0),
+          grupos: ultResumen?.grupos_activos || 0,
+          cpInv: (rs || []).reduce((s, r) => s + (r.cp_invitados || 0), 0),
+          cpAsi: (rs || []).reduce((s, r) => s + (r.cp_asistieron || 0), 0),
+          cpMat: (rs || []).reduce((s, r) => s + (r.cp_matriculados || 0), 0),
+          motivos: {
+            tecnica: (rs || []).reduce((s, r) => s + (r.mot_tecnica || 0), 0),
+            perdida: (rs || []).reduce((s, r) => s + (r.mot_perdida_clase || 0), 0),
+            economico: (rs || []).reduce((s, r) => s + (r.mot_economico || 0), 0),
+            horario: (rs || []).reduce((s, r) => s + (r.mot_horario || 0), 0),
+            graduado: (rs || []).reduce((s, r) => s + (r.mot_graduado || 0), 0),
+          },
+          origen: {
+            marketing: (rs || []).reduce((s, r) => s + (r.orig_marketing || 0), 0),
+            centro: (rs || []).reduce((s, r) => s + (r.orig_centro || 0), 0),
+            activaciones: (rs || []).reduce((s, r) => s + (r.orig_activaciones || 0), 0),
+            referidos: (rs || []).reduce((s, r) => s + (r.orig_referido || 0), 0),
+            medios: (rs || []).reduce((s, r) => s + (r.orig_medios || 0), 0),
+          },
+        })
+      } catch (cause) {
+        if (active) setError('No se pudo cargar el resumen del centro. Intenta recargar la página.')
+      } finally { if (active) setLoading(false) }
     })()
-  }, [id, period])
+    return () => { active = false }
+  }, [id, period.year, period.quarter, periodReady])
 
   if (loading) return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
-      <main className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 14 }}>Cargando…</main>
+      <main id="main-content" data-page-state="loading" className="main center-summary-page"><div className="empty" role="status" aria-live="polite">Cargando resumen…</div></main>
     </div>
   )
+
+  if (error) return <div className="shell center-core-shell">
+    <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
+    <main id="main-content" data-page-state="error" className="main center-summary-page"><div className="alert alert--error" role="alert">{error}</div></main>
+  </div>
 
   const cumplCount = meses.filter(m => m.cumpl === 'Sí').length
   const cumplPctMetas = meses.length ? Math.round((cumplCount / meses.length) * 100) : 0
@@ -236,17 +256,17 @@ export default function CentroPage() {
   const pctCpMat = totals.cpAsi ? Math.round(totals.cpMat / totals.cpAsi * 100) : 0
 
   return (
-    <div className="shell">
+    <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <GrowthBriefing centroId={id} />
-      <main className="main">
+      <main id="main-content" data-page-state="ready" className="main center-summary-page">
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Resumen de centro · {label}</div>
             <h1 className="h-title">{nombre}</h1>
             <p className="h-sub">Vista consolidada del trimestre</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="center-summary-actions">
             <PeriodSelector value={period} onChange={changePeriod} />
             <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
               <span className="dot" />{cumplPct}% cumplimiento
@@ -255,9 +275,9 @@ export default function CentroPage() {
         </div>
 
         {!isAdmin && ent && ent.completados < ent.total && (
-          <div className="alert" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)' }}>
+          <div className="alert center-summary-actions" style={{ marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)' }}>
             <span>Tu entrenamiento: <b>{ent.completados} de {ent.total}</b> módulos completados.</span>
-            <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => router.push(`/centro/${id}/entrenamiento`)}>Continuar →</button>
+            <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento`}>Continuar →</Link>
           </div>
         )}
         <div data-tour="resumen.ruta"><GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} /></div>
@@ -291,17 +311,19 @@ export default function CentroPage() {
             <div className="kpi__value" style={desercionAlta ? { color: 'var(--bad)' } : undefined}>{desReal}</div>
             <div className="kpi__sub">
               {graduadosQ > 0
-                ? <>{totals.desercion} bajas · <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>🎓 {graduadosQ} graduado{graduadosQ !== 1 ? 's' : ''}</span></>
+                ? <>{totals.desercion} bajas · <span style={{ color: 'var(--ok-text)', fontWeight: 600 }}>🎓 {graduadosQ} graduado{graduadosQ !== 1 ? 's' : ''}</span></>
                 : 'Meta: <' + meta.desercion + '% mensual'}
             </div>
           </div>
           <Card l="Grupos activos" v={totals.grupos} s={totals.grupos > 0 ? 'GPN: $' + gpn.toFixed(2) : '—'} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="center-summary-grid">
           <div className="card" style={{ padding: 20 }}>
             <h3 style={sectionTitle}>Resultados por mes</h3>
+            <div className="desktop-only"><TableScroller label="Resultados por mes">
             <table className="table">
+              <caption className="sr-only">Resultados por mes</caption>
               <thead><tr>{['Mes', 'Ventas', 'Nuevos activos', 'Deserción', 'Niños', 'Cobranza', 'Meta'].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>{meses.map((m, i) => (
                 <tr key={i} style={{ cursor: 'default' }}>
@@ -312,7 +334,7 @@ export default function CentroPage() {
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
                   <td className="num" style={{ color: m.cobranza <= meta.cobranza ? 'var(--ok)' : 'var(--bad)', fontWeight: 600 }}>
                     {m.cobranza}
-                    <span style={{ fontSize: 11, fontWeight: 400 }}> {m.cobranza <= meta.cobranza ? '✓' : '✗'}</span>
+                    <span style={{ fontSize: 13, fontWeight: 400 }}> {m.cobranza <= meta.cobranza ? '✓' : '✗'}</span>
                   </td>
                   <td>
                     <span className={`pill ${m.cumpl === 'Sí' ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{m.cumpl}</span>
@@ -320,11 +342,22 @@ export default function CentroPage() {
                 </tr>
               ))}</tbody>
             </table>
+            </TableScroller></div>
+            <div className="mobile-only operational-list center-month-cards">
+              {meses.map(m => <OperationalCard key={m.mesNum} title={m.mes} fields={[
+                { label: 'Ventas', value: m.nuevos },
+                { label: 'Nuevos activos', value: m.nuevosActivos },
+                { label: 'Deserción', value: `${m.desercion} · ${m.desPct.toFixed(1)}%` },
+                { label: 'Niños', value: m.ninos },
+                { label: 'Cobranza', value: m.cobranza },
+                { label: 'Meta', value: m.cumpl },
+              ]} />)}
+            </div>
           </div>
 
           <div className="card" style={{ padding: 20 }} data-tour="resumen.embudo">
             <h3 style={sectionTitle}>Clase de prueba</h3>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+            <div className="center-summary-triplet" style={{ marginBottom: 18 }}>
               {[
                 { l: 'Invitados', v: totals.cpInv },
                 { l: 'Asistieron', v: totals.cpAsi, p: totals.cpInv ? pctCpAsi + '%' : null },
@@ -332,8 +365,8 @@ export default function CentroPage() {
               ].map((item, i) => (
                 <div key={i} style={{ textAlign: 'center', flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '14px 8px' }}>
                   <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>{item.v}</div>
-                  <div className="label" style={{ fontSize: 10, marginTop: 4 }}>{item.l}</div>
-                  {item.p && <div className="num" style={{ fontSize: 11, color: 'var(--ts-green)', marginTop: 3 }}>{item.p}</div>}
+                  <div className="label" style={{ fontSize: 13, marginTop: 4 }}>{item.l}</div>
+                  {item.p && <div className="num" style={{ fontSize: 13, color: 'var(--ok-text)', marginTop: 3 }}>{item.p}</div>}
                 </div>
               ))}
             </div>
@@ -347,24 +380,24 @@ export default function CentroPage() {
               { l: 'Graduado 🎓', n: totals.motivos.graduado, good: true },
             ].map((m, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <span className="label" style={{ width: 100, fontSize: 10, textAlign: 'right' }}>{m.l}</span>
+                <span className="label center-summary-bar-label">{m.l}</span>
                 <Bar val={m.n} max={maxMot} color={m.good ? 'var(--ts-green)' : 'var(--warn)'} />
-                <span className="num" style={{ width: 24, fontSize: 12, fontWeight: 600, color: m.good ? 'var(--ts-green)' : 'var(--text)' }}>{m.n}</span>
+                <span className="num" style={{ width: 24, fontSize: 13, fontWeight: 600, color: m.good ? 'var(--ts-green)' : 'var(--text)' }}>{m.n}</span>
               </div>
             ))}
 
             {graduacion && graduacion.graduados > 0 && (
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                 <h3 style={sectionTitle}>Graduados {period.year} · logro 🎓</h3>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="center-summary-triplet">
                   {[
                     { l: 'Graduados', v: graduacion.graduados },
                     { l: '% de las bajas', v: graduacion.pctBajas + '%' },
                     { l: '% del alumnado', v: graduacion.pctAlumnado + '%' },
                   ].map((x, i) => (
                     <div key={i} style={{ textAlign: 'center', flex: 1, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', borderRadius: 'var(--r-sm)', padding: '10px 6px' }}>
-                      <div className="num" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ts-green)' }}>{x.v}</div>
-                      <div className="label" style={{ fontSize: 9, marginTop: 3 }}>{x.l}</div>
+                      <div className="num" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ok-text)' }}>{x.v}</div>
+                      <div className="label" style={{ fontSize: 13, marginTop: 3 }}>{x.l}</div>
                     </div>
                   ))}
                 </div>
@@ -382,9 +415,9 @@ export default function CentroPage() {
               { l: 'Medios', n: totals.origen.medios },
             ].map((o, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <span className="label" style={{ width: 90, fontSize: 10, textAlign: 'right' }}>{o.l}</span>
+                <span className="label center-summary-bar-label">{o.l}</span>
                 <Bar val={o.n} max={maxOri} />
-                <span className="num" style={{ width: 30, fontSize: 12, color: 'var(--text)' }}>{o.n}</span>
+                <span className="num" style={{ width: 30, fontSize: 13, color: 'var(--text)' }}>{o.n}</span>
               </div>
             ))}
           </div>

@@ -19,7 +19,9 @@ function parseBaseURL(value) {
 const remoteRun = Boolean(process.env.RESPONSIVE_BASE_URL)
 const dialogsRun = process.env.E2E_R3_DIALOGS === '1'
 const comparisonsRun = process.env.E2E_R6_COMPARISONS === '1'
-if ([dialogsRun, comparisonsRun, process.env.E2E_RUN_MUTATIONS === '1'].filter(Boolean).length > 1) {
+const centerCoreRun = process.env.E2E_R8_CENTER_CORE === '1'
+if (centerCoreRun && remoteRun) throw new Error('R8 solo permite ejecución local disposable.')
+if ([dialogsRun, comparisonsRun, centerCoreRun, process.env.E2E_RUN_MUTATIONS === '1'].filter(Boolean).length > 1) {
   throw new Error('Los gates con fixture son exclusivos; no se pueden combinar.')
 }
 if (comparisonsRun && remoteRun) throw new Error('R6 solo permite ejecución local disposable.')
@@ -79,7 +81,7 @@ const dialogProjects = dialogsRun ? [
 ] : []
 
 const serverEnv = remoteRun ? undefined : {
-  E2E_NEXT_PROFILE: dialogsRun ? 'dialogs' : 'authenticated',
+  E2E_NEXT_PROFILE: centerCoreRun ? 'center-core' : dialogsRun ? 'dialogs' : 'authenticated',
   E2E_NEXT_PORT: '3000',
   DATABASE_URL: testDatabase,
   USUARIOS_TEST_DATABASE_URL: testDatabase,
@@ -88,10 +90,10 @@ const serverEnv = remoteRun ? undefined : {
   E2E_NEON_WSPROXY: process.env.E2E_NEON_WSPROXY,
   E2E_DELIVERY_MODE: process.env.E2E_DELIVERY_MODE || 'stub',
   SESSION_SECRET: process.env.SESSION_SECRET,
-  ...(dialogsRun ? {
+  ...(dialogsRun || centerCoreRun ? {
     CRM_API_URL: 'http://127.0.0.1:4317',
     CRM_SERVICE_TOKEN: process.env.CRM_SERVICE_TOKEN,
-    E2E_R3_DIALOGS: '1',
+    ...(centerCoreRun ? { E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
   } : {}),
 }
 
@@ -101,9 +103,9 @@ export default defineConfig({
   preserveOutput: mutationRun ? 'never' : 'always',
   reporter: mutationRun ? [['line']] : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   expect: { timeout: 10_000 },
-  globalSetup: comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
-  globalTeardown: comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
-  workers: mutationRun || dialogsRun || comparisonsRun ? 1 : undefined,
+  globalSetup: centerCoreRun ? './tests/e2e/helpers/r8-global-setup.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
+  globalTeardown: centerCoreRun ? './tests/e2e/helpers/r8-global-teardown.mjs' : comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
+  workers: mutationRun || dialogsRun || comparisonsRun || centerCoreRun ? 1 : undefined,
   use: {
     baseURL,
     channel: 'chrome',
@@ -118,20 +120,26 @@ export default defineConfig({
       timeout: 120_000,
       env: serverEnv,
     },
-    ...(dialogsRun ? [{
+    ...(dialogsRun || centerCoreRun ? [{
       command: 'node tests/e2e/helpers/crm-readonly-stub.mjs',
       url: 'http://127.0.0.1:4317/health',
       reuseExistingServer: false,
       timeout: 30_000,
       env: {
         NODE_ENV: 'development',
-        E2E_R3_DIALOGS: '1',
+        ...(centerCoreRun ? { ...serverEnv, E2E_R8_CENTER_CORE: '1' } : { E2E_R3_DIALOGS: '1' }),
         CRM_SERVICE_TOKEN: process.env.CRM_SERVICE_TOKEN,
       },
     }] : []),
   ],
-  projects: comparisonsRun ? [
-    { name: 'setup', testMatch: /auth\.setup\.js/, use: { trace: 'off', screenshot: 'off' } },
+  projects: centerCoreRun ? [
+    { name: 'r8-setup', testMatch: /r8-auth\.setup\.js/, use: { trace: 'off', screenshot: 'off' } },
+    ...[...sizes, ['desktop-1025', 1025, 900]].map(([name, width, height]) => ({
+      name, testMatch: /center-core\.spec\.js/, dependencies: ['r8-setup'], fullyParallel: false,
+      use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/r8-center.json' },
+    })),
+  ] : comparisonsRun ? [
+    { name: 'setup', testMatch: /(?:^|\/)auth\.setup\.js$/, use: { trace: 'off', screenshot: 'off' } },
     ...[...sizes.filter(([name]) => ['phone-320', 'phone-390', 'tablet-768', 'desktop-1440'].includes(name)), ['desktop-1025', 1025, 900]].map(([name, width, height]) => ({
       name, testMatch: /dashboard-comparisons\.spec\.js/, dependencies: ['setup'], fullyParallel: false,
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
@@ -139,28 +147,28 @@ export default defineConfig({
   ] : dialogsRun ? [
     {
       name: 'setup',
-      testMatch: /auth\.setup\.js/,
+      testMatch: /(?:^|\/)auth\.setup\.js$/,
       use: { trace: 'off', screenshot: 'off' },
     },
     ...dialogProjects,
   ] : mutationRun ? [
     {
       name: 'setup',
-      testMatch: /auth\.setup\.js/,
+      testMatch: /(?:^|\/)auth\.setup\.js$/,
       use: { trace: 'off', screenshot: 'off' },
     },
     ...mutationProjects,
   ] : [
     {
       name: 'setup',
-      testMatch: /auth\.setup\.js/,
+      testMatch: /(?:^|\/)auth\.setup\.js$/,
       use: { trace: 'off', screenshot: 'off' },
     },
     ...sizes.map(([name, width, height]) => ({
       name,
       dependencies: ['setup'],
       grepInvert: /@coordinator/,
-      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
+      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|center-core\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
     {

@@ -82,13 +82,6 @@ export async function getCentroResumen(centroId, year, trimestre) {
         const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
         if (automatic.complete) {
           rs = mezclarResumenAutomatico(rs, abierto.year, abierto.month, automatic.data)
-          ks = mezclarSemanasPeriodoAutomaticas(
-            ks,
-            centroId,
-            abierto.year,
-            abierto.month,
-            automatic.data,
-          )
           automaticosAbiertos.set(`${abierto.year}-${abierto.month}`, automatic.data)
         } else {
           console.error(`[getCentroResumen] no se pudo sincronizar ${abierto.year}-${abierto.month}: ${automatic.error}`)

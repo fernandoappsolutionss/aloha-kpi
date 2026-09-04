@@ -1,11 +1,14 @@
 import { createServer } from 'node:http'
+import { R8_EVENT, R8_REGISTRATION, requireR8Gate } from './r8-fixture.mjs'
 
 const HOST = '127.0.0.1'
 const PORT = 4317
 const MAX_BODY = 64 * 1024
 const token = process.env.CRM_SERVICE_TOKEN
 
-if (process.env.E2E_R3_DIALOGS !== '1' || !token) {
+const r8 = process.env.E2E_R8_CENTER_CORE === '1'
+if (r8) requireR8Gate()
+if ((!r8 && process.env.E2E_R3_DIALOGS !== '1') || !token) {
   throw new Error('El CRM stub R3 exige gate local y token dummy explícitos.')
 }
 
@@ -105,7 +108,7 @@ const server = createServer((request, response) => {
       return
     }
     if (body.action === 'list_events') {
-      send(response, 200, { events: [fixtureEvent()] })
+      send(response, 200, { events: r8 ? (body.account_id === R8_EVENT.account_id ? [R8_EVENT] : []) : [fixtureEvent()] })
       return
     }
     if (body.action === 'list_registrations') {
@@ -118,7 +121,7 @@ const server = createServer((request, response) => {
     }
     const requested = new Set((body.event_ids || []).map(String))
     send(response, 200, {
-      registrations: requested.has('e2e-r3-event-930032') ? [fixtureRegistration()] : [],
+      registrations: r8 ? (requested.has(R8_EVENT.id) ? [R8_REGISTRATION] : []) : requested.has('e2e-r3-event-930032') ? [fixtureRegistration()] : [],
     })
   })
 })
