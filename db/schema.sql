@@ -805,6 +805,20 @@ CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
 );
 -- (sin índice extra: el UNIQUE ya indexa usuario_id como primera columna)
 
+-- ══ ENTRENAMIENTO DE OFICIO (2026-09-03) ══
+-- La misma tabla sostiene la segunda pista: el oficio de la administradora y
+-- el de la asistente (ids con prefijo `of-`, ver lib/entrenamiento/oficio/).
+-- `modulo` es TEXT libre, así que no hace falta migrar nada para sumarlos.
+-- OJO con la semántica reusada: en una fila de OFICIO `tour_visto_at` NO es un
+-- tour (no hay ninguno) — significa "lo estudió con la masa delante". Se reusa
+-- a propósito para no migrar una tercera columna.
+-- El drill lo firma el Oficial de Entrenamiento (el jefe inmediato), nunca la
+-- propia persona: `hat completo` = estudiado AND drill firmado.
+-- ON DELETE SET NULL, no CASCADE: borrar al supervisor que firmó no puede
+-- borrar el progreso del alumno.
+ALTER TABLE entrenamiento_progreso ADD COLUMN IF NOT EXISTS drill_firmado_at  TIMESTAMPTZ;
+ALTER TABLE entrenamiento_progreso ADD COLUMN IF NOT EXISTS drill_firmado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
 -- Conexión OAuth con Zoho Books (fila única): la autorización con la que el
 -- cron de cobranza (/api/cron/cobranza-zoho) lee las facturas de las 4
 -- organizaciones. Se crea desde /dashboard/zoho — solo el correo autorizado

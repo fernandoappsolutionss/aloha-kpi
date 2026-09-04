@@ -1,0 +1,737 @@
+// ============================================================
+// BANCO DE PREGUNTAS - CURSO 1: ADMINISTRACION DE CENTRO ALOHA
+// Importar en Moodle: Banco de preguntas > Importar > formato GIFT
+// ============================================================
+
+$CATEGORY: Administradora/M1 Calendarios y ciclos
+
+::A1-01:: La regla para fijar el fin de un nivel es que el inicio del proximo nivel caiga... {
+=en el mismo mes en que termina el anterior, para garantizar flujo de efectivo continuo
+~en el mes siguiente, para dar descanso
+~siempre en enero
+~cuando el Coach este disponible
+}
+
+::A1-02:: Cada nivel del Programa dura aproximadamente... {
+=5 meses, entre 19 y 22 semanas de clases
+~3 meses
+~10 meses
+~1 ano
+}
+
+::A1-03:: Las dos primeras semanas de un grupo nuevo son de induccion, y permiten incorporar ninos si el grupo no esta completo.{T}
+
+::A1-04:: Se busca aperturar cerca de la quincena porque... {
+=los padres tienen flujo de efectivo disponible para adquirir el servicio
+~los Coaches cobran esos dias
+~el corporativo lo exige
+~los salones estan libres
+}
+
+::A1-05:: Entre el nivel 1 y el nivel 2 se deja una semana de vacaciones.{F}
+
+::A1-06:: En el mes de diciembre, las vacaciones corresponden a... {
+=las ultimas dos semanas del mes
+~todo el mes
+~la primera semana
+~no hay vacaciones en diciembre
+}
+
+::A1-07:: En el formato de Calendario y Asistencia en Drive, el codigo MD significa... {
+=Mental Day
+~Media jornada
+~Modulo Didactico
+~Mes de Diciembre
+}
+
+::A1-08:: A partir de cuantas ausencias de un nino debe hacerse seguimiento? {
+=Dos ausencias
+~Una ausencia
+~Tres ausencias
+~Cinco ausencias
+}
+
+$CATEGORY: Administradora/M2 Dias especiales
+
+::A2-01:: Las evaluaciones completas de los ninos se realizan cada... {
+=3 semanas de trabajo en clases
+~semana
+~2 semanas
+~mes
+}
+
+::A2-02:: El primer Mental Day se realiza despues de la semana 5, salvo en nivel 1 donde se realiza despues de la semana 4.{T}
+
+::A2-03:: Que distingue al segundo Mental Day? {
+=Se brinda un snack y se realiza la primera tiendita del nivel con canje de ALOHA Dolares
+~Se hace el examen final
+~Se trabaja en el libro de clases
+~Se invita a los padres
+}
+
+::A2-04:: En un Mental Day, el primer paso de la estructura de la clase es... {
+=un juego, sin ninguna operacion
+~el test de velocidad
+~el dictado de numeros
+~las flashcards
+}
+
+::A2-05:: La practica de ficha de campeonato se planifica una vez cada 2 clases, iniciando despues de la semana 4 de entrenamiento.{T}
+
+::A2-06:: La tiendita ALOHA se realiza... {
+=una vez por nivel, en el segundo Mental Day, tanto en Tiny como en Kids
+~una vez al mes
+~cada semana
+~solo en el cierre de nivel
+}
+
+::A2-07:: El presupuesto para compra de productos de la tiendita en un Centro nivel 2 es de... {
+=160.00 cada 2 meses
+~100.00 cada 2 meses
+~130.00 cada 2 meses
+~200.00 mensuales
+}
+
+::A2-08:: Las denominaciones de los ALOHA Dolares son 5, 10, 20 y 50.{T}
+
+$CATEGORY: Administradora/M3 Clases de prueba y apertura
+
+::A3-01:: La clase de prueba tiene una duracion de... {
+=una hora reloj y se realiza una vez por semana
+~dos horas, una vez por semana
+~una hora, dos veces por semana
+~hora y media, quincenal
+}
+
+::A3-02:: Los horarios de apertura de nuevos grupos se informan a... {
+=Viralsolutionss Inc, el promotor de redes sociales y publicidad, por WhatsApp al grupo correspondiente
+~la Caja de Seguro Social
+~el Master Coach unicamente
+~ningun tercero
+}
+
+::A3-03:: En la clase de prueba, quien invita a los padres a pasar al salon para la charla? {
+=La Administradora, una vez los ninos estan en sus salones
+~El Coach de Tiny Tots
+~La Asistente Administrativa
+~El personal de aseo
+}
+
+::A3-04:: El minimo de ninos para abrir un grupo nuevo es de 10, salvo Tiny Tots que puede abrir con 8.{T}
+
+::A3-05:: Hasta que semana se pueden incorporar ninos nuevos en el itinerario Kids? {
+=Hasta la semana 2 del libro
+~Hasta la semana 4
+~Hasta la semana 6
+~En cualquier momento
+}
+
+::A3-06:: Hasta que semana se pueden incorporar ninos nuevos en Tiny Tots? {
+=Hasta la semana 4
+~Hasta la semana 2
+~Hasta la semana 8
+~En cualquier momento
+}
+
+::A3-07:: En niveles superiores, el Centro puede cubrir un grupo con minimo 6 estudiantes, pagando al Coach el minimo establecido por 10 ninos.{T}
+
+::A3-08:: Cuando un grupo queda con 5 o menos estudiantes y no hay posibilidad de union, quien debe tomar el grupo? {
+=La Administradora del Centro, pagada por la cantidad real de ninos
+~El Coach mas antiguo
+~El Master Coach
+~Se cierra el grupo automaticamente
+}
+
+::A3-09:: El arreglo de pago por cantidad real de ninos aplica tanto a la Administradora como a los Coaches regulares.{F}
+
+::A3-10:: En la solicitud de kits, el nombre de grupo BG-K-02 significa... {
+=Brisas del Golf, itinerario Kids, grupo Kids numero 2 del Centro
+~Buen Grupo, Kinder, 2 niveles
+~Brisas del Golf, Kinder, 2 ninos
+~Bloque General Kids 02
+}
+
+::A3-11:: La revision y conteo de los kits recibidos debe hacerse... {
+=el mismo dia, para poder formalizar discrepancias contra la orden de entrega
+~dentro de la semana
+~antes del cierre de mes
+~cuando lo pida el proveedor
+}
+
+::A3-12:: Cual de estos NO esta incluido en la matricula? {
+=La reposicion de materiales perdidos
+~El seguro estudiantil
+~La mochila ALOHA
+~El abaco
+}
+
+::A3-13:: La mochila y el abaco se entregan una sola vez en todo el programa.{T}
+
+$CATEGORY: Administradora/M4 Casos especiales, grupos compartidos y uniones
+
+::A4-01:: Un ingreso fuera del rango de edad oficial requiere... {
+=aprobacion formal del Corporativo ALOHA
+~solo la firma de la Administradora
+~solo el consentimiento del padre
+~la recomendacion del Coach
+}
+
+::A4-02:: El informe tecnico de evaluacion de un caso especial debe llevar firma del evaluador, firma del Administrador del Centro, fecha de emision y anexo de evidencias.{T}
+
+::A4-03:: Alterar o manipular la fecha de nacimiento de un estudiante para tramitar un ingreso se considera... {
+=falta grave y causal de despido inmediato
+~una falta leve
+~un error administrativo subsanable
+~una practica aceptada si el padre lo pide
+}
+
+::A4-04:: Los grupos compartidos existen a partir de cuantos ninos? {
+=13 ninos minimo
+~10 ninos
+~17 ninos
+~20 ninos
+}
+
+::A4-05:: En un grupo compartido por hora, de 13 a 16 ninos, al Coach auxiliar se le paga... {
+=10.00 la hora
+~por los ninos restantes
+~por 10 ninos base
+~lo mismo que al principal
+}
+
+::A4-06:: En un grupo compartido, el Coach principal se encarga de la programacion de la clase y de corregir 10 libros.{T}
+
+::A4-07:: Para uniones de grupos Kids, se recomienda unir a partir del nivel... {
+=3
+~1
+~5
+~7
+}
+
+::A4-08:: Para uniones entre grupos Tiny Tots, se recomienda a partir del nivel... {
+=4
+~1
+~2
+~6
+}
+
+$CATEGORY: Administradora/M5 Vida academica del nino
+
+::A5-01:: La clase de reforzamiento esta disenada para ninos que... {
+=a pesar de tener excelente asistencia, no estan comprendiendo un contenido importante
+~faltaron a varias clases
+~quieren avanzar mas rapido
+~van a competir en un campeonato
+}
+
+::A5-02:: La clase de reforzamiento no tiene costo para el padre, pero si se le paga al Coach que la imparte.{T}
+
+::A5-03:: Cual NO es un requisito para otorgar una clase de reforzamiento? {
+=Que el nino tenga menos de 8 anos
+~Que el nino tenga tres asistencias consecutivas
+~Que no tenga clase de repaso inmediatamente despues
+~Que el representante este paz y salvo
+}
+
+::A5-04:: Antes de autorizar una clase de reforzamiento, la Administradora debe... {
+=observar al nino en clase para tener referencia de su comportamiento y manejo de la tecnica
+~llamar directamente al padre
+~pedir autorizacion al corporativo
+~cambiar al nino de grupo
+}
+
+::A5-05:: Preferiblemente, la clase de reforzamiento la da el mismo Coach del nino.{F}
+
+::A5-06:: El costo de una clase de reposicion es... {
+=25.00
+~15.00
+~40.00
+~gratuita
+}
+
+::A5-07:: Con cuanta anticipacion debe notificarse la inasistencia a una clase de reposicion para no incurrir en el recargo de 15.00? {
+=Minimo 2 horas
+~Minimo 24 horas
+~Minimo 30 minutos
+~No hay recargo
+}
+
+::A5-08:: El puntaje minimo reglamentario en la evaluacion final de un nivel es... {
+=60 por ciento
+~70 por ciento
+~50 por ciento
+~80 por ciento
+}
+
+::A5-09:: Cuantas formas autorizadas existen para repetir un nivel? {
+=Dos, por criterio academico o por solicitud formal del padre aprobada y registrada
+~Una, solo por criterio academico
+~Tres
+~Ninguna, no se permite repetir nivel
+}
+
+::A5-10:: Una repeticion de nivel no documentada ni informada se considera una irregularidad administrativa y puede ser objeto de sancion.{T}
+
+::A5-11:: Un estudiante que culmina el itinerario Tiny Tots y continua en Kids debe ingresar en... {
+=Kids nivel 5
+~Kids nivel 1
+~Kids nivel 3
+~el nivel que decida el padre
+}
+
+::A5-12:: La transicion de Tiny Tots graduado a Kids nivel 5 requiere autorizacion especial del corporativo.{F}
+
+::A5-13:: Quien puede emitir una constancia escolar o certificacion academica? {
+=Exclusivamente el Corporativo ALOHA
+~La Administradora del Centro
+~El Coach del nino
+~Cualquiera de los tres anteriores
+}
+
+::A5-14:: El plazo de emision de una constancia por parte del corporativo, una vez recibida la solicitud completa, es de... {
+=no mayor a tres dias laborales
+~cinco dias habiles
+~24 horas
+~dos semanas
+}
+
+::A5-15:: Se pueden emitir constancias para referencias personales o tramites externos no vinculados al proceso educativo.{F}
+
+$CATEGORY: Administradora/M6 Cierres de nivel
+
+::A6-01:: El examen y cierre de nivel se divide en... {
+=tres clases de dos horas cada una
+~una sola clase de seis horas
+~dos clases de tres horas
+~cuatro clases
+}
+
+::A6-02:: En que clase del cierre se realiza la presentacion a los padres? {
+=En la clase 3
+~En la clase 1
+~En la clase 2
+~En una sesion aparte
+}
+
+::A6-03:: Las practicas de la demostracion del cierre se realizan en el ultimo Mental Day y en la semana de repaso de examen.{T}
+
+::A6-04:: Un Coach que va a hacer su primer Cierre de Nivel debe... {
+=asistir antes como observador a un Cierre de Nivel
+~hacerlo directamente con apoyo del Master Coach
+~grabar el cierre de otro Coach
+~pedir permiso al corporativo
+}
+
+::A6-05:: Al escoger a los ninos para la demostracion, el criterio es... {
+=escoger por tecnica a los mejores, de modo que todos los ninos se luzcan
+~escoger solo a los tres mejores del grupo
+~escoger al azar
+~que participen solo los que quieran
+}
+
+::A6-06:: La encuesta de satisfaccion se envia a los padres... {
+=por correo y WhatsApp durante la ejecucion del Cierre de Nivel
+~una semana despues del cierre
+~al inicio del nivel
+~solo si el padre la solicita
+}
+
+::A6-07:: Esta permitido abrir grupos de WhatsApp con los padres para el seguimiento del cierre.{F}
+
+::A6-08:: El correo avisando que deben estar paz y salvo para el examen y cierre se envia con... {
+=15 dias de anticipacion
+~3 dias de anticipacion
+~30 dias de anticipacion
+~el mismo dia
+}
+
+$CATEGORY: Administradora/M7 Gestion de Coaches
+
+::A7-01:: La capacitacion de los niveles 1 y 2 tiene una duracion aproximada de... {
+=32 horas
+~16 horas
+~8 horas
+~48 horas
+}
+
+::A7-02:: La capacitacion de los niveles 3 al 8 dura aproximadamente 16 horas.{T}
+
+::A7-03:: Cuantas veces se evalua a cada Coach dentro del tiempo estimado de un grupo? {
+=Al menos dos veces, por ejemplo en la semana 4 y en la semana 9
+~Una vez al final
+~Cada semana
+~Solo si hay quejas
+}
+
+::A7-04:: Cual de estos NO forma parte de la escala de evaluacion del Coach? {
+=El salario del Coach
+~La puntualidad
+~La estructura de clase
+~La relacion alumno-profesor
+}
+
+::A7-05:: Despues de evaluar a un Coach, la hoja de evaluacion se anexa a su expediente.{T}
+
+::A7-06:: Para recibir el bono de puntualidad, el Coach debe llegar... {
+=20 minutos antes del inicio de la clase, con tolerancia de 15 minutos
+~15 minutos antes, sin tolerancia
+~a la hora exacta
+~30 minutos antes
+}
+
+::A7-07:: El bono por puntualidad perfecta para un Coach con un grupo asignado es de... {
+=15.00 mensuales
+~20.00 mensuales
+~10.00 mensuales
+~30.00 mensuales
+}
+
+::A7-08:: Las reuniones mensuales de Coaches pueden coincidir con las trimestrales.{F}
+
+::A7-09:: Para decidir el cambio de un Coach en un grupo, la Administradora considera... {
+=la evaluacion del Coach, las ausencias de los ninos, la cantidad de retirados y la retroalimentacion de los padres
+~solo la opinion de los padres
+~solo la antiguedad del Coach
+~solo el resultado del examen del grupo
+}
+
+::A7-10:: A un Coach con dos o mas grupos asignados, el bono por puntualidad perfecta le suma... {
+=5.00 mensuales por cada grupo adicional
+~15.00 mensuales por cada grupo adicional
+~nada adicional, el bono es siempre de 15.00
+~el doble del bono base
+}
+
+::A7-11:: El bono por puntualidad perfecta se paga los 30 de cada mes, siempre que el Coach cumpla un minimo de un mes de trabajo con el grupo.{T}
+
+$CATEGORY: Administradora/M8 Padres
+
+::A8-01:: La Clase para Padres se realiza... {
+=el mismo dia en que los ninos inician, o a mas tardar la segunda semana de clases
+~un mes despues del inicio
+~al cierre del nivel
+~cuando los padres lo pidan
+}
+
+::A8-02:: Quien puede dar la Clase para Padres? {
+=Unicamente la Administradora del Centro; si no puede, otra Administradora o el Master Coach con costo adicional para el Centro
+~Cualquier Coach del Centro
+~La Asistente Administrativa
+~El Coordinador Operativo
+}
+
+::A8-03:: En cada Clase para Padres acompana un Coach distinto, y todo Coach debe haber asistido al menos a una como parte de su entrenamiento.{T}
+
+::A8-04:: Si 5 ninos se retiraron y en 4 de esos casos los padres no asistieron a la Clase de Padres, el indicador es... {
+=80 por ciento
+~20 por ciento
+~125 por ciento
+~40 por ciento
+}
+
+::A8-05:: Cuando un Coach necesita comunicar a un padre un comportamiento destructivo del nino, debe... {
+=hacerlo en conjunto con la Administradora del Centro
+~hacerlo directamente y luego informar
+~escribirlo por WhatsApp
+~pedirle a la Asistente que lo comunique
+}
+
+::A8-06:: Las reuniones con padres se realizan siempre en presencia de la Administradora.{T}
+
+::A8-07:: Un Coach puede dar su numero de telefono directo al representante si el padre lo solicita.{F}
+
+::A8-08:: Que debe dar el Coach al representante en lugar de su numero directo? {
+=El celular del Centro
+~El correo del corporativo
+~El numero de la Asistente
+~Ningun contacto
+}
+
+::A8-09:: El cuadro de deserciones de fin de mes debe indicar... {
+=cantidad de alumnos retirados, grupos, causas y Coach encargado de cada grupo
+~solo la cantidad de retirados
+~retirados y monto adeudado
+~retirados y fecha de ingreso
+}
+
+$CATEGORY: Administradora/M9 Personal
+
+::A9-01:: El periodo de prueba de un colaborador nuevo es de... {
+=30 dias calendario desde la fecha de contratacion
+~15 dias
+~60 dias
+~90 dias
+}
+
+::A9-02:: El primer contrato es de tres meses con un mes de prueba, y el segundo de un ano con tres meses de prueba.{T}
+
+::A9-03:: El contrato de servicios profesionales se utiliza para... {
+=Coaches y servicio de limpieza
+~Asistentes administrativos
+~Administradores
+~Todo el personal
+}
+
+::A9-04:: Cuantas referencias minimo deben verificarse de un candidato? {
+=Dos, con llamada y carta
+~Una
+~Tres
+~No es obligatorio verificar referencias
+}
+
+::A9-05:: A quien se envia el formato de Solicitud de Contrato? {
+=Al Coordinador Operativo
+~A la Junta Directiva
+~Al Ministerio de Trabajo
+~Al Master Coach
+}
+
+::A9-06:: La evaluacion de desempeno del nuevo colaborador se realiza a las... {
+=2 semanas de trabajo
+~4 semanas
+~1 semana
+~al finalizar el contrato
+}
+
+::A9-07:: Con cuanta anticipacion debe informarse si el colaborador paso su periodo de prueba? {
+=Cinco dias antes de la finalizacion del contrato
+~El ultimo dia
+~Quince dias antes
+~Un mes antes
+}
+
+::A9-08:: La evaluacion de gestion de la Asistente Administrativa se realiza cada... {
+=2 meses
+~mes
+~6 meses
+~ano
+}
+
+::A9-09:: El orden jerarquico de las acciones disciplinarias que la Administradora aplica al Asistente Administrativo es... {
+=llamado de atencion verbal, tres memorandums archivados en el file, despido
+~memorandum, llamado verbal, despido
+~despido directo
+~suspension, memorandum, despido
+}
+
+::A9-10:: Los permisos se solicitan por escrito con un minimo de... {
+=tres dias de anticipacion
+~un dia de anticipacion
+~una semana de anticipacion
+~el mismo dia
+}
+
+::A9-11:: Un permiso otorgado justifica al empleado, pero no justifica el pago del tiempo solicitado, que se descuenta del salario.{T}
+
+::A9-12:: El maximo de permisos al ano con justificacion medica pagados por la empresa es de... {
+=18
+~12
+~24
+~30
+}
+
+::A9-13:: Al exceder el maximo de permisos con justificacion medica, quien se responsabiliza del pago? {
+=La Caja de Seguro Social
+~La empresa igualmente
+~El colaborador
+~El Coordinador Operativo
+}
+
+::A9-14:: Los Coaches coordinan su suplencia con otro Coach y luego comunican a la Administradora, que verifica que la suplencia sea optima.{T}
+
+$CATEGORY: Administradora/M10 Nomina y sistema
+
+::A10-01:: La nomina de Coaches y el pago de proveedores se realizan los dias... {
+=15 y 30 de cada mes
+~13 y 28
+~1 y 15
+~ultimo dia habil
+}
+
+::A10-02:: El proceso de nomina debe estar realizado antes de los dias 13 y 28.{T}
+
+::A10-03:: Quien verifica la nomina y envia a cada Coach su factura para que confirme el pago? {
+=La Administradora del Centro
+~La Asistente Administrativa
+~El auditor
+~El Coordinador Operativo
+}
+
+::A10-04:: La factura de servicio del Coach debe contener minimamente... {
+=nombre, cedula y digito verificador
+~nombre y firma
+~nombre y numero de grupo
+~solo el monto
+}
+
+::A10-05:: Para pagar por ACH a una cuenta que no es del colaborador se requiere una autorizacion escrita y firmada por el, archivada en su file.{T}
+
+::A10-06:: Una innovacion o nueva estrategia propuesta por la Administradora... {
+=debe notificarse a la Administracion General para ser evaluada y aprobada, porque se aplicaria en todos los Centros
+~se puede aplicar de inmediato en su Centro
+~requiere aprobacion del Master Coach
+~no esta permitida
+}
+
+$CATEGORY: Administradora/M11 Indicadores y primas
+
+::A11-01:: El informe FODA se entrega a la Junta Directiva... {
+=dentro de los primeros 5 dias de cada mes
+~el ultimo dia del mes
+~cada trimestre
+~cuando lo soliciten
+}
+
+::A11-02:: Cual de estos NO es un indicador obligatorio del FODA? {
+=El costo de la tiendita ALOHA
+~Porcentaje de asistencia e inscripcion en clases de prueba
+~Porcentaje de asistencia a la Escuela de Padres
+~Porcentaje de ninos retirados en el mes
+}
+
+::A11-03:: La prima de produccion forma parte del salario del colaborador.{F}
+
+::A11-04:: La condicion de desercion para la prima mensual del Administrador de Centro es... {
+=maximo 8 por ciento al cierre de mes, por 75 USD al mes
+~maximo 5 por ciento
+~maximo 12 por ciento
+~no hay condicion de desercion
+}
+
+::A11-05:: Con un minimo de 30 ninos nuevos en el mes, la prima mensual del Administrador es de... {
+=105 USD
+~75 USD
+~90 USD
+~200 USD
+}
+
+::A11-06:: La prima trimestral del Administrador requiere minimo 60 ninos nuevos en el trimestre y desercion maxima de 8 por ciento cada mes, y equivale a... {
+=200 USD
+~175 USD
+~150 USD
+~250 USD
+}
+
+::A11-07:: Un Centro nivel 2 tiene mas de 200 ninos al cierre del trimestre y da derecho a... {
+=1 Asistente Operativo y bono mensual de 150 USD para administradora y asistente senior
+~solo un bono de 85 USD
+~1 Coach de planta unicamente
+~1 Asistente Jr
+}
+
+::A11-08:: Un Centro nivel 1 corresponde a mas de 170 ninos al cierre del trimestre.{T}
+
+::A11-09:: Un Centro con mas de 325 ninos al cierre del trimestre corresponde al nivel... {
+=4
+~3
+~5
+~2
+}
+
+::A11-10:: Quien inicia en un centro debe esperar cuantos trimestres para incorporarse a la evaluacion del nivel del centro? {
+=Minimo dos trimestres
+~Un trimestre
+~Tres trimestres
+~Se incorpora de inmediato
+}
+
+::A11-11:: Las evaluaciones para la prima trimestral se hacen en los meses de... {
+=marzo, junio, septiembre y diciembre
+~enero, abril, julio y octubre
+~febrero, mayo, agosto y noviembre
+~solo en diciembre
+}
+
+::A11-12:: La prima de produccion se sigue entregando despues de que el colaborador presenta carta de renuncia.{F}
+
+$CATEGORY: Administradora/M12 Accidentes y seguro
+
+::A12-01:: Ante un accidente, el primer paso es... {
+=brindar primeros auxilios basicos y asegurar la integridad del nino
+~llamar al padre
+~llenar el reporte
+~verificar la poliza
+}
+
+::A12-02:: Todo incidente o accidente, por leve que parezca, debe ser reportado y documentado.{T}
+
+::A12-03:: El Reporte de Accidente Escolar ALOHA debe completarse... {
+=el mismo dia del suceso
+~dentro de las 72 horas
+~cuando el padre lo solicite
+~al cierre de mes
+}
+
+::A12-04:: El traslado a un centro medico se coordina por el servicio de ambulancia contratado por el Centro... {
+=siempre con la autorizacion del representante
+~sin necesidad de autorizacion, por urgencia
+~solo si el Coach lo autoriza
+~solo si el seguro lo cubre
+}
+
+::A12-05:: Antes de entregar al padre los requisitos de la aseguradora hay que... {
+=verificar que el estudiante este dentro de la poliza colectiva vigente
+~cobrar la franquicia
+~esperar el informe medico
+~notificar al corporativo
+}
+
+::A12-06:: Si el estudiante no figura en la poliza, la Administradora debe... {
+=ubicar el documento donde el padre indico expresamente que no queria acogerse a la poliza
+~incluirlo retroactivamente
+~asumir el costo con caja menuda
+~no informar al padre
+}
+
+::A12-07:: El plazo maximo para archivar la copia digital del reporte y sus documentos en el portafolio del estudiante es de... {
+=24 horas posteriores al accidente
+~48 horas
+~una semana
+~el cierre de mes
+}
+
+::A12-08:: Un accidente no reportado constituye una falla grave del protocolo de seguridad y puede derivar en sancion administrativa.{T}
+
+::A12-09:: Ademas de supervisar la atencion, completar el reporte y verificar la cobertura del seguro, la Administradora del Centro debe... {
+=comunicar el caso al corporativo ALOHA y a la corredora de seguro
+~esperar a que el padre contacte a la aseguradora
+~archivar el reporte y cerrar el caso
+~notificar unicamente al Coach que estaba presente
+}
+
+$CATEGORY: Administradora/M13 Casos integradores
+
+::A13-01:: Faltan 5 dias para el cierre de mes y tu Centro tiene 9 por ciento de desercion. Que palanca del Manual atacas primero para no perder la prima? {
+=La retencion de los casos en proceso de salida, aplicando las herramientas de no salida autorizadas
+~Abrir un grupo nuevo de inmediato
+~Pedir una excepcion al corporativo
+~Ajustar el numero en el informe
+}
+
+::A13-02:: Una madre te pide hoy una constancia en papel membretado del Centro para el colegio. Que haces? {
+=Le explico que la emite el Corporativo, tomo su solicitud formal y la remito al correo oficial con la informacion del estudiante
+~Se la redacto y firmo yo misma
+~Le pido al Coach que la firme
+~Le digo que no existe ese tramite
+}
+
+::A13-03:: Tu Asistente te informa que un representante quiere retirar a su hijo por motivo economico, y ya se usaron las 2 ofertas de 25 por ciento del mes. Que puedes ofrecer? {
+=Las ofertas de 10 por ciento, que no tienen tope mensual, o de 15 por ciento si aun quedan de las tres
+~Una oferta de 25 por ciento adicional, por excepcion
+~Nada, se procede al retiro inmediato
+~Un descuento libre que yo decida
+}
+
+::A13-04:: Al revisar la nomina detectas que a un Coach se le paga por 10 ninos, pero el grupo quedo en 6 tras las deserciones. Que aplica? {
+=En niveles superiores se puede cubrir con minimo 6 estudiantes pagando al Coach el minimo de 10 ninos, asi que verifico si es ese el caso antes del dia 13
+~Se le debe pagar por 6 ninos siempre
+~Se le paga el doble por el esfuerzo
+~Se cierra el grupo
+}
+
+::A13-05:: Un Coach te pide dar la Clase para Padres del proximo grupo porque tu tienes una cita. Que respondes? {
+=Que solo puede darla otra Administradora o el Master Coach, con costo adicional para el Centro, y lo notifico a la Administracion
+~Que si, porque ya asistio a varias
+~Que la de la Asistente Administrativa
+~Que se posponga la clase indefinidamente
+}

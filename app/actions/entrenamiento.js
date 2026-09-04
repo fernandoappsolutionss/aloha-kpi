@@ -133,11 +133,17 @@ export async function matrizProgreso(centroId = null) {
 // puede saber que hay una persona nueva, alguien de gerencia lo declara aquí.
 // (Si además se va la persona, lo correcto sigue siendo borrar y recrear el
 // usuario: eso rota la contraseña; este botón solo borra el progreso.)
+//
+// El DELETE se limita a los 9 módulos de esta pista. La tabla la comparte otra
+// pista de entrenamiento cuyos módulos llevan el prefijo `of-` en la columna
+// `modulo`, y sus filas guardan además la firma de un tercero (el jefe que
+// tomó el ejercicio presencial). Sin este filtro, un botón que promete
+// "vuelve a 0 de 9" borraría también ese trabajo, que no se puede reconstruir.
 export async function reiniciarProgreso(usuarioId) {
   return runAction('reiniciarProgreso', async () => {
     await requireCurrentAdmin()
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
-    await sql`DELETE FROM entrenamiento_progreso WHERE usuario_id = ${usuarioId}`
+    await sql`DELETE FROM entrenamiento_progreso WHERE usuario_id = ${usuarioId} AND modulo NOT LIKE 'of-%'`
     return { ok: true }
   })
 }

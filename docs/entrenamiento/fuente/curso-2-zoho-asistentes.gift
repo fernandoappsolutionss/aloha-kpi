@@ -1,0 +1,483 @@
+// ============================================================
+// BANCO DE PREGUNTAS - CURSO 2: ZOHO BOOKS PARA ASISTENTES
+// ALOHA Mental Arithmetic
+// Importar en Moodle: Banco de preguntas > Importar > formato GIFT
+// ============================================================
+
+$CATEGORY: Zoho Asistentes/M1 Para que sirve Zoho
+
+::Z1-01:: En Zoho Books, el pago de un padre se registra... {
+=sobre la factura que se le emitio
+~como un ingreso suelto, sin factura
+~solo en la bitacora del Centro
+~en el cuadro de negocio de fin de mes
+}
+
+::Z1-02:: El numero de kits solicitados en el mes debe ser igual al numero de ninos nuevos del mes.{T}
+
+::Z1-03:: La asistencia diaria de los ninos se registra en Zoho Books.{F}
+
+::Z1-04:: Que documento de Zoho se usa para una compra menor del dia a dia pagada con caja menuda? {
+=Un gasto, para el reembolso del fondo
+~Una factura de venta
+~Una cotizacion
+~Una factura recurrente
+}
+
+$CATEGORY: Zoho Asistentes/M2 Organizacion
+
+::Z2-01:: En Zoho Books, una organizacion equivale a... {
+=una empresa fiscal, que puede facturar para mas de un centro
+~un centro ALOHA
+~un grupo de ninos
+~una cuenta bancaria
+}
+
+::Z2-02:: Los centros Calle 50 y David facturan bajo la misma organizacion de Zoho.{T}
+
+::Z2-03:: Los centros Brisas del Golf y Anclas facturan bajo la organizacion... {
+=ALTAVIA GROUP
+~F y F Soluciones Integrales
+~V y A Soluciones Integrales
+~Desarrollo Integral Radi
+}
+
+::Z2-04:: Condado del Rey factura bajo V y A Soluciones Integrales, y toda esa organizacion corresponde a ese unico centro.{T}
+
+::Z2-05:: Que debes hacer SIEMPRE al abrir Zoho, antes de crear cualquier documento? {
+=Verificar el nombre de la organizacion en la parte superior
+~Sacar el reporte de cuentas por cobrar
+~Revisar las facturas recurrentes
+~Cambiar la contrasena
+}
+
+::Z2-06:: Si tu centro comparte organizacion con otro centro, Zoho te avisa automaticamente cuando facturas al centro equivocado.{F}
+
+$CATEGORY: Zoho Asistentes/M3 Catalogo de articulos
+
+::Z3-01:: Por que los articulos del catalogo estan separados por centro? {
+=Porque cada articulo apunta a la cuenta de ingresos de su centro
+~Porque cada centro tiene precios distintos por ley
+~Por costumbre, no tiene efecto contable
+~Porque lo exige la aseguradora
+}
+
+::Z3-02:: Segun el contrato de servicios, la matricula de primer ciclo incluye... {
+=seguro estudiantil, mochila, sueter, abaco, lapiz y libros de nivel
+~solo el libro de clases
+~sueter y mochila unicamente
+~solo el abaco y el lapiz
+}
+
+::Z3-03:: La reposicion de materiales incluidos en la matricula tiene un costo adicional para el representante.{T}
+
+::Z3-04:: En el seguro de accidentes, la Opcion 2 cubre gastos medicos por accidente de... {
+=2,000.00
+~1,000.00
+~5,000.00
+~10,000.00
+}
+
+::Z3-05:: La Opcion 1 del seguro de accidentes cubre muerte accidental por 5,000.00 e incluye servicio de ambulancia.{T}
+
+::Z3-06:: Que datos hay que llenar en la descripcion del articulo de seguro de accidentes? {
+=Nombre del nino, fecha de nacimiento, cedula, nombre del representante y telefono
+~Solo el nombre del nino
+~Solo el nombre del representante
+~Ninguno, es un texto informativo
+}
+
+::Z3-07:: Si dejas en blanco los datos del nino en el articulo de seguro y luego ocurre un accidente, el reclamo ante la aseguradora se puede caer.{T}
+
+$CATEGORY: Zoho Asistentes/M4 Clientes
+
+::Z4-01:: En Zoho, el cliente es... {
+=el representante que firma el contrato y paga
+~el nino inscrito
+~el Coach del grupo
+~el Centro ALOHA
+}
+
+::Z4-02:: Un representante con tres hijos en el programa debe tener tres contactos separados en Zoho.{F}
+
+::Z4-03:: Antes de crear un contacto nuevo, lo primero que haces es... {
+=buscar el apellido en el buscador de contactos para ver si ya existe
+~crear el contacto y despues revisar duplicados
+~pedir autorizacion a la Administradora
+~emitir la factura
+}
+
+::Z4-04:: Cual de estos datos NO puede faltar al crear el cliente? {
+=La cedula o documento de identidad
+~La profesion del representante
+~El colegio del nino
+~El nombre del Coach
+}
+
+$CATEGORY: Zoho Asistentes/M5 Clase de prueba e inscripcion
+
+::Z5-01:: Cuando se confeccionan las cotizaciones de servicio de una clase de prueba? {
+=Mientras los representantes estan en la clase de prueba
+~Al dia siguiente de la clase de prueba
+~Cuando el padre confirma que se inscribe
+~Al cierre de mes
+}
+
+::Z5-02:: La lista de inscritos a la clase de prueba se pide a ventas con cuantos dias de anticipacion? {
+=Dos dias antes, para llamar a confirmar el dia anterior
+~El mismo dia de la clase
+~Una semana antes
+~No se pide, llegan espontaneamente
+}
+
+::Z5-03:: Al recibir a los representantes se les puede tutear si hay confianza.{F}
+
+::Z5-04:: Cuando el padre cierra la inscripcion, lo correcto en Zoho es... {
+=convertir la cotizacion existente en factura
+~crear una factura nueva desde cero
+~registrar el pago sin factura
+~esperar al cierre de mes para facturar
+}
+
+::Z5-05:: Si 20 padres estaban en lista y asistieron 15, el porcentaje de asistencia es... {
+=75
+~133
+~5
+~80
+}
+
+::Z5-06:: Si asistieron 15 padres y se inscribieron 8, el porcentaje de inscripcion es aproximadamente... {
+=54
+~187
+~40
+~23
+}
+
+::Z5-07:: Los indicadores de clase de prueba se entregan con frecuencia... {
+=semanal
+~diaria
+~trimestral
+~anual
+}
+
+$CATEGORY: Zoho Asistentes/M6 Facturas recurrentes
+
+::Z6-01:: La mensualidad de un nino se factura... {
+=con una factura recurrente que Zoho emite automaticamente cada mes
+~a mano cada mes
+~una sola vez al inscribir
+~solo cuando el padre la solicita
+}
+
+::Z6-02:: Quien decide detener la factura recurrente de un nino que se va del programa? {
+=El Administrador del centro, y la asistente lo ejecuta en Zoho
+~La asistente administrativa, por su cuenta
+~El Coach del grupo
+~El proveedor de los kits
+}
+
+::Z6-03:: Una recurrencia que no se detiene genera facturas a un padre que ya no recibe el servicio, e infla la cobranza vencida del centro.{T}
+
+::Z6-04:: Si ya se genero una factura del mes que no correspondia cobrar, tu puedes anularla directamente sin consultar.{F}
+
+::Z6-05:: Cuantas ausencias de un nino son la senal para que el Coach te avise y tu llames al representante? {
+=Dos ausencias
+~Una ausencia
+~Cinco ausencias
+~No hay senal establecida
+}
+
+$CATEGORY: Zoho Asistentes/M7 Registro de pagos
+
+::Z7-01:: Al registrar un pago, la fecha que se coloca es... {
+=la fecha real en que entro el dinero
+~la fecha en que lo estas montando en el sistema
+~el primer dia del mes
+~la fecha de vencimiento de la factura
+}
+
+::Z7-02:: Si un padre abona parcialmente, en Zoho se registra el monto parcial y la factura queda con saldo.{T}
+
+::Z7-03:: Que pasa si registras un pago del dia 30 con fecha del dia 2 del mes siguiente? {
+=El cobro se cuenta en el mes equivocado y descuadra el cierre del mes anterior
+~No pasa nada, el sistema lo corrige solo
+~La factura se anula
+~El padre recibe un recargo
+}
+
+::Z7-04:: Los depositos entregados se anotan tambien en la bitacora de informacion importante del Centro, con fecha y firma del responsable.{T}
+
+$CATEGORY: Zoho Asistentes/M8 Cuentas por cobrar
+
+::Z8-01:: El seguimiento de cuentas por cobrar es una tarea de frecuencia... {
+=semanal
+~diaria
+~mensual
+~trimestral
+}
+
+::Z8-02:: La condicion de la prima de produccion mensual para el asistente administrativo en cuentas por cobrar es... {
+=no tener 4 clientes con mas de dos facturas generadas sin pagar, es decir maximo tres clientes
+~no tener ninguna factura vencida
+~tener menos de diez facturas vencidas
+~cobrar el 100 por ciento de las facturas del mes
+}
+
+::Z8-03:: Con una factura emitida entre el dia 1 y el dia 15, que haces? {
+=Informas al acudiente por llamada o WhatsApp que su factura fue emitida y que es importante estar paz y salvo
+~Le informas que no puede asistir a clase
+~Lo pasas a cuentas incobrables
+~Lo pasas al personal de cobro
+}
+
+::Z8-04:: Cuando la factura lleva vencida entre 1 y 15 dias, es decir del dia 16 al 30, quien decide si se hace un acuerdo de pago o se retira al nino del programa? {
+=La Administradora del Centro
+~El Asistente Administrativo
+~El Coordinador Operativo
+~El Coach del grupo
+}
+
+::Z8-05:: Con la factura vencida entre 15 y 30 dias, es decir del dia 31 al 45, si el acuerdo no es efectivo debes... {
+=colocar los datos del cliente en el Drive de cuentas incobrables
+~pasar la lista al personal de cobro
+~anular la factura
+~aplicar un descuento del 25 por ciento
+}
+
+::Z8-06:: Con la factura vencida entre 30 y 45 dias, es decir del dia 46 al 61, quien pasa la lista al personal de cobro? {
+=El Coordinador Operativo
+~El Asistente Administrativo
+~La Administradora
+~La Junta Directiva
+}
+
+::Z8-07:: Si se llega a un acuerdo de pago, se debe dejar evidencia y notificar de inmediato al Coordinador Operativo.{T}
+
+::Z8-08:: El aviso a los padres de que deben estar paz y salvo para el examen y cierre de nivel se envia con cuantos dias de anticipacion? {
+=15 dias
+~3 dias
+~30 dias
+~El mismo dia del cierre
+}
+
+::Z8-09:: El tono en todo contacto de cobranza con el cliente debe ser amigable, buscando siempre la forma de ayudarlo a ponerse al dia.{T}
+
+$CATEGORY: Zoho Asistentes/M9 Descuentos y salida de ninos
+
+::Z9-01:: Un padre dice que el nino asiste pero no entiende la tecnica. En que categoria clasificas el caso? {
+=Nino no entiende la tecnica
+~Perdida de clase
+~Economico
+~Horario
+}
+
+::Z9-02:: Para los motivos de no entender la tecnica o perdida de clase, la herramienta de no salida autorizada es... {
+=de 1 a 2 clases de reposicion gratis
+~un descuento del 25 por ciento
+~el retiro inmediato
+~cambiar al nino de Coach
+}
+
+::Z9-03:: La Oferta 3 del motivo economico corresponde a un descuento del 25 por ciento en factura vencida con un maximo de... {
+=2 ofertas al mes
+~1 oferta al mes
+~3 ofertas al mes
+~sin limite
+}
+
+::Z9-04:: La Oferta 1 del motivo economico es un 10 por ciento de descuento en factura vencida y se puede aplicar a todas las facturas que el padre desee.{T}
+
+::Z9-05:: El Asistente Administrativo puede ofrecer un descuento por su cuenta si ve que el padre se va a retirar.{F}
+
+::Z9-06:: Quien aplica las herramientas de retencion o no salida? {
+=La Administradora del Centro
+~El Asistente Administrativo
+~El Coach
+~El Coordinador Operativo
+}
+
+$CATEGORY: Zoho Asistentes/M10 Proveedores y caja menuda
+
+::Z10-01:: El criterio del Centro frente al mantenimiento es... {
+=de prevencion, no de correccion
+~de correccion, cuando algo se dana
+~de reemplazo anual
+~a discrecion del Coach
+}
+
+::Z10-02:: El proveedor establecido de los centros ALOHA para mantenimiento, pintura, instalaciones y reparaciones es... {
+=Suplidores del Istmo, S.A.
+~C y C Soluciones Integrales
+~Viralsolutionss Inc
+~Altavia Group
+}
+
+::Z10-03:: La Administradora puede buscar otro proveedor en caso de faltas, atrasos o trabajo inadecuado, siempre con previo aviso a la Junta Directiva.{T}
+
+::Z10-04:: El monto maximo de una compra menor con caja menuda es... {
+=45.00
+~25.00
+~100.00
+~500.00
+}
+
+::Z10-05:: Las compras hechas con caja menuda se reponen mediante... {
+=un reembolso registrado en el sistema
+~una nota escrita en el cuaderno
+~el pago de la siguiente quincena
+~no se reponen
+}
+
+::Z10-06:: Al cargar un gasto en Zoho, adjuntar la foto del recibo es opcional.{F}
+
+::Z10-07:: En el cuadro comparativo de cotizaciones, la eleccion se hace... {
+=comparando precio, garantia y calidad, con la recomendacion escrita y su razon
+~siempre por el precio mas bajo
+~siempre por el proveedor mas conocido
+~por orden de llegada de las cotizaciones
+}
+
+$CATEGORY: Zoho Asistentes/M11 Nomina de Coaches
+
+::Z11-01:: La nomina de Coaches y el pago de proveedores se realizan los dias... {
+=15 y 30 de cada mes
+~13 y 28 de cada mes
+~1 y 15 de cada mes
+~el ultimo dia habil del mes
+}
+
+::Z11-02:: El proceso de nomina debe estar realizado y montado en Zoho antes de los dias... {
+=13 y 28
+~15 y 30
+~10 y 25
+~5 y 20
+}
+
+::Z11-03:: Quien es responsable de realizar y montar en Zoho los pagos del mes? {
+=El Asistente Administrativo
+~La Administradora del Centro
+~El Coordinador Operativo
+~La Junta Directiva
+}
+
+::Z11-04:: Quien verifica la nomina y envia a cada Coach su factura para que confirme el desglose? {
+=La Administradora del Centro
+~El Asistente Administrativo
+~El auditor
+~El Master Coach
+}
+
+::Z11-05:: La factura de servicio de cada Coach debe contener como minimo... {
+=nombre, cedula y digito verificador
+~solo el nombre
+~nombre y numero de grupo
+~nombre y cuenta bancaria
+}
+
+::Z11-06:: La factura de servicio del Coach se adjunta como documento dentro del sistema Zoho.{T}
+
+::Z11-07:: Para recibir el bono por puntualidad, el Coach debe llegar... {
+=20 minutos antes del inicio de su clase, con una tolerancia de 15 minutos
+~a la hora exacta de inicio
+~30 minutos antes, sin tolerancia
+~10 minutos antes
+}
+
+::Z11-08:: El bono por puntualidad perfecta de un Coach con un solo grupo asignado es de... {
+=15.00 mensuales
+~25.00 mensuales
+~10.00 mensuales
+~50.00 mensuales
+}
+
+::Z11-09:: Las clases de reforzamiento no tienen costo para el padre, pero si se le pagan al Coach que las imparte.{T}
+
+::Z11-10:: En un grupo compartido de 13 a 16 ninos, al Coach auxiliar se le paga... {
+=10.00 la hora
+~por los ninos restantes
+~por 10 ninos base
+~el mismo monto que al Coach principal
+}
+
+::Z11-11:: Si un colaborador pide que su pago por ACH vaya a una cuenta que no es suya, que se requiere? {
+=Una autorizacion escrita y firmada por el, archivada en su file
+~Un mensaje de WhatsApp del colaborador
+~La autorizacion verbal de la Administradora
+~Nada, se puede pagar directamente
+}
+
+$CATEGORY: Zoho Asistentes/M12 Reportes y cuadre
+
+::Z12-01:: La Administradora entrega los informes a la Junta Directiva dentro de los... {
+=primeros 5 dias de cada mes
+~ultimos 5 dias de cada mes
+~primeros 15 dias de cada mes
+~primeros 2 dias de cada mes
+}
+
+::Z12-02:: La formula del cuadro de negocio es... {
+=ninos del mes anterior mas ninos nuevos menos deserciones
+~ninos nuevos menos ninos del mes anterior
+~ninos del mes anterior mas deserciones
+~kits pedidos menos ninos nuevos
+}
+
+::Z12-03:: El cuadro de deserciones debe indicar... {
+=nino, grupo, Coach y motivo de la desercion
+~solo el nombre del nino
+~nino y motivo
+~nino, grupo y monto adeudado
+}
+
+::Z12-04:: El informe de puntualidad de Coach se entrega con frecuencia... {
+=quincenal
+~semanal
+~mensual
+~diaria
+}
+
+::Z12-05:: Si el numero de ninos nuevos del mes no coincide con los kits solicitados, lo correcto es... {
+=buscar la diferencia factura por factura hasta encontrar la causa
+~ajustar el numero para que cuadre
+~reportarlo sin revisar
+~esperar al mes siguiente
+}
+
+::Z12-06:: Omitir, manipular o falsear informacion en un informe constituye una falta grave de caracter laboral, etico y legal.{T}
+
+$CATEGORY: Zoho Asistentes/M13 Casos integradores
+
+::Z13-01:: Estas en Zoho, vas a facturar la matricula de un nino de Calle 50, y el buscador te muestra primero el articulo de David. Que haces? {
+=Sigo buscando hasta encontrar el articulo de Calle 50 y uso ese
+~Uso el de David, el precio es el mismo
+~Uso cualquiera y lo corrijo despues
+~Creo un articulo nuevo
+}
+
+::Z13-02:: Un representante reclama que ya pago y en Zoho aparece vencido. La causa mas probable es... {
+=que existe un contacto duplicado y el pago se aplico al otro
+~que Zoho perdio la informacion
+~que el banco no reporto
+~que la factura recurrente fallo
+}
+
+::Z13-03:: Un nino se retiro en marzo y en junio su representante aparece con tres facturas vencidas. Que fallo? {
+=No se detuvo la factura recurrente cuando se confirmo el retiro
+~El padre dejo de pagar
+~El Coach no reporto las ausencias
+~El sistema duplico las facturas
+}
+
+::Z13-04:: Es 12 del mes y aun no tienes las facturas de servicio de dos Coaches. Que haces? {
+=Las solicito de inmediato, porque la nomina debe estar montada antes del dia 13
+~Monto la nomina sin ellas y las pido despues
+~Espero al dia 15
+~Pago sin factura y aviso al auditor
+}
+
+::Z13-05:: Un padre te dice que no puede pagar y quiere retirar a su hija, que tiene dos facturas vencidas. El primer paso es... {
+=clasificar el caso como economico y escalarlo a la Administradora
+~ofrecerle un 25 por ciento de descuento
+~detener la recurrencia de inmediato
+~pasarlo a cuentas incobrables
+}

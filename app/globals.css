@@ -1108,3 +1108,116 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .growth-action__owner { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:12px 0; }
 .growth-data-note details { min-width:0; }
 @media (max-width:760px) { .growth-population { grid-template-columns:1fr; gap:8px; } .growth-segments { flex-wrap:wrap; } .growth-actions .btn { min-height:44px; } }
+
+/* =====================================================================
+   ENTRENAMIENTO DE OFICIO (.ofi-*) — se SUMA al bloque .ent-* de arriba.
+   Nada de lo anterior se redefine: los 9 tours quedan idénticos.
+   Los estilos en línea de los HTML fuente se descartan a propósito
+   (background:#fbfde8 con texto claro es ilegible en tema oscuro): aquí
+   el color de los callouts sale de las variables del tema.
+   ===================================================================== */
+.alert--warn { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-text); }
+.ent-seccion__titulo { font-family: var(--font-serif); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 14px; }
+
+/* Carril "Tu oficio" en el índice de Entrenamiento */
+.ofi-carril { margin-top: 34px; padding: 26px; border: 1px solid var(--border); border-top: 4px solid var(--aloha-lima); border-radius: var(--r-lg); background: var(--surface-1); }
+.ofi-carril__head { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.ofi-carril__head h2 { font-family: var(--font-serif); font-size: clamp(20px, 2.4vw, 28px); margin: 8px 0 0; }
+.ofi-carril__barras { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 22px 0 6px; }
+.ofi-carril__cursos { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
+.ofi-carril__cursos li { display: grid; gap: 5px; justify-items: start; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ofi-carril__cursos strong { font-family: var(--font-serif); font-size: 15px; }
+.ofi-carril__next { margin-top: 14px; color: var(--text-muted); }
+
+/* Página del hat: PFV, barras y checksheet */
+.ofi-pfv { padding: 26px; margin-bottom: 20px; border: 1px solid var(--ts-green-line); border-left: 4px solid var(--ts-green); border-radius: var(--r-lg); background: var(--ts-green-soft); }
+.ofi-pfv h2 { font-family: var(--font-serif); font-size: clamp(20px, 2.6vw, 30px); line-height: 1.3; margin: 8px 0 10px; max-width: 60ch; }
+.ofi-pfv__inline { color: var(--text-muted); margin-top: 8px; max-width: 80ch; line-height: 1.6; }
+.ofi-barras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 18px 0 24px; border-bottom: 1px solid var(--border); }
+.ofi-checksheet { margin-top: 24px; }
+.ofi-checksheet > h2 { font-family: var(--font-serif); font-size: 22px; }
+.ofi-checksheet__bloque { margin-top: 20px; }
+.ofi-checksheet__lista { list-style: none; display: grid; gap: 10px; margin-top: 10px; }
+.ofi-fila { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ofi-fila:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.ofi-fila--siguiente { background: var(--ts-green-soft); border-color: var(--ts-green-line); }
+.ofi-fila__estados { display: flex; flex-wrap: wrap; gap: 6px; }
+.ofi-nav { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0 8px; }
+.ofi-nav .btn { min-height: 48px; }
+
+/* Masa (barrera 1) y palabras (barrera 3) */
+.ofi-masa, .ofi-palabras { padding: 24px; margin-bottom: 18px; }
+.ofi-masa__lista, .ofi-drill__criterios { list-style: none; display: grid; gap: 4px; margin: 12px 0; }
+.ofi-masa__lista .ent-opt, .ofi-drill__criterios .ent-opt { align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ofi-masa__lista input, .ofi-drill__criterios input { margin-top: 3px; flex-shrink: 0; accent-color: var(--ts-green); }
+.ofi-masa__acciones, .ofi-drill__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+.ofi-masa__acciones .btn, .ofi-drill__acciones .btn { min-height: 48px; }
+.ofi-palabras__lista { display: grid; gap: 10px; margin: 14px 0; }
+.ofi-palabras__lista dt { font-weight: 600; }
+.ofi-palabras__lista dd { color: var(--text-muted); line-height: 1.6; }
+
+/* Bloques de contenido */
+.ofi-bloques { max-width: 82ch; }
+.ofi-sub { font-family: var(--font-serif); font-size: 18px; margin: 22px 0 8px; }
+.ofi-sub:first-child { margin-top: 0; }
+.ofi-p { color: var(--text-muted); line-height: 1.75; margin: 10px 0; }
+.ofi-lista, .ofi-pasos { margin: 10px 0 10px 22px; color: var(--text-muted); line-height: 1.75; }
+.ofi-lista li, .ofi-pasos li { margin: 6px 0; }
+.ofi-nota { margin: 16px 0; padding: 14px 16px; border-radius: var(--r-sm); border: 1px solid var(--border); border-left-width: 4px; background: var(--surface-2); }
+.ofi-nota strong { display: block; margin-bottom: 4px; }
+.ofi-nota p { color: var(--text-muted); line-height: 1.7; margin: 0; }
+.ofi-nota--regla { border-left-color: var(--ts-green); background: var(--ts-green-soft); }
+.ofi-nota--ojo { border-left-color: var(--aloha-lima); background: var(--warn-bg); }
+.ofi-nota--alerta { border-left-color: var(--bad); background: var(--bad-bg); }
+.ofi-tabla { margin: 18px 0; }
+.ofi-tabla__scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ofi-tabla table { width: 100%; }
+
+/* Término del glosario dentro del texto (auto-enlace) */
+.ofi-term { position: relative; display: inline; }
+.ofi-term__btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted var(--ts-green); text-underline-offset: 3px; }
+.ofi-term__btn:hover { color: var(--ts-green-deep); }
+.ofi-term__pop { position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: min(340px, 78vw); display: grid; gap: 6px; padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--text-muted); background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--r-sm); box-shadow: 0 10px 26px rgba(0, 85, 109, .16); }
+.ofi-term__pop b { color: var(--text); }
+
+/* Drill y cola de firmas */
+.ofi-drill { padding: 24px; margin-bottom: 18px; border-left: 4px solid var(--aloha-lima); }
+.ofi-drill h2 { font-family: var(--font-serif); }
+/* Un módulo puede traer varios drills y se firman JUNTOS (la firma es del
+   módulo). Se pintan uno debajo del otro dentro del mismo panel, separados,
+   con un solo bloque de firma al final. */
+.ofi-drill__uno + .ofi-drill__uno { margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--border); }
+.ofi-drill__firma { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.ofi-drill__estado { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ofi-drill__criterios-ver summary { cursor: pointer; padding: 10px 0; min-height: 44px; font-weight: 600; }
+.ofi-cola { margin-bottom: 22px; }
+.ofi-cola__head { display: flex; gap: 14px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.ofi-cola__head h2 { font-family: var(--font-serif); font-size: 20px; }
+.ofi-cola__modulo { margin-top: 14px; }
+
+/* Glosario */
+.ofi-glosario__buscador { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.ofi-glosario__buscador .input { flex: 1 1 320px; max-width: 460px; }
+.ofi-glosario__grupo { margin-bottom: 26px; }
+.ofi-glosario__letra { font-family: var(--font-mono); font-size: 13px; color: var(--ts-green-deep); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.ofi-glosario__lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 12px; }
+.ofi-glosario__item { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.ofi-glosario__item dt { font-weight: 600; margin-bottom: 4px; }
+.ofi-glosario__item dd p { color: var(--text-muted); line-height: 1.65; margin: 4px 0 0; }
+
+@media (max-width: 900px) {
+  .ofi-carril__barras, .ofi-barras { grid-template-columns: 1fr; gap: 16px; }
+}
+@media (max-width: 680px) {
+  .ofi-carril, .ofi-pfv, .ofi-masa, .ofi-palabras, .ofi-drill { padding: 18px 14px; }
+  .ofi-carril__head .btn, .ofi-nav .btn, .ofi-masa__acciones .btn, .ofi-drill__acciones .btn { width: 100%; }
+  .ofi-fila { padding: 12px; gap: 10px; }
+  .ofi-bloques { max-width: 100%; }
+  /* Tablas en tarjetas: en un teléfono una tabla de 5 columnas no se lee. */
+  .ofi-tabla__scroll { border: 0; }
+  .ofi-tabla table, .ofi-tabla thead, .ofi-tabla tbody, .ofi-tabla tr, .ofi-tabla td { display: block; width: 100%; }
+  .ofi-tabla thead { position: absolute; left: -9999px; }
+  .ofi-tabla tr { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--r-sm); padding: 6px 10px; }
+  .ofi-tabla td { border: 0; padding: 6px 0; }
+  .ofi-tabla td::before { content: attr(data-col); display: block; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); }
+}

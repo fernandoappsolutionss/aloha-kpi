@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
 import { cargarProgreso } from '../../../actions/entrenamiento'
+import CarrilOficio from '../../../../components/entrenamiento/CarrilOficio'
 import { MODULOS, ERRORES_GLOBALES, FAQ } from '../../../../lib/entrenamiento/modulos'
 import { completado, porcentaje, siguienteModulo } from '../../../../lib/entrenamiento/progreso'
 
@@ -56,11 +57,21 @@ export default function EntrenamientoPage() {
       <main className="main ent-page">
         <div className="main__head">
           <div>
+            {/* El H1 nombra la PÁGINA, no una de las dos pistas: "Aprende a usar
+                el sistema" es el título de la primera y hacía creer que aquí
+                solo hay tours. */}
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Entrenamiento</div>
-            <h1 className="h-title">Aprende a usar el sistema</h1>
-            <p className="h-sub">{nombre} · Un módulo a la vez, a tu ritmo.</p>
+            <h1 className="h-title">Tu entrenamiento</h1>
+            <p className="h-sub">
+              {nombre} · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su drill).
+            </p>
           </div>
         </div>
+
+        {/* Pista 1 — cómo usar el sistema (los 9 tours). Intacta: el oficio se
+            SUMA debajo y, si su action falla, este carril sigue funcionando solo. */}
+        <section aria-labelledby="ent-sistema-titulo">
+        <h2 id="ent-sistema-titulo" className="ent-seccion__titulo">Cómo usar el sistema</h2>
 
         {loading ? <div className="card ent-loading" role="status">Preparando tu siguiente paso…</div> : error ? (
           <div className="alert alert--error" role="alert">{error}</div>
@@ -68,8 +79,11 @@ export default function EntrenamientoPage() {
           <>
             <section className="ent-start" aria-labelledby="ent-start-title">
               <div className="ent-start__main">
+                {/* "¡Entrenamiento completado!" era falso: cierra la pista 1 y
+                    la persona todavía tiene por delante todo su oficio, que es
+                    la parte larga. Este bloque solo habla de los recorridos. */}
                 <div className="label">{recomendado ? 'Tu siguiente paso' : 'Tu avance'}</div>
-                <h2 id="ent-start-title">{recomendado ? (iniciado ? 'Continúa tu entrenamiento' : 'Empieza aquí') : '¡Entrenamiento completado!'}</h2>
+                <h2 id="ent-start-title">{recomendado ? (iniciado ? 'Continúa tu entrenamiento' : 'Empieza aquí') : 'Terminaste de aprender el sistema'}</h2>
                 {recomendado ? (
                   <>
                     <p className="ent-start__module">{recomendado.orden}. {recomendado.titulo}</p>
@@ -83,15 +97,22 @@ export default function EntrenamientoPage() {
                   </>
                 ) : (
                   <>
-                    <p className="ent-start__description">Completaste los recorridos y las preguntas de los {resumen.total} módulos. Puedes volver a cualquiera cuando lo necesites.</p>
-                    <Link className="btn btn--primary ent-start__cta" href={moduloHref(MODULOS[0].id)}>Repasar el entrenamiento <span aria-hidden="true">→</span></Link>
+                    <p className="ent-start__description">
+                      Completaste los recorridos y las preguntas de los {resumen.total} recorridos. Eso es la mitad:
+                      ahora sigue tu oficio, los módulos de tu puesto con su drill.
+                    </p>
+                    <Link className="btn btn--primary ent-start__cta" href={`/centro/${id}/entrenamiento/oficio`}>Empezar mi oficio <span aria-hidden="true">→</span></Link>
+                    <p className="ent-start__note"><Link className="tour-card__link" href={moduloHref(MODULOS[0].id)}>Repasar los recorridos del sistema</Link></p>
                   </>
                 )}
               </div>
+              {/* "recorridos", no "módulos": en esta pantalla hay tres barras y
+                  tres denominadores distintos; si las tres dicen "módulos" no se
+                  sabe cuál cuenta qué. Los del oficio son los "módulos". */}
               <div className="ent-start__aside">
-                <div className="label">Tu progreso</div>
-                <div className="ent-start__count"><strong>{resumen.completados}</strong><span>de {resumen.total} módulos<br />{' '}completados</span></div>
-                <progress className="ent-start__progress" max={resumen.total} value={resumen.completados} aria-label="Módulos completados" />
+                <div className="label">Tu progreso en el sistema</div>
+                <div className="ent-start__count"><strong>{resumen.completados}</strong><span>de {resumen.total} recorridos<br />{' '}completados</span></div>
+                <progress className="ent-start__progress" max={resumen.total} value={resumen.completados} aria-label="Recorridos completados" />
                 <p className="ent-start__note">Tu avance se guarda al completar cada recorrido y al enviar tus respuestas.</p>
               </div>
             </section>
@@ -102,7 +123,7 @@ export default function EntrenamientoPage() {
             </div>
 
             <details className="panel ent-help ent-modules">
-              <summary><span>Ver los {resumen.total} módulos</span><span className="ent-help__hint">Consultar o repasar</span></summary>
+              <summary><span>Ver los {resumen.total} recorridos</span><span className="ent-help__hint">Consultar o repasar</span></summary>
               <div className="ent-help__body">
                 <p className="h-sub">Sigue el orden recomendado o abre el tema que necesitas consultar.</p>
                 <ol className="ent-route">
@@ -123,9 +144,17 @@ export default function EntrenamientoPage() {
             </details>
           </>
         )}
+        </section>
+
+        {/* Pista 2 — el oficio del puesto. Va INMEDIATAMENTE después de la
+            pista 1 y antes de los acordeones de ayuda: son 389 minutos de
+            contenido contra ~60 de recorridos, no puede quedar enterrada bajo
+            el pie de página de la otra pista. */}
+        <CarrilOficio centroId={id} />
 
         <div className="ent-resources">
           <h2>¿Necesitas ayuda con algo puntual?</h2>
+          <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema. Las dudas de tu oficio se aclaran en el glosario, dentro de tu hat.</p>
           <details className="panel ent-help">
             <summary><span>Errores frecuentes y cómo resolverlos</span></summary>
             <div className="ent-help__body">
