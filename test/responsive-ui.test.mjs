@@ -74,13 +74,13 @@ test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invi
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
-export const PRODUCT_ROUTE_FILES = ['app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
+export const PRODUCT_ROUTE_FILES = ['app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/entrenamiento/oficio/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/entrenamiento/firmas/page.js','app/centro/[id]/entrenamiento/oficio/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/page.js','app/centro/[id]/entrenamiento/oficio/glosario/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
 export const NON_PRODUCT_ROUTE_FILES = ['app/e2e-primitives/page.js']
-test('R10 inventario local completo: 28 producto y una técnica, sin duplicados', () => {
+test('R10 inventario local completo: 33 producto y una técnica, sin duplicados', () => {
   const all = [...PRODUCT_ROUTE_FILES,...NON_PRODUCT_ROUTE_FILES]
-  assert.equal(PRODUCT_ROUTE_FILES.length,28)
+  assert.equal(PRODUCT_ROUTE_FILES.length,33)
   assert.equal(NON_PRODUCT_ROUTE_FILES.length,1)
-  assert.equal(new Set(all).size,29)
+  assert.equal(new Set(all).size,34)
   const actual = readdirSync(new URL('../app/',import.meta.url),{recursive:true}).map(String).filter(p=>p==='page.js'||p.endsWith('/page.js')).map(p=>`app/${p}`)
   assert.deepEqual(all.sort(),actual.sort())
 })

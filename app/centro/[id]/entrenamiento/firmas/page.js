@@ -1,0 +1,85 @@
+// Cola del Oficial de Entrenamiento: quién tiene módulos ESTUDIADOS esperando
+// que le tomen el drill, y hace cuántos días. La página solo se pinta si
+// puedeFirmar() lo permite — y el servidor lo vuelve a comprobar en
+// firmarDrill(), que es donde de verdad importa.
+//
+// Ruta hermana de /entrenamiento/oficio: el segmento estático "firmas" gana
+// sobre el dinámico [modulo], así que la página de los tours no se toca.
+import Link from 'next/link'
+import Sidebar from '../../../../../components/Sidebar'
+import PanelDrill from '../../../../../components/entrenamiento/PanelDrill'
+import { getCentroNombre } from '../../../../actions/centros'
+import { colaFirmas } from '../../../../actions/entrenamiento-oficio'
+
+const ROL = { administradora: 'Administradora', asistente: 'Asistente' }
+
+export default async function FirmasPage({ params }) {
+  const { id } = await params
+  const [nombre, cola] = await Promise.all([
+    getCentroNombre(id).catch(() => null),
+    colaFirmas(Number(id)),
+  ])
+
+  const shell = (contenido) => (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
+      <main className="main ent-page">
+        <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
+        {contenido}
+      </main>
+    </div>
+  )
+
+  if (cola?.error) return shell(<div className="alert alert--error" role="alert">{cola.error}</div>)
+
+  const cabecera = (
+    <div className="main__head"><div>
+      <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Oficial de Entrenamiento</div>
+      <h1 className="h-title">Drills por firmar</h1>
+      <p className="h-sub">
+        Estudiar no es saber hacer. Tómale el drill, tilda los criterios que de verdad cumplió y firma. Si no los cumple, no firmes: devuélvelo al módulo.
+      </p>
+    </div></div>
+  )
+
+  if (!cola.filas.length) {
+    return shell(<>
+      {cabecera}
+      <div className="card" style={{ padding: 24 }}>
+        <p className="h-sub" style={{ margin: 0 }}>
+          Nadie a tu cargo tiene módulos estudiados esperando firma. Vuelve cuando alguien de tu equipo termine uno.
+        </p>
+      </div>
+    </>)
+  }
+
+  return shell(<>
+    {cabecera}
+    {cola.filas.map((f) => (
+      <section key={f.usuarioId} className="ofi-cola" aria-labelledby={`alumno-${f.usuarioId}`}>
+        <div className="ofi-cola__head">
+          <div>
+            <h2 id={`alumno-${f.usuarioId}`}>{f.nombre}</h2>
+            <p className="h-sub" style={{ margin: 0 }}>{ROL[f.rol] || f.rol} · {f.centro} · {f.email}</p>
+          </div>
+          <span className={`ent-pill${f.modulos.some((m) => (m.dias ?? 0) >= 7) ? ' ent-pill--bad' : ' ent-pill--mid'}`}>
+            {f.modulos.length} {f.modulos.length === 1 ? 'drill pendiente' : 'drills pendientes'}
+          </span>
+        </div>
+        {f.modulos.map((m) => (
+          <div key={m.id} className="ofi-cola__modulo">
+            <div className="label">
+              {m.titulo} · estudiado hace {m.dias == null ? '—' : m.dias} {m.dias === 1 ? 'día' : 'días'}
+              {m.drills.length > 1 ? ` · ${m.drills.length} drills en este módulo` : ''}
+            </div>
+            {/* UN panel por MÓDULO, no por drill: la firma es del módulo (una
+                sola columna drill_firmado_at por usuario y módulo). Con cuatro
+                botones, tomar uno firmaba los cuatro. */}
+            <PanelDrill drills={m.drills} indice={`${f.usuarioId}-${m.id}`} usuarioId={f.usuarioId} moduloId={m.id}
+              moduloTitulo={m.titulo} firmadoAt={null} firmadoPor={null} puedoFirmar estudiado />
+          </div>
+        ))}
+      </section>
+    ))}
+  </>)
+}

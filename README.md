@@ -78,6 +78,30 @@ La migración de este módulo no usa `npm run db:migrate`. Primero corre el dry-
 
 Orden: respaldo de metadatos, dry-run, expansión, variables/Blob privado, despliegue, smoke de comentario/petición/descarga/estado/limpieza/legacy y, tras retirar instancias antiguas, contracción.
 
+## Entrenamiento de oficio (hats, drills y firmas)
+
+La pista de oficio comparte la tabla `entrenamiento_progreso` con los 9 recorridos
+del sistema; sus módulos llevan el prefijo `of-` en la columna `modulo`.
+
+**LA MIGRACIÓN VA ANTES DEL DESPLIEGUE.** `db/migrations/2026-09-03-entrenamiento-oficio.sql`
+agrega `drill_firmado_at` y `drill_firmado_por`, y `progresoDeUsuario` hace un
+LEFT JOIN sobre esa segunda columna. Si el código sale a producción antes que la
+migración, toda la pista de oficio responde 42703 (columna inexistente) y las
+pantallas muestran el alert rojo — sin que se note en los 9 recorridos, cuyo
+SELECT no toca esas columnas. La migración es idempotente (`ADD COLUMN IF NOT
+EXISTS`) y también está dentro de `db/schema.sql`, así que `npm run db:migrate`
+la aplica.
+
+Herramientas de desarrollo (no corren en Vercel):
+
+    node scripts/oficio-glosario-importar.mjs             # regenera el glosario
+    node scripts/oficio-glosario-importar.mjs --verificar  # comprueba que el commiteado sale de las fuentes
+    node scripts/oficio-colocacion-bloque-a.mjs            # verifica las claves de metodo, normativa y los dos hats
+    node scripts/oficio-colocacion-centro.mjs              # verifica la clave del curso de Centro
+    node scripts/oficio-colocacion-zoho.mjs                # verifica la clave del curso de Zoho
+
+Las fuentes congeladas del contenido viven en `docs/entrenamiento/fuente/`.
+
 ## Esquema de datos
 
 | Tabla | Descripción |

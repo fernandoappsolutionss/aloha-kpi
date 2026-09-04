@@ -1,0 +1,455 @@
+// ============================================================
+// BANCO DE PREGUNTAS - CURSO 3: NORMATIVA Y CASOS ALOHA
+// Obligatorio para todo colaborador
+// Importar en Moodle: Banco de preguntas > Importar > formato GIFT
+// ============================================================
+
+$CATEGORY: Normativa/M1 Quienes somos
+
+::N1-01:: ALOHA son las siglas en ingles de... {
+=Abacus Learning of Higher Arithmetic
+~Advanced Learning of Higher Arithmetic
+~Abacus Learning of Human Arithmetic
+~Academy of Learning and Higher Arithmetic
+}
+
+::N1-02:: El programa ALOHA Mental Arithmetic nacio en... {
+=Malasia, en 1993
+~China, en 1993
+~Taiwan, hace 900 anos
+~Panama, en 2005
+}
+
+::N1-03:: El fundador de ALOHA es el Sr. Loh Mun Sun.{T}
+
+::N1-04:: Panama fue el pais numero... {
+=33 en incorporarse al programa
+~1
+~40
+~10
+}
+
+::N1-05:: En los valores ALOHA, la letra O corresponde a... {
+=Objetivos claros y respeto a los procesos establecidos
+~Orden y limpieza
+~Orientacion al logro
+~Optimizacion de recursos
+}
+
+::N1-06:: En los valores ALOHA, la letra H corresponde a Honestidad, rectitud al actuar.{T}
+
+::N1-07:: La vision de ALOHA se enfoca en impulsar a estudiantes de... {
+=4 a 13 anos
+~3 a 10 anos
+~5 a 15 anos
+~6 a 12 anos
+}
+
+::N1-08:: Cual NO es uno de los cinco puntos del ALOHA Dojo Kun? {
+=Cumplo el horario de la empresa
+~Me supero dia a dia
+~Mantengo orden y limpieza
+~Practico autocontrol
+}
+
+::N1-09:: Segun el Manual, quien debe velar por la aplicacion de las normas establecidas para el debido funcionamiento del Centro? {
+=El Asistente Administrativo
+~El Administrador
+~El Coach
+~El personal de aseo
+}
+
+::N1-10:: Segun el Manual, la responsabilidad del Administrador es verificar que se utilicen las herramientas que se han brindado.{T}
+
+$CATEGORY: Normativa/M2 Imagen y vestimenta
+
+::N2-01:: Cual de estas prendas NO esta permitida? {
+=Pantalon tipo deportivo o licras de ejercicio
+~Pantalon de vestir
+~Falda acorde a un ambiente laboral
+~Camisa oficial de ALOHA
+}
+
+::N2-02:: Que calzado NO esta permitido? {
+=Sandalias sin tacon o sin punta cerrada
+~Zapatos cerrados con tacon
+~Zapatos cerrados sin tacon
+~Zapatillas
+}
+
+::N2-03:: El uso del chaleco oficial ALOHA por parte del Coach al impartir clases es... {
+=obligatorio
+~recomendado
+~opcional segun el clima
+~solo para cierres de nivel
+}
+
+::N2-04:: Los Coaches deben evitar prendas ajustadas, escotes, ombligos descubiertos, accesorios inadecuados y tatuajes visibles.{T}
+
+::N2-05:: El personal de limpieza, aunque no use uniforme oficial, debe vestir de forma adecuada a sus funciones, con ropa limpia y en buen estado.{T}
+
+$CATEGORY: Normativa/M3 Relaciones con el cliente
+
+::N3-01:: Segun el Manual, al atender a un cliente nada es mas importante que... {
+=ser cortes, ameno, servicial y bien dispuesto
+~resolver rapido
+~cumplir el horario
+~cerrar la venta
+}
+
+::N3-02:: Los clientes que deseen realizar comentarios o quejas especificas deben ser... {
+=recibidos con atencion y dirigidos a su Supervisor Inmediato
+~atendidos por quien este disponible
+~remitidos por escrito al corporativo
+~invitados a volver otro dia
+}
+
+::N3-03:: Esta permitido tutear a un representante si hay confianza de varios anos.{F}
+
+::N3-04:: El recibimiento a cada cliente debe ser... {
+=mirando a los ojos, con una sonrisa y mucha disposicion de servicio
+~desde el escritorio, sin interrumpir la tarea
+~por telefono
+~delegado al personal de aseo
+}
+
+::N3-05:: Quien es el unico encargado de responder por una situacion en la que se involucra a un padre? {
+=El Administrador del Centro
+~El Coach del nino
+~El Asistente Administrativo
+~El Coordinador Operativo
+}
+
+::N3-06:: Las reuniones con padres deben realizarse siempre en presencia del Administrador.{T}
+
+::N3-07:: Un Coach puede entregar su numero de telefono personal al representante.{F}
+
+::N3-08:: Que debe dar el Coach al representante en lugar de su numero personal? {
+=El celular del Centro
+~El correo del Master Coach
+~El numero de la Junta Directiva
+~Su correo personal
+}
+
+$CATEGORY: Normativa/M4 Etica y conducta comercial
+
+::N4-01:: El exito permanente de ALOHA esta directamente relacionado con... {
+=la confianza de nuestros clientes
+~el numero de centros abiertos
+~el precio del programa
+~la publicidad en redes
+}
+
+::N4-02:: Si se genera una situacion en la que es dificil determinar el procedimiento adecuado, el colaborador debe... {
+=discutirlo abiertamente con su superior inmediato para obtener asesoramiento
+~decidir segun su criterio y avisar despues
+~consultarlo con un companero del mismo nivel
+~esperar a que la situacion se resuelva sola
+}
+
+::N4-03:: El incumplimiento de la politica de etica y conducta comercial puede tener como consecuencia una accion disciplinaria e incluso la extincion de la relacion laboral.{T}
+
+::N4-04:: Los datos, informes de indicadores y reportes deben ser... {
+=veraces, precisos, completos y verificables
+~aproximados pero presentables
+~revisados solo al cierre trimestral
+~elaborados por el Coordinador Operativo
+}
+
+::N4-05:: Omitir, manipular o falsear informacion de impacto para la empresa constituye... {
+=una falta grave de caracter laboral, etico y legal
+~una falta leve
+~un error administrativo sin consecuencias
+~una practica tolerada bajo presion de tiempo
+}
+
+$CATEGORY: Normativa/M5 Confidencialidad
+
+::N5-01:: Cual de estos NO se lista como informacion confidencial en el Manual? {
+=El horario de apertura del Centro publicado en redes
+~Las listas de clientes
+~La informacion financiera
+~La Tecnica ALOHA
+}
+
+::N5-02:: Firmar un acuerdo de no divulgacion es una condicion de empleo para todos los colaboradores.{T}
+
+::N5-03:: Un colaborador que divulga informacion confidencial pero no obtiene ningun beneficio de ello... {
+=queda igualmente sujeto a accion disciplinaria, extincion de la relacion laboral y accion legal
+~no tiene responsabilidad, porque no hubo beneficio
+~solo recibe un llamado de atencion
+~debe firmar de nuevo el acuerdo
+}
+
+::N5-04:: Junto al MODELO DE CONTRATO DE CONFIDENCIALIDAD, el Manual adjunta como documento de referencia... {
+=la Ley 81 del 2019 de Proteccion de Datos Personales
+~el Codigo de Trabajo unicamente
+~la Ley de Propiedad Intelectual
+~un acuerdo interno sin base legal
+}
+
+::N5-05:: Segun el Manual, un Coach no divulgara a nadie los documentos que no se han publicado oficialmente ni eliminara registros de los archivos sin permiso.{T}
+
+$CATEGORY: Normativa/M6 Permisos y feriados
+
+::N6-01:: Los permisos deben solicitarse por escrito con un minimo de... {
+=tres dias de anticipacion
+~un dia de anticipacion
+~cinco dias de anticipacion
+~dos semanas de anticipacion
+}
+
+::N6-02:: La solicitud de permiso equivale automaticamente a su aprobacion.{F}
+
+::N6-03:: La solicitud de permiso de la Asistente Administrativa queda autorizada... {
+=unicamente al momento de la firma del Administrador
+~al entregarla en recepcion
+~cuando el Coordinador Operativo la recibe
+~con el aviso verbal al Administrador
+}
+
+::N6-04:: El pago del tiempo de un permiso solicitado por el colaborador... {
+=se descuenta automaticamente del salario
+~se paga tiempo por tiempo
+~se rebaja del periodo de vacaciones
+~lo cubre la Caja de Seguro Social
+}
+
+::N6-05:: El tiempo compensatorio aplica cuando... {
+=la propia empresa solicita el tiempo, no cuando lo pide el colaborador
+~el colaborador lo pide con anticipacion
+~el permiso es por motivos medicos
+~lo autoriza el Coach
+}
+
+::N6-06:: El maximo de permisos al ano con justificacion medica pagados por la empresa es de... {
+=18
+~12
+~15
+~24
+}
+
+::N6-07:: Al exceder ese maximo, quien se responsabiliza del pago? {
+=La Caja de Seguro Social
+~La empresa
+~El colaborador
+~La Junta Directiva
+}
+
+::N6-08:: Los Coaches deben coordinar su suplencia con otro Coach basandose en el nivel que requiere el grupo y el nivel del Coach suplente.{T}
+
+::N6-09:: Cuando un dia de fiesta o duelo nacional coincide con domingo... {
+=el lunes siguiente se habilita como dia de descanso semanal obligatorio
+~se pierde el feriado
+~se traslada al viernes anterior
+~se paga doble
+}
+
+::N6-10:: Los dias Lunes de Carnaval y Sabado de Gloria se otorgan libres... {
+=previo pago de horas, sin excepcion
+~sin ninguna condicion
+~solo al personal administrativo
+~a criterio del Administrador
+}
+
+::N6-11:: El sabado de carnaval y los dias 24 y 31 de diciembre, si caen en dia laboral, se permite laborar hasta... {
+=la 1:30 p.m.
+~el mediodia
+~las 3:00 p.m.
+~la hora habitual
+}
+
+::N6-12:: Cual de estas fechas NO aparece en la lista de feriados del Manual? {
+=15 de agosto
+~9 de enero, Dia de los Martires
+~3 de noviembre, Separacion de Panama de Colombia
+~8 de diciembre, Dia de las Madres
+}
+
+::N6-13:: Los documentos de permiso se entregan al Coordinador Operativo... {
+=inmediatamente despues de ser autorizados
+~al cierre de mes
+~cuando los solicite
+~junto con la planilla
+}
+
+$CATEGORY: Normativa/M7 Faltas graves
+
+::N7-01:: Alterar la fecha de nacimiento de un estudiante para tramitar un ingreso es... {
+=falta grave y causal de despido inmediato
+~una irregularidad administrativa menor
+~aceptable si el padre lo autoriza
+~responsabilidad exclusiva del corporativo
+}
+
+::N7-02:: Emitir una constancia escolar sin autorizacion corporativa es causal de despido o revocacion de franquicia.{T}
+
+::N7-03:: Cual de estas conductas se califica como falla grave del protocolo de seguridad? {
+=No reportar un accidente
+~Reportar un accidente leve
+~Llamar al padre antes de llenar el reporte
+~Solicitar la ambulancia contratada
+}
+
+::N7-04:: Una repeticion de nivel no documentada ni informada se considera... {
+=una irregularidad administrativa que puede ser objeto de observacion o sancion
+~una falta grave con despido inmediato
+~una practica permitida
+~responsabilidad del padre
+}
+
+::N7-05:: Segun el Manual, el orden de las acciones disciplinarias que el Administrador de Centro aplica al Asistente Administrativo es... {
+=llamado de atencion verbal, tres memorandums archivados en el file, despido
+~memorandum, suspension, despido
+~llamado verbal, suspension, memorandum
+~despido directo
+}
+
+::N7-06:: Los memorandums disciplinarios deben archivarse en el file del colaborador.{T}
+
+$CATEGORY: Normativa/M8 Accidentes
+
+::N8-01:: Un raspon leve que no requiere atencion medica debe reportarse igual.{T}
+
+::N8-02:: El primer paso de quien esta presente en un accidente es... {
+=brindar primeros auxilios basicos y asegurar la integridad del nino
+~llamar al padre
+~buscar el formato de reporte
+~avisar al corporativo
+}
+
+::N8-03:: La notificacion a la Administradora del Centro debe ser... {
+=de forma inmediata
+~al terminar la clase
+~el mismo dia, antes de cerrar
+~dentro de las 24 horas
+}
+
+::N8-04:: El Reporte de Accidente Escolar ALOHA se completa... {
+=el mismo dia del suceso
+~dentro de las 48 horas
+~cuando el padre lo solicite
+~solo si hubo atencion medica
+}
+
+::N8-05:: Cual de estos datos NO se exige en el reporte de accidente? {
+=El nombre del pediatra del nino
+~Fecha y hora exacta del incidente
+~Personas presentes y testigos
+~Medidas adoptadas despues del evento
+}
+
+::N8-06:: El traslado a un centro medico por ambulancia contratada requiere siempre autorizacion del representante.{T}
+
+::N8-07:: Antes de entregar al padre los requisitos de la aseguradora, el centro debe... {
+=verificar que el estudiante este dentro de la poliza colectiva vigente
+~cobrar el deducible
+~esperar el alta medica
+~consultar al Coordinador Operativo
+}
+
+::N8-08:: El plazo maximo para archivar la copia digital del reporte en el portafolio del estudiante es de... {
+=24 horas
+~48 horas
+~72 horas
+~una semana
+}
+
+::N8-09:: Segun la tabla de Responsables del Manual, las responsabilidades del coach o personal presente en un accidente son... {
+=brindar primeros auxilios y notificar al administrador
+~brindar primeros auxilios, notificar al administrador y completar el reporte
+~notificar al padre y llenar el formato de reporte
+~registrar el caso ante la aseguradora
+}
+
+::N8-10:: A quien debe comunicar el Administrador del centro, ademas de atender el caso? {
+=Al corporativo y a la corredora de seguro
+~Solo al corporativo
+~Solo a la corredora de seguro
+~Al Coordinador Operativo
+}
+
+::N8-11:: Segun el Manual, el Corporativo ALOHA registra el caso, brinda apoyo en las gestiones con la aseguradora y realiza seguimiento.{T}
+
+$CATEGORY: Normativa/M9 A quien acudir
+
+::N9-01:: El jefe inmediato del Asistente Administrativo es... {
+=el Administrador del Centro
+~el Coordinador Operativo
+~la Junta Directiva
+~el Master Coach
+}
+
+::N9-02:: Quien gestiona los contratos, la solicitud de entrada al seguro social y las firmas? {
+=El Coordinador Operativo
+~El Administrador del Centro
+~El Asistente Administrativo
+~El Master Coach
+}
+
+::N9-03:: A donde se envia la solicitud de kits y materiales? {
+=A info@alohapanama.com, C y C Soluciones Integrales, S.A.
+~Al Coordinador Operativo
+~A Suplidores del Istmo, S.A.
+~Al Master Coach
+}
+
+::N9-04:: El proveedor establecido para mantenimiento, pintura, instalaciones y reparaciones es... {
+=Suplidores del Istmo, S.A.
+~C y C Soluciones Integrales
+~Viralsolutionss Inc
+~Altavia Group
+}
+
+::N9-05:: Una propuesta de innovacion de la Administradora debe notificarse a la Administracion General porque, de aprobarse, se aplica en todos los Centros de la franquicia.{T}
+
+::N9-06:: Ante una duda etica dificil de calificar, lo correcto es... {
+=discutirla abiertamente con el superior inmediato
+~resolverla con el criterio propio
+~consultarla en el grupo de WhatsApp del Centro
+~esperar a la reunion mensual
+}
+
+::N9-07:: Segun el Manual, el Jefe Directo del Administrador del Centro es... {
+=la Junta Directiva y/o el personal que esta defina para el control y supervision de sus intereses
+~el Coordinador Operativo
+~el Master Coach
+~el Departamento Academico del Corporativo
+}
+
+$CATEGORY: Normativa/Casos integradores
+
+::N10-01:: Una excompanera te pide los telefonos de los padres de un grupo que ya cerro. Que haces? {
+=Me niego, porque las listas de clientes son informacion confidencial y firme un acuerdo de no divulgacion como condicion de empleo
+~Se los doy, porque el grupo ya cerro
+~Le doy solo algunos, sin nombres
+~Consulto al grupo de Coaches
+}
+
+::N10-02:: Un companero te cuenta que altero un dato de un estudiante para agilizar un pedido de material. Como califica el Manual esa conducta? {
+=Falta grave y causal de despido inmediato
+~Una irregularidad administrativa menor, sujeta solo a observacion
+~Una practica aceptable si el padre la autoriza
+~Una falta que solo aplica al personal administrativo
+}
+
+::N10-03:: Cierras el informe del mes y falta un nino para alcanzar el minimo de la prima. Que haces? {
+=Reporto el numero real, porque falsear informacion es falta grave laboral, etica y legal
+~Ajusto el numero, total es solo uno
+~Adelanto un nino del mes siguiente
+~Dejo el informe sin ese indicador
+}
+
+::N10-04:: Un padre molesto te aborda en el pasillo reclamando por el avance de su hija. Tu eres el Coach. Que haces? {
+=Escucho con simpatia y comprension y llevo la situacion a la Administradora, que es la unica encargada de responder
+~Le explico yo mismo y le doy mi numero para seguir conversando
+~Le digo que hable con la Asistente
+~Le respondo que su hija no practica en casa
+}
+
+::N10-05:: Un Coach llega a clase sin el chaleco oficial porque hace calor. Que aplica? {
+=El uso del chaleco oficial es obligatorio al impartir clases
+~Es opcional segun el clima
+~Solo es obligatorio en cierres de nivel
+~Puede sustituirlo por cualquier camisa de la marca
+}

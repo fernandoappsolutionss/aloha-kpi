@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getNavigationContext } from '../app/actions/navigation'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
+import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
+import { rolesQueFirma } from '../lib/entrenamiento/oficio/progreso'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -188,6 +190,23 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
   }, [loading, context, isPanel, centroId])
 
+  // Firmas pendientes del oficio: solo para quien puede firmarle a alguien
+  // (administradora, coordinador, gerencia). El permiso real lo decide el
+  // servidor en firmarDrill; esto solo evita ofrecer una pantalla vacía.
+  //
+  // El ÍTEM se muestra siempre que la persona le firme a alguien, tenga o no
+  // pendientes: si solo aparece con n>0, nadie descubre que la pantalla existe
+  // antes del primer pendiente, y el jefe no puede entrar a ver qué le van a
+  // pedir. El badge sí depende de n.
+  const [firmas, setFirmas] = useState(0)
+  const firmaDrills = rolesQueFirma(actorRole).length > 0
+  useEffect(() => {
+    if (!centroId || !firmaDrills) return
+    contadorFirmas(Number(centroId))
+      .then((r) => { if (r && !r.error) setFirmas(r.n) })
+      .catch(() => {})
+  }, [centroId, firmaDrills])
+
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
@@ -197,6 +216,9 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
     ...(context?.capabilities.viewMetas ? [{ label: 'Metas', icon: 'target', href: '/dashboard/metas' }] : []),
     ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
+    // La matriz del oficio va aparte: la de tours filtra rol='administradora'
+    // y dejaría fuera justo a las asistentes. Misma capacidad de gerencia.
+    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Oficio (hats)', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
   ]
   const configItems = [
     ...(context?.capabilities.viewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
@@ -213,7 +235,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Cumplimiento', icon: 'check', href: `/centro/${centroId}/cumplimiento` },
     { label: 'FODA', icon: 'search', href: `/centro/${centroId}/foda` },
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
+    // El badge x/9 es el de los 9 tours: la meta alcanzable de la primera
+    // semana. No se mezcla con los 26 módulos de oficio, que viven adentro.
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
+    ...(firmaDrills ? [{ label: 'Firmas de drill', icon: 'check', href: `/centro/${centroId}/entrenamiento/firmas`, badge: firmas > 0 ? String(firmas) : null }] : []),
   ]
   const items = isPanel ? (isCenterContext ? centroItems : adminItems) : (isCenterActor && centroId ? centroItems : [])
   const roleLabel = isPanel
