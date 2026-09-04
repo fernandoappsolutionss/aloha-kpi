@@ -18,6 +18,11 @@ function parseBaseURL(value) {
 
 const remoteRun = Boolean(process.env.RESPONSIVE_BASE_URL)
 const dialogsRun = process.env.E2E_R3_DIALOGS === '1'
+const comparisonsRun = process.env.E2E_R6_COMPARISONS === '1'
+if ([dialogsRun, comparisonsRun, process.env.E2E_RUN_MUTATIONS === '1'].filter(Boolean).length > 1) {
+  throw new Error('Los gates con fixture son exclusivos; no se pueden combinar.')
+}
+if (comparisonsRun && remoteRun) throw new Error('R6 solo permite ejecución local disposable.')
 const baseURL = parseBaseURL(process.env.RESPONSIVE_BASE_URL || 'http://127.0.0.1:3000')
 const testDatabase = process.env.USUARIOS_TEST_DATABASE_URL
 if (dialogsRun && remoteRun) {
@@ -93,9 +98,9 @@ export default defineConfig({
   outputDir: 'test-results',
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   expect: { timeout: 10_000 },
-  globalSetup: dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
-  globalTeardown: dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
-  workers: mutationRun || dialogsRun ? 1 : undefined,
+  globalSetup: comparisonsRun ? './tests/e2e/helpers/r6-global-setup.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-setup.mjs' : undefined,
+  globalTeardown: comparisonsRun ? './tests/e2e/helpers/r6-global-teardown.mjs' : dialogsRun ? './tests/e2e/helpers/r3-global-teardown.mjs' : undefined,
+  workers: mutationRun || dialogsRun || comparisonsRun ? 1 : undefined,
   use: {
     baseURL,
     channel: 'chrome',
@@ -122,7 +127,13 @@ export default defineConfig({
       },
     }] : []),
   ],
-  projects: dialogsRun ? [
+  projects: comparisonsRun ? [
+    { name: 'setup', testMatch: /auth\.setup\.js/, use: { trace: 'off', screenshot: 'off' } },
+    ...[...sizes.filter(([name]) => ['phone-320', 'phone-390', 'tablet-768', 'desktop-1440'].includes(name)), ['desktop-1025', 1025, 900]].map(([name, width, height]) => ({
+      name, testMatch: /dashboard-comparisons\.spec\.js/, dependencies: ['setup'], fullyParallel: false,
+      use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
+    })),
+  ] : dialogsRun ? [
     {
       name: 'setup',
       testMatch: /auth\.setup\.js/,
@@ -146,7 +157,7 @@ export default defineConfig({
       name,
       dependencies: ['setup'],
       grepInvert: /@coordinator/,
-      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
+      testIgnore: new RegExp(`(auth\\.setup|primitives\\.spec|users-coordinator\\.spec|center-user\\.spec|users-mutations\\.local\\.spec|dialogs\\.spec|dashboard-comparisons\\.spec${remoteRun ? '|upstream-integration\\.local\\.spec' : ''})\\.js`),
       use: { viewport: { width, height }, storageState: 'tests/e2e/.auth/admin.json' },
     })),
     {

@@ -5,10 +5,19 @@ import Dialog from '../../components/Dialog'
 import MeasuredChart from '../../components/MeasuredChart'
 import OperationalCard from '../../components/OperationalCard'
 import TableScroller from '../../components/TableScroller'
+import GrowthSummaryBand from '../../components/growth/GrowthSummaryBand'
+
+const growthFixture = {
+  projection: { currentChildren: 185, currentLevel: 1, nextLevel: { level: 2, threshold: 200, gap: 15 }, scenarios: { base: { series: [{ startChildren: 185, withdrawals: 2, newActives: 8, endChildren: 191 }] } } },
+  metrics: { confidence: { level: 'low' } },
+  operational: { undatedStarts: 1 },
+  recommendations: [{ title: 'Completar las fechas de inicio' }],
+}
 
 export default function PrimitivesHarness() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [chartWidth, setChartWidth] = useState(320)
+  const [growthOpened, setGrowthOpened] = useState(false)
   const initialFocusRef = useRef(null)
 
   return (
@@ -70,6 +79,8 @@ export default function PrimitivesHarness() {
           </MeasuredChart>
         </div>
       </section>
+      <GrowthSummaryBand data={growthFixture} onOpen={() => setGrowthOpened(true)} />
+      {growthOpened && <p role="status">Ruta de prueba abierta</p>}
     </main>
   )
 }

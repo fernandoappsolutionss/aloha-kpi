@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { auditPage } from './helpers/audit-page'
 
 async function openHarness(page) {
@@ -92,4 +93,21 @@ test('MeasuredChart entrega la medida real y responde a ResizeObserver', async (
 test('auditPage valida geometría, tipografía, targets y overflow local en Chrome', async ({ page }) => {
   await openHarness(page)
   await auditPage(page, { mobile: true, state: null })
+})
+
+test('GrowthSummaryBand expone progreso nombrado, datos y acción con tipografía móvil legible', async ({ page }) => {
+  await openHarness(page)
+  const band = page.getByRole('region', { name: 'Ruta al Nivel 2' })
+  // Etapa 170–200, 185 es exactamente el 50%; dato independiente del presenter.
+  await expect(band.getByRole('progressbar', { name: 'Avance al Nivel 2' })).toHaveAttribute('aria-valuenow', '50')
+  await expect(band).toContainText('185')
+  await expect(band).toContainText('Faltan 15')
+  await expect(band).toContainText('191 niños')
+  await auditPage(page, { mobile: true, state: null, scope: '.growth-band' })
+  const smallSizes = await band.locator('small, .growth-band__stage, .growth-band__numberline span').evaluateAll(els => els.map(el => parseFloat(getComputedStyle(el).fontSize)))
+  expect(smallSizes.every(size => size >= 13)).toBe(true)
+  const axe = await new AxeBuilder({ page }).include('.growth-band').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  expect(axe.violations).toEqual([])
+  await band.getByRole('button', { name: 'Ver ruta completa' }).click()
+  await expect(page.getByRole('status')).toHaveText('Ruta de prueba abierta')
 })

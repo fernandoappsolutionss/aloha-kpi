@@ -46,7 +46,7 @@ export default function GrowthSummaryBand({ data, onOpen }) {
             <span>{next ? `de ${next.threshold} · inicio confirmado` : 'con inicio confirmado'}</span>
             {next && <b className="num">Faltan {next.gap}</b>}
           </div>
-          <div className="growth-track" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
+          <div className="growth-track" role="progressbar" aria-label={next ? `Avance al Nivel ${next.level}` : 'Nivel máximo alcanzado'} aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
             <span style={{ width: `${progress}%` }} />
           </div>
           <div className="growth-band__stage">

@@ -6,11 +6,37 @@ import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
 import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
+import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
+
+test('R6 limita fixture y Growth automático a base local y modos exclusivos', () => {
+  const env = { E2E_R6_COMPARISONS: '1', E2E_DATABASE_CONFIRM: 'disposable', DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', USUARIOS_TEST_DATABASE_URL: 'postgres://dummy:dummy@aloha-r2-pg:5432/aloha_r2', E2E_NEON_HTTP: 'http://127.0.0.1:4446/sql', E2E_NEON_WSPROXY: '127.0.0.1:5435' }
+  assert.doesNotThrow(() => requireR6Gate(env))
+  for (const overrides of [{ RESPONSIVE_BASE_URL: 'https://remote.invalid' }, { E2E_R3_DIALOGS: '1' }, { E2E_RUN_MUTATIONS: '1' }, { E2E_NEON_HTTP: 'https://remote.invalid/sql' }, { E2E_DATABASE_CONFIRM: '' }, { DATABASE_URL: 'postgres://remote.invalid/db' }]) assert.throws(() => requireR6Gate({ ...env, ...overrides }))
+  const output = execFileSync(process.execPath, ['--input-type=module', '--eval', "import('./playwright.config.mjs').then(({default:c})=>console.log(JSON.stringify(c.projects.filter(p=>p.name.startsWith('phone-')).map(p=>p.testIgnore.test('dashboard-comparisons.spec.js')))))"], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8', env: { RESPONSIVE_BASE_URL: 'https://readonly.invalid' },
+  })
+  assert.deepEqual(JSON.parse(output), [true, true, true, true])
+})
+
+test('R6 declara estados, regiones y guarda fresca del layout administrativo', () => {
+  for (const name of ['crecimiento', 'historial', 'entrenamiento']) {
+    const source = read(`../app/dashboard/${name}/page.js`)
+    assert.match(source, /id="main-content"/)
+    assert.match(source, /data-page-state=/)
+    assert.match(source, /role="status"/)
+    assert.match(source, /role="alert"/)
+    assert.doesNotMatch(source, /router\.push|overflowX:/)
+  }
+  const layout = read('../app/dashboard/entrenamiento/layout.js')
+  assert.match(layout, /getNavigationContext\(\)/)
+  assert.match(layout, /viewAdminTraining/)
+  assert.match(layout, /force-dynamic/)
+})
 
 test('R5 oculta SVG decorativos de KPI, avisos, tendencias y exportación al lector de pantalla', () => {
   for (const path of ['page.js', 'reporte/page.js']) {

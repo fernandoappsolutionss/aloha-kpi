@@ -71,6 +71,8 @@ setup('autentica actores E2E en contextos aislados', async ({ browser, baseURL }
     expectedPath: /^\/dashboard(?:\/|$)/, allowedRoles: ['coordinador'],
     statePath: 'tests/e2e/.auth/coordinator.json',
   })
+  // R6 no abre centros: su Growth se limita al overview administrativo.
+  if (process.env.E2E_R6_COMPARISONS === '1') return
   await authenticate({
     browser, baseURL,
     emailName: 'E2E_CENTER_EMAIL', passwordName: 'E2E_CENTER_PASSWORD',

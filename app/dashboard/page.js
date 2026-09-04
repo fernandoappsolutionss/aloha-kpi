@@ -6,9 +6,10 @@ import PanelFilter from '../../components/PanelFilter'
 import NivelBadge from '../../components/NivelBadge'
 import TableScroller from '../../components/TableScroller'
 import OperationalCard from '../../components/OperationalCard'
+import MeasuredChart from '../../components/MeasuredChart'
 import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -249,8 +250,9 @@ export default function DashboardPage() {
             {serie.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 0', fontSize: 13 }}>Sin datos de niños para el rango seleccionado.</div>
             ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
+              <>
+              <MeasuredChart label="Evolución de niños activos" minHeight={280}>
+                {({ width, height }) => <AreaChart width={width} height={height} data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--ts-green)" stopOpacity={0.35} />
@@ -258,12 +260,16 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
                   <Tooltip content={<NinosTooltip />} />
                   <Area type="monotone" dataKey="ninos" name="Niños" stroke="var(--ts-green)" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: 'var(--ts-green)' }} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+                </AreaChart>}
+              </MeasuredChart>
+              <div className="chart-legend dashboard-chart-legend" role="group" aria-label="Datos de evolución de niños activos">
+                {serie.map(row => <span key={`${row.year}-${row.month}`}>{row.label}: <strong>{row.ninos}</strong> niños</span>)}
+              </div>
+              </>
             )}
           </div>
         </div>
