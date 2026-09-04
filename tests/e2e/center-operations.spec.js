@@ -10,10 +10,18 @@ test('operaciones R9 accesibles y exclusivamente de lectura',async ({page,reques
   async function audit(scope=null) {
     await expect(page.locator('main')).toHaveCount(1)
     await auditPage(page,{mobile,scope})
-    const builder=new AxeBuilder({page})
-    if(scope) builder.include(scope)
-    const results=await builder.analyze()
-    expect(results.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))).toEqual([])
+    for(const theme of ['light','dark']) {
+      await page.evaluate(async theme=>{
+        document.documentElement.setAttribute('data-theme',theme)
+        await new Promise(requestAnimationFrame)
+        await Promise.all(document.getAnimations().filter(a=>Number.isFinite(a.effect.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{})))
+      },theme)
+      const builder=new AxeBuilder({page})
+      if(scope) builder.include(scope)
+      const results=await builder.analyze()
+      expect(results.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),`WCAG ${theme}`).toEqual([])
+    }
+    await page.evaluate(()=>document.documentElement.setAttribute('data-theme','light'))
   }
   try {
     await page.goto('/centro/2/grupos',{waitUntil:'networkidle'})
@@ -97,6 +105,89 @@ test('operaciones R9 accesibles y exclusivamente de lectura',async ({page,reques
     expect(ledger.mutatingAttempts).toBe(0)
     console.log(`R9 ${testInfo.project.name}: DB sin cambios; CRM mutatingAttempts=0; lecturas=${ledger.readCalls}`)
   }
+})
+
+for(const form of ['reserva','extensión','suspensión','preguntas']) test(`formularios finales: ${form} accesible sin guardar`,async({page,request},testInfo)=>{
+  test.skip(![320,390,1440].includes(page.viewportSize().width),'Formulario focal en dos teléfonos y escritorio.')
+  test.setTimeout(120_000)
+  const before=await r9Snapshot()
+  async function enter(button) { await button.focus();await page.keyboard.press('Enter') }
+  try {
+    await page.goto(`/centro/2/${form==='preguntas'?'eventos':'grupos'}`,{waitUntil:'networkidle'})
+    let surface
+    if(form==='reserva') {
+      await enter(page.getByRole('button',{name:'Horarios',exact:true}))
+      await enter(page.getByRole('button',{name:'Mar',exact:true}))
+      await enter(page.getByRole('button',{name:/Clase de prueba este día/}))
+      surface=page.getByRole('dialog',{name:'Apartar clase de prueba',exact:true})
+      for(const role of ['Padres','Tiny','Kids']) for(const field of ['Salón','Coach']) {
+        const control=surface.getByLabel(`${field} ${role}`,{exact:true})
+        await expect(control).toBeVisible();await expect(control).toHaveAttribute('name',/\S+/)
+        await control.focus();await expect(control).toBeFocused()
+      }
+    } else if(form==='preguntas') {
+      await enter(page.getByRole('button',{name:/Nueva clase de prueba/}))
+      surface=page.getByRole('dialog')
+      await enter(surface.getByRole('tab',{name:'Preguntas',exact:true}))
+      for(let i=1;i<=2;i++) {
+        await enter(surface.getByRole('button',{name:'+ Agregar',exact:true}))
+        await surface.getByLabel(`Pregunta ${i}`,{exact:true}).fill(`Pregunta ficticia ${i}`)
+        await expect(surface.getByLabel(`Pregunta ${i}`,{exact:true})).toHaveAttribute('name',/\S+/)
+        await expect(surface.getByRole('button',{name:`Quitar pregunta ${i}`,exact:true})).toBeVisible()
+      }
+    } else {
+      await enter(page.getByRole('button',{name:'Abrir grupo R9-1',exact:true}))
+      if(form==='extensión') {
+        await enter(page.getByRole('button',{name:'Extender ventana',exact:true}))
+        surface=page.locator('.grp-detail')
+        await expect(surface.getByLabel('Fecha límite de la extensión',{exact:true})).toBeVisible()
+        await expect(surface.getByLabel('Fecha límite de la extensión',{exact:true})).toHaveAttribute('name','fecha_extension')
+      } else {
+        await enter(page.getByRole('tab',{name:/Itinerario/}))
+        await enter(page.getByRole('button',{name:/Ajustar itinerario/}))
+        surface=page.getByRole('dialog',{name:'Itinerario del grupo R9-1',exact:true})
+        for(let i=1;i<=2;i++) {
+          await enter(surface.getByRole('button',{name:'+ Suspender una clase',exact:true}))
+          await expect(surface.getByLabel(`Fecha de suspensión ${i}`,{exact:true})).toBeVisible()
+          await surface.getByLabel(`Motivo de suspensión ${i}`,{exact:true}).fill('Motivo ficticio')
+          await expect(surface.getByRole('button',{name:`Quitar suspensión ${i}`,exact:true})).toBeVisible()
+        }
+      }
+    }
+    await auditPage(page,{mobile:page.viewportSize().width<=1024})
+    for(const theme of ['light','dark']) {
+      await page.evaluate(async theme=>{
+        document.documentElement.setAttribute('data-theme',theme)
+        await new Promise(requestAnimationFrame)
+        await Promise.all(document.getAnimations().filter(a=>Number.isFinite(a.effect.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{})))
+      },theme)
+      const results=await new AxeBuilder({page}).analyze()
+      expect(results.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),theme).toEqual([])
+    }
+    await capturePage(page,{name:`final-form-${form}`,testInfo,locator:surface})
+    if(form==='preguntas'||form==='suspensión') {
+      await enter(surface.getByRole('button',{name:form==='preguntas'?'Quitar pregunta 2':'Quitar suspensión 2',exact:true}))
+      await expect(surface.getByLabel(form==='preguntas'?'Pregunta 2':'Fecha de suspensión 2',{exact:true})).toHaveCount(0)
+    }
+    await enter(surface.getByRole('button',{name:'Cancelar',exact:true}))
+    if(form!=='extensión') await expect(surface).toHaveCount(0)
+  } finally {
+    expect(await r9Snapshot(),'Cancelar conserva DB exacta').toEqual(before)
+    expect((await (await request.get('http://127.0.0.1:4317/stats')).json()).mutatingAttempts).toBe(0)
+  }
+})
+
+test('Eventos conserva una columna en todo teléfono',async({page})=>{
+  test.skip(page.viewportSize().width!==390,'Un caso recorre 320/360/390/767 y 1440 sin sembrar de nuevo.')
+  const before=await r9Snapshot()
+  try {
+    await page.goto('/centro/2/eventos',{waitUntil:'networkidle'})
+    for(const width of [320,360,390,767,1440]) {
+      await page.setViewportSize({width,height:900})
+      await expect.poll(()=>page.locator('.events-metrics').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(width<768?1:6)
+      await auditPage(page,{mobile:width<=1024})
+    }
+  }finally{expect(await r9Snapshot()).toEqual(before)}
 })
 
 for (const finding of ['horarios','coach','contactos']) test(`R9 revisión restaura ${finding}`,async ({page,request},testInfo)=>{

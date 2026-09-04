@@ -94,7 +94,7 @@ function ChipPlanNino({ plan, nombre, onVer, triggerRef }) {
   const s = `S${(plan.indiceSemana ?? 0) + 1}`
   let texto = `va por ${s}`
   let title = `Va por la semana ${s} de su plan${det} · ancla ${fmtDia(plan.ancla)}.`
-  let tono = { color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }
+  let tono = { color: 'var(--text)', borderColor: 'var(--ts-green-line)' }
   if (plan.estado === 'sin_plan') {
     texto = 'sin plan'
     title = 'Sin plan derivable: falta el ancla de nivel del niño o el grupo no tiene horario/calendario — nada se adivina.'
@@ -638,7 +638,7 @@ export default function GruposPage() {
                         orden de siempre — mismo orden que `visibles`, así las
                         flechas ↑/↓ recorren exactamente lo que se ve. */}
                     {enLlenado.length > 0 && (
-                      <div className="label" style={{ color: 'var(--ts-green)' }}>⏳ En llenado · {enLlenado.length}</div>
+                      <div className="label" style={{ color: 'var(--text)' }}>⏳ En llenado · {enLlenado.length}</div>
                     )}
                     {enLlenado.map((g) => (
                       <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)} tour={g.id === primeraTarjetaId ? 'grupos.tarjeta' : undefined}
@@ -858,7 +858,7 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
       <div style={{ marginTop: 11 }}><OcupacionBar n={g.estudiantes.length} metas={metas} /></div>
       {llenado && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline', marginTop: 8, fontSize: 13 }}>
-          <span className="num" style={{ fontWeight: 700, color: llenado.ventana.diasHastaLimite != null && llenado.ventana.diasHastaLimite <= 7 ? 'var(--warn)' : 'var(--ts-green)' }}>
+          <span className="num" style={{ fontWeight: 700, color: llenado.ventana.diasHastaLimite != null && llenado.ventana.diasHastaLimite <= 7 ? 'var(--warn)' : 'var(--text)' }}>
             ⏳ {countdownVentana(llenado.ventana)}
           </span>
           <span className="num" style={{ color: 'var(--text-muted)' }}>{llenado.ritmo.ninos}/{llenado.ritmo.meta} niños</span>
@@ -904,7 +904,7 @@ function AccionesNino({ e, acciones, asis }) {
     <>
       <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Editar</button>
       {e.itinerario === 'TINY' && Number(e.nivel) === 10 && (
-        <button className="btn" style={{ ...BTN_XS, color: 'var(--ts-green)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
+        <button className="btn" style={{ ...BTN_XS, color: 'var(--text)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
       )}
       {/* "Baja potencial" murió como botón (regla de Fernando 2026-08-10): el
           estado baja_potencial ya solo significa RETIRO PROGRAMADO. Quedan dos
@@ -1080,7 +1080,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
         )}
         {it?.semanas?.length > 0 && (
           <button className="grp-hoy" onClick={() => setVista('itinerario')} title="Ver el itinerario completo del nivel">
-            <span className="label" style={{ color: 'var(--ts-green)' }}>Esta semana</span>
+            <span className="label" style={{ color: 'var(--text)' }}>Esta semana</span>
             <span style={{ color: 'var(--text)', fontWeight: 600 }}>
               {idxHoy < 0 ? 'Nivel terminado' : it.semanas[idxHoy].etiqueta}
             </span>
@@ -1205,7 +1205,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
   return (
     <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 8 }} data-tour="grupo.llenado">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span className="label" style={{ color: 'var(--ts-green)' }}>Llenado</span>
+        <span className="label" style={{ color: 'var(--text)' }}>Llenado</span>
         {est && <span className={`pill ${est.pill}`} style={{ fontSize: 13 }}><span className="dot" />{est.t}</span>}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
@@ -1234,9 +1234,9 @@ function BloqueLlenado({ g, ll, onExtender }) {
       {extensible && (
         extiendo ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input type="date" className="input" style={{ width: 160 }} value={fechaExt}
+            <Field label="Fecha límite de la extensión"><input name="fecha_extension" type="date" className="input" style={{ width: 160 }} value={fechaExt}
               min={sumaDias(hoy, 1)} max={sumaDias(hoy, 56)}
-              onChange={(e) => setFechaExt(e.target.value)} />
+              onChange={(e) => setFechaExt(e.target.value)} /></Field>
             <button className="btn btn--primary" style={BTN_XS} disabled={guardando || !fechaExt} onClick={() => guardar(fechaExt)}>
               {guardando ? 'Guardando…' : 'Extender'}
             </button>
@@ -1568,7 +1568,7 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
   return (
     <div>
       <div className="card" style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.7 }} data-tour="fusiones.reglas">
-        <strong style={{ color: 'var(--ts-green)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Reglas del manual:</strong> Exentos: Kinder, Online y grupos base nivel 1–2. El manual permite fusionar desde nivel 3 (Tiny–Tiny ideal desde nivel 4).
+        <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Reglas del manual:</strong> Exentos: Kinder, Online y grupos base nivel 1–2. El manual permite fusionar desde nivel 3 (Tiny–Tiny ideal desde nivel 4).
       </div>
 
       {origen && (
@@ -1687,7 +1687,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
       <div className="label" style={{ marginBottom: 4 }}>{titulo}: Grupo {g.numero}</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         Niveles: <b style={{ color: 'var(--text)' }}>{resumenNiveles(g.estudiantes) || 'sin niños'}</b>
-        {plan ? <> · aula va por <b style={{ color: 'var(--ts-green)' }}>{plan.corto}</b></> : ' · sin itinerario generado'}
+        {plan ? <> · aula va por <b style={{ color: 'var(--text)' }}>{plan.corto}</b></> : ' · sin itinerario generado'}
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
         {(g.estudiantes || []).map((e) => {
@@ -1695,7 +1695,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
           return (
           <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel} · ${e.plan?.estado === 'en_curso' ? `va por S${(e.plan.indiceSemana ?? 0) + 1}` : semanaNinoTexto(e.plan)}${cierre.fecha ? ` · cierra ${fmtDia(cierre.fecha)} (${ORIGEN_CIERRE[cierre.origen]})` : ' · sin cierre resoluble'}`}
             style={{ fontSize: 13, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-            {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b> <span style={{ color: e.plan?.estado === 'en_curso' ? 'var(--ts-green)' : 'var(--text-dim)' }}>· {semanaNinoTexto(e.plan)}</span>
+            {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b> <span style={{ color: e.plan?.estado === 'en_curso' ? 'var(--text)' : 'var(--text-dim)' }}>· {semanaNinoTexto(e.plan)}</span>
           </span>
         ) })}
       </div>
@@ -2260,19 +2260,19 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
         <div style={{ gridColumn: '1 / -1' }}>
           <div className="label" style={{ marginBottom: 8 }}>Salón y coach por sala</div>
           {ROLES_RESERVA.map((rol) => (
-            <div key={rol} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ width: 62, fontSize: 12.5, color: 'var(--text-muted)', flexShrink: 0 }}>{ROL_LABEL[rol]}</span>
-              <select className="input" style={{ flex: 1, minWidth: 0 }} value={salonRol[rol] || ''}
+            <fieldset key={rol} className="operations-role-fields">
+              <legend className="label">{ROL_LABEL[rol]}</legend>
+              <div className="field"><label className="label" htmlFor={`reserva-salon-${rol}`}>Salón {ROL_LABEL[rol]}</label><select id={`reserva-salon-${rol}`} name={`salon_${rol}`} className="input" value={salonRol[rol] || ''}
                 onChange={(e) => setSalonRol((p) => ({ ...p, [rol]: e.target.value }))}>
                 <option value="">Sin salón</option>
                 {salones.filter((s) => s.activo || String(s.id) === salonRol[rol]).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-              </select>
-              <select className="input" style={{ flex: 1, minWidth: 0 }} value={coachRol[rol] || ''}
+              </select></div>
+              <div className="field"><label className="label" htmlFor={`reserva-coach-${rol}`}>Coach {ROL_LABEL[rol]}</label><select id={`reserva-coach-${rol}`} name={`coach_${rol}`} className="input" value={coachRol[rol] || ''}
                 onChange={(e) => setCoachRol((p) => ({ ...p, [rol]: e.target.value }))}>
                 <option value="">{ROL_PIDE_COACH[rol] ? 'Sin coach' : 'Administración'}</option>
                 {coaches.filter((c) => c.activo || String(c.id) === coachRol[rol]).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-            </div>
+              </select></div>
+            </fieldset>
           ))}
           <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-dim)' }}>
             Se necesitan 3 salones a la misma hora: uno para los papás, uno para Tiny y otro para Kids. <b style={{ color: 'var(--text-muted)' }}>Tiny y Kids llevan cada uno su coach</b> (son dos clases simultáneas); a los papás los recibe la administración. Esos salones y esos coaches quedan bloqueados en el calendario. El coach se puede cambiar cuando quieras con “Editar”.
@@ -2661,13 +2661,14 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
           <div className="label" style={{ marginBottom: 8 }}>Clases que no se dieron</div>
           {exc.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Ninguna. Cada clase suspendida corre el plan y mueve el cierre.</div>}
           {exc.map((e, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <input type="date" className="input" style={{ width: 160 }} value={e.fecha}
-                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, fecha: ev.target.value } : x)))} />
-              <input className="input" style={{ flex: 1 }} placeholder="Motivo (coach enfermo, feriado local…)" value={e.motivo || ''}
-                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, motivo: ev.target.value } : x)))} />
-              <button className="btn" style={{ padding: '6px 10px' }} onClick={() => setExc(exc.filter((_, j) => j !== i))}>✕</button>
-            </div>
+            <fieldset key={i} className="operations-exception-fields">
+              <legend className="label">Suspensión {i + 1}</legend>
+              <Field label={`Fecha de suspensión ${i + 1}`}><input name={`suspension_fecha_${i + 1}`} type="date" className="input" value={e.fecha}
+                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, fecha: ev.target.value } : x)))} /></Field>
+              <Field label={`Motivo de suspensión ${i + 1}`}><input name={`suspension_motivo_${i + 1}`} className="input" placeholder="Coach enfermo, feriado local…" value={e.motivo || ''}
+                onChange={(ev) => setExc(exc.map((x, j) => (j === i ? { ...x, motivo: ev.target.value } : x)))} /></Field>
+              <button className="btn" aria-label={`Quitar suspensión ${i + 1}`} style={{ padding: '6px 10px' }} onClick={() => setExc(exc.filter((_, j) => j !== i))}>✕</button>
+            </fieldset>
           ))}
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setExc([...exc, { fecha: hoyISO(), motivo: '' }])}>+ Suspender una clase</button>
         </div>

@@ -175,7 +175,11 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
   const centros = context?.centers || []
   const esCoordinador = actorRole === 'coordinador'
-  const mostrarRegreso = isPanel && Boolean(centroId)
+  // El contexto visual procede de la ruta y del alcance fresco del servidor;
+  // no concede permisos ni sustituye las guardas de cada página/acción.
+  const isCenterContext = isPanel && centros.some(c => String(c.id) === String(centroId))
+    && (path === `/centro/${centroId}` || path.startsWith(`/centro/${centroId}/`))
+  const mostrarRegreso = isCenterContext
   const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
@@ -211,7 +215,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Historial', icon: 'calendar', href: `/centro/${centroId}/historial` },
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
   ]
-  const items = isPanel ? adminItems : (isCenterActor && centroId ? centroItems : [])
+  const items = isPanel ? (isCenterContext ? centroItems : adminItems) : (isCenterActor && centroId ? centroItems : [])
   const roleLabel = isPanel
     ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador')
     : (centroNombre || 'Centro')
@@ -267,7 +271,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       </div>
 
       <nav className="sb__nav">
-        <div className="sb__section label">{isPanel ? 'Panel' : 'Mi centro'}</div>
+        <div className="sb__section label">{isCenterContext ? 'Centro' : isPanel ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => navigationLink(item))}
 
         {/* Centros expandible (admin) */}
@@ -282,7 +286,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
               return (
                 <Link key={c.id} href={`/centro/${c.id}`} title={c.nombre}
                   onClick={() => closeDrawer({ restoreFocus: false })}
-                  aria-current={active ? 'page' : undefined}
+                  aria-current={active && !isCenterContext ? 'page' : undefined}
                   className={`sb__item sb__sub${active ? ' sb__item--active' : ''}`}>
                   <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 3, background: active ? 'var(--ts-green)' : 'var(--text-faint)', flexShrink: 0 }} />
                   <span>{c.nombre.length > 18 ? c.nombre.split(' ').slice(0, 2).join(' ') : c.nombre}</span>

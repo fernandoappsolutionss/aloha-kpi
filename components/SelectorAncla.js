@@ -95,7 +95,7 @@ export default function SelectorAncla({
                 <input id={`${choiceId}-${o.clave}`} type="radio" name={choiceId} value={o.clave} checked={on} onChange={() => escoger(o.clave)} />
                 <b style={{ color: 'var(--text)', fontSize: 12.5 }}>{o.etiqueta}</b>
                 {o.fecha && (
-                  <span className="num" style={{ fontSize: 12, color: on ? 'var(--ts-green)' : 'var(--text-muted)' }}>{fmtDia(o.fecha)}</span>
+                  <span className="num" style={{ fontSize: 12, color: on ? 'var(--text)' : 'var(--text-muted)' }}>{fmtDia(o.fecha)}</span>
                 )}
                 {/* La marca es de PROBABILIDAD: escribir a mano nunca lo es,
                     aunque sea lo único que quede. */}

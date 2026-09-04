@@ -1650,6 +1650,19 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .plan-nino-dialog .itin-fila { flex-wrap: wrap; }
 .plan-nino-dialog .itin-fila__fechas { flex-wrap: wrap; min-width: 0; }
 .operations-page .panel__head, .events-page .panel__head { flex-wrap: wrap; gap: 10px; }
+:is(.grp-detail,.plan-nino-dialog) { --warn: var(--warn-text); --bad: var(--bad-text); }
+:is(.grp-detail,.plan-nino-dialog,.events-page) .pill--ok { color: var(--text); }
+.grp-detail .grp-seg__btn .num { opacity: 1; }
+/* El pasado se distingue por borde discontinuo, sin atenuar su contenido. */
+:is(.grp-detail,.plan-nino-dialog) .itin-blk--hecha { opacity: 1; border-style: dashed; }
+:is(.grp-detail,.plan-nino-dialog) .itin-fila[style*="opacity"] { opacity: 1 !important; }
+:is(.grp-detail,.plan-nino-dialog) .itin-fila[style*="opacity"] .itin-fila__chip { border-style: dashed; }
+.operations-role-fields, .operations-exception-fields, .events-question-fields { display: grid; gap: 8px; align-items: end; border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+.operations-role-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.operations-exception-fields { grid-template-columns: 160px minmax(0,1fr) auto; }
+.events-question-fields { grid-template-columns: minmax(0,1fr) auto; }
+:is(.operations-role-fields,.operations-exception-fields,.events-question-fields) legend { margin-bottom: 8px; }
+:is(.operations-role-fields,.operations-exception-fields,.events-question-fields) .field { min-width: 0; }
 @media (min-width: 1360px) { .events-metrics { grid-template-columns: repeat(6,minmax(0,1fr)); } }
 @media (max-width: 1024px) {
   :is(.operations-page,.events-page,.grp-detail,.plan-nino-dialog,.anchor-selector,.coach-page,.coach-note) :is(button,a[href],select,input:not([type="radio"]):not([type="checkbox"]),textarea) { min-height: 44px; min-width: 44px; }
@@ -1660,6 +1673,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 @media (max-width: 767px) {
   .r9-mobile { display: block; }
+  .events-metrics, .operations-role-fields, .operations-exception-fields, .events-question-fields { grid-template-columns: minmax(0,1fr); }
   .r9-desktop { display: none; }
   .schedule-days { grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; }
   .operations-resources { grid-template-columns: minmax(0,1fr); }
@@ -1676,4 +1690,3 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .plan-nino-dialog .itin-fila__fechas { margin-left: 0; width: 100%; }
   .plan-nino-dialog .itin-fecha, .grp-detail button.itin-fecha { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
 }
-@media (max-width: 359px) { .events-metrics { grid-template-columns: minmax(0,1fr); } }

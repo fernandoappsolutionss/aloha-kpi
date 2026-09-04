@@ -520,10 +520,11 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
               {f.registration_questions.length === 0 ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin preguntas personalizadas.</div>
               ) : f.registration_questions.map((qq, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input className="input" style={{ flex: 1 }} placeholder="Pregunta" value={qq.label} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], label: e.target.value }; set('registration_questions', a) }} />
-                  <button className="btn" onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
-                </div>
+                <fieldset key={i} className="events-question-fields">
+                  <legend className="label">Pregunta personalizada {i + 1}</legend>
+                  <Field label={`Pregunta ${i + 1}`}><input name={`pregunta_${i + 1}`} className="input" placeholder="Pregunta" value={qq.label} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], label: e.target.value }; set('registration_questions', a) }} /></Field>
+                  <button className="btn" aria-label={`Quitar pregunta ${i + 1}`} onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
+                </fieldset>
               ))}
             </div>
       )}
