@@ -11,7 +11,7 @@ export const R9_PASSWORD = 'AlohaR9Disposable!2026'
 export const R9_STATE = 'tests/e2e/.auth/r9-center.json'
 export const R9_EVENT_ID = 'e2e-r9-event-990033'
 export const R9_ACCOUNT = 'c0c81438-bb54-4ae0-a019-b54e0bfcf870'
-export const R9_IDS = { centros:[2], usuarios:[990003], coaches:[990004], salones:[990005], grupos:[990013,990014,990015], grupo_horarios:[990016,990017,990018], estudiantes:[990023,990024,990025,990026,990027], estudiante_eventos:[990028], asistencias:[990029], centro_eventos:[990033] }
+export const R9_IDS = { centros:[2], usuarios:[990003], coaches:[990004], salones:[990005], grupos:[990013,990014,990015], grupo_horarios:[990016,990017,990018,990019], estudiantes:[990023,990024,990025,990026,990027], estudiante_eventos:[990028], asistencias:[990029], centro_eventos:[990033], centro_reservas:[990034], centro_reserva_salones:[990035] }
 const manifestPath = resolve('tests/e2e/.auth/r9-fixture-manifest.json')
 export function requireR9Gate(env = process.env) {
   if (env.E2E_R9_OPERATIONS !== '1' || env.E2E_DATABASE_CONFIRM !== 'disposable' || env.RESPONSIVE_BASE_URL
@@ -49,12 +49,15 @@ export async function prepareR9Fixture() {
     await q("INSERT INTO usuarios(id,nombre,email,password_hash,rol,centro_id) VALUES(990003,$1,$2,$3,'administradora',2)",[R9_MARKER,R9_EMAIL,password])
     await q('INSERT INTO coaches(id,centro_id,nombre,nivel_kids,activo) VALUES(990004,2,$1,10,true)',['Coach R9 Nombre Largo de Aprendizaje Integral'])
     await q('INSERT INTO salones(id,centro_id,nombre,activo) VALUES(990005,2,$1,true)',['Salón R9 Aprendizaje Integral'])
-    const it = {nivel:3,fecha_inicio:past,pais:'PA',con_feriados:false,versiones:[{vigente_desde:past,dias:[new Date(today+'T12:00Z').getUTCDay()]}],semanas:[{corto:'S1',etiqueta:'Primera clase',tipo:'clase',fechas:[past]},{corto:'S2',etiqueta:'Segunda clase',tipo:'clase',fechas:[today]}],excepciones:[],clases_suspendidas:[]}
+    const it = {fecha_cierre_estimada:today,nivel:3,fecha_inicio:past,pais:'PA',con_feriados:false,versiones:[{vigente_desde:past,dias:[new Date(today+'T12:00Z').getUTCDay()]}],semanas:[{corto:'S1',etiqueta:'Primera clase',tipo:'clase',fechas:[past]},{corto:'S2',etiqueta:'Segunda clase',tipo:'clase',fechas:[today]}],excepciones:[],clases_suspendidas:[]}
     for (let i=0;i<3;i++) {
       await q("INSERT INTO grupos(id,centro_id,numero,itinerario,estado,coach_id,coach_token,fecha_apertura,fecha_inicio_clases,inscripcion_abierta,itinerario_clases,notas) VALUES($1,2,$2,'TINY','activo',990004,$3,$4,$4,true,$5::jsonb,$6)",[990013+i,`R9-${i+1}`,i===0?token:null,past,JSON.stringify(it),R9_MARKER])
       await q("INSERT INTO grupo_horarios(id,grupo_id,dia,hora_inicio,hora_fin,salon_id) VALUES($1,$2,$3,$4,$5,990005)",[990016+i,990013+i,new Date(today+'T12:00Z').getUTCDay() || 1,`${15+i}:00`,`${16+i}:00`])
     }
-    for (const [id,group,name,level,state,anchor] of [[990023,990013,'Ana R9 Con Plan Apellido Extraordinariamente Largo',3,'activo',past],[990024,990013,'Bruno R9 Sin Plan Apellido Extraordinariamente Largo',3,'activo',null],[990025,null,'Celia R9 Sin Grupo Apellido Extraordinariamente Largo',1,'activo',past],[990026,990014,'Diego R9 Retirado Apellido Extraordinariamente Largo',1,'retirado',past],[990027,990015,'Elena R9 Último Nivel Apellido Extraordinariamente Largo',10,'activo',past]]) {
+    await q("INSERT INTO grupo_horarios(id,grupo_id,dia,hora_inicio,hora_fin,salon_id) VALUES(990019,990014,4,'18:30','19:30',990005)")
+    await q("INSERT INTO centro_reservas(id,centro_id,dia,hora_inicio,hora_fin,notas) VALUES(990034,2,1,'14:45','16:15',$1)",[R9_MARKER])
+    await q("INSERT INTO centro_reserva_salones(id,reserva_id,salon_id,rol,coach_id) VALUES(990035,990034,990005,'tiny',990004)")
+    for (const [id,group,name,level,state,anchor] of [[990023,990013,'Ana R9 Con Plan Apellido Extraordinariamente Largo',3,'activo',past],[990024,990013,'Bruno R9 Sin Plan Apellido Extraordinariamente Largo',3,'baja_potencial',null],[990025,null,'Celia R9 Sin Grupo Apellido Extraordinariamente Largo',1,'activo',past],[990026,990014,'Diego R9 Retirado Apellido Extraordinariamente Largo',1,'retirado',past],[990027,990015,'Elena R9 Último Nivel Apellido Extraordinariamente Largo',10,'activo',past]]) {
       await q("INSERT INTO estudiantes(id,centro_id,grupo_id,nombre,itinerario,nivel,estado,status_plataforma,origen,origen_venta,fecha_inscripcion,fecha_inicio_nivel,fecha_cierre_nivel,fecha_retiro,motivo_retiro,representante,correo,notas) VALUES($1,2,$2,$3,'TINY',$4,$5,'INCLUIR','directo','centro',$6,$7,$8,$9,$10,'Representante R9','familia-r9@example.invalid',$11)",[id,group,name,level,state,past,anchor,id===990027?today:null,state==='retirado'?past:null,state==='retirado'?'economico':null,R9_MARKER])
     }
     await q("INSERT INTO estudiante_eventos(id,estudiante_id,centro_id,tipo,fecha,year,month,a_grupo_id,notas) VALUES(990028,990024,2,'inscripcion',$1,$2,$3,990013,$4)",[past,Number(past.slice(0,4)),Number(past.slice(5,7)),R9_MARKER])
@@ -95,7 +98,7 @@ export async function cleanupR9Fixture() {
     for(const table of ['growth_notification_receipts','entrenamiento_progreso']) m.derived[table]=(await q(`SELECT id FROM ${table} WHERE usuario_id=990003 ORDER BY id`)).map(r=>Number(r.id))
     await save(manifestPath,m)
     for(const table of ['growth_notification_receipts','growth_recommendations','growth_snapshots','entrenamiento_progreso']) await q(`DELETE FROM ${table} WHERE id=ANY($1::bigint[])`,[m.derived[table]])
-    for(const table of ['centro_eventos','asistencias','estudiante_eventos','estudiantes','grupo_horarios','grupos','coaches','salones','usuarios','centros']) await q(`DELETE FROM ${table} WHERE id=ANY($1::int[])`,[R9_IDS[table]])
+    for(const table of ['centro_reserva_salones','centro_reservas','centro_eventos','asistencias','estudiante_eventos','estudiantes','grupo_horarios','grupos','coaches','salones','usuarios','centros']) await q(`DELETE FROM ${table} WHERE id=ANY($1::int[])`,[R9_IDS[table]])
     for(const [table,ids] of Object.entries(R9_IDS)) if((await q(`SELECT id FROM ${table} WHERE id=ANY($1::int[])`,[ids])).length) throw new Error('Cleanup R9 incompleto.')
     const {token,...safe}=m; safe.phase='cleaned'
     await save(resolve('test-results/r9-cleanup-evidence.json'),safe)

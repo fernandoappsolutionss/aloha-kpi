@@ -63,6 +63,7 @@ export default function CoachPage() {
       {!data?<><h1>Lista de asistencia</h1><div role={error?'alert':'status'}>{error||'Cargando…'}</div></>:<>
         <h1>Grupo {data.grupo.numero} · {data.grupo.itinerario}</h1>
         <p className="h-sub">{data.grupo.centro} · {data.grupo.coach||'Sin coach asignado'} · {data.grupo.horarioTexto}</p>
+        {data.grupo.itinerario_clases?.fecha_cierre_estimada&&<p className="h-sub">Cierre estimado: {fmtDia(data.grupo.itinerario_clases.fecha_cierre_estimada)}</p>}
         <p>Escoge el estado de cada clase. Quitar marca deja la asistencia sin registrar. Con dos ausencias seguidas, avisa al administrador.</p>
         {feedback&&<div role="alert" className="alert alert--error">{feedback}</div>}
         {!fechas.length?<div role="status" className="alert">Este grupo aún no tiene itinerario generado. Pídele al administrador que le ponga fecha de inicio y horario.</div>:<>
@@ -84,7 +85,7 @@ export default function CoachPage() {
             })}</div>
           </div>
           <div className="r9-desktop"><TableScroller label="Asistencia de todas las clases" stickyFirstColumn><table className="table coach-table"><thead><tr><th>Niño</th>{fechas.map(f=><th key={f.fecha}>{dateLabel(f)}</th>)}<th>Nota</th></tr></thead><tbody>{data.estudiantes.map(est=><tr key={est.id}>
-            <th scope="row">{est.nombre}{absences(est)&&<span> · ⚠ Dos ausencias seguidas</span>}<div>{est.itinerario} {est.nivel}</div></th>
+            <th scope="row">{est.nombre}{absences(est)&&<span> · ⚠ Dos ausencias seguidas</span>}<div>{est.itinerario} {est.nivel}{est.estado==='baja_potencial'?' · baja potencial':''}</div></th>
             {fechas.map(f=><td key={f.fecha}><select className="input" aria-label={`Asistencia de ${est.nombre}, ${dateLabel(f)}`} value={marcas.get(`${est.id}|${f.fecha}`)||''} disabled={busy.has(`${est.id}|${f.fecha}`)} onChange={e=>saveAttendance(est,f.fecha,e.target.value)}><option value="">Sin marca</option>{STATES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></td>)}
             <td>{noteButton(est)}{est.nota_coach&&<div>{est.nota_coach}</div>}</td>
           </tr>)}</tbody></table></TableScroller></div>

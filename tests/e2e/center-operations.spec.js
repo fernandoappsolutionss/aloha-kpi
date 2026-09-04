@@ -99,6 +99,76 @@ test('operaciones R9 accesibles y exclusivamente de lectura',async ({page,reques
   }
 })
 
+for (const finding of ['horarios','coach','contactos']) test(`R9 revisión restaura ${finding}`,async ({page,request},testInfo)=>{
+  test.setTimeout(120_000)
+  const fixture=await readR9Manifest(),before=await r9Snapshot()
+  const soft=expect.configure({soft:true,timeout:1000})
+  async function audit() {
+    await auditPage(page,{mobile:page.viewportSize().width<=1024})
+    const result=await new AxeBuilder({page}).disableRules(['color-contrast']).analyze()
+    expect(result.violations.map(v=>v.id)).toEqual([])
+  }
+  try {
+    if(finding==='coach') {
+      try {await page.goto('/coach/'+fixture.token,{waitUntil:'networkidle'})}catch{throw new Error('Fallo de apertura privada local')}
+      await soft(page.getByText('Cierre estimado: '+fixture.today.slice(8,10)+'/'+fixture.today.slice(5,7),{exact:true})).toBeVisible()
+      const student=page.viewportSize().width<768?page.getByRole('article').filter({hasText:'Bruno R9'}):page.getByRole('row').filter({hasText:'Bruno R9'})
+      await soft(student.getByText(/baja potencial/)).toBeVisible()
+      await audit()
+    } else {
+      await page.goto('/centro/2/grupos',{waitUntil:'networkidle'})
+      if(finding==='horarios') {
+        await page.getByRole('button',{name:'Horarios',exact:true}).click()
+        const schedule=page.locator('.schedule-list')
+        const day=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][new Date(fixture.today+'T12:00:00Z').getUTCDay()||1]
+        await page.getByRole('button',{name:day,exact:true}).click()
+        const group=schedule.getByRole('article').filter({has:page.getByRole('heading',{name:'Grupo R9-1',exact:true})})
+        await soft(group).toContainText('TINY')
+        await soft(group).toContainText('2 niños')
+        await page.getByRole('button',{name:'Lun',exact:true}).click()
+        const reservation=schedule.getByRole('article').filter({has:page.getByRole('heading',{name:'Clase de prueba',exact:true})})
+        for(const value of ['Tiny','Coach R9 Nombre Largo de Aprendizaje Integral','2:45 pm–4:15 pm','este salón no se puede usar para grupos']) await soft(reservation).toContainText(value)
+        if(page.viewportSize().width>1024) {
+          const dense=page.locator('.schedule-calendar [title^="Clase de prueba"]')
+          await expect(dense).toBeVisible()
+          for(const value of ['Tiny','Coach R9 Nombre Largo de Aprendizaje Integral','este salón no se puede usar para grupos']) await expect(dense).toHaveAttribute('title',new RegExp(value))
+        }
+        await audit()
+        await page.getByRole('button',{name:'Mar',exact:true}).click()
+        const slot=schedule.getByRole('article').filter({has:page.getByRole('heading',{name:'Disponible 6:30 pm–7:30 pm',exact:true})})
+        for(const value of ['par en otro salón','Atractivo','Razón','Coaches libres','Coach R9 Nombre Largo de Aprendizaje Integral']) await soft(slot).toContainText(value)
+        if(page.viewportSize().width>1024) await expect(page.locator('.schedule-calendar [title]').filter({hasText:'6:30 pm–7:30 pm'})).toHaveAttribute('title',/par en otro salón.*Coaches libres: Coach R9/)
+        await audit()
+      } else {
+        async function checkContacts(dialog) {
+          for(const [name,type] of [['telefono','tel'],['correo','email']]) {
+            await soft(dialog.locator('input[name="'+name+'"]')).toHaveAttribute('type',type)
+            await soft(dialog.locator('input[name="'+name+'"]')).toHaveAttribute('autocomplete',type)
+          }
+          await audit()
+          await dialog.getByRole('button',{name:'Cancelar',exact:true}).click()
+        }
+        await page.getByRole('button',{name:'Inscribir niño',exact:true}).click()
+        await checkContacts(page.getByRole('dialog',{name:'Inscribir niño',exact:true}))
+        await page.getByRole('button',{name:'Abrir grupo R9-1',exact:true}).click()
+        const row=page.locator('.grp-roster__item, tbody tr').filter({hasText:'Ana R9'})
+        await row.getByRole('button',{name:'Editar',exact:true}).click()
+        await checkContacts(page.getByRole('dialog',{name:/Editar a Ana/}))
+        await page.goto('/centro/2/eventos',{waitUntil:'networkidle'})
+        await page.getByRole('button',{name:/Ver registros de Clase R9/}).click()
+        await page.getByRole('button',{name:/Agregar invitado/}).click()
+        for(const [name,autocomplete] of [['first_name','given-name'],['last_name','family-name'],['email','email'],['phone','tel']]) await soft(page.locator('input[name="'+name+'"]')).toHaveAttribute('autocomplete',autocomplete)
+        await audit()
+        await page.getByRole('button',{name:/Cancelar/}).click()
+      }
+    }
+  }finally{
+    expect(await r9Snapshot()).toEqual(before)
+    expect((await (await request.get('http://127.0.0.1:4317/stats')).json()).mutatingAttempts).toBe(0)
+    console.log(`R9 revisión ${finding} ${testInfo.project.name}: DB invariante; CRM mutatingAttempts=0`)
+  }
+})
+
 test('los fallos de lectura conservan shell y main de error, nunca un vacío exitoso',async ({page,request},testInfo)=>{
   test.skip(testInfo.project.name!=='phone-320','Estado fatal focal en teléfono; geometría normal cubre seis anchos.')
   test.setTimeout(90_000)

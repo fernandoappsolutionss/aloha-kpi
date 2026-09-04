@@ -591,7 +591,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
       {showInv && (
         <form onSubmit={addInv} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14, padding: 12, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)' }}>
           {[['first_name', 'Nombre *'], ['last_name', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']].map(([k, l]) => (
-            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label" htmlFor={`invite-${k}`}>{l}</label><input id={`invite-${k}`} name={k} type={k==='email'?'email':k==='phone'?'tel':'text'} className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
+            <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label" htmlFor={`invite-${k}`}>{l}</label><input id={`invite-${k}`} name={k} autoComplete={{first_name:'given-name',last_name:'family-name',email:'email',phone:'tel'}[k]} type={k==='email'?'email':k==='phone'?'tel':'text'} className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
           ))}
           <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? '…' : 'Agregar'}</button>
         </form>

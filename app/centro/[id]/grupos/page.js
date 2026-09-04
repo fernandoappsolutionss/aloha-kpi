@@ -1791,7 +1791,46 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
   const recos = recomendacionesApertura(grupos, salones, coaches, retirados, 4)
   const modelo = estadoModelo(grupos, salones)
   const inv = inventarioSemanal(activos, salones)
-  const cols = calendarioDia(activos, salones, dia)
+  // One presentation projection feeds both the accessible list and dense calendar.
+  const cols = calendarioDia(activos, salones, dia).map(col => {
+    const sesiones = col.sesiones.map(sesion => {
+      const { grupo, horario, inicio, fin } = sesion
+      const rol = ROL_LABEL[horario.rol] || horario.rol || ''
+      const coach = grupo.es_reserva
+        ? coaches.find(c => String(c.id) === String(grupo.coach_id))
+        : grupo.coach
+      const coachNombre = coach?.nombre || (grupo.es_reserva && !ROL_PIDE_COACH[horario.rol] ? 'la recibe la administración' : 'Sin coach asignado')
+      const rango = `${aHora12(inicio)}–${aHora12(fin)}`
+      const liberacion = grupo.es_reserva ? null : liberacionDe(grupo)
+      const tituloLiberacion = liberacion?.libera ? `Se libera el bloque ~${fmtDia(liberacion.cierre)} (todos en su último nivel)` : ''
+      const fields = [{ label:'Horario', value:rango }, { label:'Coach', value:coachNombre }]
+      if (grupo.es_reserva) fields.push({ label:'Rol', value:rol }, { label:'Reserva', value:'este salón no se puede usar para grupos' })
+      else fields.push({ label:'Programa', value:grupo.itinerario }, { label:'Niños', value:`${grupo.estudiantes.length} niños` }, { label:'Liberación', value:tituloLiberacion })
+      const titulo = grupo.es_reserva ? 'Clase de prueba' : `Grupo ${grupo.numero}`
+      return { ...sesion, rol, coach, coachNombre, rango, liberacion, titulo, fields, descripcion:`${titulo} · ${fields.map(f=>f.value).filter(Boolean).join(' · ')}` }
+    })
+    const unidadesSalon = unidadesLibres(activos, [col.salon])
+    const slots = slotsDelDia(dia, conPrueba.has(dia))
+      .filter(sl => col.huecos.some(h => sl.inicio >= h.inicio && sl.fin <= h.fin))
+      .map(sl => {
+        const unidad = unidadesSalon.find(u => u.sesiones.some(s => s.dia === dia && s.inicio === sl.inicio && s.fin === sl.fin))
+        const at = atractivoDe(grupos, retirados, dia, sl.inicio)
+        const libres = coachesLibresEn(activos, coaches, dia, sl.inicio, sl.fin)
+        const diaPar = (sl.tipo === 'LM' || (sl.kinder && (dia === 1 || dia === 3))) ? (dia === 1 ? 3 : 1)
+          : (sl.tipo === 'MJ' || (sl.kinder && (dia === 2 || dia === 4))) ? (dia === 2 ? 4 : 2) : null
+        const horarios = unidad ? unidad.sesiones.map(s => ({ dia:s.dia, hora_inicio:aHora(s.inicio), hora_fin:aHora(s.fin), salon_id:String(s.salon_id) }))
+          : [{ dia, hora_inicio:aHora(sl.inicio), hora_fin:aHora(sl.fin), salon_id:String(col.salon.id) },
+            ...(diaPar ? [{ dia:diaPar, hora_inicio:aHora(sl.inicio), hora_fin:aHora(sl.fin), salon_id:'' }] : [])]
+        const subTexto = !unidad && diaPar ? '1 h + 1 h · par en otro salón' : sl.sub
+        const esKinder = !!sl.kinder
+        const coachesTexto = libres.length ? libres.map(c=>c.nombre).join(', ') : 'ninguno'
+        const descripcion = esKinder
+          ? `Zona Kinder (2:45–3:45 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. ${subTexto}. ${at.razon} Coaches libres: ${coachesTexto}.`
+          : `${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${coachesTexto}.`
+        return { ...sl, at, libres, horarios, subTexto, esKinder, coachesTexto, descripcion }
+      })
+    return { ...col, sesiones, slots }
+  })
   const sinSalon = sinSalonDia(activos, dia)
   const sinHorario = activos.filter((g) => !(g.horarios || []).length)
 
@@ -1949,7 +1988,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
           ))}
         </div>
         {reservaDia ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className="pill pill--warn" style={{ whiteSpace: 'nowrap' }}>🎯 Clase de prueba {aHora12(aMinutos(reservaDia.hora_inicio))}–{aHora12(aMinutos(reservaDia.hora_fin))}</span>
             <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReservaModal(reservaDia) }}>Editar</button>
             {!esAsistente && (
@@ -1974,14 +2013,11 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
       )}
 
       <div className="operational-list schedule-list" aria-label="Sesiones y horarios disponibles">
-        {cols.map(({salon,sesiones,huecos}) => <section key={salon.id}><h2>{salon.nombre}</h2>
-          {sesiones.map(({grupo,horario,inicio,fin})=><OperationalCard key={`${grupo.id}-${horario.id}`} title={grupo.es_reserva?'Clase de prueba':`Grupo ${grupo.numero}`} fields={[{label:'Horario',value:`${aHora12(inicio)}–${aHora12(fin)}`},{label:'Coach',value:grupo.coach?.nombre||'Sin coach'}]} />)}
-          {slotsDelDia(dia, conPrueba.has(dia)).filter(sl=>huecos.some(h=>sl.inicio>=h.inicio&&sl.fin<=h.fin)).map(sl=>{
-            const unidad=unidadesLibres(activos,[salon]).find(u=>u.sesiones.some(s=>s.dia===dia&&s.inicio===sl.inicio&&s.fin===sl.fin))
-            const par=(sl.tipo==='LM'||(sl.kinder&&(dia===1||dia===3)))?(dia===1?3:1):(sl.tipo==='MJ'||(sl.kinder&&(dia===2||dia===4)))?(dia===2?4:2):null
-            const horarios=unidad?unidad.sesiones.map(s=>({dia:s.dia,hora_inicio:aHora(s.inicio),hora_fin:aHora(s.fin),salon_id:String(s.salon_id)})):[{dia,hora_inicio:aHora(sl.inicio),hora_fin:aHora(sl.fin),salon_id:String(salon.id)},...(par?[{dia:par,hora_inicio:aHora(sl.inicio),hora_fin:aHora(sl.fin),salon_id:''}]:[])]
-            return <OperationalCard key={sl.inicio} title={`Disponible ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} subtitle={sl.sub} actions={<button type="button" className="btn" onClick={()=>onAbrirGrupo({horarios,itinerario:sl.kinder?'KINDER':undefined})}>Aperturar en este horario</button>} />
-          })}
+        {cols.map(({salon,sesiones,slots}) => <section key={salon.id}><h2>{salon.nombre}</h2>
+          {sesiones.map(({grupo,horario,titulo,fields})=><OperationalCard key={`${grupo.id}-${horario.id}`} title={titulo} fields={fields} />)}
+          {slots.map(sl=><OperationalCard key={sl.inicio} title={`Disponible ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} subtitle={sl.subTexto}
+            fields={[{label:'Programa',value:sl.esKinder?'Zona Kinder':'Tiny/Kids'},{label:'Atractivo',value:sl.at.etiqueta},{label:'Razón',value:sl.at.razon},{label:'Coaches libres',value:sl.coachesTexto}]}
+            actions={<button type="button" className="btn" onClick={()=>onAbrirGrupo({horarios:sl.horarios,itinerario:sl.esKinder?'KINDER':undefined})}>Aperturar en este horario</button>} />)}
         </section>)}
       </div>
       {/* Calendario del día: vista densa informativa; las acciones viven arriba. */}
@@ -2002,24 +2038,20 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
             ))}
           </div>
 
-          {cols.map(({ salon, sesiones, huecos }) => {
-            const unidadesSalon = unidadesLibres(activos, [salon])
-            const slotsLibres = slotsDelDia(dia, conPrueba.has(dia)).filter((sl) => huecos.some((h) => sl.inicio >= h.inicio && sl.fin <= h.fin))
+          {cols.map(({ salon, sesiones, huecos, slots }) => {
             return (
             <div key={salon.id} style={{
               position: 'relative', height: altura, borderRadius: 'var(--r-sm)',
               background: `repeating-linear-gradient(to bottom, var(--surface-2), var(--surface-2) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2 - 1}px, var(--border) ${ROW_H * 2}px)`,
               border: '1px solid var(--border)',
             }}>
-              {sesiones.map(({ grupo, horario, inicio, fin }) => {
+              {sesiones.map(({ grupo, horario, inicio, fin, rol, coach, coachNombre, liberacion, descripcion }) => {
                 const st = groupStatus(grupo, 8)
                 const alerta = st.key === 'bajo'
                 const corto = fin - inicio <= 60 // sesión de 1 h: layout compacto para que nada se corte
                 if (grupo.es_reserva) {
-                  const rol = ROL_LABEL[horario.rol] || horario.rol || ''
-                  const coachR = coaches.find((c) => String(c.id) === String(grupo.coach_id))
                   return (
-                    <div key={`${grupo.id}-${horario.id}`} title={`Clase de prueba · ${rol} · ${coachR ? coachR.nombre : (ROL_PIDE_COACH[horario.rol] ? 'sin coach asignado' : 'la recibe la administración')} · ${aHora12(inicio)}–${aHora12(fin)} · este salón no se puede usar para grupos`}
+                    <div key={`${grupo.id}-${horario.id}`} title={descripcion}
                       style={{
                         position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                         background: 'var(--warn-bg, rgba(245,158,11,0.14))', border: '1px solid var(--warn)',
@@ -2030,16 +2062,15 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                         🎯 Clase de prueba
                       </div>
                       <div style={{ color: 'var(--text-muted)', fontSize: 10.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {rol}{coachR ? ` · ${coachR.nombre.split(' ')[0]}` : (ROL_PIDE_COACH[horario.rol] ? ' · sin coach' : '')}
+                        {rol} · {coachNombre}
                       </div>
                       <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{aHora12(inicio)}–{aHora12(fin)}</div>
                     </div>
                   )
                 }
-                const lib = liberacionDe(grupo)
-                const tituloLib = lib?.libera ? ` · SE LIBERA el bloque ~${fmtDia(lib.cierre)} (todos en su último nivel)` : ''
+                const lib = liberacion
                 return (
-                  <div key={`${grupo.id}-${horario.id}`} title={`Grupo ${grupo.numero} · ${grupo.coach?.nombre || 'sin coach'} · ${grupo.itinerario} · ${grupo.estudiantes.length} niños · ${aHora12(inicio)}–${aHora12(fin)}${tituloLib}`}
+                  <div key={`${grupo.id}-${horario.id}`} title={descripcion}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(inicio) + 1, height: topDe(fin) - topDe(inicio) - 2,
                       background: 'var(--surface-1)', border: '1px solid var(--border-strong)',
@@ -2051,7 +2082,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                       <span className="num" style={{ color: alerta ? 'var(--bad)' : 'var(--ok)', flexShrink: 0 }}>{grupo.estudiantes.length}</span>
                     </div>
                     <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontSize: corto ? 10.5 : 11.5 }}>
-                      {grupo.coach?.nombre?.split(' ')[0] || 'Sin coach'}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
+                      {coach?.nombre?.split(' ')[0] || coachNombre}{corto ? ` · ${aHora12(inicio)}` : ` · ${grupo.itinerario}`}
                     </div>
                     {!corto && (
                       <div className="num" style={{ color: 'var(--text-dim)', fontSize: 10 }}>
@@ -2086,31 +2117,12 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 ))
               })}
               {/* Bloques del MODELO libres: la parrilla planificada del negocio */}
-              {slotsLibres.map((sl) => {
-                const unidad = unidadesSalon.find((u) => u.sesiones.some((ses) => ses.dia === dia && ses.inicio === sl.inicio && ses.fin === sl.fin))
-                const at = atractivoDe(grupos, retirados, dia, sl.inicio)
-                const libres = coachesLibresEn(activos, coaches, dia, sl.inicio, sl.fin)
+              {slots.map((sl) => {
+                const { at, libres, subTexto, esKinder, descripcion } = sl
                 const corto = sl.fin - sl.inicio <= 60
-                // Si el par del día está ocupado en ESTE salón, igual se prellena la
-                // segunda sesión de 1 h en el día par (salón por asignar): el grupo
-                // siempre nace cumpliendo las 2 h semanales del programa.
-                const diaPar = (sl.tipo === 'LM' || (sl.kinder && (dia === 1 || dia === 3))) ? (dia === 1 ? 3 : 1)
-                  : (sl.tipo === 'MJ' || (sl.kinder && (dia === 2 || dia === 4))) ? (dia === 2 ? 4 : 2) : null
-                const horarios = unidad
-                  ? unidad.sesiones.map((ses) => ({ dia: ses.dia, hora_inicio: aHora(ses.inicio), hora_fin: aHora(ses.fin), salon_id: String(ses.salon_id) }))
-                  : diaPar
-                    ? [
-                        { dia, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: String(salon.id) },
-                        { dia: diaPar, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: '' },
-                      ]
-                    : [{ dia, hora_inicio: aHora(sl.inicio), hora_fin: aHora(sl.fin), salon_id: String(salon.id) }]
-                const subTexto = unidad ? sl.sub : (sl.kinder ? sl.sub : diaPar ? '1 h + 1 h · par en otro salón' : sl.sub)
-                const esKinder = !!sl.kinder
                 return (
                   <div key={`s-${sl.inicio}`}
-                    title={esKinder
-                      ? `Zona Kinder (2:45–3:45 pm entre semana): aquí SÍ se abren Kinder — prohibidos en sábado y en los horarios calientes de Tiny/Kids. Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`
-                      : `${unidad ? unidad.titulo : `${DIAS[dia]} ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} · ${subTexto}. ${at.razon} Coaches libres: ${libres.length ? libres.map((c) => c.nombre).join(', ') : 'ninguno'}.`}
+                    title={descripcion}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
                       background: esKinder ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1.5px dashed ${esKinder ? 'var(--warn-line)' : 'var(--ok-line)'}`, borderRadius: 'var(--r-sm)',
@@ -2761,8 +2773,8 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
           </div>
         </Field>
         <Field label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-        <Field label="Teléfono"><input name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-        <Field full label="Correo"><input name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+        <Field label="Teléfono"><input name="telefono" type="tel" autoComplete="tel" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+        <Field full label="Correo"><input name="correo" type="email" autoComplete="email" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
       </div>
     </Modal>
   )
@@ -2844,13 +2856,13 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
         <Field label="Cierre de nivel (override)">
           <input name="fecha_cierre_nivel" type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
             Efectivo hoy: <b style={{ color: 'var(--text-muted)' }}>{cierreVigente.fecha ? `${fmtDia(cierreVigente.fecha)} (${ORIGEN_CIERRE[cierreVigente.origen]})` : 'sin cierre resoluble'}</b>. Vacío = se deriva del plan del niño.
           </div>
         </Field>
         <Field label="Representante"><input name="representante" className="input" value={f.representante} onChange={(e) => set('representante', e.target.value)} /></Field>
-        <Field label="Teléfono"><input name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
-        <Field full label="Correo"><input name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
+        <Field label="Teléfono"><input name="telefono" type="tel" autoComplete="tel" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
+        <Field full label="Correo"><input name="correo" type="email" autoComplete="email" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
         <Field full label="Notas"><textarea name="notas" className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} /></Field>
       </div>
     </Modal>
