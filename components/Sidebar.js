@@ -7,6 +7,7 @@ import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
 import { rolesQueFirma } from '../lib/entrenamiento/oficio/progreso'
+import { hrefActivo } from './nav-activo.mjs'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -250,7 +251,14 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     localStorage.clear()
     router.push('/login')
   }
-  const isActive = (href) => path === href || (href.endsWith('/entrenamiento') && path.startsWith(`${href}/`))
+  // UN SOLO enlace marcado como "página actual", y es el más específico del
+  // menú que cubre la ruta abierta. La regla anterior (exacta, más un caso
+  // especial de prefijo para el árbol de entrenamiento) marcaba DOS a la vez en
+  // /dashboard/entrenamiento/oficio y en /centro/<id>/entrenamiento/firmas. La
+  // decide components/nav-activo.mjs, que es la misma función que usa el
+  // barrido R10 para saber qué enlace exigir activo en cada ruta.
+  const activo = hrefActivo(path, [...items, ...configItems, { href: '/perfil' }].map((i) => i.href))
+  const isActive = (href) => href === activo
   const isCenterActive = (centerId) => {
     const prefix = `/centro/${centerId}`
     return path === prefix || path.startsWith(`${prefix}/`)

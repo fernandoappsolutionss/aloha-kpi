@@ -23,6 +23,10 @@
 
 # Reportes de corridas de scripts (dry-run/--apply): son evidencia local, no código
 scripts/out/
+# Andamiaje de medición (HTML generado para medir la hoja SOP en el navegador,
+# capturas de trabajo): evidencia local de una auditoría, no código. Sin esto un
+# `git add -A` se lleva cientos de KB de HTML generado al repo.
+/.scratch/
 /playwright-report/
 /test-results/
 /tests/e2e/.auth/

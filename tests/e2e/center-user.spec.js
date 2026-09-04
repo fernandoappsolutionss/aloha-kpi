@@ -1,6 +1,6 @@
 import { test,expect } from '@playwright/test'
 import { actorPage,ready,geometry,activeNavigation,CENTER_ROUTES } from './helpers/r10-audit.mjs'
-test('centro: once rutas con usuario no privilegiado',async({browser},testInfo)=>{
+test('centro: quince rutas con usuario no privilegiado, incluido el oficio',async({browser},testInfo)=>{
   test.setTimeout(300000)
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {

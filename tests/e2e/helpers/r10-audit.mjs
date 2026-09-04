@@ -2,8 +2,15 @@ import { expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { auditPage,capturePage,settleVisuals } from './audit-page.js'
 import { requireR10Gate } from './r10-fixture.mjs'
-export const ADMIN_ROUTES=['/dashboard','/dashboard/alertas','/dashboard/centros','/dashboard/crecimiento','/dashboard/entrenamiento','/dashboard/historial','/dashboard/metas','/dashboard/ranking','/dashboard/reporte','/dashboard/usuarios','/dashboard/zoho','/perfil']
-export const CENTER_ROUTES=['','/ruta-nivel','/kpi','/grupos','/cuadro','/eventos','/cumplimiento','/foda','/historial','/entrenamiento','/entrenamiento/meta']
+import { hrefActivo } from '../../../components/nav-activo.mjs'
+// /dashboard/entrenamiento/oficio es la matriz "quién tiene su hat": entró con
+// el PR #111, tiene su propio ítem en el menú y nadie la abría en un viewport.
+export const ADMIN_ROUTES=['/dashboard','/dashboard/alertas','/dashboard/centros','/dashboard/crecimiento','/dashboard/entrenamiento','/dashboard/entrenamiento/oficio','/dashboard/historial','/dashboard/metas','/dashboard/ranking','/dashboard/reporte','/dashboard/usuarios','/dashboard/zoho','/perfil']
+// El árbol /oficio entró con el PR #111 sin una sola prueba de navegador: la
+// hoja de SOP y el carrusel de diapositivas no los abría nadie en un viewport.
+// El actor `center` es administradora del centro 2, así que of-cen-1 es de su
+// puesto y su hoja trae el procedimiento escrito a mano.
+export const CENTER_ROUTES=['','/ruta-nivel','/kpi','/grupos','/cuadro','/eventos','/cumplimiento','/foda','/historial','/entrenamiento','/entrenamiento/meta','/entrenamiento/oficio','/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-1','/entrenamiento/oficio/of-cen-1/sop']
 const pageErrors=new WeakMap()
 export async function actorPage(browser,testInfo,actor) {
   requireR10Gate()
@@ -56,7 +63,15 @@ export async function activeNavigation(page,mobile) {
   if(mobile) await page.getByRole('button',{name:'Abrir menú'}).click()
   const nav=page.locator('aside.sb')
   const path=new URL(page.url()).pathname
-  const target=path.includes('/entrenamiento/')?path.slice(0,path.lastIndexOf('/')):path
+  // Qué enlace tiene que estar activo lo decide la MISMA función que lo pinta
+  // (components/nav-activo.mjs): el más específico del menú que cubre la ruta.
+  // Antes se recortaba la ruta a mano un nivel, así que
+  // /entrenamiento/oficio/<modulo>/sop buscaba un enlace que no existe, y
+  // /dashboard/entrenamiento/oficio exigía el enlace del padre cuando el ítem
+  // propio es el que manda.
+  const hrefs=await nav.locator('a[href]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')))
+  const target=hrefActivo(path,hrefs)
+  expect(target,`ningún enlace del menú cubre ${path}`).toBeTruthy()
   await expect(nav.locator(`a[href="${target}"]`).first()).toBeVisible()
   await expect(nav.locator('a[aria-current="page"]')).toHaveCount(1)
   await expect(nav.locator(`a[href="${target}"]`).first()).toHaveAttribute('aria-current','page')

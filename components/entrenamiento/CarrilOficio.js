@@ -3,17 +3,22 @@
 // NO importa nada de lib/entrenamiento/oficio, por eso la prosa de los 40
 // módulos nunca entra al bundle de la página índice (que es 'use client').
 //
-// Si la action falla o el rol no tiene plan (gerencia, coordinador), no pinta
-// nada: el carril de los 9 tours sigue funcionando solo.
+// Dos carriles distintos según lo que responda el SERVIDOR:
+//   modo 'entrenamiento' → "Tu oficio": tus barras, tus cursos, tu siguiente.
+//   modo 'revision'      → "Revisar el entrenamiento": gerencia y coordinador
+//     no se entrenan, pero tienen que poder leer el plan que le dan a su gente.
+//     Sin barras y sin "tu": no es su entrenamiento, es lectura.
+// Si la action falla o devuelve null (nadie a quien firmarle, ningún plan
+// propio), no pinta nada: el carril de los 9 tours sigue funcionando solo.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { resumenOficio } from '../../app/actions/entrenamiento-oficio'
 
 export default function CarrilOficio({ centroId }) {
   const [datos, setDatos] = useState(null)
-  // 'cargando' | 'sin-plan' | 'error' | 'listo'. Antes devolvía null en los
-  // cuatro casos: en un centro con mala conexión la segunda pista simplemente
-  // no existía y nadie se enteraba.
+  // 'cargando' | 'sin-plan' | 'error' | 'listo' | 'revision'. Antes devolvía
+  // null en los cuatro primeros casos: en un centro con mala conexión la
+  // segunda pista simplemente no existía y nadie se enteraba.
   const [estado, setEstado] = useState('cargando')
 
   useEffect(() => {
@@ -22,7 +27,12 @@ export default function CarrilOficio({ centroId }) {
       .then((r) => {
         if (!activo) return
         if (!r) { setEstado('sin-plan'); return }
-        if (r.error || !(r.avance?.total > 0)) { setEstado('error'); return }
+        if (r.error) { setEstado('error'); return }
+        if (r.modo === 'revision') {
+          if (!(r.revision?.length > 0)) { setEstado('error'); return }
+          setDatos(r); setEstado('revision'); return
+        }
+        if (!(r.avance?.total > 0)) { setEstado('error'); return }
         setDatos(r); setEstado('listo')
       })
       .catch(() => { if (activo) setEstado('error') })
@@ -30,6 +40,44 @@ export default function CarrilOficio({ centroId }) {
   }, [])
 
   if (estado === 'sin-plan') return null
+
+  // REVISIÓN — gerencia y coordinador. Se dice con todas sus letras que es
+  // lectura: sin barras de avance, sin "continuar", sin "tu hat". El dueño
+  // entra a leer lo que estudia su gente, no a acumular progreso.
+  if (estado === 'revision') {
+    const base = `/centro/${centroId}/entrenamiento/oficio`
+    return (
+      <section className="ofi-carril" aria-labelledby="ofi-carril-title">
+        <div className="ofi-carril__head">
+          <div>
+            <div className="label">Entrenamiento de oficio</div>
+            <h2 id="ofi-carril-title">Revisa el entrenamiento de tu gente</h2>
+            <p className="h-sub" style={{ marginTop: 4 }}>
+              Tú no te entrenas en estos planes: los firmas. Aquí los abres en modo lectura — los módulos completos, el glosario y los drills con
+              los que vas a evaluar. No acumulas progreso ni respondes cuestionarios.
+            </p>
+          </div>
+          <Link className="btn" href={`/centro/${centroId}/entrenamiento/firmas`}>Firmas pendientes <span aria-hidden="true">→</span></Link>
+        </div>
+
+        <ul className="ofi-carril__cursos">
+          {datos.revision.map((p) => (
+            <li key={p.rol}>
+              <span className="label">Plan de {p.rolNombre}</span>
+              <strong>{p.total} módulos · {p.minutos >= 60 ? `${Math.round(p.minutos / 60)} h` : `${p.minutos} min`} de estudio</strong>
+              <span className="ent-pill">{p.conDrill} llevan drill que tú firmas</span>
+              <Link className="tour-card__link" href={`${base}?revisar=${p.rol}`}>Revisar este plan <span aria-hidden="true">→</span></Link>
+            </li>
+          ))}
+        </ul>
+
+        <p className="ofi-carril__next">
+          También: <Link className="tour-card__link" href={`${base}/glosario`}>el glosario de términos</Link>
+          {datos.veMatriz && <> y <Link className="tour-card__link" href="/dashboard/entrenamiento/oficio">quién tiene su hat</Link></>}.
+        </p>
+      </section>
+    )
+  }
   if (estado !== 'listo') {
     return (
       <section className="ofi-carril" aria-labelledby="ofi-carril-title">

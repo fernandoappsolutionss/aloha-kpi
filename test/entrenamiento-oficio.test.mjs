@@ -25,10 +25,18 @@ const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota'])
 const TONOS = new Set(['regla', 'ojo', 'alerta'])
 
 // Recorre cada string de un módulo (textos, items, celdas, criterios…).
+// EXCEPTO `voz`: ese campo no es contenido de pantalla, es el guion que se le
+// manda a ElevenLabs, y lleva marcas de respiración <break time="0.3s"/> —
+// obligatorias para que la locución no suene a robot. Nunca se pinta en el
+// navegador (no viaja en metadatosOficio ni lo recibe ninguna isla cliente),
+// así que el invariante anti-HTML de abajo no aplica ahí. Su forma la blinda
+// test/entrenamiento-oficio-voz.test.mjs, que exige la marca y prohíbe el
+// markdown, los "B/." y los "%".
+const SIN_BARRIDO = new Set(['voz'])
 function textos(v, out = []) {
   if (typeof v === 'string') out.push(v)
   else if (Array.isArray(v)) for (const x of v) textos(x, out)
-  else if (v && typeof v === 'object') for (const k of Object.keys(v)) textos(v[k], out)
+  else if (v && typeof v === 'object') for (const k of Object.keys(v)) { if (!SIN_BARRIDO.has(k)) textos(v[k], out) }
   return out
 }
 

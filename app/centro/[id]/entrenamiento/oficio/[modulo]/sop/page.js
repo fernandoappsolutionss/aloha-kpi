@@ -1,0 +1,113 @@
+// El SOP de una hoja de un módulo de oficio: /entrenamiento/oficio/<modulo>/sop
+//
+// Es la MISMA información del módulo, en formato de papel: lo que se pega al
+// lado del escritorio para ejecutar el proceso, no para estudiarlo. El módulo
+// enseña; la hoja recuerda.
+//
+// Server Component: la prosa se queda en el servidor. Al cliente baja solo la
+// hoja ya derivada (derivarSop) y el botón de imprimir.
+import Link from 'next/link'
+import Sidebar from '../../../../../../../components/Sidebar'
+import SopHoja from '../../../../../../../components/entrenamiento/SopHoja'
+import { derivarSop } from '../../../../../../../components/entrenamiento/sop-derivar.mjs'
+import { getCentroNombre } from '../../../../../../actions/centros'
+import { cargarOficio } from '../../../../../../actions/entrenamiento-oficio'
+import { CURSOS, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
+import { rolesQueFirma } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+
+// Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
+// Administradora es la Oficial de Entrenamiento de la Asistente, así que
+// necesita la hoja de los procesos que le va a tomar; y gerencia, coordinador y
+// supervisor firman a la Administradora, así que pueden revisar el
+// entrenamiento entero aunque no se entrenen en él.
+const puedeLeerComoOficial = (rol, m) => rolesQueFirma(rol).some((r) => m.roles.includes(r))
+
+export default async function SopPage({ params, searchParams }) {
+  const { id, modulo: moduloId } = await params
+  // ?revisar=<rol>: mismo acarreo que la página del módulo, para que el
+  // "volver" de quien revisa no lo devuelva al selector de planes.
+  const sp = searchParams ? await searchParams : {}
+  const [nombre, oficio] = await Promise.all([
+    getCentroNombre(id).catch(() => null),
+    cargarOficio(),
+  ])
+
+  const base = `/centro/${id}/entrenamiento/oficio`
+  const shell = (estado, contenido) => (
+    <div className="shell">
+      <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
+      <main className="main ent-page sop-page" id="main-content" data-page-state={estado}>
+        {/* @page es una regla DE DOCUMENTO: en app/globals.css forzaría a A4
+            vertical con márgenes de 14 mm toda impresión de la app —el cuadro,
+            el reporte, el histórico— y, como declara `size`, Chrome además
+            bloquea el selector de papel del diálogo. Aquí vive con la página
+            que la necesita y se va con ella al navegar a otra. */}
+        <style dangerouslySetInnerHTML={{ __html: '@page { size: A4; margin: 14mm; }' }} />
+        {contenido}
+      </main>
+    </div>
+  )
+
+  if (oficio?.error) {
+    return shell('error', <>
+      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <div className="alert alert--error" role="alert">{oficio.error}</div>
+    </>)
+  }
+
+  const m = moduloOficio(moduloId)
+  if (!m) {
+    return shell('error', <>
+      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <div className="alert alert--error" role="alert">Este módulo no existe, así que no tiene procedimiento.</div>
+    </>)
+  }
+
+  const { rol, oficiales } = oficio
+  const esMio = m.roles.includes(rol)
+  const rolPlan = esMio ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
+  const cola = esMio ? '' : `?revisar=${rolPlan}`
+  if (!esMio && !puedeLeerComoOficial(rol, m)) {
+    return shell('error', <>
+      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <div className="main__head"><div>
+        <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Procedimiento operativo</div>
+        <h1 className="h-title">Este procedimiento no es de tu puesto</h1>
+        <p className="h-sub">&quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. Tu plan está en tu hat.</p>
+      </div></div>
+    </>)
+  }
+
+  const hoja = derivarSop(m)
+  // La fecha del reloj del servidor es UTC; la hoja la firma alguien que está
+  // en Panamá, así que se emite con la fecha de Panamá.
+  const emision = new Date().toLocaleDateString('es-PA', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Panama',
+  })
+  // El nombre del Oficial solo se imprime cuando la hoja es del puesto de quien
+  // la abre: si la está leyendo quien firma, su propio Oficial no pinta nada
+  // en esa línea.
+  const oficial = esMio && (oficiales || []).length > 0 ? oficiales[0].nombre : ''
+
+  return shell('ready', <>
+    <div className="sop-volver">
+      <Link className="tour-card__link" href={`${base}/${m.id}${cola}`}>← Volver al módulo</Link>
+      {/* Lo que la hoja no puede sostener se dice aquí, no se rellena abajo:
+          así el que escribe los procedimientos ve el hueco al abrirla. */}
+      <span className="h-sub">
+        {hoja.escrito
+          ? 'Procedimiento escrito para esta hoja.'
+          : 'Hoja derivada del módulo: los pasos, las reglas y los errores salen de su contenido, sin agregar nada.'}
+        {hoja.vacios.length > 0 && ` Todavía sin declarar: ${hoja.vacios.join(', ')}.`}
+      </span>
+    </div>
+
+    <SopHoja
+      hoja={hoja}
+      centro={nombre || 'Centro ALOHA'}
+      curso={CURSOS[m.curso]?.titulo || 'Oficio'}
+      emision={emision}
+      oficial={oficial}
+    />
+  </>)
+}

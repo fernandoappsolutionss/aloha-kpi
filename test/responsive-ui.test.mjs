@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { buildNextEnvironment } from '../tests/e2e/helpers/next-server-env.mjs'
 import { requireDisposableGate } from '../tests/e2e/helpers/r3-fixture.mjs'
 import { createDialogLifetime } from '../components/dialog-lifetime.mjs'
+import { hrefActivo } from '../components/nav-activo.mjs'
 import { requireR6Gate } from '../tests/e2e/helpers/r6-fixture.mjs'
 import { requireR8Gate } from '../tests/e2e/helpers/r8-fixture.mjs'
 import { requireR9Gate } from '../tests/e2e/helpers/r9-fixture.mjs'
@@ -74,16 +75,33 @@ test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invi
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
-export const PRODUCT_ROUTE_FILES = ['app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/entrenamiento/oficio/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/entrenamiento/firmas/page.js','app/centro/[id]/entrenamiento/oficio/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/page.js','app/centro/[id]/entrenamiento/oficio/glosario/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
+export const PRODUCT_ROUTE_FILES = ['app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/entrenamiento/oficio/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/entrenamiento/firmas/page.js','app/centro/[id]/entrenamiento/oficio/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/sop/page.js','app/centro/[id]/entrenamiento/oficio/glosario/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
 export const NON_PRODUCT_ROUTE_FILES = ['app/e2e-primitives/page.js']
-test('R10 inventario local completo: 33 producto y una técnica, sin duplicados', () => {
+test('R10 inventario local completo: 34 producto y una técnica, sin duplicados', () => {
   const all = [...PRODUCT_ROUTE_FILES,...NON_PRODUCT_ROUTE_FILES]
-  assert.equal(PRODUCT_ROUTE_FILES.length,33)
+  assert.equal(PRODUCT_ROUTE_FILES.length,34)
   assert.equal(NON_PRODUCT_ROUTE_FILES.length,1)
-  assert.equal(new Set(all).size,34)
+  assert.equal(new Set(all).size,35)
   const actual = readdirSync(new URL('../app/',import.meta.url),{recursive:true}).map(String).filter(p=>p==='page.js'||p.endsWith('/page.js')).map(p=>`app/${p}`)
   assert.deepEqual(all.sort(),actual.sort())
 })
+// La regla de "nada por debajo de 12px" solo miraba px, así que se esquivaba
+// escribiendo rem: 0.74rem son 11,8 px y pasaban. Esto la cierra.
+// 0.75rem = 12px con la raíz en 16, que es el piso de tests/e2e/helpers/audit-page.js.
+const REM_ILEGIBLE = /font(?:Size|-size):\s*['"]?0\.(?:[0-6]\d*|7(?:[0-4]\d*)?)(?:rem|em)\b/g
+// ÚNICA excepción, y nombrada: el facsímil A4 de la hoja SOP. Eso no es texto
+// de pantalla, es la foto de un papel de 210 mm; debajo de 900 px deja de
+// dibujarse y el mismo contenido fluye con --mobile-body (app/globals.css).
+// El selector de la regla que envuelve la posición i: se busca el '{' que abre
+// el bloque y se lee hacia atrás hasta el final de la regla anterior.
+const selectorDe = (source, i) => {
+  const antes = source.slice(0, i)
+  const abre = antes.lastIndexOf('{')
+  if (abre < 0) return ''
+  const cabecera = antes.slice(0, abre)
+  const corte = Math.max(cabecera.lastIndexOf('}'), cabecera.lastIndexOf('{'), cabecera.lastIndexOf(';'))
+  return cabecera.slice(corte + 1).trim()
+}
 test('R10 barrido global no conserva fuentes ilegibles ni interacciones no semánticas', () => {
   const violations=[]
   const pattern = /transition:\s*all|overflowX:\s*['"]visible|<(?:div|span|tr|td)\b[^>]*onClick|font(?:Size|-size):\s*['"]?(?:8|9|10|11)(?:\.\d+)?(?:px)?(?=[^\d.]|$)/g
@@ -91,6 +109,10 @@ test('R10 barrido global no conserva fuentes ilegibles ni interacciones no semá
     if(!/\.(?:js|css)$/.test(path)) continue
     const source = read(`../${root}/${path}`)
     for(const match of source.matchAll(pattern)) violations.push(`${root}/${path}:${source.slice(0,match.index).split('\n').length}: ${match[0]}`)
+    for(const match of source.matchAll(REM_ILEGIBLE)) {
+      if(/\.sop-/.test(selectorDe(source,match.index))) continue
+      violations.push(`${root}/${path}:${source.slice(0,match.index).split('\n').length}: ${match[0]} (por debajo de 0.75rem = 12px)`)
+    }
   }
   assert.deepEqual(violations,[])
   for(const path of readdirSync(new URL('../tests/e2e/',import.meta.url))) {
@@ -283,6 +305,40 @@ test('el shell móvil declara drawer, breakpoint de tablet y navegación semánt
   assert.match(css, /\.mobile-bar/)
   assert.match(css, /\.sb--open/)
   assert.match(css, /@media\s*\(max-width:\s*1024px\)/)
+})
+
+// UN SOLO "página actual" EN EL MENÚ. La regla vieja (exacta + un caso especial
+// de prefijo para el árbol de entrenamiento) marcaba DOS enlaces a la vez en
+// /dashboard/entrenamiento/oficio y en /centro/<id>/entrenamiento/firmas, que
+// son rutas reales con ítem propio. Dos aria-current="page" no dicen dónde
+// estás. Ahora lo decide hrefActivo, y esta es la prueba que no tenía.
+test('el menú marca un solo enlace actual, y es el más específico que cubre la ruta', () => {
+  const admin = ['/dashboard', '/dashboard/entrenamiento', '/dashboard/entrenamiento/oficio', '/dashboard/usuarios', '/perfil']
+  assert.equal(hrefActivo('/dashboard/entrenamiento/oficio', admin), '/dashboard/entrenamiento/oficio', 'gana el ítem propio, no el padre')
+  assert.equal(hrefActivo('/dashboard/entrenamiento', admin), '/dashboard/entrenamiento')
+  assert.equal(hrefActivo('/dashboard/usuarios', admin), '/dashboard/usuarios', 'un hijo no deja activo a /dashboard')
+  assert.equal(hrefActivo('/perfil', admin), '/perfil')
+
+  const centro = ['/centro/2', '/centro/2/kpi', '/centro/2/entrenamiento', '/centro/2/entrenamiento/firmas']
+  assert.equal(hrefActivo('/centro/2/entrenamiento/firmas', centro), '/centro/2/entrenamiento/firmas')
+  assert.equal(hrefActivo('/centro/2/kpi', centro), '/centro/2/kpi')
+  assert.equal(hrefActivo('/centro/2', centro), '/centro/2')
+  // El módulo de oficio y su hoja SOP no son ítems del menú: activo se queda
+  // Entrenamiento, que es lo más adentro que llega.
+  assert.equal(hrefActivo('/centro/2/entrenamiento/oficio/of-cen-1/sop', centro), '/centro/2/entrenamiento')
+  assert.equal(hrefActivo('/centro/2/entrenamiento/oficio/glosario', centro), '/centro/2/entrenamiento')
+
+  // Cubrir es por segmento de ruta, no por texto: /centro/21 no es /centro/2.
+  assert.equal(hrefActivo('/centro/21/kpi', ['/centro/2', '/centro/2/kpi']), null)
+  // Sin enlace que la cubra no se marca nada, en vez de inventar uno.
+  assert.equal(hrefActivo('/login', admin), null)
+  assert.equal(hrefActivo('', admin), null)
+  assert.equal(hrefActivo('/dashboard', []), null)
+
+  // Y el Sidebar no puede volver a decidirlo por su cuenta.
+  const sidebar = read('../components/Sidebar.js')
+  assert.match(sidebar, /hrefActivo\(path,/, 'el Sidebar tiene que derivar el enlace activo de nav-activo.mjs')
+  assert.match(sidebar, /const isActive = \(href\) => href === activo/)
 })
 
 test('el selector de tema expone estado presionado y no actúa como submit', () => {

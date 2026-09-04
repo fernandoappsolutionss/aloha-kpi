@@ -20,17 +20,19 @@ export default async function FirmasPage({ params }) {
     colaFirmas(Number(id)),
   ])
 
-  const shell = (contenido) => (
+  const shell = (estado, contenido) => (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
-      <main className="main ent-page">
+      {/* id + data-page-state: el "Saltar al contenido" del layout apunta a
+          #main-content, y sin el estado la ruta no entra al barrido R10. */}
+      <main className="main ent-page" id="main-content" data-page-state={estado}>
         <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
         {contenido}
       </main>
     </div>
   )
 
-  if (cola?.error) return shell(<div className="alert alert--error" role="alert">{cola.error}</div>)
+  if (cola?.error) return shell('error', <div className="alert alert--error" role="alert">{cola.error}</div>)
 
   const cabecera = (
     <div className="main__head"><div>
@@ -43,7 +45,7 @@ export default async function FirmasPage({ params }) {
   )
 
   if (!cola.filas.length) {
-    return shell(<>
+    return shell('ready', <>
       {cabecera}
       <div className="card" style={{ padding: 24 }}>
         <p className="h-sub" style={{ margin: 0 }}>
@@ -53,7 +55,7 @@ export default async function FirmasPage({ params }) {
     </>)
   }
 
-  return shell(<>
+  return shell('ready', <>
     {cabecera}
     {cola.filas.map((f) => (
       <section key={f.usuarioId} className="ofi-cola" aria-labelledby={`alumno-${f.usuarioId}`}>

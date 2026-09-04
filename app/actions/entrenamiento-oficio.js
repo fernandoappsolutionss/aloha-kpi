@@ -9,7 +9,7 @@
 // autorizado y se verifica con puedeFirmar); las respuestas del quiz viven en
 // respuestas-oficio/ (solo servidor) y jamás llegan al cliente.
 import { sql } from '../../lib/db'
-import { requireSession, requireCurrentUser, requireCurrentAdmin } from '../../lib/auth'
+import { requireSession, requireCurrentUser, requireCurrentAdmin, isAdminRole } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
@@ -17,18 +17,10 @@ import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/tod
 import {
   minimoAprobacion, corregirQuizOficio, estudiado, hatted, planDeRol,
   avanceOficio, avanceDrills, siguienteOficio, gradienteAbierto, puedeFirmar,
-  rolesQueFirma, OFICIAL_DE,
+  rolesQueFirma, rolesQueRevisa, OFICIAL_DE, NOMBRE_ROL,
 } from '../../lib/entrenamiento/oficio/progreso'
 
 const ROLES_ALUMNO = ['administradora', 'asistente']
-
-const NOMBRE_ROL = {
-  administradora: 'Administradora del Centro',
-  asistente: 'Asistente Administrativo',
-  coordinador: 'Coordinador Operativo',
-  supervisor: 'Supervisor',
-  admin_general: 'Gerencia',
-}
 
 async function runAction(name, work) {
   try { return await work() } catch (error) {
@@ -100,21 +92,80 @@ async function oficialesDe(alumno) {
   return []
 }
 
-// → { rol, plan:[metadatos], progreso, avance, drills, siguiente, puedeFirmarA, oficiales }
+// Los planes que este rol puede REVISAR: leerlos sin entrenarse en ellos. Es
+// para gerencia y coordinador, que no tienen plan propio (planDeRol → []) y
+// hasta ahora no veían NADA del entrenamiento que le dan a su gente.
+//
+// LA DECISIÓN ES DEL SERVIDOR. rolesQueRevisa() sale de OFICIAL_DE (quien firma
+// un hat puede leerlo), no de una lista de roles escrita a mano, y la pantalla
+// solo pinta lo que esta función devuelve: pedir ?revisar=administradora en la
+// URL no habilita nada que no esté aquí. Una asistente sigue sin ver el curso
+// de la administradora porque ella sí tiene plan propio → lista vacía.
+//
+// `conPlan` agrega los metadatos módulo a módulo (los pinta la página del hat);
+// el carril del índice solo necesita los totales y no los recibe.
+function planesDeRevision(rol, { conPlan = false } = {}) {
+  const puede = new Set(rolesQueRevisa(rol, MODULOS_OFICIO))
+  // ROLES_ALUMNO manda el orden: la administradora primero, que es el hat mayor.
+  return ROLES_ALUMNO.filter((r) => puede.has(r)).map((r) => {
+    const plan = planDeRol(r, MODULOS_OFICIO)
+    const cursos = Object.keys(CURSOS)
+      .map((id) => ({ id, titulo: CURSOS[id].titulo, bloque: CURSOS[id].bloque, total: plan.filter((m) => m.curso === id).length }))
+      .filter((c) => c.total > 0)
+    return {
+      rol: r,
+      rolNombre: NOMBRE_ROL[r] || r,
+      total: plan.length,
+      minutos: plan.reduce((acc, m) => acc + (m.duracionMin || 0), 0),
+      conDrill: plan.filter((m) => (m.drills || []).length > 0).length,
+      cursos,
+      primero: plan[0] ? { id: plan[0].id, titulo: plan[0].titulo } : null,
+      ...(conPlan ? { plan: plan.map(metadatosOficio) } : {}),
+    }
+  })
+}
+
+// → { modo, rol, rolNombre, plan:[metadatos], progreso, avance, drills,
+//     siguiente, puedeFirmarA, oficiales, revision }
 // Una sola vuelta: la página del hat pinta el checksheet completo con esto.
+// modo 'entrenamiento' = tiene plan propio; 'revision' = lo lee para revisarlo
+// (plan y progreso vacíos, los planes ajenos van en `revision`); 'ninguno' = ni
+// una cosa ni la otra.
 export async function cargarOficio() {
   return runAction('cargarOficio', async () => {
     const s = await requireSession()
     const plan = planDeRol(s.rol, MODULOS_OFICIO)
+    // Sin plan propio no se acaba la historia: si le firma el hat a alguien,
+    // abre ese plan en modo REVISIÓN (lectura). No se le carga progreso porque
+    // no lo acumula, y `revision` viaja con los metadatos para que la página
+    // pinte el plan completo sin volver a preguntar.
+    if (plan.length === 0) {
+      const revision = planesDeRevision(s.rol, { conPlan: true })
+      return {
+        modo: revision.length > 0 ? 'revision' : 'ninguno',
+        rol: s.rol,
+        rolNombre: NOMBRE_ROL[s.rol] || s.rol,
+        veMatriz: isAdminRole(s.rol),
+        plan: [],
+        progreso: {},
+        avance: avanceOficio([], {}),
+        drills: avanceDrills([], {}),
+        siguiente: null,
+        puedeFirmarA: rolesQueFirma(s.rol),
+        oficiales: [],
+        revision,
+      }
+    }
     const [progreso, oficiales] = await Promise.all([
       progresoDeUsuario(s.uid),
-      plan.length > 0
-        ? oficialesDe({ id: Number(s.uid), rol: s.rol, centroId: s.centro_id == null ? null : Number(s.centro_id) })
-        : Promise.resolve([]),
+      oficialesDe({ id: Number(s.uid), rol: s.rol, centroId: s.centro_id == null ? null : Number(s.centro_id) }),
     ])
     const sig = siguienteOficio(plan, progreso)
     return {
+      modo: 'entrenamiento',
       rol: s.rol,
+      rolNombre: NOMBRE_ROL[s.rol] || s.rol,
+      veMatriz: isAdminRole(s.rol),
       plan: plan.map(metadatosOficio),
       progreso,
       avance: avanceOficio(plan, progreso),
@@ -122,18 +173,30 @@ export async function cargarOficio() {
       siguiente: sig ? { id: sig.id, titulo: sig.titulo, curso: sig.curso } : null,
       puedeFirmarA: rolesQueFirma(s.rol),
       oficiales,
+      revision: [],
     }
   })
 }
 
-// Carril "Tu oficio" del índice de Entrenamiento. null para quien no tiene
-// plan (gerencia y coordinador): ellos firman, no se entrenan.
-// → { rol, cursos:[{id,titulo,bloque,total,estudiados,hatted}], avance, drills, siguiente }
+// Carril "Tu oficio" del índice de Entrenamiento. Dos formas:
+//   modo 'entrenamiento' → { rol, cursos:[{id,titulo,bloque,total,estudiados,hatted}], avance, drills, siguiente }
+//   modo 'revision'      → { rol, rolNombre, revision:[{rol,rolNombre,total,minutos,conDrill,cursos,primero}] }
+// null solo para quien ni se entrena ni le firma a nadie: ahí el carril no se
+// pinta. Gerencia y coordinador YA NO caen en ese null — antes sí, y el dueño
+// entraba a Entrenamiento y veía únicamente los 9 recorridos del sistema.
 export async function resumenOficio() {
   return runAction('resumenOficio', async () => {
     const s = await requireSession()
     const plan = planDeRol(s.rol, MODULOS_OFICIO)
-    if (plan.length === 0) return null
+    if (plan.length === 0) {
+      const revision = planesDeRevision(s.rol)
+      if (revision.length === 0) return null
+      // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
+      // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
+      // enlace se decide con isAdminRole, la misma fuente que ese layout, no
+      // comparando nombres de rol en el navegador.
+      return { modo: 'revision', rol: s.rol, rolNombre: NOMBRE_ROL[s.rol] || s.rol, veMatriz: isAdminRole(s.rol), revision }
+    }
     const progreso = await progresoDeUsuario(s.uid)
     const cursos = Object.keys(CURSOS)
       .map((id) => {
@@ -150,6 +213,7 @@ export async function resumenOficio() {
       .filter((c) => c.total > 0)
     const sig = siguienteOficio(plan, progreso)
     return {
+      modo: 'entrenamiento',
       rol: s.rol,
       cursos,
       avance: avanceOficio(plan, progreso),
