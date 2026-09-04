@@ -199,7 +199,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   // antes del primer pendiente, y el jefe no puede entrar a ver qué le van a
   // pedir. El badge sí depende de n.
   const [firmas, setFirmas] = useState(0)
-  const firmaDrills = rolesQueFirma(rolReal).length > 0
+  const firmaDrills = rolesQueFirma(actorRole).length > 0
   useEffect(() => {
     if (!centroId || !firmaDrills) return
     contadorFirmas(Number(centroId))
