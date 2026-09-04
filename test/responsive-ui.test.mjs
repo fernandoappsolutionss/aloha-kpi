@@ -12,6 +12,24 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
+test('R5 oculta SVG decorativos de KPI, avisos, tendencias y exportación al lector de pantalla', () => {
+  for (const path of ['page.js', 'reporte/page.js']) {
+    const icons = read(`../app/dashboard/${path}`).match(/<svg\b[^>]*>/g) || []
+    assert.ok(icons.length > 0, `${path}: fixture de iconos existente`)
+    assert.equal(icons.every(icon => /aria-hidden="true"/.test(icon)), true, `${path}: SVG decorativo sin aria-hidden`)
+  }
+})
+
+test('R5 permite que los títulos vacíos hereden el mínimo móvil de 15px', () => {
+  for (const [path, text] of [['ranking/page.js', 'Aún no hay datos para clasificar'], ['alertas/page.js', 'No hay alertas todavía']]) {
+    const source = read(`../app/dashboard/${path}`)
+    const tag = source.match(new RegExp(`<div[^>]*>${text}</div>`))?.[0]
+    assert.ok(tag, `${path}: rama vacía existente`)
+    assert.doesNotMatch(tag, /fontSize:\s*1[0-4](?:\.\d+)?\b/, `${path}: inline impide heredar 15px móvil`)
+    assert.match(source, /className="main operations-page"/, `${path}: hereda el mínimo móvil operativo`)
+  }
+})
+
 test('operación administrativa declara estados explícitos y tablas con alternativas móviles', () => {
   for (const path of ['page.js', 'ranking/page.js', 'alertas/page.js', 'reporte/page.js', 'metas/page.js', 'centros/page.js', 'zoho/page.js']) {
     const source = read(`../app/dashboard/${path}`)

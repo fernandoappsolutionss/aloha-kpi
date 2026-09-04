@@ -104,7 +104,7 @@ export default function AlertasPage() {
         ) : alertas.length === 0 ? (
           <div className="panel" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔔</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>No hay alertas todavía</div>
+            <div style={{ fontWeight: 600, color: 'var(--text)' }}>No hay alertas todavía</div>
             <div style={{ marginTop: 6 }}>Las alertas se generan a partir del cumplimiento de cada centro.</div>
           </div>
         ) : (

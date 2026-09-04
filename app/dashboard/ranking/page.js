@@ -54,7 +54,7 @@ export default function RankingPage() {
         ) : centros.length === 0 ? (
           <div className="panel" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Aún no hay datos para clasificar</div>
+            <div style={{ fontWeight: 600, color: 'var(--text)' }}>Aún no hay datos para clasificar</div>
             <div style={{ marginTop: 6 }}>El ranking aparecerá cuando los centros registren sus KPIs.</div>
           </div>
         ) : (
