@@ -228,6 +228,92 @@ test('sincroniza el embudo y la venta de una clase de prueba sin duplicar regist
   assert.equal(source.ventasTotal, 1)
 })
 
+test('las matriculas de prueba usan origen historico y el CRM solo como respaldo', () => {
+  const source = fuenteKpiAutomatica({
+    year: 2026, month: 8,
+    ventas: [
+      { id: 1, origen: 'clase_prueba' },
+      { id: 2, origen: 'clase_prueba' },
+      { id: 3, origen: 'directo', crm_registration_id: 'lead-directo' },
+      { id: 4, crm_registration_id: 'lead-prueba' },
+      { id: 5 },
+    ],
+  })
+  assert.equal(source.cp_matriculados, 3)
+  assert.equal(source._trial_funnel.directSales, 1)
+  assert.equal(source._trial_funnel.unknownSales, 1)
+  assert.equal(source._trial_funnel.coverage, 0.8)
+  assert.equal(source._trial_funnel.reliable, false)
+})
+
+test('un ajuste CP legado no vuelve a sumar ventas directas cuando cada venta esta clasificada', () => {
+  const source = fuenteKpiAutomatica({ year: 2026, month: 8,
+    ventas: [{ id: 1, origen: 'clase_prueba' }, { id: 2, origen: 'directo' }],
+  })
+  const adjustments = crearAjustes({ cp_matriculados: 2 }, source)
+  const data = aplicarAjustes(source, adjustments)
+  assert.equal(data.cp_matriculados, 1)
+  assert.equal(data._trial_funnel.reliable, true)
+  assert.equal(data._trial_funnel.legacyAdjustmentIgnored, 1)
+})
+
+function legacyPartialTrialFixture() {
+  const source = fuenteKpiAutomatica({ year: 2026, month: 8, ventas: [
+    { id: 1, origen: 'directo', crm_registration_id: 'crm-directo' },
+    { id: 2 },
+  ] })
+  const saved = { cp_matriculados: 2 }
+  // El criterio antiguo contaba el vínculo CRM del ingreso directo como CP.
+  const oldSource = { ...source, cp_matriculados: 1 }
+  const adjustments = crearAjustes(saved, oldSource)
+  return { source, saved, adjustments }
+}
+
+test('CP parcial conserva el resumen guardado al cambiar la base de un ajuste legado', () => {
+  const { source, saved, adjustments } = legacyPartialTrialFixture()
+  assert.equal(source._trial_funnel.reliable, false)
+  assert.equal(source.cp_matriculados, 0)
+  assert.equal(adjustments.cp_matriculados, 1)
+  const data = aplicarAjustes(source, adjustments, saved)
+  assert.equal(data.cp_matriculados, 2)
+  assert.equal(data._trial_funnel.valueSource, 'declared')
+  assert.equal(saved.cp_matriculados, 2)
+})
+
+test('CP parcial respeta primero el override explicito, incluso cero', () => {
+  const { source, saved, adjustments } = legacyPartialTrialFixture()
+  const data = aplicarAjustes(source, adjustments, { ...saved, cp_matriculados_override: 0 })
+  assert.equal(data.cp_matriculados, 0)
+  assert.equal(data._trial_funnel.valueSource, 'manual_override')
+})
+
+test('CP parcial sin resumen no suma un ajuste contra una base desconocida', () => {
+  const { source, adjustments } = legacyPartialTrialFixture()
+  const data = aplicarAjustes(source, adjustments)
+  assert.equal(data.cp_matriculados, 0)
+  assert.equal(data._trial_funnel.valueSource, 'partial_source')
+})
+
+test('CP conciliado vuelve al derivado fiable y mantiene el override si existe', () => {
+  const source = fuenteKpiAutomatica({ year: 2026, month: 8, ventas: [
+    { id: 1, origen: 'directo', crm_registration_id: 'crm-directo' },
+    { id: 2, origen: 'clase_prueba' },
+  ] })
+  const saved = { cp_matriculados: 2 }
+  const adjustments = crearAjustes(saved, source)
+  assert.equal(aplicarAjustes(source, adjustments, saved).cp_matriculados, 1)
+  const overridden = aplicarAjustes(source, adjustments, { ...saved, cp_matriculados_override: 2 })
+  assert.equal(overridden.cp_matriculados, 2)
+  assert.equal(overridden._trial_funnel.valueSource, 'manual_override')
+})
+
+test('la lectura automatica conserva un override CP explicito incluso si es cero', () => {
+  const [row] = mezclarResumenAutomatico([
+    { year: 2026, month: 9, cp_matriculados: 0, cp_matriculados_override: 0 },
+  ], 2026, 9, { cp_matriculados: 4 })
+  assert.equal(row.cp_matriculados, 0)
+})
+
 test('usa la fecha de la clase como respaldo para una asistencia sin checked_in_at', () => {
   const source = fuenteKpiAutomatica({
     year: 2026,

@@ -15,10 +15,7 @@ const requestCache = new Map()
 const loadBriefing = (centroId) => {
   const key = String(centroId)
   if (!requestCache.has(key)) {
-    requestCache.set(key, getGrowthBriefing(centroId).catch((cause) => {
-      requestCache.delete(key)
-      throw cause
-    }))
+    requestCache.set(key, getGrowthBriefing(centroId).finally(() => requestCache.delete(key)))
   }
   return requestCache.get(key)
 }
@@ -111,21 +108,21 @@ export default function GrowthBriefing({ centroId }) {
         <div className="growth-briefing__body">
           <div className="label">Guía semanal · {briefing.center.nombre}</div>
           <h2 id="growth-briefing-title" ref={titleRef} tabIndex="-1">
-            {next ? `Faltan ${next.gap} niños para el Nivel ${next.level}` : 'El reto ahora es sostener el Nivel 5'}
+            {next ? `Faltarían ${next.gap} niños al cierre para el Nivel ${next.level}` : 'El reto ahora es sostener el Nivel 5'}
           </h2>
           <p id="growth-briefing-summary">
             {briefing.confidence.level === 'low'
               ? 'Primero completa la información operativa para recuperar una fecha de proyección confiable.'
-              : 'Esta semana concentra el equipo en la palanca con mayor impacto medible.'}
+              : 'Esta semana ejecuta la acción prioritaria y comprueba su resultado con los próximos datos.'}
           </p>
 
           {month && (
             <div className="growth-briefing__equation">
               <span><small>Inicio</small><strong className="num">{month.startChildren}</strong></span>
               <i>−</i>
-              <span><small>Retiros</small><strong className="num">{month.withdrawals}</strong></span>
+              <span><small>Salidas</small><strong className="num">{month.withdrawals}</strong></span>
               <i>+</i>
-              <span><small>Inicios</small><strong className="num">{month.newActives}</strong></span>
+              <span><small>Inicios y reincorporaciones</small><strong className="num">{Number(month.newActives || 0) + Number(month.reincorporations || 0)}</strong></span>
               <i>=</i>
               <span><small>{formatGrowthPeriod(month.period)}</small><strong className="num">{month.endChildren}</strong></span>
             </div>
@@ -138,7 +135,7 @@ export default function GrowthBriefing({ centroId }) {
               <p>{recommendation?.action || 'Revisa semanalmente captación, retención y capacidad.'}</p>
             </div>
             <div className="growth-briefing__target">
-              <span className="label">Meta semanal</span>
+              <span className="label">Meta comercial semanal</span>
               <strong className="num">
                 {briefing.weeklyInvitations == null ? '—' : briefing.weeklyInvitations}
               </strong>

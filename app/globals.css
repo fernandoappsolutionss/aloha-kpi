@@ -1097,3 +1097,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 /* Badge de progreso del entrenamiento en el menú (n/9) */
 .sb__badge { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--ts-green-soft); color: var(--ts-green); border: 1px solid var(--ts-green-line); }
+
+/* Growth: separate observed population, monthly forecast and assumptions. */
+.growth-population { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; padding:20px 0; border-bottom:1px solid var(--border); }
+.growth-population .growth-metric-line { min-width:0; align-items:flex-start; gap:12px; }
+.growth-explanation { color:var(--text-muted); font-size:13px; line-height:1.6; max-width:85ch; margin:10px 0; }
+.growth-assumptions { font-size:13px; line-height:1.6; margin:12px 0; color:var(--text-muted); }
+.growth-assumptions summary, .growth-data-note summary { cursor:pointer; color:var(--text); padding:8px 0; }
+.growth-assumptions ul, .growth-data-note ul { padding-left:20px; }
+.growth-action__owner { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-muted); margin:12px 0; }
+.growth-data-note details { min-width:0; }
+@media (max-width:760px) { .growth-population { grid-template-columns:1fr; gap:8px; } .growth-segments { flex-wrap:wrap; } .growth-actions .btn { min-height:44px; } }

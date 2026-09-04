@@ -39,7 +39,18 @@ test('combines the three scenarios into rows aligned by period', () => {
 })
 
 test('maps confidence to stable user-facing labels', () => {
-  assert.deepEqual(confidenceMeta('high'), { label: 'Confianza alta', tone: 'ok' })
-  assert.deepEqual(confidenceMeta('medium'), { label: 'Confianza media', tone: 'warn' })
-  assert.deepEqual(confidenceMeta('low'), { label: 'Confianza baja', tone: 'bad' })
+  assert.deepEqual(confidenceMeta('high'), { label: 'Datos completos', tone: 'ok' })
+  assert.deepEqual(confidenceMeta('medium'), { label: 'Datos por revisar', tone: 'warn' })
+  assert.deepEqual(confidenceMeta('low'), { label: 'Datos insuficientes', tone: 'bad' })
+})
+
+
+test('muestra el histórico cerrado y el cierre previsto sin llamar observado a un mes abierto', () => {
+  const rows = scenarioChartRows({ currentChildren: 108, scenarios: { base: { series: [{ period: '2026-10', endChildren: 108 }] } } }, {
+    currentPeriod: '2026-09', startPeriod: '2026-07',
+    history: [{ year: 2026, month: 7, endChildren: 99, closed: true }, { year: 2026, month: 8, endChildren: 100, closed: true }],
+  })
+  assert.equal(rows.find(row => row.period === '2026-08').observed, 100)
+  assert.equal(rows.find(row => row.period === '2026-09').observed, null)
+  assert.equal(rows.find(row => row.period === '2026-09').base, 108)
 })
