@@ -10,8 +10,11 @@ import Sidebar from '../../../../../components/Sidebar'
 import PanelDrill from '../../../../../components/entrenamiento/PanelDrill'
 import { getCentroNombre } from '../../../../actions/centros'
 import { colaFirmas } from '../../../../actions/entrenamiento-oficio'
-
-const ROL = { administradora: 'Administradora', asistente: 'Asistente' }
+// Cómo se nombra cada puesto delante de una persona: una sola fuente. Aquí
+// había una sexta copia con dos entradas, y el Coach y el Coordinador —que
+// ahora también entran a esta cola— habrían salido como "coach" y
+// "coordinador", en minúscula y sin acento.
+import { nombreDeRol } from '../../../../../lib/entrenamiento/oficio/progreso'
 
 export default async function FirmasPage({ params }) {
   const { id } = await params
@@ -62,7 +65,7 @@ export default async function FirmasPage({ params }) {
         <div className="ofi-cola__head">
           <div>
             <h2 id={`alumno-${f.usuarioId}`}>{f.nombre}</h2>
-            <p className="h-sub" style={{ margin: 0 }}>{ROL[f.rol] || f.rol} · {f.centro} · {f.email}</p>
+            <p className="h-sub" style={{ margin: 0 }}>{nombreDeRol(f.rol)} · {f.centro} · {f.email}</p>
           </div>
           <span className={`ent-pill${f.modulos.some((m) => (m.dias ?? 0) >= 7) ? ' ent-pill--bad' : ' ent-pill--mid'}`}>
             {f.modulos.length} {f.modulos.length === 1 ? 'maniobra pendiente' : 'maniobras pendientes'}

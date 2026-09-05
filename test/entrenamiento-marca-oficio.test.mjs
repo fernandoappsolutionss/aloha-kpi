@@ -55,8 +55,8 @@ const CORPUS = MODULOS_OFICIO.map(textoDe).join('\n')
 const EXCEPCIONES = [
   // El NOMBRE del método no es una imagen: es dónde estás parado. Aparece en la
   // portada de cada módulo y en la línea del pie, por diseño.
-  [/Entrenamiento a Bordo/gi, ''],
-  [/\ba bordo\b/gi, ''],
+  [/Entrenamiento en Cubierta/gi, ''],
+  [/\ben cubierta\b/gi, ''],
   // "velar por" = cuidar de. Nada que ver con las velas de un barco; es como el
   // Manual describe la función del Asistente.
   [/\bvela(n)? por(que)?\b/gi, ''],

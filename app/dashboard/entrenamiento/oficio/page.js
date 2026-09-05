@@ -12,8 +12,9 @@ import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import { matrizOficio } from '../../../actions/entrenamiento-oficio'
 import { listCentros } from '../../../actions/centros'
-
-const ROL = { administradora: 'Administradora', asistente: 'Asistente' }
+// El nombre de cada puesto sale de la misma fuente que el resto del oficio.
+// progreso.js es cálculo puro (no arrastra el catálogo ni la prosa al bundle).
+import { nombreDeRol } from '../../../../lib/entrenamiento/oficio/progreso'
 
 function Celda({ c }) {
   if (!c || c.total === 0) return <td style={{ textAlign: 'center', color: 'var(--text-faint)' }}>—</td>
@@ -26,16 +27,16 @@ function Celda({ c }) {
   )
 }
 
-// Los dos planes que la gerencia puede LEER. No es un permiso —quién puede
-// abrirlos lo decide cargarOficio() en el servidor con rolesQueRevisa()—: es el
-// enlace inverso del que ya existía. La lectura enlazaba de vuelta a esta
-// matriz y la matriz no enlazaba a la lectura, así que Fernando, que vive en
-// /dashboard, tenía que adivinar: entrar a un centro, abrir Entrenamiento y
-// encontrar el carril.
-const PLANES = [
-  { rol: 'administradora', nombre: 'la Administradora' },
-  { rol: 'asistente', nombre: 'la Asistente' },
-]
+// Los planes que la gerencia puede LEER. No es un permiso —quién puede abrirlos
+// lo decide cargarOficio() en el servidor con rolesQueRevisa()—: es el enlace
+// inverso del que ya existía. La lectura enlazaba de vuelta a esta matriz y la
+// matriz no enlazaba a la lectura, así que Fernando, que vive en /dashboard,
+// tenía que adivinar: entrar a un centro, abrir Entrenamiento y encontrar el
+// carril.
+//
+// Salen de la respuesta de la action, no de una lista escrita aquí: eran dos y
+// hoy son cuatro (se sumaron el Coach y el Coordinador Operativo), y una lista
+// a mano se queda corta sin que nada lo diga.
 
 export default function EntrenamientoOficioAdminPage() {
   const [data, setData] = useState(null)
@@ -76,14 +77,14 @@ export default function EntrenamientoOficioAdminPage() {
               entrenador después de tomarle la maniobra. La columna <b>Cola de firmas</b> abre la pantalla donde se toma y se firma, en el centro de esa
               persona. <Link className="tour-card__link" href="/dashboard/entrenamiento">Ver el entrenamiento del sistema (los 9 recorridos)</Link>
             </p>
-            {centroLectura && (
+            {centroLectura && (data?.planes || []).length > 0 && (
               <p className="h-sub" style={{ marginTop: 4 }}>
                 Leer el entrenamiento completo, módulo por módulo:{' '}
-                {PLANES.map((pl, i) => (
+                {(data?.planes || []).map((pl, i) => (
                   <span key={pl.rol}>
                     {i > 0 && ' · '}
                     <Link className="tour-card__link" href={`/centro/${centroLectura}/entrenamiento/oficio?revisar=${pl.rol}`}>
-                      el plan de {pl.nombre}
+                      el plan de {pl.rolNombre}
                     </Link>
                   </span>
                 ))}
@@ -119,7 +120,7 @@ export default function EntrenamientoOficioAdminPage() {
                 {data.usuarios.map((u) => (
                   <tr key={u.id}>
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
-                    <td>{ROL[u.rol] || u.rol}</td>
+                    <td>{nombreDeRol(u.rol)}</td>
                     <td>{u.centro}</td>
                     {/* La única pantalla desde la que se firma una maniobra vive dentro
                         del centro. Desde /dashboard no había ninguna ruta hasta

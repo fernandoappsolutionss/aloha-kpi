@@ -176,6 +176,11 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const actorRole = context?.actor?.role
   const isPanel = actorRole === 'admin_general' || actorRole === 'supervisor' || actorRole === 'coordinador'
   const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
+  // EL COACH NO OPERA EL CENTRO. Su única puerta en el KPI es su entrenamiento
+  // (el middleware lo encierra ahí), así que darle el menú del centro sería
+  // ofrecerle nueve pantallas que lo van a rebotar. Sin esta rama el menú le
+  // salía VACÍO: isCenterActor era false y `items` quedaba en [].
+  const esCoach = actorRole === 'coach'
   const centros = context?.centers || []
   const esCoordinador = actorRole === 'coordinador'
   // El contexto visual procede de la ruta y del alcance fresco del servidor;
@@ -239,9 +244,14 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     // El badge x/9 es el de los 9 tours: la meta alcanzable de la primera
     // semana. No se mezcla con los 26 módulos de oficio, que viven adentro.
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
-    ...(firmaDrills ? [{ label: 'Firmas de drill', icon: 'check', href: `/centro/${centroId}/entrenamiento/firmas`, badge: firmas > 0 ? String(firmas) : null }] : []),
+    ...(firmaDrills ? [{ label: 'Firmas de maniobra', icon: 'check', href: `/centro/${centroId}/entrenamiento/firmas`, badge: firmas > 0 ? String(firmas) : null }] : []),
   ]
-  const items = isPanel ? (isCenterContext ? centroItems : adminItems) : (isCenterActor && centroId ? centroItems : [])
+  const coachItems = [
+    { label: 'Mi entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento` },
+  ]
+  const items = isPanel
+    ? (isCenterContext ? centroItems : adminItems)
+    : centroId ? (esCoach ? coachItems : isCenterActor ? centroItems : []) : []
   const roleLabel = isPanel
     ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador')
     : (centroNombre || 'Centro')

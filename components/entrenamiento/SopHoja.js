@@ -23,7 +23,7 @@ function Falta({ children }) {
   return <p className="sop-falta">{children}</p>
 }
 
-export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
+export default function SopHoja({ hoja, centro, curso, emision, oficial, tomador }) {
   const hojaRef = useRef(null)
   const reglaRef = useRef(null)
   const [desborda, setDesborda] = useState(false)
@@ -147,19 +147,42 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
           </div>
 
           <footer className="sop-pie">
-            <div className="sop-firmas">
-              <div className="sop-firma">
-                <span className="sop-firma__linea" aria-hidden="true" />
-                <p>Jefe entrenador — nombre y firma{oficial ? ` (${oficial})` : ''}</p>
-              </div>
-              <div className="sop-firma">
-                <span className="sop-firma__linea" aria-hidden="true" />
-                <p>Fecha</p>
-              </div>
+            {/* DOS PIES DISTINTOS, UNA SOLA FILA. La hoja normal la firma el jefe
+                entrenador; la hoja DE PAPEL la firman dos personas —quien la
+                recibió, que no tiene cuenta en el sistema, y quien se la tomó—
+                porque ese papel ES el registro: va al file del colaborador y
+                aquí no queda nada. Las dos variantes ocupan una sola fila del
+                grid, así que el pie mide igual y el presupuesto de alto de la
+                A4 (test/entrenamiento-sop-oficio.test.mjs) sigue valiendo. */}
+            <div className={`sop-firmas${hoja.papel ? ' sop-firmas--papel' : ''}`}>
+              {hoja.papel ? <>
+                <div className="sop-firma">
+                  <span className="sop-firma__linea" aria-hidden="true" />
+                  <p>Quien lo recibió — nombre y firma</p>
+                </div>
+                <div className="sop-firma">
+                  <span className="sop-firma__linea" aria-hidden="true" />
+                  <p>Quien lo tomó — firma{tomador ? ` (${tomador})` : ''}</p>
+                </div>
+                <div className="sop-firma">
+                  <span className="sop-firma__linea" aria-hidden="true" />
+                  <p>Fecha</p>
+                </div>
+              </> : <>
+                <div className="sop-firma">
+                  <span className="sop-firma__linea" aria-hidden="true" />
+                  <p>Jefe entrenador — nombre y firma{oficial ? ` (${oficial})` : ''}</p>
+                </div>
+                <div className="sop-firma">
+                  <span className="sop-firma__linea" aria-hidden="true" />
+                  <p>Fecha</p>
+                </div>
+              </>}
             </div>
             <p className="sop-origen">
-              Entrenamiento a Bordo · ALOHA · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
+              Entrenamiento en Cubierta · ALOHA · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
               si el Manual cambia, se corrige el módulo y esta hoja se vuelve a imprimir.
+              {hoja.papel && ' Esta hoja firmada reposa en el file del colaborador: es el único registro de este módulo.'}
             </p>
           </footer>
         </article>

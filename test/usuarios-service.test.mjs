@@ -269,7 +269,7 @@ test('pageData no ofrece editar supervisor pero conserva acceso y eliminación g
     rol: 'supervisor', centro_id: null, centros: [], activo,
   }))
   const result = await createUsuariosService({ repo: readRepo(actor, supervisors) }).pageData({ uid: 1 })
-  assert.deepEqual(result.assignableRoles, ['admin_general', 'coordinador', 'administradora', 'asistente'])
+  assert.deepEqual(result.assignableRoles, ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
   assert.deepEqual(result.users.map(user => user.actions), [
     { edit: false, resendInvitation: true, sendPasswordReset: false, delete: true },
     { edit: false, resendInvitation: false, sendPasswordReset: true, delete: true },
@@ -443,7 +443,9 @@ test('repositorio restringe en SQL a operativas de los centros asignados', async
   const result = await usuariosRepository.listUsers(query, [10, 12])
   assert.deepEqual(result, [{ id: 8, rol: 'administradora', centros: [] }])
   assert.match(calls[0].text, /u\.rol = ANY\(\$1::text\[\]\) AND u\.centro_id = ANY\(\$2::int\[\]\)/)
-  assert.deepEqual(calls[0].values, [['administradora', 'asistente'], [10, 12]])
+  // El Coach entra en la lista operativa: el coordinador puede crearlo, así que
+  // tiene que VERLO. La lista sale de ROLES_OPERATIVOS, no de una copia local.
+  assert.deepEqual(calls[0].values, [['administradora', 'asistente', 'coach'], [10, 12]])
 })
 
 test('repositorio bloquea actor antes de leer sus centros ordenados', async () => {

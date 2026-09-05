@@ -63,7 +63,7 @@ function limpiar(md, { negrita = false } = {}) {
 // rompería enlaces ya repartidos. Así que el término nuevo apunta al slug de
 // siempre. Mapa: slug que produciría el término nuevo → slug que se conserva.
 const SLUG_FIJO = {
-  'puesto-a-bordo': 'hat',
+  'puesto-en-cubierta': 'hat',
   'producto-del-puesto': 'producto-final-valioso',
   'lo-que-va-a-la-vista': 'masa',
   'orden-de-los-pasos': 'gradiente',

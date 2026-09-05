@@ -20,7 +20,28 @@ import {
   rolesQueFirma, rolesQueRevisa, OFICIAL_DE, NOMBRE_ROL,
 } from '../../lib/entrenamiento/oficio/progreso'
 
-const ROLES_ALUMNO = ['administradora', 'asistente']
+// Los puestos que se entrenan, en el orden en que se muestran: manda la cola de
+// firmas, los planes de revisión y las filas de la matriz. Gerencia no aparece
+// porque no se entrena; el personal de aseo tampoco, porque no tiene cuenta —
+// su paquete se entrega en papel (curso `aseo`, bloque C).
+const ROLES_ALUMNO = ['administradora', 'asistente', 'coach', 'coordinador']
+
+// PERTENECER A UN CENTRO no es solo usuarios.centro_id. El Coordinador
+// Operativo lo tiene en NULL: manda en varios centros a la vez y su pertenencia
+// vive en usuario_centros. Sin contarla, el día que el Coordinador tiene plan
+// propio no aparece en la cola de firmas de NINGÚN centro y su supervisor no
+// tiene desde dónde firmarle. Por eso las tres consultas de abajo que filtran
+// por centro llevan, además del centro_id, un EXISTS contra usuario_centros.
+// Va repetido en cada una y no como fragmento reusable porque el tagged
+// template de Neon no compone: interpolarle otra consulta la mandaría como
+// PARÁMETRO, no como SQL.
+
+// Los cursos que de verdad tienen módulos cargados. CURSOS declara la pista
+// aunque su contenido todavía no exista, y una columna "0 de 0" en la matriz o
+// una píldora vacía en el índice no dicen nada.
+const cursosConModulos = () => Object.keys(CURSOS)
+  .map((id) => ({ id, titulo: CURSOS[id].titulo, bloque: CURSOS[id].bloque }))
+  .filter((c) => MODULOS_OFICIO.some((m) => m.curso === c.id))
 
 async function runAction(name, work) {
   try { return await work() } catch (error) {
@@ -109,8 +130,8 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
   // ROLES_ALUMNO manda el orden: la administradora primero, que es el hat mayor.
   return ROLES_ALUMNO.filter((r) => puede.has(r)).map((r) => {
     const plan = planDeRol(r, MODULOS_OFICIO)
-    const cursos = Object.keys(CURSOS)
-      .map((id) => ({ id, titulo: CURSOS[id].titulo, bloque: CURSOS[id].bloque, total: plan.filter((m) => m.curso === id).length }))
+    const cursos = cursosConModulos()
+      .map((c) => ({ ...c, total: plan.filter((m) => m.curso === c.id).length }))
       .filter((c) => c.total > 0)
     return {
       rol: r,
@@ -128,32 +149,40 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
 // → { modo, rol, rolNombre, plan:[metadatos], progreso, avance, drills,
 //     siguiente, puedeFirmarA, oficiales, revision }
 // Una sola vuelta: la página del hat pinta el checksheet completo con esto.
-// modo 'entrenamiento' = tiene plan propio; 'revision' = lo lee para revisarlo
-// (plan y progreso vacíos, los planes ajenos van en `revision`); 'ninguno' = ni
-// una cosa ni la otra.
+// modo 'entrenamiento' = tiene plan propio; 'revision' = no lo tiene y solo
+// lee los ajenos; 'ninguno' = ni una cosa ni la otra.
+//
+// LOS DOS CARRILES VIAJAN JUNTOS, y `modo` solo dice cuál es el principal. Con
+// el Coordinador Operativo teniendo sus propios módulos, elegir uno le quitaba
+// la lectura de los planes que su puesto existe para auditar; y a la
+// Administradora, el plan del Coach al que le firma. Lo que se estudia y lo que
+// se revisa no se estorban: son dos listas distintas en la misma respuesta.
 export async function cargarOficio() {
   return runAction('cargarOficio', async () => {
     const s = await requireSession()
     const plan = planDeRol(s.rol, MODULOS_OFICIO)
-    // Sin plan propio no se acaba la historia: si le firma el hat a alguien,
-    // abre ese plan en modo REVISIÓN (lectura). No se le carga progreso porque
-    // no lo acumula, y `revision` viaja con los metadatos para que la página
-    // pinte el plan completo sin volver a preguntar.
+    // `conPlan` agrega los metadatos módulo a módulo: es lo que la pantalla de
+    // revisión pinta como checksheet del plan ajeno.
+    const revision = planesDeRevision(s.rol, { conPlan: true })
+    const modo = plan.length > 0 ? 'entrenamiento' : revision.length > 0 ? 'revision' : 'ninguno'
+    const comun = {
+      modo,
+      rol: s.rol,
+      rolNombre: NOMBRE_ROL[s.rol] || s.rol,
+      veMatriz: isAdminRole(s.rol),
+      puedeFirmarA: rolesQueFirma(s.rol),
+      revision,
+    }
+    // Sin plan propio no se le carga progreso: no lo acumula.
     if (plan.length === 0) {
-      const revision = planesDeRevision(s.rol, { conPlan: true })
       return {
-        modo: revision.length > 0 ? 'revision' : 'ninguno',
-        rol: s.rol,
-        rolNombre: NOMBRE_ROL[s.rol] || s.rol,
-        veMatriz: isAdminRole(s.rol),
+        ...comun,
         plan: [],
         progreso: {},
         avance: avanceOficio([], {}),
         drills: avanceDrills([], {}),
         siguiente: null,
-        puedeFirmarA: rolesQueFirma(s.rol),
         oficiales: [],
-        revision,
       }
     }
     const [progreso, oficiales] = await Promise.all([
@@ -162,49 +191,49 @@ export async function cargarOficio() {
     ])
     const sig = siguienteOficio(plan, progreso)
     return {
-      modo: 'entrenamiento',
-      rol: s.rol,
-      rolNombre: NOMBRE_ROL[s.rol] || s.rol,
-      veMatriz: isAdminRole(s.rol),
+      ...comun,
       plan: plan.map(metadatosOficio),
       progreso,
       avance: avanceOficio(plan, progreso),
       drills: avanceDrills(plan, progreso),
       siguiente: sig ? { id: sig.id, titulo: sig.titulo, curso: sig.curso } : null,
-      puedeFirmarA: rolesQueFirma(s.rol),
       oficiales,
-      revision: [],
     }
   })
 }
 
 // Carril "Tu oficio" del índice de Entrenamiento. Dos formas:
-//   modo 'entrenamiento' → { rol, cursos:[{id,titulo,bloque,total,estudiados,hatted}], avance, drills, siguiente }
+//   modo 'entrenamiento' → { rol, cursos:[{id,titulo,bloque,total,estudiados,hatted}], avance, drills, siguiente, revision }
 //   modo 'revision'      → { rol, rolNombre, revision:[{rol,rolNombre,total,minutos,conDrill,cursos,primero}] }
 // null solo para quien ni se entrena ni le firma a nadie: ahí el carril no se
 // pinta. Gerencia y coordinador YA NO caen en ese null — antes sí, y el dueño
 // entraba a Entrenamiento y veía únicamente los 9 recorridos del sistema.
+//
+// `revision` viaja en las DOS formas: quien tiene plan propio y además le firma
+// a alguien (la Administradora al Coach y a la Asistente; el Coordinador a los
+// tres) necesita los dos carriles a la vez. Aquí va sin `conPlan`: el carril
+// del índice solo pinta totales y no tiene por qué bajarse los metadatos de
+// tres planes ajenos en cada visita.
 export async function resumenOficio() {
   return runAction('resumenOficio', async () => {
     const s = await requireSession()
     const plan = planDeRol(s.rol, MODULOS_OFICIO)
+    const revision = planesDeRevision(s.rol)
+    // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
+    // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
+    // enlace se decide con isAdminRole, la misma fuente que ese layout, no
+    // comparando nombres de rol en el navegador.
+    const veMatriz = isAdminRole(s.rol)
     if (plan.length === 0) {
-      const revision = planesDeRevision(s.rol)
       if (revision.length === 0) return null
-      // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
-      // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
-      // enlace se decide con isAdminRole, la misma fuente que ese layout, no
-      // comparando nombres de rol en el navegador.
-      return { modo: 'revision', rol: s.rol, rolNombre: NOMBRE_ROL[s.rol] || s.rol, veMatriz: isAdminRole(s.rol), revision }
+      return { modo: 'revision', rol: s.rol, rolNombre: NOMBRE_ROL[s.rol] || s.rol, veMatriz, revision }
     }
     const progreso = await progresoDeUsuario(s.uid)
-    const cursos = Object.keys(CURSOS)
-      .map((id) => {
-        const suyos = plan.filter((m) => m.curso === id)
+    const cursos = cursosConModulos()
+      .map((c) => {
+        const suyos = plan.filter((m) => m.curso === c.id)
         return {
-          id,
-          titulo: CURSOS[id].titulo,
-          bloque: CURSOS[id].bloque,
+          ...c,
           total: suyos.length,
           estudiados: suyos.filter((m) => estudiado(progreso[m.id])).length,
           hatted: suyos.filter((m) => hatted(progreso[m.id], m)).length,
@@ -215,10 +244,13 @@ export async function resumenOficio() {
     return {
       modo: 'entrenamiento',
       rol: s.rol,
+      rolNombre: NOMBRE_ROL[s.rol] || s.rol,
+      veMatriz,
       cursos,
       avance: avanceOficio(plan, progreso),
       drills: avanceDrills(plan, progreso),
       siguiente: sig ? { id: sig.id, titulo: sig.titulo } : null,
+      revision,
     }
   })
 }
@@ -373,7 +405,7 @@ export async function colaFirmas(centroId = null) {
     if (roles.length === 0) return { rol: firmante.rol, filas: [] }
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     const candidatos = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
+      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.nombre`
       : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) ORDER BY c.nombre, u.nombre`
     const mios = candidatos.filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
     const ids = mios.map((a) => Number(a.id))
@@ -437,8 +469,8 @@ export async function contadorFirmas(centroId = null) {
     if (roles.length === 0) return { n: 0 }
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     const candidatos = cid
-      ? await sql`SELECT id, rol, centro_id FROM usuarios WHERE rol = ANY(${roles}) AND centro_id = ${cid}`
-      : await sql`SELECT id, rol, centro_id FROM usuarios WHERE rol = ANY(${roles})`
+      ? await sql`SELECT u.id, u.rol, u.centro_id FROM usuarios u WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid}))`
+      : await sql`SELECT u.id, u.rol, u.centro_id FROM usuarios u WHERE u.rol = ANY(${roles})`
     const ids = candidatos
       .filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
       .map((a) => Number(a.id))
@@ -464,7 +496,7 @@ export async function matrizOficio(centroId = null) {
     await requireCurrentAdmin()
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     const usuarios = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${ROLES_ALUMNO}) AND u.centro_id = ${cid} ORDER BY c.nombre, u.rol, u.nombre`
+      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${ROLES_ALUMNO}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.rol, u.nombre`
       : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${ROLES_ALUMNO}) ORDER BY c.nombre, u.rol, u.nombre`
     const ids = usuarios.map((u) => Number(u.id))
     const rows = ids.length
@@ -472,9 +504,15 @@ export async function matrizOficio(centroId = null) {
       : []
     const porUsuario = {}
     for (const r of rows) (porUsuario[r.usuario_id] ||= {})[r.modulo] = aCamel(r)
-    const cursos = Object.keys(CURSOS).map((id) => ({ id, titulo: CURSOS[id].titulo, bloque: CURSOS[id].bloque }))
+    const cursos = cursosConModulos()
+    // Los planes que se pueden abrir en lectura, con su nombre de puesto: la
+    // pantalla enlazaba dos escritos a mano y hoy son cuatro.
+    const planes = ROLES_ALUMNO
+      .filter((r) => planDeRol(r, MODULOS_OFICIO).length > 0)
+      .map((r) => ({ rol: r, rolNombre: NOMBRE_ROL[r] || r }))
     return {
       cursos,
+      planes,
       usuarios: usuarios.map((u) => {
         const progreso = porUsuario[u.id] || {}
         const plan = planDeRol(u.rol, MODULOS_OFICIO)

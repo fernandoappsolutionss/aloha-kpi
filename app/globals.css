@@ -1541,7 +1541,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .reports-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
 .reports-tabs { flex-wrap: wrap; }
 .reports-pedido-form { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; }
-.compliance-matrix { width: 460px; table-layout: fixed; }
+/* ponytail: los 3 grupos de disciplina van en columnas, no apilados. Cada tabla
+   pedía 460px dentro de una tarjeta a todo el ancho y dejaba ~1100px muertos al
+   lado, tres veces seguidas. En grid se usa el ancho y baja el scroll; por
+   debajo de 980px vuelve a una columna sola. */
+.disciplina__grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 980px) { .disciplina__grupos { grid-template-columns: 1fr; } }
+.compliance-matrix { width: 100%; min-width: 430px; table-layout: fixed; }
 .compliance-matrix th:first-child { width: 240px; max-width: 240px; white-space: normal; }
 .compliance-matrix button[aria-pressed="true"] { border-color: var(--ok-text); background: var(--ok-bg); color: var(--ok-text); }
 .chart-data summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
@@ -1668,8 +1674,15 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .ofi-palabras__lista dt { font-weight: 600; }
 .ofi-palabras__lista dd { color: var(--text-muted); line-height: 1.6; }
 
-/* Bloques de contenido */
-.ofi-bloques { max-width: 82ch; }
+/* Bloques de contenido.
+   ponytail: la medida de lectura la lleva la TARJETA, no el texto de adentro.
+   Antes .ofi-bloques se limitaba a 82ch dentro de una tarjeta a todo el ancho,
+   y quedaba un hueco muerto a la derecha del texto. Ahora la tarjeta se ajusta
+   a su contenido y las tablas anchas siguen scrolleando en .ofi-tabla__scroll.
+   Si algún día un bloque necesita el ancho completo, ese bloque sale del
+   max-width, no se le quita a la tarjeta. */
+.card:has(> .ofi-bloques) { max-width: 84ch; }
+.ofi-bloques { max-width: 100%; }
 .ofi-sub { font-family: var(--font-serif); font-size: 18px; margin: 22px 0 8px; }
 .ofi-sub:first-child { margin-top: 0; }
 .ofi-p { color: var(--text-muted); line-height: 1.75; margin: 10px 0; }
@@ -1975,6 +1988,11 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 
 .sop-pie { margin-top: auto; padding-top: 3mm; border-top: 1.5px solid #14161A; break-inside: avoid; page-break-inside: avoid; }
 .sop-firmas { display: grid; grid-template-columns: minmax(0, 1fr) 48mm; gap: 9mm; }
+/* La hoja DE PAPEL (el paquete del personal de aseo) lleva tres firmas en vez
+   de dos: quien lo recibió, quien se lo tomó y la fecha. Sigue siendo UNA fila
+   —si envolviera, el pie crecería y el presupuesto de alto de la A4 dejaría de
+   valer sin que nadie se entere. */
+.sop-firmas--papel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34mm; }
 .sop-firma__linea { display: block; height: 9mm; border-bottom: 1px solid #14161A; }
 .sop-firma p { margin: 1.5mm 0 0; font-size: 0.68rem; color: #4A4F57; }
 .sop-origen { margin: 4mm 0 0; font-size: 0.62rem; line-height: 1.4; color: #62676F; }

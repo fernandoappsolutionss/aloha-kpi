@@ -28,7 +28,7 @@ export const TOPE = { pasos: 12, decide: 3, errores: 3 }
 // página del módulo, que nombra el plan que se está revisando) y las cinco
 // cadenas se fueron a lib/entrenamiento/oficio/progreso.js, que es cálculo puro
 // igual que este archivo — se sigue pudiendo probar suelto, sin React ni BD.
-import { nombreDeRol } from '../../lib/entrenamiento/oficio/progreso.js'
+import { nombreDeRol, esDePapel } from '../../lib/entrenamiento/oficio/progreso.js'
 
 export { nombreDeRol }
 
@@ -123,7 +123,14 @@ export function derivarSop(m) {
     codigo: m.id,
     proceso: plano(escrito?.proceso) || plano(m.titulo),
     cuando: plano(escrito?.cuando),
-    aplicaA: (m.roles || []).map(nombreDeRol),
+    // De qué puesto es la hoja. Sale de `roles`, salvo en las hojas DE PAPEL:
+    // el personal de aseo no es un rol del sistema (no tiene cuenta), así que
+    // su nombre solo puede venir escrito en el `sop` del módulo. Es el único
+    // caso en el que `aplicaA` no se deriva.
+    aplicaA: lista(escrito?.aplicaA).length ? lista(escrito.aplicaA) : (m.roles || []).map(nombreDeRol),
+    // La hoja de un módulo de papel se firma en tinta por dos personas (quien
+    // la recibió y quien se la tomó), no por un jefe entrenador: el pie cambia.
+    papel: esDePapel(m),
     producto: plano(escrito?.producto) || plano(m.pfv),
     pasos: pasos.slice(0, TOPE.pasos),
     pasosOmitidos: Math.max(0, pasos.length - TOPE.pasos),

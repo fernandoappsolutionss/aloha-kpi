@@ -1,4 +1,4 @@
-// Un módulo de oficio, en el orden que manda el método (Entrenamiento a Bordo):
+// Un módulo de oficio, en el orden que manda el método (Entrenamiento en Cubierta):
 //   0. la portada  → objetivo, temario y qué actividades trae (con su restricción)
 //   1. a la vista  → qué tener delante antes de leer
 //   2. las palabras → lo que hay que entender para que el texto signifique algo
@@ -26,7 +26,7 @@ import { GLOSARIO } from '../../../../../../lib/entrenamiento/oficio/glosario'
 // Los 40 guiones están escritos y probados; los mp3 se generan aparte con
 // `npm run entrenamiento:audio -- --solo oficio` y el manifest los publica.
 import manifestVoz from '../../../../../../lib/entrenamiento/audio-manifest-oficio.json'
-import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, rolesQueFirma, nombreDeRol } from '../../../../../../lib/entrenamiento/oficio/progreso'
+import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
 
 // Quien FIRMA un módulo puede LEERLO: necesita ver con qué va a evaluar. El
 // permiso sale de rolesQueFirma(), que es la regla real — la Administradora es
@@ -62,6 +62,47 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   if (!m) return shell('error', <>{volverAlHat}<div className="alert alert--error" role="alert">Este módulo no existe.</div></>)
 
   const { rol, progreso, oficiales } = oficio
+
+  // ── EL MÓDULO DE PAPEL ──────────────────────────────────────────────────
+  // Los seis módulos del personal de aseo no llevan `roles`: no están en el
+  // plan de nadie, no piden cuestionario y no escriben progreso. Esta página
+  // no tiene nada que enseñarles —con `roles: []` la frase de arriba decía
+  // literalmente "es del entrenamiento de ."—, así que manda a la hoja, que es
+  // el módulo entero. Quién puede abrirla la decide rolesDelPapel(): quien
+  // reparte el paquete (la Asistente, con of-ase-0) y quien le firma a ella.
+  if (esDePapel(m)) {
+    if (!puedeImprimirPapel(rol, m, MODULOS_OFICIO)) {
+      return shell('error', <>
+        {volverAlHat}
+        <div className="main__head"><div>
+          <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Entrenamiento de oficio</div>
+          <h1 className="h-title">Esta hoja no es de tu puesto</h1>
+          <p className="h-sub">
+            &quot;{m.titulo}&quot; se entrega impresa y la toma {rolesDelPapel(m, MODULOS_OFICIO).map(nombreDeRol)[0] || 'otro puesto'}.
+            Tu plan está en tu puesto.
+          </p>
+        </div></div>
+      </>)
+    }
+    return shell('ready', <>
+      {volverAlHat}
+      <div className="main__head"><div>
+        <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
+          Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · {m.duracionMin} min
+        </div>
+        <h1 className="h-title">{m.titulo}</h1>
+        <p className="h-sub">
+          Este módulo se entrega EN PAPEL: la persona no tiene cuenta en el sistema. Imprime la hoja, tómasela con ella
+          delante y que firmen las dos al pie. La hoja firmada va al file del colaborador — el sistema no guarda nada de esto.
+        </p>
+      </div></div>
+      <div className="ofi-nav">
+        <Link className="btn btn--primary" href={`${base}/${m.id}/sop`}>Abrir la hoja para imprimir <span aria-hidden="true">→</span></Link>
+        <Link className="btn" href={base}>Volver a mi puesto</Link>
+      </div>
+    </>)
+  }
+
   const esMio = m.roles.includes(rol)
   const esOficial = puedeLeerComoOficial(rol, m)
   if (!esMio && !esOficial) {
@@ -71,7 +112,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Entrenamiento de oficio</div>
         <h1 className="h-title">Este módulo no es de tu puesto</h1>
         <p className="h-sub">
-          &quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. No cuenta para tu avance ni te lo van a pedir.
+          &quot;{m.titulo}&quot; es del entrenamiento de {m.roles.map(nombreDeRol).join(' y ')}. No cuenta para tu avance ni te lo van a pedir.
           Tu plan está en tu puesto.
         </p>
       </div></div>
@@ -121,12 +162,12 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       {/* La portada de cada módulo nombra el método: no hay método nuevo, es la
           misma O·L·A aplicada a un puesto en vez de a un negocio. */}
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
-        Entrenamiento a Bordo · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
+        Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
       </div>
       <h1 className="h-title">{m.titulo}</h1>
       {!esMio && esOficial && (
         <div className="alert alert--warn" role="note">
-          Estás leyendo un módulo del puesto de {m.roles.join(' y ')} como su jefe entrenador. No cuenta para tu avance.
+          Estás leyendo un módulo del puesto de {m.roles.map(nombreDeRol).join(' y ')} como su jefe entrenador. No cuenta para tu avance.
         </div>
       )}
     </div></div>

@@ -16,11 +16,14 @@ import { RESPUESTAS_OFICIO } from '../lib/entrenamiento/respuestas-oficio/todas.
 import {
   UMBRAL, minimoAprobacion, corregirQuizOficio, estudiado, firmado, hatted,
   planDeRol, avanceOficio, siguienteOficio, gradienteAbierto, marcarTerminos,
-  OFICIAL_DE, puedeFirmar, rolesQueFirma,
+  OFICIAL_DE, puedeFirmar, rolesQueFirma, esDePapel, rolesDelPapel,
 } from '../lib/entrenamiento/oficio/progreso.js'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const ROLES = ['administradora', 'asistente']
+// Los puestos que se entrenan salen del CATÁLOGO, no de una lista a mano: eran
+// dos, hoy son cuatro y el día que entre un quinto este archivo no se entera.
+// Sigue pasando en verde con el catálogo vacío (queda en []).
+const ROLES = [...new Set(MODULOS_OFICIO.flatMap((m) => m.roles || []))].sort()
 const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota'])
 const TONOS = new Set(['regla', 'ojo', 'alerta'])
 
@@ -68,7 +71,10 @@ test('ningún módulo de oficio tiene pasos ni inicio (no es un pseudo-tour)', (
 test('forma del módulo: curso, roles, orden, duración, masa, palabras, drills y fuente', () => {
   for (const m of MODULOS_OFICIO) {
     assert.ok(CURSOS[m.curso], `${m.id}: curso desconocido ${m.curso}`)
-    assert.ok(Array.isArray(m.roles) && m.roles.length > 0, `${m.id}: roles vacío`)
+    // `roles: []` es LEGAL y es el módulo DE PAPEL: no está en el plan de nadie
+    // porque la persona que lo recibe (el aseo) no tiene cuenta en el sistema.
+    // Lo que no puede es fallar el tipo.
+    assert.ok(Array.isArray(m.roles), `${m.id}: roles tiene que ser un array`)
     for (const r of m.roles) assert.ok(CURSOS[m.curso].roles.includes(r), `${m.id}: rol ${r} fuera de su curso`)
     assert.ok(Number.isInteger(m.orden) && m.orden > 0, `${m.id}: orden`)
     assert.ok(m.titulo, `${m.id}: título`)
@@ -194,9 +200,27 @@ test('el plan de cada rol es el suyo: la asistente no ve el curso del Centro ni 
   assert.ok(!asistente.some((m) => m.curso === 'centro'), 'la asistente no lleva el curso del Centro')
   assert.ok(!asistente.some((m) => m.id === 'of-cen-10'), 'of-cen-10 (Supervisión de nómina) no es de la asistente')
   assert.ok(!administradora.some((m) => m.curso === 'zoho'), 'la administradora no lleva el curso de Zoho')
-  // Gerencia y coordinador no se entrenan: firman.
-  for (const rol of ['admin_general', 'supervisor', 'coordinador']) {
+  // Ningún puesto lleva el curso B de otro puesto. Es el criterio 2 de Fernando
+  // y ahora hay cuatro planes, no dos: el Coach no ve Zoho ni el Centro, y el
+  // Coordinador no ve el curso del Coach.
+  const CURSO_B_DE = { administradora: 'centro', asistente: 'zoho', coach: 'coach', coordinador: 'coordinacion' }
+  for (const rol of ROLES) {
+    const plan = planDeRol(rol, MODULOS_OFICIO)
+    for (const [otro, curso] of Object.entries(CURSO_B_DE)) {
+      if (otro === rol) continue
+      assert.ok(!plan.some((m) => m.curso === curso), `${rol} no puede llevar el curso "${curso}", que es de ${otro}`)
+    }
+  }
+  // Gerencia no se entrena: firma. (El coordinador SÍ tiene plan propio ahora.)
+  for (const rol of ['admin_general', 'supervisor']) {
     assert.deepEqual(planDeRol(rol, MODULOS_OFICIO), [], `${rol} no debe tener plan`)
+  }
+  // Y los módulos DE PAPEL no están en el plan de NADIE, ni siquiera de quien
+  // los reparte: se imprimen, no se estudian en pantalla.
+  const papel = MODULOS_OFICIO.filter(esDePapel)
+  for (const rol of [...ROLES, 'admin_general', 'supervisor']) {
+    const plan = planDeRol(rol, MODULOS_OFICIO)
+    for (const m of papel) assert.ok(!plan.some((x) => x.id === m.id), `${m.id} es de papel y se coló en el plan de ${rol}`)
   }
   // Si el método ya está cargado, es por donde empiezan los dos.
   if (MODULO_IDS_OFICIO.has('of-met-1')) {
@@ -283,9 +307,54 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.equal(puedeFirmar({ id: 1, rol: 'administradora', centroId: null }, { id: 2, rol: 'asistente', centroId: null }), false)
   assert.equal(puedeFirmar(null, alumnoAsi), false)
   assert.equal(puedeFirmar(admiMismo, null), false)
+  // Quien no le firma a nadie: la asistente y el coach son el final de la línea.
   assert.deepEqual(rolesQueFirma('asistente'), [])
-  assert.deepEqual(rolesQueFirma('administradora'), ['asistente'])
-  assert.deepEqual(rolesQueFirma('coordinador').sort(), ['administradora', 'asistente'])
+  assert.deepEqual(rolesQueFirma('coach'), [])
+  assert.deepEqual(rolesQueFirma('administradora').sort(), ['asistente', 'coach'])
+  assert.deepEqual(rolesQueFirma('coordinador').sort(), ['administradora', 'asistente', 'coach'])
+  for (const rol of ['supervisor', 'admin_general']) {
+    assert.deepEqual(rolesQueFirma(rol).sort(), ['administradora', 'asistente', 'coach', 'coordinador'], `${rol} firma a los cuatro puestos`)
+  }
+  // NADIE SE QUEDA SIN OFICIAL: los cuatro puestos que se entrenan tienen al
+  // menos un firmante posible. Un puesto sin oficial no puede cerrar un módulo.
+  for (const rol of ROLES) {
+    assert.ok((OFICIAL_DE[rol] || []).length > 0, `${rol} se entrena y nadie le puede firmar el drill`)
+    assert.ok(!OFICIAL_DE[rol].includes(rol), `${rol} no se puede firmar a sí mismo`)
+  }
+  // El coach lo firma su administradora, dentro del centro; la de otro no.
+  const coach7 = { id: 20, rol: 'coach', centroId: 7 }
+  assert.equal(puedeFirmar(admiMismo, coach7), true)
+  assert.equal(puedeFirmar(admiOtro, coach7), false, 'una administradora de OTRO centro no le firma al coach')
+  assert.equal(puedeFirmar({ id: 21, rol: 'coach', centroId: 7 }, coach7), false, 'un coach no le firma a otro coach')
+  assert.equal(puedeFirmar({ id: 8, rol: 'coordinador', centros: [7] }, coach7), true)
+  // Al coordinador solo lo firma la Junta Directiva: supervisor y admin_general.
+  const coord = { id: 30, rol: 'coordinador', centroId: null }
+  for (const rol of ['supervisor', 'admin_general']) {
+    assert.equal(puedeFirmar({ id: 9, rol, centroId: null }, coord), true)
+  }
+  assert.equal(puedeFirmar({ id: 31, rol: 'coordinador', centros: [7] }, coord), false, 'un coordinador no le firma a otro coordinador')
+  assert.equal(puedeFirmar(admiMismo, coord), false, 'una administradora no le firma a su coordinador')
+})
+
+// ── 10 bis. EL MÓDULO DE PAPEL ────────────────────────────────────────────
+// El personal de aseo NO tiene cuenta: no entra a usuarios.rol y nunca escribe
+// en entrenamiento_progreso. Su entrenamiento es papel con id.
+test('los módulos de papel no piden cuenta, no piden quiz y solo los abre quien los reparte', () => {
+  const papel = MODULOS_OFICIO.filter(esDePapel)
+  for (const m of papel) {
+    assert.deepEqual(m.roles, [], `${m.id}: un módulo de papel no lleva roles`)
+    assert.deepEqual(m.quiz || [], [], `${m.id}: un módulo de papel no pide cuestionario (nadie puede responderlo: no tiene cuenta)`)
+    assert.deepEqual(m.drills || [], [], `${m.id}: un módulo de papel no lleva maniobra que firmar en el sistema`)
+    assert.ok(m.sop, `${m.id}: un módulo de papel ES su hoja imprimible; sin \`sop\` no hay nada que entregar`)
+    // Y lo abre quien reparte el paquete más quien le firma a esa persona.
+    const quienes = rolesDelPapel(m, MODULOS_OFICIO)
+    assert.ok(quienes.length > 0, `${m.id}: nadie puede imprimir esta hoja`)
+    for (const r of quienes) assert.ok(OFICIAL_DE[r] || rolesQueFirma(r).length > 0, `${m.id}: ${r} no es un rol del sistema`)
+  }
+  // Un módulo normal nunca es de papel.
+  for (const m of MODULOS_OFICIO.filter((m) => !esDePapel(m))) {
+    assert.deepEqual(rolesDelPapel(m, MODULOS_OFICIO), [], `${m.id}: no es de papel y rolesDelPapel devolvió algo`)
+  }
 })
 
 // ── 11. UMBRAL ────────────────────────────────────────────────────────────

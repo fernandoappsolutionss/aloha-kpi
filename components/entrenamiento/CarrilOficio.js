@@ -97,8 +97,13 @@ export default function CarrilOficio({ centroId }) {
     )
   }
 
-  const { avance, drills, cursos, siguiente } = datos
+  const { avance, drills, cursos, siguiente, revision } = datos
   const base = `/centro/${centroId}/entrenamiento/oficio`
+  // LOS DOS CARRILES A LA VEZ. Quien tiene plan propio y además le firma el hat
+  // a alguien —la Administradora al Coach y a la Asistente; el Coordinador
+  // Operativo a los tres— tiene que ver las dos cosas. Antes el servidor elegía
+  // una y el que estudiaba perdía la lectura de los planes que audita.
+  const revisa = revision || []
 
   return (
     <section className="ofi-carril" aria-labelledby="ofi-carril-title">
@@ -148,6 +153,19 @@ export default function CarrilOficio({ centroId }) {
       {siguiente && (
         <p className="ofi-carril__next">
           Siguiente: <Link className="tour-card__link" href={`${base}/${siguiente.id}`}>{siguiente.titulo} <span aria-hidden="true">→</span></Link>
+        </p>
+      )}
+
+      {revisa.length > 0 && (
+        <p className="ofi-carril__next">
+          Y tú firmas {revisa.length === 1 ? 'el plan de' : 'los planes de'}{' '}
+          {revisa.map((p, i) => (
+            <span key={p.rol}>
+              {i > 0 && (i === revisa.length - 1 ? ' y ' : ', ')}
+              <Link className="tour-card__link" href={`${base}?revisar=${p.rol}`}>{p.rolNombre}</Link>
+            </span>
+          ))}
+          : ábrelos en lectura para prepararte las maniobras que le vas a tomar.
         </p>
       )}
     </section>
