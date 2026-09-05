@@ -336,6 +336,22 @@ function loggerDe(logger) {
   }
 }
 
+function errorSeguro(err, key = '') {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  let msg = raw.replace(/\s+/g, ' ').trim() || 'error desconocido'
+  if (key) msg = msg.split(key).join('[api-key]')
+  if (msg.length > 500) msg = `${msg.slice(0, 497)}...`
+  return msg
+}
+
+function registrarFalloClip({ clip, result, out, detalle }) {
+  const msg = `x ${clip.clave}: ${detalle}`
+  result.exitCode = 1
+  result.errores.push(msg)
+  out.error(msg)
+  return false
+}
+
 export async function ejecutarAudio({ args = [], env = process.env, fetchImpl = globalThis.fetch, paths: pathsEntrada = {}, concurrencia = null, logger = null } = {}) {
   const paths = normalizaPaths(pathsEntrada)
   const parsed = parseArgs(args)
@@ -486,31 +502,35 @@ async function ejecutarMuestra({ seleccion, parsed, env, fetchImpl, paths, resul
 
 async function generarClip({ clip, key, fetchImpl, baseDir, result, out }) {
   if (!fetchImpl) {
-    result.exitCode = 1
-    result.errores.push('No hay fetch disponible para generar audio.')
-    return false
+    return registrarFalloClip({ clip, result, out, detalle: 'No hay fetch disponible para generar audio.' })
   }
-  mkdirSync(dirname(join(baseDir, clip.file)), { recursive: true })
-  result.fetches += 1
   const receta = clip.receta
-  const res = await fetchImpl(`https://api.elevenlabs.io/v1/text-to-speech/${receta.voiceId}?output_format=${receta.format}`, {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: clip.texto, ...receta.settings }),
-  })
-  if (!res.ok) {
-    const msg = `x ${clip.clave}: ${res.status} ${await res.text()}`
-    result.exitCode = 1
-    result.errores.push(msg)
-    out.error(msg)
-    return false
+  try {
+    mkdirSync(dirname(join(baseDir, clip.file)), { recursive: true })
+    result.fetches += 1
+    const res = await fetchImpl(`https://api.elevenlabs.io/v1/text-to-speech/${receta.voiceId}?output_format=${receta.format}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clip.texto, ...receta.settings }),
+    })
+    if (!res.ok) {
+      let body = ''
+      try {
+        body = errorSeguro(await res.text(), key)
+      } catch (err) {
+        body = `no se pudo leer respuesta: ${errorSeguro(err, key)}`
+      }
+      return registrarFalloClip({ clip, result, out, detalle: `${res.status} ${body}`.trim() })
+    }
+    const buf = Buffer.from(await res.arrayBuffer())
+    writeFileSync(join(baseDir, clip.file), buf)
+    clip.segReal = Math.round((buf.length * 8) / 64000)
+    result.generados += 1
+    out.log(`ok ${clip.clave} (${clip.segReal}s)`)
+    return true
+  } catch (err) {
+    return registrarFalloClip({ clip, result, out, detalle: errorSeguro(err, key) })
   }
-  const buf = Buffer.from(await res.arrayBuffer())
-  writeFileSync(join(baseDir, clip.file), buf)
-  clip.segReal = Math.round((buf.length * 8) / 64000)
-  result.generados += 1
-  out.log(`ok ${clip.clave} (${clip.segReal}s)`)
-  return true
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

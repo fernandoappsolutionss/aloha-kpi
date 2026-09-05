@@ -292,3 +292,64 @@ test('generar guía usa voz aprobada, settings exactos y actualiza solo manifest
     assert.ok(existsSync(join(paths.publicDir, manifest[clip.clave].file)), `${clip.clave}: no escribió mp3`)
   }
 })
+
+test('un fallo de clip no aborta la tanda y la reanudación omite los exitosos', async () => {
+  const paths = rutasTemporales()
+  const clips = audio.clipsDeGuia('of-met-1')
+  const falla = clips.find((c) => c.clave === 'guia/of-met-1/palabras')
+  const calls = []
+  const logsError = []
+  const fetchConFallo = async (url, options = {}) => {
+    const body = JSON.parse(options.body || '{}')
+    const clip = clips.find((c) => c.texto === body.text)
+    calls.push(clip?.clave || String(url))
+    return {
+      ok: true,
+      status: 200,
+      async arrayBuffer() {
+        if (clip?.clave === falla.clave) throw new Error('arrayBuffer falló con test-key')
+        return Uint8Array.from([9, 8, 7, calls.length]).buffer
+      },
+      async text() { return '' },
+    }
+  }
+
+  const result = await audio.ejecutarAudio({
+    args: ['--solo', 'guia:of-met-1'],
+    env: { ELEVENLABS_API_KEY: 'test-key' },
+    fetchImpl: fetchConFallo,
+    paths,
+    concurrencia: 3,
+    logger: { error: (msg) => logsError.push(msg) },
+  })
+
+  assert.equal(result.exitCode, 1)
+  assert.equal(result.fetches, 3)
+  assert.equal(result.generados, 2)
+  assert.ok(result.errores.some((e) => e.includes(falla.clave) && e.includes('arrayBuffer falló')))
+  assert.equal(logsError.length, 1)
+  assert.ok(logsError[0].includes(falla.clave))
+  assert.ok(logsError[0].includes('[api-key]'))
+  assert.equal(logsError[0].includes('test-key'), false)
+  let manifest = json(paths.manifestGuia)
+  assert.deepEqual(Object.keys(manifest).sort(), clips.filter((c) => c.clave !== falla.clave).map((c) => c.clave).sort())
+  assert.deepEqual(archivosBajo(paths.publicDir).sort(), clips.filter((c) => c.clave !== falla.clave).map((c) => c.file).sort())
+
+  const retryCalls = []
+  const retry = await audio.ejecutarAudio({
+    args: ['--solo', 'guia:of-met-1'],
+    env: { ELEVENLABS_API_KEY: 'test-key' },
+    fetchImpl: fetchOk(retryCalls),
+    paths,
+    concurrencia: 3,
+  })
+
+  assert.equal(retry.exitCode, 0)
+  assert.equal(retry.saltados, 2)
+  assert.equal(retry.fetches, 1)
+  assert.equal(retry.generados, 1)
+  assert.equal(retryCalls.length, 1)
+  assert.equal(retryCalls[0].body.text, falla.texto)
+  manifest = json(paths.manifestGuia)
+  assert.deepEqual(Object.keys(manifest).sort(), clips.map((c) => c.clave).sort())
+})
