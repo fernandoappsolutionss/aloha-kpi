@@ -35,6 +35,8 @@ Los tests de base de datos requieren `E2E_DATABASE_CONFIRM=disposable` y una URL
 3. Comprobar reproducción y silencio con los clips reales, incluida la recuperación tras una acción de servidor. La política real de Safari/iPhone necesita prueba en ese dispositivo.
 4. Antes de publicar, aplicar `db/migrations/2026-09-05-entrenamiento-conceptos.sql` y luego desplegar. Merge y migración productiva siguen pendientes de la aprobación del resultado.
 
+La rama permanece local y todavía no existe PR: la revisión automática bloqueó también `git push`. Se verificó por API que `fernandoappsolutionss/aloha-kpi` es público y que la cuenta autenticada es su administradora; se solicitó autorización explícita para publicar allí el código y los guiones nuevos.
+
 ## Decisiones de implementación
 
 - Auditor disponible independiente en lugar de Sonnet, que estaba sin cuota.
