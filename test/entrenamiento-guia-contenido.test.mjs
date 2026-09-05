@@ -168,7 +168,18 @@ function terminosNombrados(m, guia) {
     .filter((termino) => texto.includes(norm(termino)))
 }
 
-function siguientesDerivables() {
+const OFICIAL_DE = {
+  administradora: 'coordinador',
+  asistente: 'administradora',
+  coach: 'administradora',
+  coordinador: 'supervisor',
+}
+
+function jefeEsperado(rol) {
+  return nombreDeRol(OFICIAL_DE[rol])
+}
+
+function siguientesPorModulo() {
   const porModulo = new Map()
   for (const rol of ['administradora', 'asistente', 'coach', 'coordinador']) {
     const plan = planDeRol(rol, MODULOS_OFICIO)
@@ -180,7 +191,7 @@ function siguientesDerivables() {
       porModulo.set(m.id, set)
     }
   }
-  return new Map([...porModulo.entries()].filter(([, titulos]) => titulos.size === 1))
+  return porModulo
 }
 
 test('guía hablada: cobertura exacta para los módulos en pantalla y tres clips generales', () => {
@@ -213,21 +224,39 @@ test('guía hablada: cada vista nombra lo que va a la vista y cada glosario dice
   }
 })
 
-test('guía hablada: el cierre manda maniobra cuando toca y nombra el siguiente módulo derivable', () => {
-  const siguientes = siguientesDerivables()
+test('guía hablada: el cierre manda maniobra cuando toca y deriva el siguiente desde el plan del rol', () => {
+  const siguientes = siguientesPorModulo()
   for (const m of MODULOS_EN_PANTALLA) {
     const cierre = GUIA[m.id].cierre
+    const cierreNormalizado = norm(cierre)
     if ((m.drills || []).length > 0) {
       assert.match(cierre, /maniobra/i, `${m.id}: tiene maniobra y el cierre no la manda`)
+      const jefes = new Set(m.roles.map(jefeEsperado))
       if (m.roles.length === 1) {
-        const jefe = nombreDeRol({ administradora: 'coordinador', asistente: 'administradora', coach: 'administradora', coordinador: 'supervisor' }[m.roles[0]])
-        assert.match(norm(cierre), new RegExp(`\\b${norm(jefe).split(' ')[0]}\\b`), `${m.id}: no nombra al jefe entrenador esperado (${jefe})`)
+        const [jefe] = [...jefes]
+        assert.match(cierreNormalizado, new RegExp(`\\b${norm(jefe).split(' ')[0]}\\b`), `${m.id}: no nombra al jefe entrenador esperado (${jefe})`)
+      } else if (jefes.size > 1) {
+        assert.match(cierreNormalizado, /jefe inmediato/, `${m.id}: módulo compartido debe remitir al jefe inmediato`)
+        assert.match(cierreNormalizado, /jefe entrenador/, `${m.id}: módulo compartido debe nombrar al jefe entrenador`)
+        for (const jefe of jefes) {
+          assert.equal(cierreNormalizado.includes(norm(jefe)), false, `${m.id}: módulo compartido impone un cargo exclusivo (${jefe})`)
+        }
       }
     }
-    const [siguiente] = [...(siguientes.get(m.id) || [])]
+    const titulos = siguientes.get(m.id) || new Set()
+    if (titulos.size > 1) {
+      for (const titulo of titulos) {
+        const esperado = tituloParaAudio(titulo).slice(0, 18)
+        assert.equal(cierreNormalizado.includes(esperado), false, `${m.id}: cierre escoge un siguiente de un solo rol ("${titulo}")`)
+      }
+      assert.match(cierreNormalizado, /modulo de tu puesto/, `${m.id}: cierre compartido debe remitir al módulo del puesto`)
+      assert.match(cierreNormalizado, /tu plan/, `${m.id}: cierre compartido debe remitir al plan del rol`)
+      continue
+    }
+    const [siguiente] = [...titulos]
     if (siguiente) {
       const esperado = tituloParaAudio(siguiente).slice(0, 18)
-      assert.ok(norm(cierre).includes(esperado), `${m.id}: cierre no nombra el siguiente módulo "${siguiente}"`)
+      assert.ok(cierreNormalizado.includes(esperado), `${m.id}: cierre no nombra el siguiente módulo "${siguiente}"`)
     } else if (siguiente === '') {
       assert.match(cierre, /cierras tu plan|no hay módulo siguiente/i, `${m.id}: cierre final no dice que el plan queda cerrado`)
     }
