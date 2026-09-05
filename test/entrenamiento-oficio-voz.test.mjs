@@ -9,12 +9,14 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MODULOS } from '../lib/entrenamiento/modulos.js'
 import { MODULOS_OFICIO, CURSOS } from '../lib/entrenamiento/oficio/catalogo.js'
-import {
-  saneaVoz, textoVozOficio, clipsDeTours, clipsDeOficio, seleccionMuestraOficio, resuelveSolo,
-} from '../scripts/entrenamiento-audio.mjs'
+import * as audio from '../scripts/entrenamiento-audio.mjs'
+
+const { saneaVoz, textoVozOficio, clipsDeTours, clipsDeOficio, seleccionMuestraOficio, resuelveSolo } = audio
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const json = (p) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'))
+const DIGITALES = MODULOS_OFICIO.filter((m) => m.roles.length > 0)
+const PAPEL = MODULOS_OFICIO.filter((m) => m.roles.length === 0)
 
 test('saneaVoz: lo que se manda a la API es texto hablado, no texto escrito', () => {
   assert.equal(saneaVoz('El **producto** final'), 'El producto final')
@@ -26,7 +28,7 @@ test('saneaVoz: lo que se manda a la API es texto hablado, no texto escrito', ()
 
 test('un clip por módulo de oficio, con clave propia que no choca con la de los tours', () => {
   const oficio = clipsDeOficio()
-  assert.equal(oficio.length, MODULOS_OFICIO.length, 'un clip por módulo: ni uno por bloque ni el módulo entero locutado')
+  assert.equal(oficio.length, DIGITALES.length, 'un clip por módulo digital: los módulos de papel no reciben audio')
   const tours = clipsDeTours()
   const claves = new Set()
   for (const c of [...tours, ...oficio]) {
@@ -38,13 +40,19 @@ test('un clip por módulo de oficio, con clave propia que no choca con la de los
     assert.equal(c.file, `${c.clave}.mp3`)
     assert.ok(c.texto && c.texto.length > 40, `${c.clave}: texto vacío o de una línea`)
   }
+  for (const m of PAPEL) assert.equal(oficio.some((c) => c.clave === `oficio/${m.id}`), false, `${m.id}: el papel no se locuta`)
   // --solo acepta tour, módulo de oficio, curso o pista entera; nada más.
   assert.deepEqual(resuelveSolo(MODULOS[0].id), { pista: 'tour', filtro: MODULOS[0].id })
   assert.deepEqual(resuelveSolo('normativa'), { pista: 'oficio', filtro: 'normativa' })
   assert.deepEqual(resuelveSolo('oficio'), { pista: 'oficio', filtro: null })
+  assert.deepEqual(resuelveSolo('guia'), { pista: 'guia', filtro: null })
+  assert.deepEqual(resuelveSolo('guia:of-met-1'), { pista: 'guia', filtro: 'of-met-1' })
+  assert.deepEqual(resuelveSolo('general'), { pista: 'guia', filtro: 'general' })
+  assert.equal(resuelveSolo(PAPEL[0].id), null)
+  assert.equal(resuelveSolo(`guia:${PAPEL[0].id}`), null)
   assert.equal(resuelveSolo('no-existe'), null)
   assert.equal(resuelveSolo(''), null)
-  assert.equal(clipsDeOficio('zoho').length, MODULOS_OFICIO.filter((m) => m.curso === 'zoho').length)
+  assert.equal(clipsDeOficio('zoho').length, DIGITALES.filter((m) => m.curso === 'zoho').length)
 })
 
 test('--muestra deja 3 clips de OFICIO para audición, de cursos distintos', () => {
@@ -86,7 +94,7 @@ test('textoVozOficio: manda el campo voz si existe; si no, arma con lo que ya ha
 const TRAMO_MAX = 135
 
 test('los guiones de voz cumplen la guía: cortos, con respiración y sin markdown', () => {
-  for (const m of MODULOS_OFICIO) {
+  for (const m of DIGITALES) {
     const voz = textoVozOficio(m)
     assert.equal(typeof voz, 'string', `${m.id}: voz tiene que ser un string`)
     const largo = voz.replace(/<break[^>]*\/>/g, '').length
@@ -107,8 +115,8 @@ test('los guiones de voz cumplen la guía: cortos, con respiración y sin markdo
   }
 })
 
-test('los 40 módulos traen su guion escrito a mano', () => {
-  const derivados = MODULOS_OFICIO.filter((m) => !m.voz).map((m) => m.id)
+test('los 64 módulos digitales traen su guion escrito a mano', () => {
+  const derivados = DIGITALES.filter((m) => !m.voz).map((m) => m.id)
   assert.deepEqual(
     derivados, [],
     'un clip derivado suena a rúbrica leída ("Al terminar este módulo: puedes decir el producto final valioso…"): escríbele el `voz`',
@@ -126,7 +134,7 @@ test('manifest de oficio: toda entrada apunta a un módulo real y a un mp3 en di
   assert.ok(existsSync(join(ROOT, RUTA_MANIFEST)), 'falta el manifest del oficio')
   const oficio = json(RUTA_MANIFEST)
   const tour = json('lib/entrenamiento/audio-manifest.json')
-  const validas = new Set(MODULOS_OFICIO.map((m) => `oficio/${m.id}`))
+  const validas = new Set(DIGITALES.map((m) => `oficio/${m.id}`))
   for (const [k, v] of Object.entries(oficio)) {
     assert.ok(validas.has(k), `clave huérfana en el manifest de oficio (módulo renombrado o borrado): ${k}`)
     assert.ok(v?.hash && v?.file, `${k}: entrada sin hash o sin archivo`)
@@ -138,7 +146,7 @@ test('manifest de oficio: toda entrada apunta a un módulo real y a un mp3 en di
 })
 
 // Se salta mientras el manifest esté vacío (locución pendiente de generar) y
-// pasa a exigir los 40 en cuanto exista el primer clip: una pista locutada a
+// pasa a exigir los 64 digitales en cuanto exista el primer clip: una pista locutada a
 // medias es peor que ninguna, porque el alumno no sabe cuáles tienen audio.
 const manifestOficio = existsSync(join(ROOT, RUTA_MANIFEST)) ? json(RUTA_MANIFEST) : {}
 test('manifest de oficio: un clip por módulo, sin dejar ninguno mudo', {
@@ -148,7 +156,7 @@ test('manifest de oficio: un clip por módulo, sin dejar ninguno mudo', {
 }, () => {
   assert.deepEqual(
     Object.keys(manifestOficio).sort(),
-    MODULOS_OFICIO.map((m) => `oficio/${m.id}`).sort(),
+    DIGITALES.map((m) => `oficio/${m.id}`).sort(),
     'faltan clips por generar: corre npm run entrenamiento:audio -- --solo oficio',
   )
 })

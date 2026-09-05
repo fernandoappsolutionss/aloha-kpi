@@ -22,6 +22,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { MODULOS_OFICIO } from '../lib/entrenamiento/oficio/catalogo.js'
+import { GUIA, GUIA_GENERAL } from '../lib/entrenamiento/oficio/guia.js'
 
 // ── Qué cuenta como texto visible ──────────────────────────────────────────
 // Se serializa el módulo entero menos las claves que la persona NO ve: ids,
@@ -47,7 +48,10 @@ function visiblesDe(modulo) {
 }
 
 const textoDe = (modulo) => visiblesDe(modulo).join('\n')
-const CORPUS = MODULOS_OFICIO.map(textoDe).join('\n')
+const textoGuiaDe = (modulo) => Object.values(GUIA[modulo.id] || {}).join('\n')
+const textoCompletoDe = (modulo) => [textoDe(modulo), textoGuiaDe(modulo)].filter(Boolean).join('\n')
+const TEXTO_GUIA_GENERAL = Object.values(GUIA_GENERAL).join('\n')
+const CORPUS = [...MODULOS_OFICIO.map(textoCompletoDe), TEXTO_GUIA_GENERAL].join('\n')
 
 // ── EXCEPCIONES DECLARADAS ─────────────────────────────────────────────────
 // Se descuentan ANTES de contar. Cada una lleva escrito por qué: quien quiera
@@ -79,7 +83,7 @@ const IMAGEN = /\b(mar|mares|olas?|remar|rema|remas|reman|remando|nadar|nades|na
 test('presupuesto de metáfora: 1 imagen marítima en los módulos de método, 0 en los operativos', () => {
   for (const m of MODULOS_OFICIO) {
     const cupo = /^of-met-/.test(m.id) ? 1 : 0
-    const hits = sinExcepciones(textoDe(m)).match(IMAGEN) || []
+    const hits = sinExcepciones(textoCompletoDe(m)).match(IMAGEN) || []
     assert.ok(
       hits.length <= cupo,
       `${m.id}: cupo ${cupo} imagen(es) marítima(s), encontradas ${hits.length} → ${hits.join(', ')}. ` +
@@ -87,6 +91,8 @@ test('presupuesto de metáfora: 1 imagen marítima en los módulos de método, 0
       'Un módulo de cobranza no lleva mar.',
     )
   }
+  const generales = sinExcepciones(TEXTO_GUIA_GENERAL).match(IMAGEN) || []
+  assert.deepEqual(generales, [], `GUIA_GENERAL no gasta metáforas marítimas: ${generales.join(', ')}`)
 })
 
 test('las cuatro líneas del brand kit aparecen UNA vez cada una en todo el corpus', () => {
@@ -128,8 +134,9 @@ test('lo que tiene dueño no entra: ni el nombre ni una variante', () => {
   }
   for (const [nombre, re] of Object.entries(CONDUEÑO)) {
     for (const m of MODULOS_OFICIO) {
-      assert.ok(!re.test(textoDe(m)), `${m.id}: usa "${nombre}", que tiene dueño y producto en OLAempresario`)
+      assert.ok(!re.test(textoCompletoDe(m)), `${m.id}: usa "${nombre}", que tiene dueño y producto en OLAempresario`)
     }
+    assert.ok(!re.test(TEXTO_GUIA_GENERAL), `GUIA_GENERAL usa "${nombre}", que tiene dueño y producto en OLAempresario`)
   }
 })
 
@@ -150,8 +157,9 @@ test('los títulos de maniobra solo usan "Maniobra N" o "Maniobra del puesto"', 
 test('nunca "la maniobra de <proceso operativo>"', () => {
   const PROCESOS = /maniobra de (la |el )?(cobranza|matr[ií]cula|n[oó]mina|facturaci[oó]n|inscripci[oó]n|retiro|caja|pago|cierre)\b/i
   for (const m of MODULOS_OFICIO) {
-    assert.ok(!PROCESOS.test(textoDe(m)), `${m.id}: "maniobra de <proceso>" está prohibido; "maniobra" nombra el ejercicio`)
+    assert.ok(!PROCESOS.test(textoCompletoDe(m)), `${m.id}: "maniobra de <proceso>" está prohibido; "maniobra" nombra el ejercicio`)
   }
+  assert.ok(!PROCESOS.test(TEXTO_GUIA_GENERAL), 'GUIA_GENERAL no debe convertir "maniobra" en proceso operativo')
 })
 
 // ── El assert que habría cazado la media traducción ────────────────────────
@@ -169,12 +177,15 @@ const VIEJO = {
   'Tecnología de Estudio': /tecnolog[ií]a de estudio/i,
 }
 
-test('no queda vocabulario viejo en el texto visible de los 40 módulos', () => {
+test('no queda vocabulario viejo en el texto visible ni en la guía hablada del oficio', () => {
   for (const m of MODULOS_OFICIO) {
-    const t = textoDe(m)
+    const t = textoCompletoDe(m)
     for (const [nombre, re] of Object.entries(VIEJO)) {
       assert.ok(!re.test(t), `${m.id}: todavía dice "${nombre}" donde la persona lo lee`)
     }
+  }
+  for (const [nombre, re] of Object.entries(VIEJO)) {
+    assert.ok(!re.test(TEXTO_GUIA_GENERAL), `GUIA_GENERAL todavía dice "${nombre}" donde la persona lo escucha`)
   }
 })
 
@@ -242,7 +253,7 @@ test('los rótulos de pantalla tampoco arrastran vocabulario viejo', () => {
     for (const [nombre, re] of Object.entries(VIEJO)) {
       assert.ok(
         !re.test(frases),
-        `${ruta}: un string visible todavía dice "${nombre}". La persona lee "maniobra" en 40 módulos ` +
+        `${ruta}: un string visible todavía dice "${nombre}". La persona lee "maniobra" en los módulos ` +
         'y no puede encontrarse "drill" en el mensaje de la firma.',
       )
     }
