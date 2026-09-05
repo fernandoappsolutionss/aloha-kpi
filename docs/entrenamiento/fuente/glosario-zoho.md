@@ -1,8 +1,8 @@
 # Glosario Zoho y Administración — ALOHA
-**Curso 2 · Zoho Books para Asistentes Administrativas · Entrenamiento en Cubierta**
+**Curso 2 · Zoho Books para Asistentes Administrativas · Entrenamiento a Bordo**
 > Este glosario es el **primer paso** del entrenamiento, no un anexo del final.
 >
-> En el Entrenamiento en Cubierta la barrera más grande del aprendizaje es la **palabra sin aclarar**: cuando
+> En el Entrenamiento a Bordo la barrera más grande del aprendizaje es la **palabra sin aclarar**: cuando
 > lees o escuchas una palabra cuyo significado no comprendes del todo, te quedas en blanco inmediatamente
 > después, y a partir de ahí no recuerdas ni entiendes nada de lo que siga.
 >
@@ -17,7 +17,7 @@
 
 **73 términos.** Los ejemplos salen del Zoho real de los Centros.
 
-> **Vocabulario.** Las palabras del método se renombraron con el Entrenamiento en Cubierta: *hat* es
+> **Vocabulario.** Las palabras del método se renombraron con el Entrenamiento a Bordo: *hat* es
 > ahora **tu puesto**, *drill* es **maniobra**, *masa* es **lo que va a la vista**, *checksheet*
 > es **tu plan**, *gradiente* es **el orden**, *PFV* es **tu producto** y el *Oficial de
 > Entrenamiento* es **tu jefe entrenador**. La tabla completa, con lo que NO cambió y las

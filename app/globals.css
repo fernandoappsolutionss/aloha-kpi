@@ -2045,3 +2045,166 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
      baja al pie de la página impresa sin que un redondeo empuje una segunda. */
   .sop-hoja { width: auto; min-height: 262mm; margin: 0; padding: 0; border: 0; border-top: 0; box-shadow: none; }
 }
+
+/* ---------------------------------------------------------------- */
+/*  Semáforo del producto valioso                                    */
+/*  Lo pinta SÓLO Producto (las 3 metas de resultado + el            */
+/*  crecimiento real). Disciplina nunca entra aquí ni se promedia.   */
+/*  El color no es el único portador: la banda lleva forma (▲ ◆ ●) y */
+/*  la palabra del estado, para daltónicos y para blanco y negro.    */
+/* ---------------------------------------------------------------- */
+.semaforo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 18px;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  border-left: 10px solid var(--semaforo-linea, var(--border-strong));
+  border-radius: var(--r);
+  background: var(--semaforo-fondo, var(--surface-1));
+}
+.semaforo--rojo     { --semaforo-linea: var(--bad);  --semaforo-fondo: var(--bad-bg);  --semaforo-tinta: var(--bad-text); }
+.semaforo--amarillo { --semaforo-linea: var(--warn); --semaforo-fondo: var(--warn-bg); --semaforo-tinta: var(--warn-text); }
+.semaforo--verde    { --semaforo-linea: var(--ok);   --semaforo-fondo: var(--ok-bg);   --semaforo-tinta: var(--ok-text); }
+
+/* Marca de estado: forma + palabra. Sin ella el color quedaría solo. */
+.semaforo__marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 104px;
+  padding: 10px 12px;
+  border: 2px solid var(--semaforo-linea);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--semaforo-tinta);
+  text-align: center;
+}
+.semaforo__forma { font-size: 26px; line-height: 1; }
+.semaforo__estado {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.semaforo__cuerpo { flex: 1 1 320px; min-width: 0; }
+.semaforo__titulo {
+  margin: 6px 0 0;
+  font-family: var(--font-serif);
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.semaforo__motivo {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--semaforo-tinta);
+}
+
+/* Las 3 metas de resultado, con su número. Fallar una de estas es otra cosa
+   que no tener aromatizante: por eso viajan dentro del semáforo. */
+.semaforo__metas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.semaforo__meta {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  column-gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  font-size: 13px;
+}
+.semaforo__meta-marca { font-weight: 700; font-size: 15px; }
+.semaforo__meta--ok .semaforo__meta-marca { color: var(--ok-text); }
+.semaforo__meta--no .semaforo__meta-marca { color: var(--bad-text); }
+.semaforo__meta--nd .semaforo__meta-marca { color: var(--text-dim); }
+.semaforo__meta-nombre { color: var(--text); font-weight: 600; min-width: 0; }
+.semaforo__meta-valor { color: var(--text); font-size: 14px; white-space: nowrap; }
+.semaforo__meta--no .semaforo__meta-valor { color: var(--bad-text); }
+.semaforo__meta-objetivo { grid-column: 2 / -1; color: var(--text-dim); font-size: 12px; }
+
+.semaforo__tendencia {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: 0 1 168px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+}
+.semaforo__tendencia-valor {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--semaforo-tinta);
+}
+.semaforo__tendencia-pie { font-size: 13px; color: var(--text-dim); }
+
+@media screen and (max-width: 899px) {
+  .semaforo { gap: 12px; padding: 16px; }
+  .semaforo__marca { min-width: 0; flex: 1 1 100%; flex-direction: row; gap: 8px; }
+  .semaforo__titulo { font-size: 21px; }
+  .semaforo__tendencia { flex: 1 1 100%; }
+}
+
+/* ---------------------------------------------------------------- */
+/*  Disciplina operativa · marcador 2, SUBORDINADO                   */
+/*  Va deliberadamente más pequeño que el semáforo y sin barra de    */
+/*  color propia: un 100% de disciplina junto a un rojo es texto,    */
+/*  no un logro.                                                     */
+/* ---------------------------------------------------------------- */
+.disciplina { border-left: 4px solid var(--border-strong); }
+.disciplina__valor {
+  font-family: var(--font-serif);
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-muted);
+}
+.disciplina__denominador { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
+.disciplina__nota { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+.disciplina__grupo-peso {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+.disciplina__sin-registrar {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn-line);
+  border-left: 6px solid var(--warn);
+  border-radius: var(--r-sm);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 14px;
+  line-height: 1.5;
+}

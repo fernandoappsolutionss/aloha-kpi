@@ -19,18 +19,21 @@ const nivelTxt = (n) => (n ? `Nivel ${n}` : 'Sin nivel')
 function buildAlertas(centros, prevNivel, label) {
   const out = []
   for (const c of centros) {
-    // ── Cumplimiento (siempre se muestra, según su banda) ──
+    // ── PRODUCTO (siempre se muestra, según su semáforo) ──
+    // Antes esta rama salía del checklist de 33 criterios: un centro que
+    // decrecía emitía "Buen cumplimiento (88%)" en banda VERDE. El mensaje lo
+    // escribe ahora el propio semáforo, que ya trae el motivo con su número.
+    const s = c.semaforo
+    const motivo = s?.motivo || ''
     if (c.estado === 'Crítico') {
       out.push({ tipo:'critico', centro:c.nombre, fecha: label,
-        msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
+        msg:`${motivo} Ventas ${c.ventasQ}/${c.metaQ} y ${c.desercionReal} bajas reales en el periodo.` })
     } else if (c.estado === 'Parcial') {
       out.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
-        msg: c.nuevos < c.meta
-          ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para la meta.`
-          : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
+        msg:`${motivo}${c.ventasQ < c.metaQ ? ` Faltan ${c.metaQ - c.ventasQ} ventas para la meta.` : ''}` })
     } else {
       out.push({ tipo:'info', centro:c.nombre, fecha: label,
-        msg:`Buen cumplimiento (${c.cumpl}%), ${c.nuevos} nuevos ingresos${c.nivel ? ` · ${nivelTxt(c.nivel)}` : ''}.` })
+        msg:`${motivo}${c.nivel ? ` · ${nivelTxt(c.nivel)}` : ''}` })
     }
 
     // ── Críticas adicionales: bajada de nivel y niños por grupo ──

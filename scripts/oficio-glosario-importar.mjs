@@ -76,6 +76,20 @@ export const slugDe = (termino) => {
   const s = slugify(termino)
   return SLUG_FIJO[s] || s
 }
+// SLUG_FIJO se indexa por el slug que produce el TÉRMINO VISIBLE, así que
+// renombrar el término en el .md sin tocar este mapa hace desaparecer el slug
+// viejo en silencio: los módulos que lo piden se quedan sin definición. Ya
+// pasó una vez (el término se llamó "Puesto en cubierta" un rato y el slug
+// `hat` se evaporó). Esto lo convierte en un error de generación, aquí mismo.
+function verificarSlugsFijos(slugs) {
+  const faltan = [...new Set(Object.values(SLUG_FIJO))].filter((s) => !slugs.has(s))
+  if (faltan.length) {
+    throw new Error(
+      `SLUG_FIJO promete slugs que las fuentes ya no producen: ${faltan.join(', ')}.\n` +
+      'Cambió el término visible en el .md y no se actualizó la clave de SLUG_FIJO.',
+    )
+  }
+}
 
 export function parseGlosario(ruta) {
   const lineas = readFileSync(ruta, 'utf8').split('\n')
@@ -97,6 +111,12 @@ export function parseGlosario(ruta) {
       if ((m = p.match(/^\*\*Qué es[.:]\*\*\s*([\s\S]*)$/))) campos.que = m[1]
       else if ((m = p.match(/^\*\*Ejemplo[.:]\*\*\s*([\s\S]*)$/))) campos.ejemplo = m[1]
       else if ((m = p.match(/^\*\*No lo confundas con[.:]?\*\*[.:]?\s*([\s\S]*)$/))) campos.noConfundir = m[1]
+      // "También lo vas a ver escrito:" — el puente hacia la palabra vieja. Va
+      // con UN asterisco (cursiva), no con dos, así que caía en `libres` y se
+      // descartaba en silencio: la ficha prometía el puente y la pantalla no lo
+      // pintaba. Es el campo que le confirma a las 143 personas ya entrenadas
+      // que "Maniobra" y "drill" son la misma cosa.
+      else if ((m = p.match(/^\*También lo vas a ver escrito[.:]\*\s*([\s\S]*)$/))) campos.tambien = m[1]
       else if (/^\*\*[^*]+[.:]\*\*/.test(p)) continue // "Ojo:", "Qué haces:", …
       else libres.push(p)
     }
@@ -107,6 +127,7 @@ export function parseGlosario(ruta) {
       que: limpiar(campos.que),
       ejemplo: limpiar(campos.ejemplo),
       noConfundir: limpiar(campos.noConfundir, { negrita: true }),
+      tambien: limpiar(campos.tambien),
     }
   })
 }
@@ -240,7 +261,7 @@ export function construirGlosario() {
       if (pref[campo] === 'zoho' && deZoho) return deZoho
       return deBase || deZoho
     }
-    return { termino: base.termino, que: elegir('que'), ejemplo: elegir('ejemplo'), noConfundir: elegir('noConfundir') }
+    return { termino: base.termino, que: elegir('que'), ejemplo: elegir('ejemplo'), noConfundir: elegir('noConfundir'), tambien: elegir('tambien') }
   }
 
   for (const e of aloha) fuera.set(e.slug, mezclar(e, porSlugZoho.get(e.slug), e.slug))
@@ -256,6 +277,7 @@ export function construirGlosario() {
       que: e.que,
       ...(e.ejemplo ? { ejemplo: e.ejemplo } : {}),
       ...(e.noConfundir ? { noConfundir: e.noConfundir } : {}),
+      ...(e.tambien ? { tambien: e.tambien } : {}),
     }
   }
   return { salida, compartidos: aloha.filter((e) => porSlugZoho.has(e.slug)).map((e) => e.slug) }
@@ -265,6 +287,7 @@ const lit = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
 export function renderArchivo({ salida, compartidos }) {
   const slugs = Object.keys(salida)
+  verificarSlugsFijos(new Set(slugs))
   const cuerpo = slugs.map((slug) => {
     const e = salida[slug]
     const filas = [
@@ -274,6 +297,7 @@ export function renderArchivo({ salida, compartidos }) {
     ]
     if (e.ejemplo) filas.push(`    ejemplo: ${lit(e.ejemplo)},`)
     if (e.noConfundir) filas.push(`    noConfundir: ${lit(e.noConfundir)},`)
+    if (e.tambien) filas.push(`    tambien: ${lit(e.tambien)},`)
     return `  ${lit(slug)}: {\n${filas.join('\n')}\n  },`
   }).join('\n')
 
@@ -286,11 +310,14 @@ export function renderArchivo({ salida, compartidos }) {
 // definición, con la del Manual como canónica (la del curso rellena los huecos).
 // No se edita a mano: se corrige la fuente y se vuelve a generar.
 //
-// Forma: { slug: { termino, variantes, que, ejemplo?, noConfundir? } }
+// Forma: { slug: { termino, variantes, que, ejemplo?, noConfundir?, tambien? } }
 //   variantes  → para el auto-enlace de marcarTerminos(); respeta límites de
 //                palabra, así que "facturación" no dispara "factura".
 //   que        → texto plano; el renderer no interpreta markdown aquí.
 //   noConfundir→ único campo donde sobrevive **negrita** (el componente la limpia).
+//   tambien    → "También lo vas a ver escrito": la palabra vieja. Se PINTA, para
+//                que quien ya entrenó con el vocabulario anterior vea en la ficha
+//                que "Maniobra" y "drill" son la misma cosa.
 //
 // Los slugs son la clave con la que los módulos piden un término
 // (\`palabras\` y \`quiz[].repasa\`): renombrar uno deja la palabra sin definición.

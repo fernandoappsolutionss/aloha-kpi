@@ -110,7 +110,7 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
             <h2>El producto de este proceso</h2>
             {hoja.producto
               ? <p>{hoja.producto}</p>
-              : <Falta>Este módulo todavía no declara el producto de su puesto.</Falta>}
+              : <Falta>Este módulo todavía no declara el producto de este proceso.</Falta>}
           </section>
 
           <section className="sop-sec">
@@ -152,13 +152,13 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
                 <span className="sop-firma__linea" aria-hidden="true" />
                 <p>Jefe entrenador — nombre y firma{oficial ? ` (${oficial})` : ''}</p>
               </div>
-              <div className="sop-firma sop-firma--corta">
+              <div className="sop-firma">
                 <span className="sop-firma__linea" aria-hidden="true" />
                 <p>Fecha</p>
               </div>
             </div>
             <p className="sop-origen">
-              Entrenamiento en Cubierta · ALOHA · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
+              Entrenamiento a Bordo · ALOHA · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
               si el Manual cambia, se corrige el módulo y esta hoja se vuelve a imprimir.
             </p>
           </footer>

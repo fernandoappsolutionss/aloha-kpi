@@ -12,7 +12,7 @@ export default async function GlosarioPage({ params }) {
   const nombre = await getCentroNombre(id).catch(() => null)
 
   const terminos = Object.entries(GLOSARIO)
-    .map(([slug, g]) => ({ slug, termino: g.termino, variantes: g.variantes || [], que: g.que, ejemplo: g.ejemplo || '', noConfundir: g.noConfundir || '' }))
+    .map(([slug, g]) => ({ slug, termino: g.termino, variantes: g.variantes || [], que: g.que, ejemplo: g.ejemplo || '', noConfundir: g.noConfundir || '', tambien: g.tambien || '' }))
     .sort((a, b) => a.termino.localeCompare(b.termino, 'es'))
 
   return (

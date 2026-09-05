@@ -109,7 +109,7 @@ test('reportes: matrices tabs y formación conservan lectura e interacción loca
     const tabs=page.getByRole('tab')
     await tabs.first().focus();await page.keyboard.press('ArrowRight');await ready(page)
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected','true')
-    await expect(page.locator('.compliance-matrix')).toHaveCount(5)
+    await expect(page.locator('.compliance-matrix')).toHaveCount(3)
     for(const row of await page.locator('.compliance-matrix tbody tr').all()) {
       await expect(row.locator('th[scope=row]')).toHaveCount(1)
       await expect(row.getByRole('button')).toHaveCount(2)

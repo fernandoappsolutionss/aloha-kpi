@@ -2,11 +2,16 @@
 // Acciones del LINK DE COACH: autenticadas por el token del grupo (sin sesión).
 // El coach recibe /coach/<token> y ahí marca la asistencia de cada clase del
 // itinerario y lleva sus notas por niño (formato de la lista de Anclas Mall).
+// Al final del archivo, y claramente separada, vive la única acción de este
+// módulo que NO usa el token: la lectura de deserción por coach, para el equipo
+// del centro — esa pasa por requireCentroAccess como el resto del producto.
 import { sql, withTransaction, upsertWith } from '../../lib/db'
 import { horarioTextoDe } from '../../lib/modelo'
 import { hoyISO } from '../../lib/operaciones'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
 import { errorFechaAsistencia } from '../../lib/retiros.mjs'
+import { requireCentroAccess } from '../../lib/auth'
+import { alertasDeCoach, consultarDesercionPorCoach, ventanaTrimestre } from '../../lib/desercion-coach.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const ESTADOS = ['presente', 'ausente', 'justificada']
@@ -126,4 +131,18 @@ export async function guardarNotaCoach(token, estudianteId, nota) {
   const texto = String(nota ?? '').trim().slice(0, 2000) || null
   await sql`UPDATE estudiantes SET nota_coach = ${texto}, updated_at = ${new Date().toISOString()} WHERE id = ${estudianteId}`
   return { ok: true }
+}
+
+// ── Deserción por Coach (lectura autenticada por sesión, no por token) ──────
+// Fernando: "si al coach se le está saliendo mucha gente es una alerta para el
+// coach". Aquí no se juzga a nadie: se devuelve el dato, su brecha contra el
+// propio centro y el periodo. Los 4 candados contra el ruido y las frases viven
+// en lib/desercion-coach.mjs (puro, testeable sin base de datos).
+export async function getDesercionPorCoach(centroId, anio, trimestre) {
+  await requireCentroAccess(centroId)
+  const { mesDesde, mesHasta } = ventanaTrimestre(Number(trimestre))
+  const { filas, sinCoach } = await consultarDesercionPorCoach(sql, {
+    centroId: Number(centroId), anio: Number(anio), mesDesde, mesHasta,
+  })
+  return alertasDeCoach(filas, { anio: Number(anio), trimestre: Number(trimestre), sinCoach })
 }

@@ -9,6 +9,8 @@ import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo }
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { ninosDeclarados } from '../../lib/kpi-calc'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
+import { cobranzaDeclarada, evaluarProducto, semaforo, verdictoCrecimiento } from '../../lib/marcadores.mjs'
+import { calculateCentroGrowth } from '../../lib/growth/server'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -163,6 +165,31 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     cumpAgg[row.centro_id] = e
   }
 
+  // TENDENCIA REAL de cada centro. El panel del supervisor no puede seguir
+  // ordenando por el checklist: ANCLAS subía al podio con 88% mientras perdía
+  // 2,7 niños al mes. `persist:false` — el panel sólo LEE.
+  const rangoEsCorriente = (() => {
+    const [ay, am] = hoyISO().split('-').map(Number)
+    return toY === ay && toM === am
+  })()
+  const crecimientos = new Map()
+  await Promise.all(centros.map(async (centro) => {
+    if (!rangoEsCorriente) return
+    try {
+      const g = await calculateCentroGrowth(centro.id, { persist: false })
+      crecimientos.set(centro.id, {
+        net: g?.projection?.scenarios?.base?.monthlyNet ?? null,
+        confianza: g?.metrics?.confidence?.level ?? null,
+        graduadosMedianos: g?.metrics?.medians?.graduates ?? null,
+        retirosMedianos: g?.metrics?.medians?.withdrawals ?? null,
+        fallo: false,
+      })
+    } catch (e) {
+      console.error(`[dashboard] no se pudo calcular el crecimiento del centro ${centro.id}:`, e)
+      crecimientos.set(centro.id, { net: null, confianza: null, graduadosMedianos: null, retirosMedianos: null, fallo: true })
+    }
+  }))
+
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
   const metaDesMes = Number(metas?.meta_desercion_mes || 8) // % máximo de deserción mensual
   const metaCobMes = metas?.meta_cobranza_max || 1
@@ -183,9 +210,14 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       const nuevos = ws.reduce((s, w) => s + (w.ing_d1||0)+(w.ing_d2||0)+(w.ing_d3||0)+(w.ing_d4||0)+(w.ing_d5||0), 0)
       const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1||0)+(w.des_d2||0)+(w.des_d3||0)+(w.des_d4||0)+(w.des_d5||0), 0)
       const desercion = r?.retiros_operativos_mes ?? desercionSemanal
-      let cob = 0
-      if (ws.length) { const last = [...ws].sort((a, b) => b.semana - a.semana)[0]; cob = last.cob_d5||last.cob_d4||last.cob_d3||last.cob_d2||last.cob_d1||0 }
-      const has = ws.length > 0 || !!r
+      // Mismo criterio que el Resumen (lib/marcadores.mjs): el PEOR valor
+      // declarado del mes, y `null` cuando no se declaró ninguno. Antes se leía
+      // el último día de la última semana con una cadena `||` que se saltaba
+      // los ceros, así que un mes sin registrar puntuaba 0 = "sin vencidas".
+      const cob = cobranzaDeclarada(ws)
+      // Y `has` no puede salir de `ws.length`: la superposición viva fabrica 5
+      // filas vacías por mes, incluidos los meses que aún no han ocurrido.
+      const has = !!r || nuevos > 0 || desercionSemanal > 0 || cob !== null
       const balanceDeclarado = !!r && (r.balance_vivo === true || r.estado_mes === 'cerrado')
       // Encadenado: sin inicio guardado, el mes hereda el cierre del anterior.
       const ninosIni = balanceDeclarado && r.ninos_inicio_mes != null
@@ -196,12 +228,16 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
         ? Number(r.ninos_final_mes)
         : (r?.ninos_final_mes || 0) > 0 ? r.ninos_final_mes : Math.max(0, ninosIni + nuevosActivos - desercion)
       if (has) { cadena = ninosFinal; if ((r?.grupos_activos || 0) > 0) cadenaGrupos = r.grupos_activos }
-      const desPct = ninosIni > 0 ? (desercion / ninosIni) * 100 : (desercion > 0 ? 100 : 0)
-      const ok = nuevos >= metaNuevosMes && desPct <= metaDesMes && cob <= metaCobMes
+      // Deserción REAL (bajas − graduados) también aquí: graduarse es un logro
+      // y no puede tumbar la meta del mes en el panel del supervisor.
+      const graduadosMes = Number(r?.mot_graduado || 0)
+      const desRealMes = Math.max(0, desercion - graduadosMes)
+      const desPct = ninosIni > 0 ? (desRealMes / ninosIni) * 100 : (desRealMes > 0 ? 100 : 0)
+      const ok = has && nuevos >= metaNuevosMes && desPct <= metaDesMes && cob !== null && cob <= metaCobMes
       // Declarado = fila real del KPI (cierre o captura), NO la proyección viva
       // del mes abierto: esa no cuenta para los niños del panel.
       const declarado = !!r && r.balance_vivo !== true
-      return { nuevos, desercion, desPct, cob, ok, has, declarado, ninosInicio: ninosIni, ninosFinal, nuevosActivos, grupos: (r?.grupos_activos || 0) > 0 ? r.grupos_activos : cadenaGrupos }
+      return { year, month, nuevos, desercion, desPct, cob, ok, has, declarado, graduadosMes, ninosInicio: ninosIni, ninosFinal, nuevosActivos, grupos: (r?.grupos_activos || 0) > 0 ? r.grupos_activos : cadenaGrupos }
     })
     const totNuevos = months.reduce((s, m) => s + m.nuevos, 0)
     const totDes = months.reduce((s, m) => s + m.desercion, 0)
@@ -216,8 +252,42 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     const ag = cumpAgg[c.id]
+    // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
+    // deja de decidir el estado del centro: es soporte, no el producto.
     const cumpl = ag && ag.tot ? Math.round((ag.si / ag.tot) * 100) : 0
-    const estado = cumpl >= 85 ? 'Cumplido' : cumpl >= 70 ? 'Parcial' : 'Crítico'
+
+    // ── EL ESTADO LO PINTA PRODUCTO, igual que en la pantalla del centro ─────
+    // Aquí seguía intacto el bug original: `estado` salía de promediar los 33
+    // criterios y un 88% se declaraba "Cumplido" mientras el centro decrecía.
+    const producto = evaluarProducto({
+      meses: months.map((m) => ({
+        mesNum: m.month, anio: m.year,
+        ventas: m.nuevos, bajas: m.desercion, graduados: m.graduadosMes,
+        ninosInicio: m.ninosInicio,
+        cobranza: m.cob, cobranzaRegistrada: m.cob !== null,
+        tieneDatos: m.has,
+      })),
+      metas,
+    })
+    const cre = crecimientos.get(c.id) || { net: null, confianza: null, graduadosMedianos: null, retirosMedianos: null, fallo: false }
+    const semaforoCentro = semaforo({
+      metasFallidas: producto.metasFallidas,
+      metasQueFallan: producto.metasQueFallan,
+      crecimiento: verdictoCrecimiento(cre.net),
+      netMensual: cre.net,
+      confianza: cre.confianza,
+      sinDatos: producto.sinDatos,
+      registroCompleto: producto.registroCompleto,
+      mesesSinRegistrar: producto.mesesSinRegistrar,
+      mesesSinCobranza: producto.mesesSinCobranza,
+      graduadosMedianos: cre.graduadosMedianos,
+      retirosMedianos: cre.retirosMedianos,
+      crecimientoNoDisponible: cre.fallo,
+    })
+    // `estado` conserva el nombre por compatibilidad, pero ya NO sale del
+    // checklist: Cumplido = verde, Parcial = amarillo, Crítico = rojo.
+    const estado = semaforoCentro.color === 'verde' ? 'Cumplido'
+      : semaforoCentro.color === 'rojo' ? 'Crítico' : 'Parcial'
     let trend = '→'
     if (conDatos.length >= 2) {
       const a = conDatos[conDatos.length - 2].nuevos
@@ -237,7 +307,13 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
-      cobranza: last.cob <= metaCobMes ? 'Sí' : 'No', cumpl, metasCumpl, estado, trend,
+      cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
+      cumpl, disciplina: cumpl, metasCumpl, estado, trend,
+      semaforo: semaforoCentro,
+      metasFallidas: producto.metasFallidas,
+      ventasQ: producto.ventasQ, metaQ: producto.metaQ,
+      registroCompleto: producto.registroCompleto,
+      netMensual: cre.net,
       nivel, nivelEnCurso, sig, desOkActual,
       grupos, ninosGrupo, gpnBajo, metaGpn,
     }

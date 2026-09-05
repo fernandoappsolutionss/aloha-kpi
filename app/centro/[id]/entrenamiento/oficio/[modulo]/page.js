@@ -1,4 +1,4 @@
-// Un módulo de oficio, en el orden que manda el método (Entrenamiento en Cubierta):
+// Un módulo de oficio, en el orden que manda el método (Entrenamiento a Bordo):
 //   0. la portada  → objetivo, temario y qué actividades trae (con su restricción)
 //   1. a la vista  → qué tener delante antes de leer
 //   2. las palabras → lo que hay que entender para que el texto signifique algo
@@ -121,7 +121,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       {/* La portada de cada módulo nombra el método: no hay método nuevo, es la
           misma O·L·A aplicada a un puesto en vez de a un negocio. */}
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
-        Entrenamiento en Cubierta · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
+        Entrenamiento a Bordo · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
       </div>
       <h1 className="h-title">{m.titulo}</h1>
       {!esMio && esOficial && (

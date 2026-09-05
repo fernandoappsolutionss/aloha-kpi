@@ -31,3 +31,7 @@ scripts/out/
 /test-results/
 /tests/e2e/.auth/
 /artifacts/responsive-audit/
+
+# Scripts sueltos de verificación contra la base (evidencia local, no código):
+# abren producción y no deben viajar en un `git add -A`.
+scratch-*.mjs

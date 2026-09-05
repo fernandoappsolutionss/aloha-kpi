@@ -32,7 +32,7 @@ async function runAction(name, work) {
   }
 }
 
-// tour_visto_at en una fila de oficio = "lo estudió con la masa delante".
+// tour_visto_at en una fila de oficio = "lo estudió con todo a la vista".
 function aCamel(row) {
   return {
     tourVistoAt: row.tour_visto_at ? new Date(row.tour_visto_at).toISOString() : null,
@@ -41,7 +41,7 @@ function aCamel(row) {
     ultimoPuntaje: row.ultimo_puntaje == null ? null : Number(row.ultimo_puntaje),
     drillFirmadoAt: row.drill_firmado_at ? new Date(row.drill_firmado_at).toISOString() : null,
     drillFirmadoPor: row.drill_firmado_por
-      ? { id: Number(row.drill_firmado_por), nombre: row.firmante_nombre || 'Oficial de Entrenamiento' }
+      ? { id: Number(row.drill_firmado_por), nombre: row.firmante_nombre || 'Jefe entrenador' }
       : null,
   }
 }
@@ -60,8 +60,8 @@ async function progresoDeUsuario(usuarioId) {
   return out
 }
 
-// Quién le puede firmar el drill a esta persona, con nombre y apellido. Todo el
-// flujo se apoya en "pídele a tu Oficial de Entrenamiento que te lo tome": si el
+// Quién le puede firmar la maniobra a esta persona, con nombre y apellido. Todo
+// el flujo se apoya en "pídele a tu jefe entrenador que te la tome": si el
 // sistema no lo nombra, una asistente nueva no sabe a quién tocarle la puerta.
 // Devuelve solo el escalón MÁS CERCANO de OFICIAL_DE (a la asistente la firma su
 // administradora, no la gerencia) y como máximo tres nombres.
@@ -311,7 +311,7 @@ function comoFirmante(u) {
   return { id: Number(u.id), rol: u.rol, centroId: u.centro_id == null ? null : Number(u.centro_id), centros: u.centros || [] }
 }
 
-// El drill lo firma el Oficial de Entrenamiento (el jefe inmediato) después de
+// La maniobra la firma el jefe entrenador (el jefe inmediato) después de
 // tomárselo. El sistema no lo finge y nadie se firma solo: puedeFirmar() lo
 // decide y requireCurrentUser() relee rol y centro en la base.
 //
@@ -325,16 +325,16 @@ export async function firmarDrill(usuarioId, modulo) {
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
-    if ((m.drills || []).length === 0) return { error: 'Este módulo no tiene drill que firmar.' }
+    if ((m.drills || []).length === 0) return { error: 'Este módulo no tiene maniobra que firmar.' }
     const alumno = await alumnoDe(usuarioId)
     if (!alumno) return { error: 'Usuario inválido.' }
     if (!m.roles.includes(alumno.rol)) return { error: 'Ese módulo no es del puesto de esa persona.' }
-    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el Oficial de Entrenamiento de esa persona.' }
+    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
     // Firmar lo que no se estudió deja el checksheet diciendo "Drill firmado"
     // al lado de "Por estudiar". Por la UI no se llega, pero la action es
     // pública y el estado resultante es incoherente.
     const suyo = await progresoDeUsuario(alumno.id)
-    if (!estudiado(suyo[modulo])) return { error: 'Todavía no lo ha estudiado: no se le puede tomar el drill.' }
+    if (!estudiado(suyo[modulo])) return { error: 'Todavía no lo ha estudiado: no se le puede tomar la maniobra.' }
     await sql`
       INSERT INTO entrenamiento_progreso (usuario_id, modulo, drill_firmado_at, drill_firmado_por, updated_at)
       VALUES (${alumno.id}, ${modulo}, now(), ${firmante.id}, now())
@@ -353,7 +353,7 @@ export async function quitarFirmaDrill(usuarioId, modulo) {
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const alumno = await alumnoDe(usuarioId)
     if (!alumno) return { error: 'Usuario inválido.' }
-    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el Oficial de Entrenamiento de esa persona.' }
+    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
     await sql`
       UPDATE entrenamiento_progreso
       SET drill_firmado_at = NULL, drill_firmado_por = NULL, updated_at = now()
@@ -363,8 +363,8 @@ export async function quitarFirmaDrill(usuarioId, modulo) {
   })
 }
 
-// Cola del Oficial de Entrenamiento: quién tiene módulos ESTUDIADOS esperando
-// que le tomen el drill, y hace cuántos días.
+// Cola del jefe entrenador: quién tiene módulos ESTUDIADOS esperando
+// que le tomen la maniobra, y hace cuántos días.
 // → { rol, filas:[{ usuarioId, nombre, email, rol, centro, centroId, modulos:[…] }] }
 export async function colaFirmas(centroId = null) {
   return runAction('colaFirmas', async () => {

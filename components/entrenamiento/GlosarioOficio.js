@@ -51,6 +51,7 @@ export default function GlosarioOficio({ terminos }) {
                   <p>{t.que}</p>
                   {t.ejemplo && <p className="h-sub"><i>Ejemplo:</i> {t.ejemplo}</p>}
                   {t.noConfundir && <p className="h-sub"><i>No lo confundas</i> {String(t.noConfundir).replace(/\*\*/g, '')}</p>}
+                  {t.tambien && <p className="h-sub"><i>También lo vas a ver escrito:</i> {t.tambien}</p>}
                 </dd>
               </div>
             ))}

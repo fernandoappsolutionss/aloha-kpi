@@ -89,7 +89,7 @@ function Cuerpo({ drill, numero }) {
       {numero > 0 && <div className="label" style={{ marginTop: 14 }}>Maniobra {numero} de la lista</div>}
       <h3 className="ofi-sub" style={{ marginTop: numero > 0 ? 4 : 0 }}>{drill.titulo}</h3>
       {drill.proposito && <p className="ofi-p"><b>Para qué:</b> {drill.proposito}</p>}
-      {drill.gradiente && <div className="ofi-nota ofi-nota--ojo"><strong>El orden</strong><p>{drill.gradiente}</p></div>}
+      {drill.gradiente && <div className="ofi-nota ofi-nota--ojo"><strong>Antes de esta maniobra</strong><p>{drill.gradiente}</p></div>}
 
       {(drill.masa || []).length > 0 && (
         <>

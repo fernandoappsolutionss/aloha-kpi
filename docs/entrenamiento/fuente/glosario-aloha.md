@@ -20,7 +20,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 ## Cómo se llaman ahora las palabras del método
 
-El entrenamiento se llama **Entrenamiento en Cubierta**. No hay método nuevo: es la misma O·L·A
+El entrenamiento se llama **Entrenamiento a Bordo**. No hay método nuevo: es la misma O·L·A
 —Observar, Liderar, Avanzar— aplicada a un puesto en vez de a un negocio. Cambiaron los
 nombres; el procedimiento, no. Si mañana el Corporativo pide alinear con material propio, esto
 se revierte con un cambio de texto: los slugs, los ids de módulo y los nombres de campo del
@@ -28,7 +28,7 @@ código nunca se tocaron.
 
 | Antes | Ahora (forma corta · forma larga) |
 |---|---|
-| hat | tu puesto · tu puesto en cubierta |
+| hat | tu puesto · tu puesto a bordo |
 | estar hatted | tener tu puesto tomado |
 | hatting, entrenamiento en el puesto | tomar el puesto |
 | paquete de hat | el paquete del puesto |
@@ -39,7 +39,7 @@ código nunca se tocaron.
 | drill | maniobra |
 | oficial de entrenamiento | tu jefe entrenador |
 | checksheet | tu plan · tu plan de puesto |
-| el nombre del método anterior | el Entrenamiento en Cubierta · cómo se estudia en cubierta |
+| el nombre del método anterior | el Entrenamiento a Bordo · cómo se estudia a bordo |
 
 Las tres barreras del estudio se nombran por lo que le pasa a la persona: **estudiar a ciegas**
 (antes ausencia de masa), **entrar antes de tiempo** (antes gradiente excesivo) y la **palabra
@@ -1205,7 +1205,7 @@ cambio, no un descuido.
 
 **Ejemplo.** Si el grupo BG-K-02 cierra nivel en tres semanas, sus kits del nivel siguiente se piden ahora, no el día del cierre.
 
-### Puesto en cubierta
+### Puesto a bordo
 
 **Qué es.** Tu puesto, con todo lo que el puesto incluye: sus responsabilidades, sus tareas y el producto que entrega. Tener tu puesto tomado es saber con absoluta claridad qué te toca hacer y cómo sacar tu producto.
 

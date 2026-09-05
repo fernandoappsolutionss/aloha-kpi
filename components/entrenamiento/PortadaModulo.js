@@ -1,6 +1,6 @@
 // Portada del módulo: OBJETIVO, TEMAS y las ACTIVIDADES con su restricción —
 // la cabecera del Moodle de training.alohavenezuela.com, en clave del
-// Entrenamiento en Cubierta.
+// Entrenamiento a Bordo.
 //
 // Server Component a propósito: son títulos y estados, no hay nada que pulsar.
 // Así ni el temario ni el objetivo de los 40 módulos entran al bundle del
