@@ -51,6 +51,71 @@ test('R10 FODA confirma descartes y borrados mediante Dialog accesible',()=>{
   }
 })
 
+// PERMANENCIA DE LAS ALERTAS. Fernando: "la alerta debe mantenerse hasta que se
+// corrijan los datos, y la del coach también". Una alerta con botón de cerrar
+// está cerrada el primer día y nadie corrige nada; una que recuerda su descarte
+// en el navegador es lo mismo con más pasos. Las dos sólo pueden desaparecer
+// porque el dato que las levantó ya no está: eso se logra dibujándolas desde
+// una función pura sobre los datos y sin ningún estado de "visto".
+const sinComentarios = (texto) => texto.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+test('R10 las alertas de higiene y de coach no se pueden descartar', () => {
+  // Se miran los comentarios fuera: los dos archivos EXPLICAN esta regla en
+  // prosa, y un test que se rompe porque el código está bien documentado no
+  // vigila nada.
+  const codigo = (path) => sinComentarios(read(path))
+  for (const path of [
+    '../components/higiene/AlertaHigieneDatos.js',
+    '../components/coach/AlertaDesercionCoach.js',
+    // Las dos de discrepancia de metas faltaban en este bucle, y la frase de
+    // Fernando que este test cita ("la alerta debe mantenerse hasta que se
+    // corrijan los datos") era sobre ÉSAS. Hoy no tienen botón ni
+    // localStorage; sin esta línea, mañana podían tenerlos con los tests en
+    // verde.
+    '../components/AvisoDiscrepanciaMetas.js',
+    '../components/AvisoDiscrepanciaHistorico.js',
+  ]) {
+    const source = codigo(path)
+    assert.doesNotMatch(source, /localStorage|sessionStorage|document\.cookie/, `${path}: no puede recordar un descarte`)
+    assert.doesNotMatch(source, /<button/, `${path}: una alerta permanente no lleva control de cierre`)
+    assert.doesNotMatch(source, /descart|dismiss|ocultar|snooze/i, `${path}: sin afordancia de descarte`)
+  }
+
+  // El aviso pegado a cada meta vive dentro de la pantalla de Cumplimiento, que
+  // sí tiene botones (Guardar, pestañas, el checklist). Se aísla la función.
+  const pagina = sinComentarios(read('../app/centro/[id]/cumplimiento/page.js'))
+  const desde = pagina.indexOf('function AvisoDiscrepancia(')
+  assert.ok(desde > 0, 'la pantalla de Cumplimiento debe seguir dibujando el aviso de discrepancia')
+  const aviso = pagina.slice(desde, pagina.indexOf('\nfunction ', desde + 1))
+  assert.doesNotMatch(aviso, /localStorage|sessionStorage|document\.cookie/, 'AvisoDiscrepancia: no puede recordar un descarte')
+  assert.doesNotMatch(aviso, /<button/, 'AvisoDiscrepancia: sin control de cierre')
+  assert.doesNotMatch(aviso, /descart|dismiss|ocultar|snooze/i, 'AvisoDiscrepancia: sin afordancia de descarte')
+  // Y dice cómo se corrige: una alerta que no se puede descartar y no dice qué
+  // hacer es una condena, no un aviso.
+  assert.match(aviso, /Guardar/, 'AvisoDiscrepancia: tiene que decir cómo se corrige')
+})
+
+test('R10 el histórico de discrepancias no depende del trimestre seleccionado', () => {
+  // CAMBIAR DE TRIMESTRE NO PUEDE APAGAR LA ALERTA. El selector guarda el
+  // período en localStorage ('ts_period') y lo comparten Panel, Ranking,
+  // Reporte y la pantalla del centro: una alerta que sólo mira ese trimestre se
+  // apaga sin corregir un dato, que es un descarte persistente con otro nombre.
+  const historico = sinComentarios(read('../components/AvisoDiscrepanciaHistorico.js'))
+  assert.doesNotMatch(historico, /readStoredPeriod|getCurrentPeriod|period|quarter|trimestre=/i,
+    'el histórico no puede recibir ni leer un período')
+  assert.match(historico, /getDiscrepanciasHistoricas\(\)/, 'barre todos los trimestres, sin argumentos')
+
+  // Y la página lo monta SIEMPRE, fuera del `!loading && !error` del trimestre.
+  const alertas = sinComentarios(read('../app/dashboard/alertas/page.js'))
+  assert.match(alertas, /<AvisoDiscrepanciaHistorico \/>/, 'la página tiene que montarlo sin props')
+
+  // La lectura del trimestre ya no se traga en silencio: un fallo se ve
+  // distinto de "no hay nada".
+  assert.doesNotMatch(alertas, /getMetasMarcadasPanel\([^)]*\)\.catch\(\(\) => \[\]\)/,
+    'un catch que devuelve [] hace desaparecer la tarjeta sin decir nada')
+  assert.match(alertas, /errorMetas/, 'el fallo de lectura tiene que llegar a la pantalla')
+})
+
 test('R10 reportes conservan un main identificado y estados recuperables', () => {
   for (const path of ['cuadro','cumplimiento','foda','historial','entrenamiento','entrenamiento/[modulo]']) {
     const source = read(`../app/centro/[id]/${path}/page.js`)

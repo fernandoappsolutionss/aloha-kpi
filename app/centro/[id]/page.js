@@ -17,6 +17,7 @@ import GrowthBriefing from '../../../components/growth/GrowthBriefing'
 import SemaforoProducto, { SemaforoPill } from '../../../components/SemaforoProducto'
 import { evaluarProducto, mesesProducto, normalizarMetas, semaforo as calcularSemaforo, verdictoCrecimiento, dec1 } from '../../../lib/marcadores.mjs'
 import AlertaDesercionCoach from '../../../components/coach/AlertaDesercionCoach'
+import AlertaHigieneDatos from '../../../components/higiene/AlertaHigieneDatos'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
@@ -319,6 +320,14 @@ export default function CentroPage() {
             pidió Fernando. Se dibuja sola sólo si algún coach dispara los 4
             candados; sin alerta no ocupa espacio. */}
         <AlertaDesercionCoach centroId={id} anio={period.year} trimestre={period.quarter} />
+
+        {/* "Lo que falta por cargar" — la confianza baja bloquea el VERDE del
+            semáforo, y hasta ahora eso se veía como una etiqueta gris sin
+            salida. Esta lista dice qué falta, con nombre y número, y no se
+            puede descartar: se va sola cuando el dato está cargado. Recibe el
+            payload de crecimiento que la página ya tiene en memoria para no
+            volver a correr el motor. */}
+        <AlertaHigieneDatos centroId={id} growth={growth} />
 
         {/* El entrenamiento va DESPUÉS del semáforo y sin fondo verde: antes
             era la primera caja con color de la pantalla, y en un centro en rojo

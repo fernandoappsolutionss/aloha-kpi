@@ -3,7 +3,7 @@ import { sql } from '../../lib/db'
 import { alcancePanel, soloDeMisCentros } from '../../lib/alcance'
 import { getCurrentPeriod } from '../../lib/period'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
-import { CUMPLIMIENTO_KEYS } from '../../lib/checklist'
+import { disciplinaPct } from '../../lib/checklist'
 import { hoyISO } from '../../lib/operaciones'
 import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
@@ -155,14 +155,23 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
     WHERE t.anio BETWEEN ${fromY} AND ${toY}
   `
-  const cumpAgg = {}
+  // DISCIPLINA, y sólo disciplina. Este bucle recorría los 33
+  // CUMPLIMIENTO_KEYS, o sea metía las 3 metas de PRODUCTO dentro del marcador
+  // de Disciplina y además las pesaba todas igual. La pantalla del centro y el
+  // FODA usan `disciplinaPct` (30 criterios, ponderados), así que dos
+  // pantallas con la MISMA etiqueta "Disciplina" daban números distintos
+  // —ANCLAS 94% en el panel contra 100% en el centro, LOS NARANJOS hasta 8
+  // puntos de diferencia—. Peor: al corregir el histórico de las 3 metas, el
+  // número del panel habría bajado y el del centro no, así que la corrección
+  // habría parecido que dañó la Disciplina. Ahora las dos llaman a la misma
+  // función y las 3 columnas de meta no la mueven.
+  const cumpFilas = {}
   for (const row of cumpRows) {
     const calMonth = (row.trimestre - 1) * 3 + row.mes
     const v = row.anio * 100 + calMonth
     if (v < lo || v > hi) continue
-    const e = cumpAgg[row.centro_id] || { si: 0, tot: 0 }
-    for (const k of CUMPLIMIENTO_KEYS) { e.tot++; if (row[k] === 'si') e.si++ }
-    cumpAgg[row.centro_id] = e
+    if (!cumpFilas[row.centro_id]) cumpFilas[row.centro_id] = []
+    cumpFilas[row.centro_id].push(row)
   }
 
   // TENDENCIA REAL de cada centro. El panel del supervisor no puede seguir
@@ -251,10 +260,11 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const ninos = ninosDeclarados(months, prev?.ninos_final_mes)
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
-    const ag = cumpAgg[c.id]
     // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
-    // deja de decidir el estado del centro: es soporte, no el producto.
-    const cumpl = ag && ag.tot ? Math.round((ag.si / ag.tot) * 100) : 0
+    // deja de decidir el estado del centro: es soporte, no el producto. Un
+    // centro sin filas registradas no tiene porcentaje; se muestra 0 porque el
+    // panel promedia esta columna y un null la volvería NaN.
+    const cumpl = disciplinaPct(cumpFilas[c.id] || []).pct ?? 0
 
     // ── EL ESTADO LO PINTA PRODUCTO, igual que en la pantalla del centro ─────
     // Aquí seguía intacto el bug original: `estado` salía de promediar los 33
@@ -310,6 +320,11 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,
       semaforo: semaforoCentro,
+      // El verdicto CALCULADO de las 3 metas, tal cual, para que el panel
+      // pueda contrastarlo contra lo que hay GUARDADO en `cumplimiento`
+      // (lib/discrepancias-metas.mjs) sin recalcular nada por su cuenta: si el
+      // detector recalculara, habría tres fuentes en vez de dos.
+      producto: { sinDatos: producto.sinDatos, detalle: producto.detalle },
       metasFallidas: producto.metasFallidas,
       ventasQ: producto.ventasQ, metaQ: producto.metaQ,
       registroCompleto: producto.registroCompleto,

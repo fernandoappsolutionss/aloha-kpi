@@ -2208,3 +2208,257 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* ── LO GUARDADO CONTRA LO CALCULADO ────────────────────────────────────────
+   Aviso de que DOS FUENTES no coinciden, no de que alguien mintió: por eso va
+   en ámbar (aviso) y no en rojo (error), y por eso no existe un estilo de
+   botón de descarte — no hay botón. Se retira solo cuando las dos coincidan.
+   El color nunca informa solo: cada aviso trae el símbolo ⚠ y la frase con sus
+   números, para daltónicos, para el papel y para el lector de pantalla. */
+.discrepancia {
+  margin-top: 8px;
+  padding: 11px 14px;
+  border: 1px solid var(--warn-line);
+  border-left: 6px solid var(--warn);
+  border-radius: var(--r-sm);
+  background: var(--warn-bg);
+}
+.discrepancia__titulo { font-size: 14px; font-weight: 600; color: var(--warn-text); }
+.discrepancia__detalle { margin: 5px 0 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+.discrepancia__nota { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+
+.discrepancia-panel {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-left: 6px solid var(--warn);
+}
+.discrepancia-panel__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.discrepancia-panel__titular { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.discrepancia-panel__lista { list-style: none; margin: 14px 0 0; padding: 0; }
+.discrepancia-panel__centro { padding: 12px 0; border-top: 1px solid var(--border); }
+.discrepancia-panel__nombre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.discrepancia-panel__admin { font-family: var(--font-mono); font-size: 13px; font-weight: 400; color: var(--text-dim); }
+.discrepancia-panel__metas { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.discrepancia-panel__meta {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--warn-line);
+  border-radius: var(--r-sm);
+  background: var(--warn-bg);
+}
+.discrepancia-panel__meta-nombre { font-size: 13px; color: var(--warn-text); }
+.discrepancia-panel__meta-titulo { font-size: 13px; color: var(--text); }
+.discrepancia-panel__meta-detalle { font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+
+/* La acción: qué hacer para que el aviso se vaya. Sin esto era la única de las
+   tres alertas que decía el problema y se callaba el arreglo. */
+.discrepancia__accion { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+/* El encuadre va ANTES de los nombres propios: con el patrón en casi todos los
+   centros, un reparto junto a un nombre se lee como señalamiento personal. */
+.discrepancia-panel__marco {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--border-strong);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+/* Modo informativo: marcas guardadas que hoy NO se pueden contrastar. No es
+   una alerta —no se afirma nada de ellas— así que no lleva borde de aviso ni
+   píldora de alarma. */
+.discrepancia-panel--info { border-left-color: var(--border-strong); }
+.discrepancia-panel--info .pill {
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+.discrepancia-panel--info .pill .dot { background: var(--text-faint); }
+
+/* ── HISTÓRICO DE DISCREPANCIAS ─────────────────────────────────────────────
+   El bloque que no depende del selector de trimestre. Va arriba de todo en
+   Alertas y no se puede cerrar: no hay estilo de botón de descarte porque no
+   hay botón. */
+.discrepancia-historico {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-left: 6px solid var(--warn);
+}
+.discrepancia-historico__error {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.discrepancia-historico__cortes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 22px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.discrepancia-historico__corte h3 { margin: 0 0 8px; }
+.discrepancia-historico__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.discrepancia-historico__lista li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.discrepancia-historico__lista b { font-weight: 600; color: var(--text); }
+
+/* ── HIGIENE DE DATOS ───────────────────────────────────────────────────────
+   "Lo que falta por cargar en este centro". Vive bajo el semáforo y no se
+   puede cerrar: no hay estilo de botón de descarte porque no hay botón.
+   El color nunca informa solo — cada punto trae forma (▲ ◆ ·) y palabra. */
+.higiene {
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  /* 6px, no 10px: era el borde más grueso de la pantalla y competía en peso
+     con el semáforo, que es el que debe mandar. */
+  border-left: 6px solid var(--warn);
+  border-radius: var(--r);
+  background: var(--surface-1);
+}
+/* El borde decía ámbar aunque el contenido fuera rojo: en BRISAS quedaba una
+   barra ámbar gruesísima enmarcando puntos rojos, justo debajo del semáforo
+   rojo. El atributo ya lo emite el componente. */
+.higiene[data-higiene-bloqueantes]:not([data-higiene-bloqueantes="0"]) {
+  border-left-color: var(--bad);
+}
+/* Y cuando lo único que queda es trabajo de Dirección, la sección se calma:
+   la lista no puede llegar a cero (capacity_unverified la empuja siempre), así
+   que un centro impecable enmarcado en ámbar todos los días es papel tapiz. */
+.higiene--sereno { border-left-color: var(--border-strong); }
+.higiene__resumen { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--text); }
+.higiene__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+.higiene__head-texto { flex: 1 1 280px; min-width: 0; }
+.higiene__h {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.higiene__porque { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.higiene__aviso {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--bad-line);
+  border-radius: var(--r-sm);
+  background: var(--bad-bg);
+  color: var(--bad-text);
+  font-size: 13px;
+}
+.higiene__error { margin: 0 0 20px; font-size: 13px; color: var(--text-dim); }
+
+.higiene__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.higiene__punto {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--higiene-linea, var(--border-strong));
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.higiene__punto--bloquea { --higiene-linea: var(--bad); --higiene-tinta: var(--bad-text); background: var(--bad-bg); }
+.higiene__punto--suma    { --higiene-linea: var(--warn); --higiene-tinta: var(--warn-text); }
+.higiene__punto--ajeno   { --higiene-linea: var(--border-strong); --higiene-tinta: var(--text-dim); }
+.higiene__marca {
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--higiene-tinta, var(--text-dim));
+}
+.higiene__cuerpo { flex: 1 1 auto; min-width: 0; }
+.higiene__estado {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--higiene-tinta, var(--text-dim));
+}
+.higiene__titulo { margin: 3px 0 0; font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--text); }
+.higiene__accion { margin: 5px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+
+.higiene__items, .higiene__meses { list-style: none; margin: 9px 0 0; padding: 0; }
+.higiene__items li {
+  padding: 3px 0 3px 13px;
+  border-left: 2px solid var(--border-strong);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.higiene__meses { display: flex; flex-wrap: wrap; gap: 8px; }
+.higiene__mes, .higiene__ir {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.higiene__mes:hover, .higiene__ir:hover { border-color: var(--ts-green); color: var(--ok-text); }
+.higiene__mes:focus-visible, .higiene__ir:focus-visible { outline: 2px solid var(--ts-green); outline-offset: 2px; }
+.higiene__resto { margin-top: 8px; }
+.higiene__resto summary { cursor: pointer; font-size: 13px; color: var(--text-dim); }
+
+.higiene__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-top: 11px;
+}
+.higiene__ganancia {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--higiene-tinta, var(--text-dim));
+}
+.higiene__cierre { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+.higiene__nota { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-dim); }
+
+@media (max-width: 640px) {
+  .higiene { padding: 16px; border-left-width: 6px; }
+  .higiene__pie { flex-direction: column; align-items: flex-start; }
+}

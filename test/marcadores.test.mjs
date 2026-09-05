@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   evaluarProducto, mesesProducto, semaforo, verdictoCrecimiento, BANDA_CRECIMIENTO,
 } from '../lib/marcadores.mjs'
@@ -420,4 +421,28 @@ test('el VERDE es alcanzable: la rama R2 no es código muerto', () => {
   assert.equal(p.registroCompleto, true)
   const s = semaforo({ ...p, crecimiento: 'CRECE', netMensual: 2.5, confianza: 'high' })
   assert.equal(s.color, 'verde')
+})
+
+test('EL PANEL Y LA PANTALLA DEL CENTRO DICEN EL MISMO "Disciplina"', () => {
+  // El panel del supervisor calculaba su "Disciplina" recorriendo los 33
+  // CUMPLIMIENTO_KEYS a peso plano: metía las 3 metas de PRODUCTO dentro del
+  // marcador de Disciplina, mientras la pantalla del centro y el FODA usaban
+  // `disciplinaPct` (30 criterios, ponderados). Dos pantallas con la MISMA
+  // etiqueta y números distintos — ANCLAS 94% contra 100%, LOS NARANJOS hasta 8
+  // puntos. Y al corregir el histórico de las 3 metas, el número del panel iba
+  // a BAJAR y el del centro no: la corrección habría parecido un daño.
+  const fuente = readFileSync(new URL('../app/actions/dashboard.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(fuente, /for \(const k of CUMPLIMIENTO_KEYS\)/,
+    'el panel no puede volver a promediar los 33 a peso plano')
+  assert.match(fuente, /disciplinaPct\(cumpFilas\[c\.id\] \|\| \[\]\)\.pct/,
+    'el panel llama a la misma función que la pantalla del centro')
+
+  // Y la prueba de fondo: mover las 3 columnas de meta NO mueve la Disciplina.
+  const mes = Object.fromEntries(CUMPLIMIENTO_KEYS.map((k) => [k, 'si']))
+  const conMetasEnNo = { ...mes }
+  for (const k of PRODUCTO_KEYS) conMetasEnNo[k] = 'no'
+  assert.equal(disciplinaPct([mes]).pct, disciplinaPct([conMetasEnNo]).pct)
+  assert.equal(disciplinaPct([mes]).puntos, disciplinaPct([conMetasEnNo]).puntos)
+  // El promedio plano de los 33 sí se movía: por eso no puede ser "Disciplina".
+  assert.notEqual(cumplimientoPct([mes]), cumplimientoPct([conMetasEnNo]))
 })

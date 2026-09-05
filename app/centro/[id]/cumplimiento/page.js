@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
-import { loadCumplimiento, saveCumplimiento, getDisciplinaTrimestre } from '../../../actions/cumplimiento'
+import { loadCumplimiento, saveCumplimiento, getDisciplinaTrimestre, getMetasMarcadas } from '../../../actions/cumplimiento'
 import { getCentroNombre } from '../../../actions/centros'
 import { getCentroResumen } from '../../../actions/centro'
 import { getCentroGrowth } from '../../../actions/growth'
@@ -16,6 +16,7 @@ import {
 import {
   evaluarProducto, mesesProducto, normalizarMetas, semaforo as calcularSemaforo, verdictoCrecimiento, dec1,
 } from '../../../../lib/marcadores.mjs'
+import { CLAVES_PRODUCTO, compararMetas, discrepanciasPorClave, NOTA_NEUTRAL } from '../../../../lib/discrepancias-metas.mjs'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -23,6 +24,45 @@ const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','A
 // prellenados, así que la pantalla enseñaba un 88% de un mes que nadie había
 // registrado nunca. Ese era el número que daba la falsa confianza.
 const VACIO = Object.fromEntries(CUMPLIMIENTO_KEYS.map((k) => [k, 'no']))
+
+// AVISO DE DISCREPANCIA · pegado a la meta, no en una pantalla aparte.
+//
+// Se dibuja SÓLO cuando lo guardado en la base contradice el cálculo. No tiene
+// botón de descartar a propósito: descartarlo sería volver al punto de partida
+// (un valor que nadie ve y que sigue sumando en el panel del supervisor). Se
+// va solo cuando las dos fuentes coinciden.
+//
+// Lo lee la persona que marcó la casilla: dice qué guarda el registro, qué
+// dice el cálculo y con qué números. No dice que esté mal.
+//
+// Y DICE CÓMO SE ARREGLA. Era la única de las tres alertas sin acción: la de
+// higiene siempre trae `accion` + `donde` y la del coach cierra con "es un dato
+// para conversar y corregir". El arreglo existe y es trivial —volver a pulsar
+// Guardar hace que el servidor vuelva a derivar la meta desde la base y pise la
+// marca vieja (app/actions/cumplimiento.js)— pero ninguna pantalla lo decía.
+// Fernando pidió "debe corregirse, y el sistema lo debe detectar de forma
+// automática": la detección estaba; la corrección era un secreto. Y hay que
+// pulsar Guardar en CADA mes del trimestre, porque cada fila es un mes.
+function AvisoDiscrepancia({ d }) {
+  if (!d) return null
+  const varios = (d.meses || []).length > 1
+  return (
+    <div role="note" className="discrepancia">
+      <div className="discrepancia__titulo">
+        <span aria-hidden="true">⚠</span> {d.titulo}
+      </div>
+      <p className="discrepancia__detalle">{d.detalle}</p>
+      <p className="discrepancia__accion">
+        Para corregirlo, pulsa <b>Guardar</b> en este mes: el sistema vuelve a derivar la meta desde la base y
+        reemplaza la marca guardada.{' '}
+        {varios
+          ? `Cada fila es un mes, así que repítelo en las otras pestañas del trimestre (${d.nombresMeses}).`
+          : `Afecta a ${d.nombresMeses}: guarda en esa pestaña.`}
+      </p>
+      <p className="discrepancia__nota">{NOTA_NEUTRAL}</p>
+    </div>
+  )
+}
 
 function CumplePill({ cumple }) {
   if (cumple == null) {
@@ -64,6 +104,10 @@ export default function CumplimientoPage() {
   const [estado, setEstado] = useState(null)
   const [serie, setSerie] = useState([])
   const [disciplinaQ, setDisciplinaQ] = useState(null)
+  // Lo GUARDADO en las 3 metas de resultado, crudo de la base. Es la otra
+  // fuente de la comparación: `vals` no sirve porque loadCumplimiento
+  // normaliza NULL → 'no' y eso inventaría discrepancias que nadie marcó.
+  const [metasMarcadas, setMetasMarcadas] = useState([])
 
   // Al cambiar de trimestre/año se vuelve al primer mes y se recarga.
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p); setMes(1) }
@@ -88,12 +132,14 @@ export default function CumplimientoPage() {
   // sigue sirviendo para registrar el checklist.
   async function loadProducto() {
     if (!centroId) return
-    const [resumen, growth, disciplina] = await Promise.all([
+    const [resumen, growth, disciplina, marcadas] = await Promise.all([
       getCentroResumen(centroId, year, quarter).catch(() => null),
       getCentroGrowth(centroId).catch(() => null),
       getDisciplinaTrimestre(centroId, year, quarter).catch(() => null),
+      getMetasMarcadas(centroId, year, quarter).catch(() => []),
     ])
     setDisciplinaQ(disciplina || null)
+    setMetasMarcadas(marcadas || [])
     if (!resumen || resumen.error) { setProducto(null); setEstado(null); setSerie([]); return }
     // Misma normalización que el Resumen: Neon devuelve `numeric` como string.
     const metas = normalizarMetas(resumen.metas)
@@ -125,26 +171,27 @@ export default function CumplimientoPage() {
 
   function toggle(k, v) { setVals(prev => ({ ...prev, [k]: v })) }
 
-  // Las 3 claves de Producto se guardan CALCULADAS, no con el clic: siguen
-  // viviendo en la tabla para no romper el histórico, pero su valor lo decide
-  // la base. Si el cálculo no cargó, se conserva lo que ya había guardado.
-  // Sólo se escribe lo que de verdad se pudo juzgar: una meta NO evaluable
-  // (sin población base, sin cobranza declarada) no se guarda como 'no'.
-  const productoVals = producto && !producto.sinDatos ? Object.fromEntries([
-    ['meta_nuevos_ingresos', producto.P1],
-    ['meta_desercion', producto.P2],
-    ['meta_cobranza', producto.P3],
-  ].filter(([, v]) => v !== null).map(([k, v]) => [k, v ? 'si' : 'no'])) : null
-
+  // Las 3 claves de Producto ya NO viajan en el guardado. No es que la
+  // pantalla se porte bien: es que el servidor las ignora y las deriva él
+  // mismo (app/actions/cumplimiento.js). Mandarlas desde aquí sería sugerir
+  // que el cliente puede decidirlas, y es justo lo que se cerró.
   async function save() {
     if (!centroId) { setStatus('Modo demo — conéctate con cuenta real para guardar.'); return }
     setSaving(true); setStatus('')
     try {
-      const res = await saveCumplimiento(centroId, year, quarter, mes, { ...vals, ...(productoVals || {}) })
+      const res = await saveCumplimiento(centroId, year, quarter, mes, vals)
       if (res.error) throw new Error(res.error)
       setExiste(true)
-      setStatus('✅ Cumplimiento guardado correctamente.')
-      setTimeout(() => setStatus(''), 4000)
+      // LA SALVAGUARDA, CONECTADA. `metasEscritas` existe para que guardar no
+      // parezca que confirmó una meta que el sistema no pudo juzgar: si el
+      // cálculo falla o el trimestre no es evaluable, la marca vieja sobrevive
+      // intacta. La pantalla tiraba ese dato y mostraba un tick verde en el
+      // caso exacto que el servidor teme.
+      const escritas = (res.metasEscritas || []).length
+      setStatus(escritas === CLAVES_PRODUCTO.length
+        ? '✅ Guardado. Las 3 metas se recalcularon desde la base.'
+        : `✅ Guardado. Se recalcularon ${escritas} de ${CLAVES_PRODUCTO.length} metas; las otras quedaron como estaban porque todavía no se pueden juzgar.`)
+      setTimeout(() => setStatus(''), escritas === CLAVES_PRODUCTO.length ? 4000 : 8000)
       loadProducto()
       getDisciplinaTrimestre(centroId, year, quarter).then(setDisciplinaQ).catch(() => {})
     } catch (e) { setStatus('❌ Error: ' + e.message) }
@@ -166,6 +213,13 @@ export default function CumplimientoPage() {
     if (clave === 'meta_desercion') return `${nombreMes}: ${mesDeSerie.desReal} de ${mesDeSerie.ninosInicio} = ${dec1(mesDeSerie.desPct)}%`
     return `${nombreMes}: ${mesDeSerie.cobranza} vencidas`
   }
+
+  // ¿LO GUARDADO CONTRADICE LO CALCULADO?
+  // Se compara contra las filas del TRIMESTRE entero, no sólo contra el mes
+  // visible: el verdicto de Producto es trimestral, así que una marca vieja de
+  // otro mes seguiría escondida detrás de una pestaña.
+  const comparacion = compararMetas({ producto, filas: metasMarcadas, mesesDelTrimestre: qMonths })
+  const discrepancias = discrepanciasPorClave(comparacion)
 
   return (
     <div className="shell">
@@ -209,15 +263,18 @@ export default function CumplimientoPage() {
             {!producto && <p style={{ margin: 0, fontSize: 14, color: 'var(--text-dim)' }}>No se pudo calcular el producto del trimestre. El checklist de abajo sigue disponible.</p>}
             {producto && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {producto.detalle.map((d) => (
-                <div key={d.clave} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{CUMPLIMIENTO_LABELS[d.clave]}</div>
-                    <div className="label" style={{ fontSize: 13, marginTop: 3 }}>Meta {d.meta} · {detalleDelMes(d.clave) || 'sin datos del mes'}</div>
+                <div key={d.clave}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{CUMPLIMIENTO_LABELS[d.clave]}</div>
+                      <div className="label" style={{ fontSize: 13, marginTop: 3 }}>Meta {d.meta} · {detalleDelMes(d.clave) || 'sin datos del mes'}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span className="num" style={{ fontSize: 18, fontWeight: 600, color: d.cumple === false ? 'var(--bad-text)' : 'var(--text)' }}>{d.valor}</span>
+                      <CumplePill cumple={d.cumple} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span className="num" style={{ fontSize: 18, fontWeight: 600, color: d.cumple === false ? 'var(--bad-text)' : 'var(--text)' }}>{d.valor}</span>
-                    <CumplePill cumple={d.cumple} />
-                  </div>
+                  <AvisoDiscrepancia d={discrepancias[d.clave]} />
                 </div>
               ))}
             </div>}
@@ -225,6 +282,14 @@ export default function CumplimientoPage() {
               <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                 Trimestre: ventas {producto.ventasQ} de {producto.metaQ} · deserción real {producto.desRealQ} de {producto.bajasQ} bajas ({producto.graduadosQ} graduados, que no penalizan) ·
                 cobranza fuera de meta en {producto.cobranzaFuera} de {producto.mesesConDatos} {producto.mesesConDatos === 1 ? 'mes' : 'meses'} (meta ≤ {metaCobranza}, deserción &lt; {metaDesercion}%).
+              </p>
+            )}
+            {/* "No se puede saber" no es "no cumple": una meta sin datos para
+                juzgar se dice, no se corrige a la brava. */}
+            {comparacion.noVerificables.length > 0 && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                {comparacion.noVerificables.length === 1 ? 'Hay una meta con marca guardada que' : `Hay ${comparacion.noVerificables.length} metas con marca guardada que`} hoy no se {comparacion.noVerificables.length === 1 ? 'puede' : 'pueden'} contrastar:{' '}
+                {comparacion.noVerificables.map((n) => `${n.corta} (${n.motivo})`).join(' · ')}. Se conservan como están hasta que haya datos para juzgarlas.
               </p>
             )}
           </div>
