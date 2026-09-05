@@ -263,7 +263,7 @@ export async function responderQuizOficio(modulo, respuestas) {
       return { error: 'Este módulo todavía no tiene sus preguntas cargadas.' }
     }
     // El gradiente se comprueba en el SERVIDOR, ANTES de corregir: leer siempre
-    // se puede (HCA dice devuélvete, no te prohíbe avanzar), pero el quiz del
+    // se puede (el método dice devuélvete, no te prohíbe avanzar), pero el quiz del
     // módulo N exige el N−1 estudiado.
     const progreso = await progresoDeUsuario(u.id)
     if (!gradienteAbierto(m, progreso)) {

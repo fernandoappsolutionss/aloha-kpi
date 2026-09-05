@@ -64,7 +64,7 @@ export default function EntrenamientoPage() {
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Entrenamiento</div>
             <h1 className="h-title">Tu entrenamiento</h1>
             <p className="h-sub">
-              {nombre} · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su drill).
+              {nombre} · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).
             </p>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function EntrenamientoPage() {
                   <>
                     <p className="ent-start__description">
                       Completaste los recorridos y las preguntas de los {resumen.total} recorridos. Eso es la mitad:
-                      ahora sigue tu oficio, los módulos de tu puesto con su drill.
+                      ahora sigue tu oficio, los módulos de tu puesto con su maniobra.
                     </p>
                     <Link className="btn btn--primary ent-start__cta" href={`/centro/${id}/entrenamiento/oficio`}>Empezar mi oficio <span aria-hidden="true">→</span></Link>
                     <p className="ent-start__note"><Link className="tour-card__link" href={moduloHref(MODULOS[0].id)}>Repasar los recorridos del sistema</Link></p>
@@ -155,7 +155,7 @@ export default function EntrenamientoPage() {
 
         <div className="ent-resources">
           <h2>¿Necesitas ayuda con algo puntual?</h2>
-          <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema. Las dudas de tu oficio se aclaran en el glosario, dentro de tu hat.</p>
+          <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema. Las dudas de tu oficio se aclaran en el glosario, dentro de tu puesto.</p>
           <details className="panel ent-help">
             <summary><span>Errores frecuentes y cómo resolverlos</span></summary>
             <div className="ent-help__body">

@@ -16,7 +16,7 @@ import { CURSOS, moduloOficio } from '../../../../../../../lib/entrenamiento/ofi
 import { rolesQueFirma } from '../../../../../../../lib/entrenamiento/oficio/progreso'
 
 // Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
-// Administradora es la Oficial de Entrenamiento de la Asistente, así que
+// Administradora es la jefa entrenadora de la Asistente, así que
 // necesita la hoja de los procesos que le va a tomar; y gerencia, coordinador y
 // supervisor firman a la Administradora, así que pueden revisar el
 // entrenamiento entero aunque no se entrenen en él.
@@ -50,7 +50,7 @@ export default async function SopPage({ params, searchParams }) {
 
   if (oficio?.error) {
     return shell('error', <>
-      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
       <div className="alert alert--error" role="alert">{oficio.error}</div>
     </>)
   }
@@ -58,7 +58,7 @@ export default async function SopPage({ params, searchParams }) {
   const m = moduloOficio(moduloId)
   if (!m) {
     return shell('error', <>
-      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
       <div className="alert alert--error" role="alert">Este módulo no existe, así que no tiene procedimiento.</div>
     </>)
   }
@@ -69,11 +69,11 @@ export default async function SopPage({ params, searchParams }) {
   const cola = esMio ? '' : `?revisar=${rolPlan}`
   if (!esMio && !puedeLeerComoOficial(rol, m)) {
     return shell('error', <>
-      <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+      <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Procedimiento operativo</div>
         <h1 className="h-title">Este procedimiento no es de tu puesto</h1>
-        <p className="h-sub">&quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. Tu plan está en tu hat.</p>
+        <p className="h-sub">&quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. Tu plan está en tu puesto.</p>
       </div></div>
     </>)
   }

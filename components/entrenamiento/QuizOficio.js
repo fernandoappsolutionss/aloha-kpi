@@ -4,7 +4,7 @@
 // la prosa de los 40 módulos no entra al bundle del navegador.
 //
 // Nunca dice "módulo completado": aprobar el cuestionario es haberlo ESTUDIADO.
-// El hat lo cierra el Oficial de Entrenamiento cuando firma el drill.
+// El puesto lo cierra el jefe entrenador cuando firma la maniobra.
 import { useState } from 'react'
 import Link from 'next/link'
 import { responderQuizOficio } from '../../app/actions/entrenamiento-oficio'
@@ -90,7 +90,7 @@ export default function QuizOficio({ moduloId, preguntas, minimo, yaAprobado, ti
               <>
                 <div className="ent-pill ent-pill--ok">✓ {resultado.puntaje} de {total} · Estudiado</div>
                 <span className="h-sub" style={{ margin: 0 }}>
-                  {tieneDrill ? 'Falta que tu Oficial de Entrenamiento te tome el drill y lo firme.' : 'Este módulo no lleva drill: con esto queda cerrado.'}
+                  {tieneDrill ? 'Falta que tu jefe entrenador te tome la maniobra y la firme.' : 'Este módulo no lleva maniobra: con esto queda cerrado.'}
                 </span>
               </>
             ) : (

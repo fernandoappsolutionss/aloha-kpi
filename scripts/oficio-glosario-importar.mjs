@@ -1,5 +1,6 @@
-// Importador del GLOSARIO del oficio — la masa de la barrera de palabra
-// malentendida. Herramienta de desarrollo: NO corre en Vercel, no la importa la app.
+// Importador del GLOSARIO del oficio — lo que va a la vista de la barrera de
+// la palabra sin aclarar. Herramienta de desarrollo: NO corre en Vercel, no la
+// importa la app.
 //
 // Lee las dos fuentes congeladas en docs/entrenamiento/fuente/
 //   glosario-aloha.md  (186 términos, del Manual de Operaciones)
@@ -54,6 +55,28 @@ function limpiar(md, { negrita = false } = {}) {
 // Las dos usan `### Término` por entrada. El Manual marca el cuerpo con
 // "**Qué es.**"; el de Zoho abre con el párrafo suelto. Los dos usan
 // "**Ejemplo:**" / "**Ejemplo.**" y "**No lo confundas con**".
+// ── Slugs congelados: cambió el TÉRMINO VISIBLE, no la clave ───────────────
+// El vocabulario del método se renombró (Entrenamiento a Bordo): hat → puesto,
+// drill → maniobra, masa → lo que va a la vista, y así. El slug es la clave con
+// la que los módulos piden un término (`palabras`, `quiz[].repasa`) y el ancla
+// del glosario (#t-<slug>): renombrarlo dejaría nueve palabras sin definición y
+// rompería enlaces ya repartidos. Así que el término nuevo apunta al slug de
+// siempre. Mapa: slug que produciría el término nuevo → slug que se conserva.
+const SLUG_FIJO = {
+  'puesto-a-bordo': 'hat',
+  'producto-del-puesto': 'producto-final-valioso',
+  'lo-que-va-a-la-vista': 'masa',
+  'orden-de-los-pasos': 'gradiente',
+  maniobra: 'drill',
+  'plan-de-puesto': 'checksheet',
+  'jefe-entrenador': 'oficial-de-entrenamiento',
+  'palabra-sin-aclarar': 'palabra-malentendida',
+}
+export const slugDe = (termino) => {
+  const s = slugify(termino)
+  return SLUG_FIJO[s] || s
+}
+
 export function parseGlosario(ruta) {
   const lineas = readFileSync(ruta, 'utf8').split('\n')
   const entradas = []
@@ -80,7 +103,7 @@ export function parseGlosario(ruta) {
     if (!campos.que && libres.length) campos.que = libres[0]
     return {
       termino: e.termino,
-      slug: slugify(e.termino),
+      slug: slugDe(e.termino),
       que: limpiar(campos.que),
       ejemplo: limpiar(campos.ejemplo),
       noConfundir: limpiar(campos.noConfundir, { negrita: true }),
@@ -104,8 +127,8 @@ const PREFERENCIA = {
 // el genérico les pondría "-es", así que van a mano.
 const PLURAL_A_MANO = {
   // Préstamos del inglés: plural en -s.
-  hat: ['hats'], drill: ['drills'], kit: ['kits'], 'kit-de-reserva': ['kits de reserva'],
-  checksheet: ['checksheets'], coach: ['coaches'], 'coach-auxiliar': ['coaches auxiliares'],
+  kit: ['kits'], 'kit-de-reserva': ['kits de reserva'],
+  coach: ['coaches'], 'coach-auxiliar': ['coaches auxiliares'],
   'coach-de-planta': ['coaches de planta'], 'master-coach': ['master coaches'],
   'expediente-de-coach': ['expedientes de coach'], 'factura-de-servicio-del-coach': ['facturas de servicio del coach'],
   'mental-day': ['mental days'], 'test-de-velocidad': ['tests de velocidad'],
@@ -120,17 +143,46 @@ const PLURAL_A_MANO = {
   'class-dojo': ['classdojo'], 'calendario-y-asistencia': [],
   kids: [], 'tiny-tots': [], flashcards: [], orales: [], kinder: [],
   'aloha-mental-arithmetic': [],
+  // Vocabulario del método. El plural genérico no sirve aquí: "Orden de los
+  // pasos" daría "ordenes de los pasos" (sin tilde y pisando "orden de
+  // entrega"), y los que llevan "sin" o "entrenador" en el medio no pluralizan
+  // solos porque el genérico solo cruza preposiciones.
+  gradiente: [],
+  'palabra-malentendida': ['palabras sin aclarar'],
+  'oficial-de-entrenamiento': ['jefes entrenadores'],
 }
 // Abreviaturas y sinónimos que la gente usa en el Centro y en los módulos.
+//
+// LAS PALABRAS VIEJAS NO SE BORRAN. Los HTML congelados de
+// docs/entrenamiento/fuente/ y el Moodle anterior siguen diciendo "hat",
+// "drill" y "masa", y la gente ya entrenada también. Se conservan como
+// variantes para que el auto-enlace siga cazándolas: así el cambio de
+// vocabulario se vuelve navegable en vez de ruidoso.
+//
+// NADA DE FORMAS DE UNA PALABRA. 'puesto', 'producto', 'plan', 'orden' y
+// 'entrega' a secas están PROHIBIDAS como variante: marcarTerminos enlaza la
+// primera aparición del módulo y subrayaría "no se abandona el puesto de
+// trabajo", "el producto del kit" o "la orden de entrega firmada", que no
+// enseñan nada. Solo formas largas.
 const SINONIMOS = {
-  'producto-final-valioso': ['pfv'],
+  'producto-final-valioso': ['pfv', 'producto final valioso', 'productos finales valiosos', 'producto de tu puesto'],
+  // 'tu puesto' NO va: en of-met-1 caía sobre "aplicación en tu puesto de
+  // trabajo" y se gastaba ahí el único enlace del módulo, dejando sin marcar la
+  // frase que sí define. La forma larga "tu puesto a bordo" la caza 'puesto a
+  // bordo'.
+  hat: ['hat', 'hats'],
+  drill: ['drill', 'drills'],
+  masa: ['masa', 'masas'],
+  gradiente: ['gradiente', 'gradientes'],
+  checksheet: ['tu plan de puesto', 'checksheet', 'checksheets'],
+  'palabra-malentendida': ['palabra malentendida', 'palabras malentendidas'],
   // Las dos acepciones de "ciclo" se distinguen por una tilde, así que la
   // forma sin tilde tiene que apuntar a la misma tarjeta: si no, cae en
   // 'ciclo' (el del Programa) justo donde se habla de lo que el padre pagó.
   'ciclo-de-matricula': ['ciclo de matricula', 'ciclos de matricula'],
   // Como aparece escrito en el catálogo de Zoho y en la factura del padre.
   'primer-ciclo': ['1er ciclo'],
-  'oficial-de-entrenamiento': ['oficial de entrenamiento'],
+  'oficial-de-entrenamiento': ['oficial de entrenamiento', 'oficiales de entrenamiento'],
   'caja-menuda': ['caja chica'],
   'informe-de-antiguedad-de-saldos': ['antigüedad de saldos'],
   'ley-81-de-2019': ['ley 81'],
@@ -225,7 +277,7 @@ export function renderArchivo({ salida, compartidos }) {
     return `  ${lit(slug)}: {\n${filas.join('\n')}\n  },`
   }).join('\n')
 
-  return `// GLOSARIO del oficio — la masa de la barrera de palabra malentendida.
+  return `// GLOSARIO del oficio — lo que va a la vista de la barrera de la palabra sin aclarar.
 //
 // GENERADO por scripts/oficio-glosario-importar.mjs desde las fuentes
 // congeladas en docs/entrenamiento/fuente/: glosario-aloha.md (186 términos del
@@ -242,6 +294,10 @@ export function renderArchivo({ salida, compartidos }) {
 //
 // Los slugs son la clave con la que los módulos piden un término
 // (\`palabras\` y \`quiz[].repasa\`): renombrar uno deja la palabra sin definición.
+// Por eso los nueve términos del método conservan su slug viejo (hat, drill,
+// masa, gradiente, checksheet…) aunque en pantalla se llamen de otra forma, y
+// sus variantes siguen cazando la palabra antigua. El mapa está en
+// SLUG_FIJO, dentro del importador.
 export const GLOSARIO = {
 ${cuerpo}
 }

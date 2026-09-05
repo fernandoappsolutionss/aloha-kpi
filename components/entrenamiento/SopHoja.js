@@ -72,7 +72,7 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
 
       {desborda && (
         <p className="alert alert--warn sop-aviso" role="status">
-          Esta hoja no cabe en una página: se va a imprimir en dos. Avísale a tu Oficial de Entrenamiento
+          Esta hoja no cabe en una página: se va a imprimir en dos. Avísale a tu jefe entrenador
           para que recorte el procedimiento — un SOP de dos hojas no se usa.
         </p>
       )}
@@ -110,7 +110,7 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
             <h2>El producto de este proceso</h2>
             {hoja.producto
               ? <p>{hoja.producto}</p>
-              : <Falta>Este módulo todavía no declara su Producto Final Valioso.</Falta>}
+              : <Falta>Este módulo todavía no declara el producto de su puesto.</Falta>}
           </section>
 
           <section className="sop-sec">
@@ -150,7 +150,7 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
             <div className="sop-firmas">
               <div className="sop-firma">
                 <span className="sop-firma__linea" aria-hidden="true" />
-                <p>Oficial de Entrenamiento — nombre y firma{oficial ? ` (${oficial})` : ''}</p>
+                <p>Jefe entrenador — nombre y firma{oficial ? ` (${oficial})` : ''}</p>
               </div>
               <div className="sop-firma sop-firma--corta">
                 <span className="sop-firma__linea" aria-hidden="true" />
@@ -158,7 +158,7 @@ export default function SopHoja({ hoja, centro, curso, emision, oficial }) {
               </div>
             </div>
             <p className="sop-origen">
-              Del entrenamiento de oficio · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
+              Entrenamiento en Cubierta · ALOHA · {curso} · {hoja.codigo}. El contenido sale del Manual de Operaciones:
               si el Manual cambia, se corrige el módulo y esta hoja se vuelve a imprimir.
             </p>
           </footer>

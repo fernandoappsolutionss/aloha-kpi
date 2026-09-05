@@ -1,14 +1,14 @@
-// Un módulo de oficio, en el orden que manda el método (HCA):
+// Un módulo de oficio, en el orden que manda el método (Entrenamiento en Cubierta):
 //   0. la portada  → objetivo, temario y qué actividades trae (con su restricción)
-//   1. la masa     → qué tener delante antes de leer
+//   1. a la vista  → qué tener delante antes de leer
 //   2. las palabras → lo que hay que entender para que el texto signifique algo
 //   3. las láminas → la explicación en diapositivas, si el módulo las trae
 //   4. el contenido → con el glosario auto-enlazado
 //   5. las preguntas → comprobar que se estudió
-//   6. el drill    → lo toma y lo firma el Oficial de Entrenamiento
+//   6. la maniobra → te la toma y la firma tu jefe entrenador
 //
 // Server Component: la prosa se queda en el servidor. Las islas cliente
-// (masa, bloques, quiz, drill) reciben solo lo que pintan.
+// (a la vista, bloques, cuestionario, maniobra) reciben solo lo que pintan.
 import Link from 'next/link'
 import Sidebar from '../../../../../../components/Sidebar'
 import BloquesOficio from '../../../../../../components/entrenamiento/BloquesOficio'
@@ -30,14 +30,14 @@ import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, rolesQueFirma
 
 // Quien FIRMA un módulo puede LEERLO: necesita ver con qué va a evaluar. El
 // permiso sale de rolesQueFirma(), que es la regla real — la Administradora es
-// la Oficial de Entrenamiento de la Asistente, así que tiene que poder abrir
-// los 13 módulos de Zoho y el hat de la asistente para prepararse los drills.
+// la jefa entrenadora de la Asistente, así que tiene que poder abrir
+// los 13 módulos de Zoho y el puesto de la asistente para prepararse las maniobras.
 // No lo estudia ni lo responde: solo lee.
 const puedeLeerComoOficial = (rol, m) => rolesQueFirma(rol).some((r) => m.roles.includes(r))
 
 export default async function ModuloOficioPage({ params, searchParams }) {
   const { id, modulo: moduloId } = await params
-  // ?revisar=<rol> lo trae el checksheet de la REVISIÓN, para que el "volver" y
+  // ?revisar=<rol> lo trae el plan de la REVISIÓN, para que el "volver" y
   // el "siguiente" se queden dentro del plan que se está revisando. Es una
   // preferencia de vista: abajo solo se acepta si el rol pedido es uno de los
   // del módulo, y quién puede leerlo lo sigue decidiendo cargarOficio().
@@ -54,7 +54,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       <main className="main ent-page" id="main-content" data-page-state={estado}>{contenido}</main>
     </div>
   )
-  const volverAlHat = <Link className="tour-card__link" href={base}>← Volver a mi hat</Link>
+  const volverAlHat = <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
 
   if (oficio?.error) return shell('error', <>{volverAlHat}<div className="alert alert--error" role="alert">{oficio.error}</div></>)
 
@@ -72,7 +72,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
         <h1 className="h-title">Este módulo no es de tu puesto</h1>
         <p className="h-sub">
           &quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. No cuenta para tu avance ni te lo van a pedir.
-          Tu plan está en tu hat.
+          Tu plan está en tu puesto.
         </p>
       </div></div>
     </>)
@@ -89,7 +89,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const rolPlan = esMio ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
   const plan = planDeRol(rolPlan, MODULOS_OFICIO)
   // Una sola raíz para las frases de bloqueo de las tres pantallas: la portada y
-  // la masa hablan de MARCAR el módulo, el cuestionario de RESPONDERLO, que es
+  // lo que va a la vista hablan de MARCAR el módulo, el cuestionario de RESPONDERLO, que es
   // exactamente lo que contesta el servidor en cada caso (marcarEstudiado y
   // responderQuizOficio). Escribirlas aparte es como se desincronizan.
   const bloqueo = (verbo) => anterior
@@ -118,19 +118,21 @@ export default async function ModuloOficioPage({ params, searchParams }) {
     {volver}
 
     <div className="main__head"><div>
+      {/* La portada de cada módulo nombra el método: no hay método nuevo, es la
+          misma O·L·A aplicada a un puesto en vez de a un negocio. */}
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
-        {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
+        Entrenamiento en Cubierta · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
       </div>
       <h1 className="h-title">{m.titulo}</h1>
       {!esMio && esOficial && (
         <div className="alert alert--warn" role="note">
-          Estás leyendo un módulo del puesto de {m.roles.join(' y ')} como Oficial de Entrenamiento. No cuenta para tu avance.
+          Estás leyendo un módulo del puesto de {m.roles.join(' y ')} como su jefe entrenador. No cuenta para tu avance.
         </div>
       )}
     </div></div>
 
-    {/* La portada va ANTES de la masa: la persona tiene que saber para qué es
-        este módulo y qué le van a pedir antes de ponerse a buscar cosas. */}
+    {/* La portada va ANTES de lo que va a la vista: la persona tiene que saber
+        para qué es este módulo y qué le van a pedir antes de buscar nada. */}
     <PortadaModulo
       objetivo={objetivoDe(m)}
       pfv={pfvAparte(m)}
@@ -232,13 +234,13 @@ export default async function ModuloOficioPage({ params, searchParams }) {
 
     <div className="ofi-nav">
       <Link className="btn" href={`${base}${cola}`}>
-        {esMio ? 'Volver a mi hat' : `Volver al plan de ${nombreDeRol(rolPlan)}`}
+        {esMio ? 'Volver a mi puesto' : `Volver al plan de ${nombreDeRol(rolPlan)}`}
       </Link>
       {/* LA HOJA DEL PROCESO. Existía la ruta, existían los 35 procedimientos
           escritos y no había un solo enlace: solo se llegaba escribiendo la URL.
           Se ofrece únicamente cuando el módulo declara `sop`: la derivación es la
           red de seguridad del módulo nuevo, no una hoja que se le proponga a
-          nadie (en método y hat imprimiría el temario bajo "Los pasos"). */}
+          nadie (en método y puesto imprimiría el temario bajo "Los pasos"). */}
       {m.sop && (
         <Link className="btn" href={`${base}/${m.id}/sop${cola}`}>Hoja del proceso (imprimible)</Link>
       )}

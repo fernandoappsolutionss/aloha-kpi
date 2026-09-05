@@ -1,9 +1,9 @@
 # Glosario Zoho y Administración — ALOHA
-**Curso 2 · Zoho Books para Asistentes Administrativas · Entrenamiento HCA**
+**Curso 2 · Zoho Books para Asistentes Administrativas · Entrenamiento en Cubierta**
 > Este glosario es el **primer paso** del entrenamiento, no un anexo del final.
 >
-> En la metodología HCA la barrera más grande del aprendizaje es la **palabra malentendida**: cuando lees
-> o escuchas una palabra cuyo significado no comprendes del todo, tu mente queda en blanco inmediatamente
+> En el Entrenamiento en Cubierta la barrera más grande del aprendizaje es la **palabra sin aclarar**: cuando
+> lees o escuchas una palabra cuyo significado no comprendes del todo, te quedas en blanco inmediatamente
 > después, y a partir de ahí no recuerdas ni entiendes nada de lo que siga.
 >
 > **Cómo se usa.** Antes de estudiar cada módulo, aclara las palabras de ese módulo. Y en cuanto sientas
@@ -11,11 +11,17 @@
 > justo antes del punto donde te perdiste. Búscala, léela y úsala en dos o tres frases tuyas hasta que el
 > concepto quede claro.
 >
-> **La masa.** Ninguna de estas palabras se estudia solo leyendo. Ten Zoho abierto en pantalla y busca en
+> **Lo que va a la vista.** Ninguna de estas palabras se estudia solo leyendo. Ten Zoho abierto en pantalla y busca en
 > el sistema lo que la definición menciona: el artículo, la cuenta, el botón. La palabra se entiende cuando
 > la ves.
 
 **73 términos.** Los ejemplos salen del Zoho real de los Centros.
+
+> **Vocabulario.** Las palabras del método se renombraron con el Entrenamiento en Cubierta: *hat* es
+> ahora **tu puesto**, *drill* es **maniobra**, *masa* es **lo que va a la vista**, *checksheet*
+> es **tu plan**, *gradiente* es **el orden**, *PFV* es **tu producto** y el *Oficial de
+> Entrenamiento* es **tu jefe entrenador**. La tabla completa, con lo que NO cambió y las
+> palabras quemadas, está en `glosario-aloha.md`.
 
 ---
 
@@ -47,7 +53,7 @@ Factura de proveedor · Gasto · Reembolso · Pago realizado · Planilla · Fact
 
 **Bloque 6 — Control, cuadre y auditoría**
 
-Cuentas por cobrar · Informe de antigüedad de saldos · Cuentas incobrables · Auditor · Observación de auditoría · Cuadrar · Cuadro de negocio · Deserción · Bitácora · Prima de producción · Producto final valioso
+Cuentas por cobrar · Informe de antigüedad de saldos · Cuentas incobrables · Auditor · Observación de auditoría · Cuadrar · Cuadro de negocio · Deserción · Bitácora · Prima de producción · Producto del puesto
 
 ---
 
@@ -639,11 +645,11 @@ Es el incentivo económico que se paga cuando se cumplen los parámetros del pue
 
 **Ojo:** Una recurrencia que no se detuvo a tiempo infla ese número con deuda que no existe, y te tumba la prima por un error administrativo, no por falta de cobranza.
 
-### Producto final valioso
+### Producto del puesto
 
-Es la cosa concreta, contable y de calidad que tu puesto le entrega al Centro. Si no puedes nombrarla, todavía no estás entrenada en tu puesto.
+Es la cosa concreta, contable y de calidad que tu puesto le entrega al Centro. Si no puedes nombrarla, todavía no tienes tu puesto tomado.
 
-**Ejemplo:** El de la asistente administrativa, en la redacción canónica del hat: **niños nuevos inscritos y facturados, y las cuentas del Centro cobradas al día — con los números que lo demuestran ya en manos del Administrador.** Es la misma frase de `hat-asistente.html`, y es la que se dice de memoria. No la parafrasees: las dos mitades (los niños nuevos y la cartera) son obligatorias, porque son las dos únicas cosas por las que la prima te paga.
+**Ejemplo:** El de la asistente administrativa, en la redacción canónica del puesto: **niños nuevos inscritos y facturados, y las cuentas del Centro cobradas al día — con los números que lo demuestran ya en manos del Administrador.** Es la misma frase de `hat-asistente.html`, y es la que se dice de memoria. No la parafrasees: las dos mitades (los niños nuevos y la cartera) son obligatorias, porque son las dos únicas cosas por las que la prima te paga.
 
 **Ojo:** Todo lo demás de este glosario existe para que ese producto salga completo.
 
@@ -651,7 +657,7 @@ Es la cosa concreta, contable y de calidad que tu puesto le entrega al Centro. S
 
 ## Prueba de que la palabra quedó clara
 
-No es un quiz. Es el drill con el que se cierra la aclaración de palabras, y se hace en voz alta:
+No es un cuestionario. Es la maniobra con la que se cierra la aclaración de palabras, y se hace en voz alta:
 
 1. **Dila con tus palabras.** Si tienes que recitar la definición de memoria, todavía no está clara.
 2. **Úsala en tres frases tuyas**, distintas al ejemplo, que hablen de tu centro y de tu semana.
@@ -663,12 +669,12 @@ devuélvete al término anterior del bloque, porque ahí está el hueco.
 
 ---
 
-## El cierre: tu producto final valioso
+## El cierre: el producto de tu puesto
 
 Un puesto se cierra nombrando lo que entrega. El de la asistente administrativa es:
 
 > **Niños nuevos inscritos y facturados, y las cuentas del Centro cobradas al día — con los números que lo demuestran ya en manos del Administrador.**
 
 Cada venta facturada en su propio centro, cada pago aplicado en su fecha real, cada egreso con su
-adjunto, y el informe de cuentas por cobrar al día. Si no puedes nombrarlo sin leerlo, todavía no estás
-entrenada en tu puesto.
+adjunto, y el informe de cuentas por cobrar al día. Si no puedes nombrarlo sin leerlo, todavía no tienes
+tu puesto tomado.

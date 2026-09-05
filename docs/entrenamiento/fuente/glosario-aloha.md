@@ -1,8 +1,8 @@
 # Glosario ALOHA — las palabras del Manual de Operaciones, aclaradas
 
-> **Por qué existe este glosario.** La palabra malentendida es la barrera más importante del
-> estudio: cuando alguien lee o escucha una palabra cuyo significado no comprende del todo, su
-> mente queda **en blanco** inmediatamente después, y de ahí en adelante no recuerda ni
+> **Por qué existe este glosario.** La palabra sin aclarar es la barrera más importante del
+> estudio: cuando alguien lee o escucha una palabra cuyo significado no comprende del todo, se
+> **queda en blanco** inmediatamente después, y de ahí en adelante no recuerda ni
 > comprende nada de lo que sigue. Es la causa principal de que la gente se aburra, abandone o
 > "no agarre" el entrenamiento. Por eso ningún módulo empieza con teoría: empieza aclarando
 > las palabras.
@@ -15,6 +15,51 @@
 real del centro; y, cuando dos términos se mezclan, *con qué no confundirlo*.
 
 Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
+
+---
+
+## Cómo se llaman ahora las palabras del método
+
+El entrenamiento se llama **Entrenamiento en Cubierta**. No hay método nuevo: es la misma O·L·A
+—Observar, Liderar, Avanzar— aplicada a un puesto en vez de a un negocio. Cambiaron los
+nombres; el procedimiento, no. Si mañana el Corporativo pide alinear con material propio, esto
+se revierte con un cambio de texto: los slugs, los ids de módulo y los nombres de campo del
+código nunca se tocaron.
+
+| Antes | Ahora (forma corta · forma larga) |
+|---|---|
+| hat | tu puesto · tu puesto en cubierta |
+| estar hatted | tener tu puesto tomado |
+| hatting, entrenamiento en el puesto | tomar el puesto |
+| paquete de hat | el paquete del puesto |
+| producto final valioso, PFV | tu producto · el producto de tu puesto |
+| masa | a la vista · lo que va a la vista |
+| gradiente | el orden |
+| palabra malentendida | palabra sin aclarar |
+| drill | maniobra |
+| oficial de entrenamiento | tu jefe entrenador |
+| checksheet | tu plan · tu plan de puesto |
+| el nombre del método anterior | el Entrenamiento en Cubierta · cómo se estudia en cubierta |
+
+Las tres barreras del estudio se nombran por lo que le pasa a la persona: **estudiar a ciegas**
+(antes ausencia de masa), **entrar antes de tiempo** (antes gradiente excesivo) y la **palabra
+sin aclarar** (antes palabra malentendida). Lo que deja la tercera se dice **quedarse en
+blanco**.
+
+**No cambian, a propósito:** *aclaración de palabras*, *demostración*, *el cuestionario* y *el
+Manual de Operaciones*. La demostración es a la vez un tipo de paso del plan y el cierre de
+nivel de ALOHA: es intocable.
+
+**Palabras quemadas — no se usan para nombrar nada nuevo**, porque ya significan otra cosa en
+el Manual o en el sistema: *bitácora* (libro de record del Centro y bitácora diaria del Coach),
+*escala · escalar · escalón* (prima, disciplina, nivel del niño, nivel del Centro y escalar el
+caso a la Administradora), *demostración*, *ruta* (Ruta de Nivel), *tramo* (cobranza),
+*prueba* (Clase de Prueba) y *entrega* (informes, fondo, orden de entrega).
+
+Cada entrada renombrada conserva su línea *«También lo vas a ver escrito»* con la palabra
+vieja: los HTML congelados de esta carpeta y el Moodle anterior siguen en vocabulario antiguo,
+y la gente ya entrenada dice "hat". Que la palabra vieja siga encontrándose es parte del
+cambio, no un descuido.
 
 ---
 
@@ -50,7 +95,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Qué es.** **El Manual no define esta palabra.** La nombra una sola vez, como función del Administrador de Centro ("búsqueda, planificación y ejecución de oportunidades de activaciones"), y no dice qué cuenta como activación, cuántas se esperan al mes ni con qué presupuesto.
 
-**Ejemplo.** **Qué haces:** no uses una definición propia. Pídele al Oficial de Entrenamiento que lleve la definición y la meta a la Junta Directiva; mientras no exista definición formal, esta función no tiene indicador y no se evalúa.
+**Ejemplo.** **Qué haces:** no uses una definición propia. Pídele a tu jefe entrenador que lleve la definición y la meta a la Junta Directiva; mientras no exista definición formal, esta función no tiene indicador y no se evalúa.
 
 ### Actividades cognitivas
 
@@ -238,12 +283,6 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** El niño con certificado de participación igual hace su presentación en el cierre de nivel con su grupo.
 
-### Checksheet
-
-**Qué es.** La hoja de pasos del entrenamiento del puesto: la lista ordenada de todo lo que hay que estudiar y hacer, en orden y sin saltar. Cada paso se firma con fecha cuando el Oficial de Entrenamiento lo vio hecho. En castellano de trabajo: la hoja de pasos.
-
-**Ejemplo.** Un checksheet no es una lista de lectura: es el plan de entrenamiento completo del puesto, y sin firma no hay paso.
-
 ### Ciclo
 
 **Qué es.** Una de las dos etapas en que está dividido cada itinerario del Programa. Ciclo 1: los niveles 1 al 4, igual en Tiny Tots y en Kids; ahí el niño aprende los fundamentos del cálculo con ábaco y de la aritmética mental. Ciclo 2: los niveles 5 al 10 en Tiny Tots y los niveles 5 al 8 en Kids; ahí se potencia la aritmética mental y se busca la estimulación máxima de las capacidades intelectuales. Por eso Tiny Tots tiene 10 niveles en total y Kids tiene 8. Fuente: la web oficial de la empresa, alohapanama.com/program.
@@ -298,7 +337,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Qué es.** **El Manual usa este nombre en un solo requisito** —para dar una Clase de Reforzamiento el niño no debe tener una Clase de Repaso inmediatamente después de la petición— y no la define en ninguna parte. En el resto del Manual la figura definida es el **día de repaso**: el día en que el niño trabaja con ábaco, libro y lápiz.
 
-**Ejemplo.** **Qué haces:** antes de rechazar o aprobar un reforzamiento por este requisito, pídele al Oficial de Entrenamiento que confirme con la Junta Directiva si "clase de repaso" es lo mismo que "día de repaso". No lo asumas: son dos nombres y hasta que alguien lo aclare, dos cosas distintas.
+**Ejemplo.** **Qué haces:** antes de rechazar o aprobar un reforzamiento por este requisito, pídele a tu jefe entrenador que confirme con la Junta Directiva si "clase de repaso" es lo mismo que "día de repaso". No lo asumas: son dos nombres y hasta que alguien lo aclare, dos cosas distintas.
 
 **No lo confundas con** la **clase de reposición**, que es otra cosa: la reposición es para el niño que faltó a contenido nuevo y cuesta B/.25.00.
 
@@ -548,12 +587,6 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** El Dojo Kun es el punto 2 de la estructura de clase, justo después del juego de entrada.
 
-### Drill
-
-**Qué es.** Hacer la acción de verdad, con la masa delante y con un caso real, hasta que sale bien. No es un quiz ni una explicación: se aprueba haciéndolo, y el criterio es el producto del drill.
-
-**Ejemplo.** El calendario armado en un drill tiene que ser un calendario que se pueda usar; la nómina verificada, una nómina que se pueda pagar. Si no sirve, el drill no está aprobado.
-
 ### Drive
 
 **Qué es.** La nube de Google donde viven los formatos compartidos del centro: Calendario y Asistencia, notas de exámenes, cuentas incobrables, planificaciones de los Coaches.
@@ -702,12 +735,6 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 ## G
 
-### Gradiente
-
-**Qué es.** El orden de los pasos, de menor a mayor dificultad, donde cada uno se apoya en el anterior ya dominado. Un gradiente excesivo es un salto: intentar algo sin haber dominado el paso previo indispensable. El síntoma es que la persona se confunde y se siente incapaz.
-
-**Ejemplo.** Regla clave: cuando alguien se atasca, la dificultad real no está en el paso donde se atascó, sino en uno anterior que no quedó asimilado. Se vuelve al último paso que sí entendió, no se repite el actual más fuerte.
-
 ### Graduación Tiny Tots
 
 **Qué es.** El cierre del itinerario Tiny Tots al terminar el nivel 10. El centro emite el certificado de culminación avalado por el corporativo y hace la ceremonia o entrega de diploma.
@@ -731,12 +758,6 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 **Ejemplo.** Un grupo mixto obliga al Coach a tener estrategias claras para dictar orales y juegos a dos niveles a la vez.
 
 ## H
-
-### Hat
-
-**Qué es.** El puesto, con todo lo que el puesto incluye: sus responsabilidades, sus tareas y el producto final valioso que entrega. "Estar hatted" es comprender con absoluta claridad qué debes hacer y cómo conseguir tu producto. En castellano de trabajo: tu sombrero, tu puesto.
-
-**Ejemplo.** Una persona entrenada en su hat se corrige sola y empuja por iniciativa propia; una que no lo está pregunta cada día lo que ya está escrito.
 
 ### Herramientas de no salida
 
@@ -816,6 +837,14 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 ## J
 
+### Jefe entrenador
+
+**Qué es.** Tu jefe inmediato en su papel de entrenador: designa la tarea, verifica que la sepas hacer y firma. No es un rol aparte ni una tarea extra: es en qué consiste el puesto de ejecutivo. Para el Asistente Administrativo, el jefe entrenador es el Administrador del Centro; para el Administrador, la Junta Directiva (con el Coordinador Operativo en los temas de personal).
+
+**Ejemplo.** No te suelta el área hasta estar completamente seguro de que la sabes hacer y de que lo probaste en la práctica.
+
+*También lo vas a ver escrito:* Oficial de Entrenamiento.
+
 ### Junta Directiva
 
 **Qué es.** El grupo de dueños y directivos de la empresa operadora de los centros. Es el jefe directo del Administrador, aprueba permisos, decide el programa de primas y recibe el FODA mensual.
@@ -894,6 +923,14 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** El material se revisa y se contabiliza el mismo día en que llega, contra la orden de entrega, porque después ya no se pueden formalizar las discrepancias.
 
+### Lo que va a la vista
+
+**Qué es.** El objeto real de lo que se estudia, o una representación razonable de él: el formato en la mano, el sistema abierto en pantalla, el salón, el kit, una foto o una demostración. Estudiar a ciegas produce dolor de cabeza, mareo y sensación de aplastamiento.
+
+**Ejemplo.** Leer "impresora fiscal" sin haber tocado nunca una es estudiar a ciegas: el remedio no es explicar más, es poner la impresora delante.
+
+*También lo vas a ver escrito:* masa.
+
 ## M
 
 ### Madurez cognitiva
@@ -908,11 +945,13 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** El formato de apertura de grupo se trabaja en Mailchimp, actualizando el enlace del contrato que corresponde a cada grupo.
 
-### Masa
+### Maniobra
 
-**Qué es.** El objeto real de lo que se estudia, o una representación razonable de él: el formato en la mano, el sistema abierto en pantalla, el salón, el kit, una foto o una demostración. Estudiar sin masa produce dolor de cabeza, mareo y sensación de aplastamiento.
+**Qué es.** Hacer la acción de verdad, con lo que va a la vista y con un caso real, hasta que sale bien. No es un cuestionario ni una explicación: se aprueba haciéndola, y el criterio es lo que la maniobra deja hecho.
 
-**Ejemplo.** Leer "impresora fiscal" sin haber tocado nunca una es ausencia de masa pura: el remedio no es explicar más, es poner la impresora delante.
+**Ejemplo.** El calendario armado en una maniobra tiene que ser un calendario que se pueda usar; la nómina verificada, una nómina que se pueda pagar. Si no sirve, la maniobra no está aprobada.
+
+*También lo vas a ver escrito:* drill.
 
 ### Master Coach
 
@@ -996,12 +1035,6 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 ## O
 
-### Oficial de Entrenamiento
-
-**Qué es.** Tu jefe inmediato en su papel de entrenador: designa la tarea, verifica que la sepas hacer y firma. No es un rol aparte ni una tarea extra: es en qué consiste el puesto de ejecutivo. Para el Asistente Administrativo, el Oficial de Entrenamiento es el Administrador del Centro; para el Administrador, la Junta Directiva (con el Coordinador Operativo en los temas de personal).
-
-**Ejemplo.** El Oficial no disminuye su control sobre un sector hasta estar completamente seguro de que la persona está capacitada y de que su potencial fue probado en la práctica.
-
 ### Oportunidad
 
 **Qué es.** En el FODA: algo de afuera del Centro que podrías aprovechar si actúas. Es externo: no lo controlas, pero puedes tomarlo.
@@ -1024,13 +1057,23 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** Los kits se revisan y cuentan el mismo día en que llegan, para poder reclamar cualquier discrepancia contra la orden de entrega.
 
+### Orden de los pasos
+
+**Qué es.** El orden: de menor a mayor dificultad, cada paso apoyado en el anterior ya dominado. Entrar antes de tiempo es saltarse uno, intentar algo sin haber dominado el paso previo indispensable. El síntoma es que la persona se confunde y se siente incapaz.
+
+**Ejemplo.** Regla clave: cuando alguien se atasca, la dificultad real no está en el paso donde se atascó, sino en uno anterior que no quedó asimilado. Se vuelve al último paso que sí entendió; no se repite el actual más fuerte.
+
+*También lo vas a ver escrito:* gradiente, gradiente excesivo.
+
 ## P
 
-### Palabra malentendida
+### Palabra sin aclarar
 
-**Qué es.** Una palabra cuyo significado no se comprendió del todo. La mente queda en blanco inmediatamente después, y de ahí en adelante no se recuerda ni se comprende nada de lo que sigue. Es la barrera más importante del estudio y la causa principal del aburrimiento, la deserción y el fracaso al aprender.
+**Qué es.** Una palabra cuyo significado no se comprendió del todo. Quien la pasó por encima se queda en blanco inmediatamente después, y de ahí en adelante no recuerda ni comprende nada de lo que sigue. Es la barrera más importante del estudio y la causa principal del aburrimiento, la deserción y el fracaso al aprender.
 
 **Ejemplo.** Cuidado con las palabras comunes y cortas: son las que más se dejan pasar. En este Manual las trampas suelen ser *paz y salvo*, *itinerario*, *cotejo* o *prima*, no los tecnicismos evidentes.
+
+*También lo vas a ver escrito:* palabra malentendida.
 
 ### Pasaporte de salida
 
@@ -1065,6 +1108,14 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 **Ejemplo.** Aunque no usa el uniforme oficial de ALOHA, el personal de aseo debe vestir de forma adecuada, limpia y en buen estado.
 
 *También lo vas a ver escrito:* personal de limpieza, personal de aseo.
+
+### Plan de puesto
+
+**Qué es.** Tu plan de puesto: la lista ordenada de todo lo que hay que estudiar y hacer para tomar el puesto, en orden y sin saltar. Cada paso lo firma con fecha tu jefe entrenador cuando lo vio hecho.
+
+**Ejemplo.** Un plan de puesto no es una lista de lectura: es el entrenamiento completo del puesto, y sin firma no hay paso.
+
+*También lo vas a ver escrito:* checksheet, hoja de pasos.
 
 ### Planilla
 
@@ -1126,13 +1177,15 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Ejemplo.** Primeros auxilios no es diagnosticar ni medicar: es contener la situación y avisar de una vez.
 
-### Producto final valioso
+### Producto del puesto
 
-**Qué es.** La cosa concreta, contable y de calidad que un puesto le entrega a la organización. Existe o no existe al final del mes. Si no se puede contar, no es el producto. Se abrevia PFV.
+**Qué es.** El producto de tu puesto: la cosa concreta, contable y de calidad que ese puesto le entrega a la organización. Existe o no existe al final del mes. Si no se puede contar, no es el producto.
 
 **Ejemplo.** Si el puesto desaparece y el producto sigue apareciendo, ese no era el producto del puesto.
 
 **No lo confundas con** una **lista de tareas**: "superviso, organizo, atiendo padres" son tareas; el producto es lo que queda entregado cuando esas tareas se hicieron bien.
+
+*También lo vas a ver escrito:* producto final valioso, PFV.
 
 ### Propuesta de servicio
 
@@ -1151,6 +1204,14 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 **Qué es.** Calcular por adelantado qué va a hacer falta y cuándo, para pedirlo a tiempo. Se hace por prioridad de fechas de Cierre de Nivel, y C&C Soluciones Integrales la solicita.
 
 **Ejemplo.** Si el grupo BG-K-02 cierra nivel en tres semanas, sus kits del nivel siguiente se piden ahora, no el día del cierre.
+
+### Puesto en cubierta
+
+**Qué es.** Tu puesto, con todo lo que el puesto incluye: sus responsabilidades, sus tareas y el producto que entrega. Tener tu puesto tomado es saber con absoluta claridad qué te toca hacer y cómo sacar tu producto.
+
+**Ejemplo.** Quien tiene su puesto tomado se corrige sola y empuja por iniciativa propia; quien no, pregunta cada día lo que ya está escrito.
+
+*También lo vas a ver escrito:* hat, estar hatted, tu sombrero.
 
 ### Puntaje cuantitativo
 
@@ -1354,7 +1415,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 **Qué es.** Que otra persona puede comprobarlo por su cuenta, señalando el documento del que salió. Un número verificable tiene detrás una factura, una lista firmada o un reporte del sistema.
 
-**Ejemplo.** En la demostración final del hat no puede haber un solo número que el alumno no pueda respaldar señalando el documento en pantalla.
+**Ejemplo.** En la demostración final del puesto no puede haber un solo número que el alumno no pueda respaldar señalando el documento en pantalla.
 
 ## Z
 

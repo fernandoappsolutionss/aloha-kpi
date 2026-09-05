@@ -212,11 +212,11 @@ test('el plan de cada rol es el suyo: la asistente no ve el curso del Centro ni 
   }
 })
 
-// ── 8. HCA EN LOS DATOS ───────────────────────────────────────────────────
+// ── 8. el método EN LOS DATOS ───────────────────────────────────────────────────
 const VERBO_VAGO = /\b(entiende|sabe|conoce|comprende)\b/i
 const VERBO_ACCION = /\b(hace|registra|explica|dice|arma|abre|llena|entrega|muestra|ejecuta|corrige|identifica|aplica|calcula|redacta|clasifica|ubica|anota|reporta|resuelve|demuestra|completa|revisa|firma|carga|emite|cierra|convierte|localiza|cita|responde|toma|coloca|verifica|separa|compara|prepara|actualiza|contacta|escribe|nombra|repite|simula|conduce|atiende)\b/i
 
-test('HCA: masa, palabras del glosario y drills con criterios observables', () => {
+test('método: lo que va a la vista, palabras del glosario y maniobras con criterios observables', () => {
   for (const m of MODULOS_OFICIO) {
     assert.ok(m.masa.length >= 1, `${m.id}: sin masa`)
     assert.ok(m.pfv && m.pfv.length > 10, `${m.id}: pfv vacío o de una palabra`)

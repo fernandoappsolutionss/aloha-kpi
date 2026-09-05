@@ -1,5 +1,5 @@
 'use client'
-// BARRERA 3 — PALABRA MALENTENDIDA. El glosario completo, buscable y agrupado
+// BARRERA 3 · O · OBSERVAR — LA PALABRA SIN ACLARAR. El glosario completo, buscable y agrupado
 // por letra. Recibe los términos por props desde la página (Server Component):
 // no importa lib/entrenamiento/oficio/glosario, así el archivo no entra al
 // bundle de ninguna otra ruta.
@@ -36,7 +36,7 @@ export default function GlosarioOficio({ terminos }) {
 
       {total === 0 && (
         <div className="card" style={{ padding: 24 }}>
-          <p className="h-sub" style={{ margin: 0 }}>Ninguna palabra coincide. Si la palabra que no entiendes no está aquí, anótala y pásasela a tu Oficial de Entrenamiento: el glosario se completa con lo que de verdad traba a la gente.</p>
+          <p className="h-sub" style={{ margin: 0 }}>Ninguna palabra coincide. Si la palabra que no entiendes no está aquí, anótala y pásasela a tu jefe entrenador: el glosario se completa con lo que de verdad traba a la gente.</p>
         </div>
       )}
 

@@ -9,8 +9,9 @@
 //
 // El campo `sop` del módulo es el ESCAPE, no la regla: cuando el frente de
 // contenido escriba el procedimiento a mano, gana sección por sección. Mientras
-// no exista, la hoja se deriva de lo que el módulo ya tiene (pfv, bloques
-// `pasos`, notas y drills), igual que el temario se deriva de los `sub`.
+// no exista, la hoja se deriva de lo que el módulo ya tiene (el producto del
+// puesto, bloques `pasos`, notas y maniobras), igual que el temario se deriva
+// de los `sub`.
 // ponytail: la derivación es un andamio honesto, no la meta. Cuando los 40
 // módulos declaren `sop`, esta función queda como red de seguridad para el
 // módulo nuevo que alguien agregue sin escribirlo. Si algún día estorba,
@@ -55,7 +56,7 @@ const bloques = (m, t) => (m?.bloques || []).filter((b) => b.t === t)
 const notas = (m, tono) => bloques(m, 'nota').filter((b) => b.tono === tono)
 
 // LOS PASOS. En orden de confianza: el bloque `pasos` del módulo (que es
-// literalmente el paso a paso del proceso) → los pasos del primer drill (que es
+// literalmente el paso a paso del proceso) → los pasos de la primera maniobra (que es
 // el proceso ejecutado de verdad) → la primera lista. Nunca se recorta el TEXTO
 // de un paso: ahí viven las cifras y los plazos del Manual. Se recorta el
 // NÚMERO de pasos, y se dice cuántos quedaron fuera.
@@ -79,7 +80,7 @@ function derivarDecide(m) {
   return [...reglas, ...escalan]
 }
 
-// ERRORES QUE CUESTAN. El `errorTipico` del drill es justo eso, escrito para
+// ERRORES QUE CUESTAN. El `errorTipico` de la maniobra es justo eso, escrito para
 // que se reconozca en el trabajo real. Se queda su primera oración: el resto
 // del párrafo explica cómo se delata, y eso es material de módulo, no de hoja.
 function derivarErrores(m) {

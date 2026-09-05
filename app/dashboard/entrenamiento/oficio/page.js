@@ -20,7 +20,7 @@ function Celda({ c }) {
   const color = c.hatted === c.total ? 'var(--ok)' : c.estudiados > 0 ? 'var(--warn)' : 'var(--text-dim)'
   return (
     <td style={{ textAlign: 'center', color, fontFamily: 'var(--font-mono)' }}
-      title={`${c.estudiados} de ${c.total} estudiados · ${c.hatted} con el drill firmado`}>
+      title={`${c.estudiados} de ${c.total} estudiados · ${c.hatted} con la maniobra firmada`}>
       {c.hatted} / {c.estudiados} / {c.total}
     </td>
   )
@@ -70,10 +70,10 @@ export default function EntrenamientoOficioAdminPage() {
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento de oficio</div>
-            <h1 className="h-title">Quién tiene su hat</h1>
+            <h1 className="h-title">Quién tiene su puesto tomado</h1>
             <p className="h-sub">
-              Cada celda: <b>firmados / estudiados / total</b>. Estudiado lo declara la persona con su quiz aprobado; firmado lo pone su Oficial de
-              Entrenamiento después de tomarle el drill. La columna <b>Cola de firmas</b> abre la pantalla donde se toma y se firma, en el centro de esa
+              Cada celda: <b>firmados / estudiados / total</b>. Estudiado lo declara la persona con su cuestionario aprobado; firmado lo pone su jefe
+              entrenador después de tomarle la maniobra. La columna <b>Cola de firmas</b> abre la pantalla donde se toma y se firma, en el centro de esa
               persona. <Link className="tour-card__link" href="/dashboard/entrenamiento">Ver el entrenamiento del sistema (los 9 recorridos)</Link>
             </p>
             {centroLectura && (
@@ -107,7 +107,7 @@ export default function EntrenamientoOficioAdminPage() {
                   <th>Persona</th><th>Puesto</th><th>Centro</th><th>Cola de firmas</th>
                   {data.cursos.map((c) => <th key={c.id} title={c.titulo} style={{ textAlign: 'center' }}>{c.titulo}</th>)}
                   <th style={{ textAlign: 'right' }}>Estudiado</th>
-                  <th style={{ textAlign: 'right' }}>Hat</th>
+                  <th style={{ textAlign: 'right' }}>Puesto tomado</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,12 +121,12 @@ export default function EntrenamientoOficioAdminPage() {
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
                     <td>{ROL[u.rol] || u.rol}</td>
                     <td>{u.centro}</td>
-                    {/* La única pantalla desde la que se firma un drill vive dentro
+                    {/* La única pantalla desde la que se firma una maniobra vive dentro
                         del centro. Desde /dashboard no había ninguna ruta hasta
                         ella: quien firma tenía que escribir la URL. */}
                     <td>
                       {u.centroId
-                        ? <Link className="tour-card__link" href={`/centro/${u.centroId}/entrenamiento/firmas`}>Tomar drill <span aria-hidden="true">→</span></Link>
+                        ? <Link className="tour-card__link" href={`/centro/${u.centroId}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
                         : <span style={{ color: 'var(--text-faint)' }}>sin centro</span>}
                     </td>
                     {data.cursos.map((c) => <Celda key={c.id} c={u.porCurso[c.id]} />)}

@@ -1,11 +1,11 @@
 'use client'
-// BARRERA 1 — AUSENCIA DE MASA. Antes de leer, la persona confirma que tiene
-// delante lo que el módulo necesita: el sistema abierto, el documento real, la
-// bitácora física. Estudiar sobre la nada no deja nada.
+// BARRERA 1 · O · OBSERVAR — ESTUDIAR A CIEGAS. Antes de leer, la persona
+// confirma que tiene delante lo que el módulo necesita: el sistema abierto, el
+// documento real, la bitácora física. Estudiar sobre la nada no deja nada.
 //
 // "Ya lo estudié" no se habilita hasta tildarlas todas. No es un candado
-// burocrático: es la primera barrera del método, y quien tilda sin tener la
-// masa se delata solo en el drill.
+// burocrático: es la primera barrera del método, y quien tilda sin tenerlo a la
+// vista se delata solo en la maniobra.
 import { useState } from 'react'
 import { marcarEstudiado } from '../../app/actions/entrenamiento-oficio'
 
@@ -28,9 +28,9 @@ export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, mot
   return (
     <section className="card ofi-masa" aria-labelledby="masa-titulo">
       <div className="label" style={{ marginBottom: 6 }}>Antes de leer</div>
-      <h2 id="masa-titulo" style={{ fontSize: 20, margin: '0 0 8px' }}>Ten esto delante</h2>
+      <h2 id="masa-titulo" style={{ fontSize: 20, margin: '0 0 8px' }}>Ten esto a la vista</h2>
       <p className="h-sub" style={{ marginTop: 0 }}>
-        Sin la cosa real delante, lo que leas se te va a olvidar. Búscalo primero y tíldalo.
+        Esto es lo que va a la vista antes de leer. Sin la cosa real delante, lo que leas se te olvida. Búscalo primero y tíldalo.
       </p>
       <ul className="ofi-masa__lista">
         {masa.map((m, i) => (
@@ -43,14 +43,14 @@ export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, mot
         ))}
       </ul>
       {error && <div className="alert alert--error" role="alert">{error}</div>}
-      {/* El gradiente lo vuelve a comprobar el servidor en marcarEstudiado: aquí
+      {/* El orden lo vuelve a comprobar el servidor en marcarEstudiado: aquí
           solo se evita ofrecer un botón que va a devolver error. */}
       {bloqueado && !listo && (
         <div className="alert alert--warn" role="note">{motivoBloqueo || 'Antes de marcar este módulo tienes que estudiar el anterior.'}</div>
       )}
       <div className="ofi-masa__acciones" aria-live="polite">
         {listo ? (
-          <span className="ent-pill ent-pill--ok">✓ Estudiado con la masa delante</span>
+          <span className="ent-pill ent-pill--ok">✓ Estudiado con todo a la vista</span>
         ) : bloqueado ? null : (
           <>
             <button className="btn btn--primary" onClick={declarar} disabled={!todos || guardando}>

@@ -1,4 +1,4 @@
-// Entrenamiento de OFICIO — la página del hat. Ruta hermana de los 9 tours:
+// Entrenamiento de OFICIO — la página de tu puesto. Ruta hermana de los 9 tours:
 // el segmento estático "oficio" gana sobre el dinámico [modulo], así que
 // app/centro/[id]/entrenamiento/[modulo]/page.js no se toca.
 //
@@ -65,8 +65,8 @@ export default async function OficioPage({ params, searchParams }) {
         <h1 className="h-title">{elegido ? `Plan de ${elegido.rolNombre}` : 'Revisa el entrenamiento de tu gente'}</h1>
         <p className="h-sub">
           {elegido
-            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: puedes leer cada módulo completo, pero no acumulas progreso, no respondes el cuestionario y la firma del drill se pone en la cola de firmas, después de tomárselo a la persona.</>
-            : <>Como {rolNombre || rol} tú no te entrenas en estos planes: los firmas. Ábrelos en modo lectura para prepararte los drills, revisar qué se está enseñando o corregir un módulo.</>}
+            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: puedes leer cada módulo completo, pero no acumulas progreso, no respondes el cuestionario y la firma de la maniobra se pone en la cola de firmas, después de tomársela a la persona.</>
+            : <>Como {rolNombre || rol} tú no te entrenas en estos planes: los firmas. Ábrelos en modo lectura para prepararte las maniobras, revisar qué se está enseñando o corregir un módulo.</>}
         </p>
       </div></div>
     )
@@ -81,7 +81,7 @@ export default async function OficioPage({ params, searchParams }) {
             {revision.map((r) => (
               <li key={r.rol}>
                 <span className="label">{r.rolNombre}</span>
-                <strong>{r.total} módulos · {r.minutos >= 60 ? `${Math.round(r.minutos / 60)} h` : `${r.minutos} min`} · {r.conDrill} con drill</strong>
+                <strong>{r.total} módulos · {r.minutos >= 60 ? `${Math.round(r.minutos / 60)} h` : `${r.minutos} min`} · {r.conDrill} con maniobra</strong>
                 <span className="ent-pill">{r.cursos.map((c) => c.titulo).join(' · ')}</span>
                 <Link className="btn btn--primary" href={`${base}?revisar=${r.rol}`}>Revisar este plan <span aria-hidden="true">→</span></Link>
               </li>
@@ -91,7 +91,7 @@ export default async function OficioPage({ params, searchParams }) {
         <div className="ofi-nav">
           <Link className="btn" href={`${base}/glosario`}>Glosario de términos</Link>
           <Link className="btn" href={`/centro/${id}/entrenamiento/firmas`}>Firmas pendientes</Link>
-          {veMatriz && <Link className="btn" href="/dashboard/entrenamiento/oficio">Quién tiene su hat</Link>}
+          {veMatriz && <Link className="btn" href="/dashboard/entrenamiento/oficio">Quién tiene su puesto tomado</Link>}
         </div>
       </>)
     }
@@ -105,7 +105,7 @@ export default async function OficioPage({ params, searchParams }) {
       </div>
       <section className="ofi-checksheet" aria-labelledby="revision-checksheet">
         <h2 id="revision-checksheet">Los {suPlan.length} módulos, en orden</h2>
-        <p className="h-sub">El orden no es decorativo: cada módulo abre con el anterior estudiado. Los que llevan drill son los que tú le vas a tomar y firmar.</p>
+        <p className="h-sub">El orden no es decorativo: cada módulo abre con el anterior estudiado. Los que llevan maniobra son los que tú le vas a tomar y firmar.</p>
         {['A', 'B'].map((b) => {
           const suyos = suPlan.filter((m) => CURSOS[m.curso]?.bloque === b)
           if (suyos.length === 0) return null
@@ -126,7 +126,7 @@ export default async function OficioPage({ params, searchParams }) {
                         <span className="ofi-fila__estados">
                           <span className="ent-pill">{m.preguntas} preguntas</span>
                           <span className={`ent-pill${m.drills > 0 ? ' ent-pill--mid' : ''}`}>
-                            {m.drills > 0 ? `${m.drills} drill${m.drills > 1 ? 's' : ''} que tú firmas` : 'Sin drill'}
+                            {m.drills > 0 ? `${m.drills} maniobra${m.drills > 1 ? 's' : ''} que tú firmas` : 'Sin maniobra'}
                           </span>
                           {m.sop && <span className="ent-pill">Hoja SOP</span>}
                         </span>
@@ -155,7 +155,7 @@ export default async function OficioPage({ params, searchParams }) {
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Mi centro · Entrenamiento de oficio</div>
         <h1 className="h-title">El oficio se estudia por puesto</h1>
-        <p className="h-sub">Este entrenamiento es de la Administradora del Centro y de la Asistente Administrativo. Tu rol ({rol}) no lleva plan propio: lo tuyo es tomar los drills y firmarlos.</p>
+        <p className="h-sub">Este entrenamiento es de la Administradora del Centro y de la Asistente Administrativo. Tu rol ({rol}) no lleva plan propio: lo tuyo es tomar las maniobras y firmarlas.</p>
       </div></div>
       <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento/firmas`}>Ver las firmas pendientes <span aria-hidden="true">→</span></Link>
     </>)
@@ -170,23 +170,23 @@ export default async function OficioPage({ params, searchParams }) {
     <div className="main__head"><div>
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Mi centro · Entrenamiento de oficio</div>
       <h1 className="h-title">{hat ? hat.titulo : 'Tu oficio'}</h1>
-      <p className="h-sub">{nombre || 'Tu centro'} · Estudiar es la mitad. La otra mitad la firma tu Oficial de Entrenamiento cuando te toma el drill.</p>
-      {/* El flujo entero dice "pídeselo a tu Oficial de Entrenamiento": aquí se
+      <p className="h-sub">{nombre || 'Tu centro'} · Estudiar es la mitad. La otra mitad la firma tu jefe entrenador cuando te toma la maniobra.</p>
+      {/* El flujo entero dice "pídesela a tu jefe entrenador": aquí se
           dice quién es esa persona, con nombre. Si no hay, es un bloqueo
           operativo y hay que decirlo, no callarlo. */}
       <p className="h-sub" style={{ marginTop: 4 }}>
         {quien
-          ? <>Tu Oficial de Entrenamiento: <b>{quien}</b>. Es quien te toma los drills y los firma.</>
-          : <>Todavía no tienes un Oficial de Entrenamiento asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con drill.</>}
+          ? <>Tu jefe entrenador: <b>{quien}</b>. Es quien te toma las maniobras y las firma.</>
+          : <>Todavía no tienes un jefe entrenador asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con maniobra.</>}
       </p>
     </div></div>
 
     {hat?.pfv && (
       <section className="ofi-pfv" aria-labelledby="pfv-titulo">
-        <div className="label">Tu Producto Final Valioso</div>
+        <div className="label">El producto de tu puesto</div>
         <h2 id="pfv-titulo">{hat.pfv}</h2>
-        <p className="h-sub">El reto es decirlo sin leerlo. Si no puedes, todavía no es tuyo: vuelve al módulo del hat.</p>
-        <Link className="btn btn--primary" href={`${base}/${hat.id}`}>Estudiar mi hat <span aria-hidden="true">→</span></Link>
+        <p className="h-sub">El reto es decirlo sin leerlo. Si no puedes, todavía no es tuyo: vuelve al módulo de tu puesto.</p>
+        <Link className="btn btn--primary" href={`${base}/${hat.id}`}>Estudiar mi puesto <span aria-hidden="true">→</span></Link>
       </section>
     )}
 
@@ -196,27 +196,27 @@ export default async function OficioPage({ params, searchParams }) {
         <progress className="ent-start__progress" max={avance.total} value={avance.estudiados} aria-label="Módulos estudiados" />
         <p className="ent-start__note">{avance.estudiados} de {avance.total} · {avance.pctEstudio}%</p>
       </div>
-      {/* Sobre los módulos QUE LLEVAN DRILL: los que no llevan cierran solos al
-          estudiarlos y llenarían esta barra sin una sola firma. */}
+      {/* Sobre los módulos QUE LLEVAN MANIOBRA: los que no llevan cierran solos
+          al estudiarlos y llenarían esta barra sin una sola firma. */}
       <div>
-        <div className="label">Drills firmados</div>
-        <progress className="ent-start__progress" max={drills?.total || 0} value={drills?.firmados || 0} aria-label="Drills firmados por tu Oficial de Entrenamiento" />
+        <div className="label">Maniobras firmadas</div>
+        <progress className="ent-start__progress" max={drills?.total || 0} value={drills?.firmados || 0} aria-label="Maniobras firmadas por tu jefe entrenador" />
         <p className="ent-start__note">
-          {drills?.total ? `${drills.firmados} de ${drills.total} drills · ${drills.pct}%` : 'Tu plan no lleva drills.'}
+          {drills?.total ? `${drills.firmados} de ${drills.total} maniobras · ${drills.pct}%` : 'Tu plan no lleva maniobras.'}
         </p>
       </div>
       <div>
         <div className="label">Tu siguiente paso</div>
         {siguiente
           ? <p style={{ margin: '6px 0 0' }}><Link className="tour-card__link" href={`${base}/${siguiente.id}`}>{siguiente.titulo} <span aria-hidden="true">→</span></Link></p>
-          : <p className="h-sub" style={{ margin: '6px 0 0' }}>Estudiaste todo tu plan. Lo que falta lo firma tu Oficial.</p>}
+          : <p className="h-sub" style={{ margin: '6px 0 0' }}>Estudiaste todo tu plan. Lo que falta lo firma tu jefe entrenador.</p>}
         <p className="ent-start__note"><Link className="tour-card__link" href={`${base}/glosario`}>Glosario de términos</Link></p>
       </div>
     </div>
 
     <section className="ofi-checksheet" aria-labelledby="checksheet-titulo">
-      <h2 id="checksheet-titulo">Tu checksheet</h2>
-      <p className="h-sub">El orden no es decorativo: cada módulo abre con el anterior estudiado. Leer siempre se puede; responder sus preguntas, no.</p>
+      <h2 id="checksheet-titulo">Tu plan</h2>
+      <p className="h-sub">Tu plan de puesto, en orden. El orden no es decorativo: cada módulo abre con el anterior estudiado. Leer siempre se puede; responder sus preguntas, no.</p>
       {bloques.map((b) => {
         const suyos = plan.filter((m) => CURSOS[m.curso]?.bloque === b)
         if (suyos.length === 0) return null
@@ -241,8 +241,8 @@ export default async function OficioPage({ params, searchParams }) {
                           {m.drills > 0 && (
                             <span className={`ent-pill${firmadoOk ? ' ent-pill--ok' : est ? ' ent-pill--mid' : ''}`}>
                               {firmadoOk
-                                ? `✓ Drill firmado ${fmt(p.drillFirmadoAt)}${p.drillFirmadoPor?.nombre ? ` · ${p.drillFirmadoPor.nombre}` : ''}`
-                                : 'Drill sin firmar'}
+                                ? `✓ Maniobra firmada ${fmt(p.drillFirmadoAt)}${p.drillFirmadoPor?.nombre ? ` · ${p.drillFirmadoPor.nombre}` : ''}`
+                                : 'Maniobra sin firmar'}
                             </span>
                           )}
                           {/* La hoja del proceso, para tenerla al lado mientras se
