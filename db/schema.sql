@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre         TEXT NOT NULL,
   email          TEXT NOT NULL UNIQUE,
   password_hash  TEXT,
-  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_general | supervisor | coordinador | administradora | asistente
+  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_general | supervisor | coordinador | administradora | asistente | coach
   centro_id      INTEGER REFERENCES centros(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ DEFAULT now()
 );
@@ -390,6 +390,20 @@ CREATE TABLE IF NOT EXISTS coaches (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_coaches_centro ON coaches(centro_id);
+
+-- EL PUENTE ENTRE EL COACH DEL HORARIO Y EL COACH QUE SE ENTRENA.
+-- `coaches` es la ficha operativa (la que cuelga de grupos.coach_id y de la que
+-- sale lib/desercion-coach.mjs); `usuarios` es la cuenta con la que entra al
+-- sistema y acumula su entrenamiento. Sin esta columna el hat del Coach y su
+-- alerta de deserción viven en dos identidades distintas y nadie las puede
+-- cruzar.
+-- NO es UNIQUE a propósito: un Coach que da clases en dos centros tiene DOS
+-- fichas (una por centro) y una sola cuenta. Su cuenta lleva un único
+-- usuarios.centro_id — su CENTRO BASE—, y es la Administradora de ese centro
+-- quien le firma el drill (lib/entrenamiento/oficio/progreso.js, OFICIAL_DE).
+-- ON DELETE SET NULL: borrar la cuenta no puede borrar la ficha del horario.
+ALTER TABLE coaches ADD COLUMN IF NOT EXISTS usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_coaches_usuario ON coaches(usuario_id);
 
 CREATE TABLE IF NOT EXISTS grupos (
   id SERIAL PRIMARY KEY,

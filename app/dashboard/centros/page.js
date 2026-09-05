@@ -13,6 +13,7 @@ const PAISES = { PA: 'Panamá', VE: 'Venezuela' }
 const ROL_MIEMBRO = {
   administradora: { label: 'Administrador', pill: 'pill--ok' },
   asistente:      { label: 'Asistente',     pill: 'pill--warn' },
+  coach:          { label: 'Coach',         pill: '' },
   coordinador:    { label: 'Coordinador',   pill: '' },
 }
 const REGIONES = {

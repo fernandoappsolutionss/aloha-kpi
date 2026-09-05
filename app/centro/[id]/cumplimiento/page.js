@@ -321,8 +321,9 @@ export default function CumplimientoPage() {
             </p>
           </div>
 
+          <div className="disciplina__grupos">
           {DISCIPLINA_GRUPOS.map(group => (
-            <div key={group.id} className="card" style={{ padding: '16px 20px', marginBottom: 12 }}>
+            <div key={group.id} className="card" style={{ padding: '16px 20px' }}>
               <h3 className="label" style={{ color: 'var(--ok-text)', marginBottom: 4 }}>
                 {nombreMes} · {group.titulo}
                 <span className="disciplina__grupo-peso">peso {group.peso} × {group.claves.length}</span>
@@ -335,6 +336,7 @@ export default function CumplimientoPage() {
               </TableScroller>
             </div>
           ))}
+          </div>
         </div>}
       </main>
     </div>

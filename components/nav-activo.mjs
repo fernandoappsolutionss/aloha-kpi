@@ -8,7 +8,7 @@
 // para el árbol de entrenamiento (`href.endsWith('/entrenamiento') &&
 // path.startsWith(href + '/')`), y con eso DOS enlaces se marcaban a la vez:
 //   /dashboard/entrenamiento/oficio    → "Entrenamiento" (por el prefijo) Y "Oficio (hats)"
-//   /centro/<id>/entrenamiento/firmas  → "Entrenamiento" (por el prefijo) Y "Firmas de drill"
+//   /centro/<id>/entrenamiento/firmas  → "Entrenamiento" (por el prefijo) Y "Firmas de maniobra"
 // Dos "página actual" no dicen dónde estás: el lector de pantalla anuncia dos
 // destinos actuales y la marca visual pierde el sentido (WCAG 2.4.8). Por eso
 // gana UNO SOLO, y es el más específico.

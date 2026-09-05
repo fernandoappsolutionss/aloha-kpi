@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   loadCurrentUser, assertCentroAccess, assertAdmin, assertPuedeCerrarMes, assertPuedeEliminar,
   esAdminDe, centrosDe, vePanelGerencia,
@@ -26,8 +27,8 @@ test('solo gerencia y coordinador abren Gestión de usuarios', () => {
 })
 
 test('roles y centros asignables dependen del actor vigente', () => {
-  assert.deepEqual(rolesAsignablesUsuarios(gerencia), ['admin_general', 'coordinador', 'administradora', 'asistente'])
-  assert.deepEqual(rolesAsignablesUsuarios(coordinador), ['administradora', 'asistente'])
+  assert.deepEqual(rolesAsignablesUsuarios(gerencia), ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
+  assert.deepEqual(rolesAsignablesUsuarios(coordinador), ['administradora', 'asistente', 'coach'])
   assert.deepEqual(centrosDestinoUsuarios(gerencia), null)
   assert.deepEqual(centrosDestinoUsuarios(coordinador), [10, 12])
   assert.deepEqual(centrosDestinoUsuarios(sinCentros), [])
@@ -126,6 +127,31 @@ test('la administradora del centro sí cierra el mes y elimina', () => {
   const admin = { id: 8, rol: 'administradora', centro_id: 10 }
   assert.equal(assertPuedeCerrarMes(admin), admin)
   assert.equal(assertPuedeEliminar(admin), admin)
+})
+
+// EL COACH NO OPERA EL CENTRO. Tiene cuenta para estudiar su puesto: entra a su
+// centro, pero las dos acciones destructivas que la sesión alcanza le quedan
+// negadas. Sin esto, darle un rol nuevo con centro_id lo habría convertido de
+// una en alguien que cierra el mes.
+test('el coach entra a su centro pero no cierra el mes ni elimina', () => {
+  const coach = { id: 12, rol: 'coach', centro_id: 10 }
+  assert.equal(assertCentroAccess(coach, 10), coach)
+  assert.throws(() => assertCentroAccess(coach, 11), /No autorizado/)
+  assert.throws(() => assertPuedeCerrarMes(coach), /no puede cerrar/)
+  assert.throws(() => assertPuedeEliminar(coach), /no puede eliminar/)
+  assert.equal(vePanelGerencia(coach), false)
+  assert.equal(esAdminDe(coach, 10), false)
+  assert.equal(puedeGestionarUsuarios(coach), false)
+  assert.deepEqual(rolesAsignablesUsuarios(coach), [])
+})
+
+// Y el middleware lo encierra en su entrenamiento antes de que se pinte una
+// pantalla: dentro de /centro/<id> el Coach solo alcanza ese árbol.
+test('el middleware deja al coach solo en el árbol de entrenamiento de su centro', () => {
+  const src = readFileSync(new URL('../middleware.js', import.meta.url), 'utf8')
+  assert.match(src, /ROL_COACH/, 'el rol sale de lib/current-user.mjs, no de una cadena suelta')
+  assert.match(src, /rutaDelCoach\(pathname, centroId\)/, 'la guarda tiene que correr dentro de /centro/')
+  assert.match(src, /entrenamiento\}\/`\)/, 'la guarda abre el árbol entero de entrenamiento, no una sola página')
 })
 
 test('loadCurrentUser trae los centros asignados del coordinador', async () => {

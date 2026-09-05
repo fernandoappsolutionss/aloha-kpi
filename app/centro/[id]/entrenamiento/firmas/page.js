@@ -10,8 +10,11 @@ import Sidebar from '../../../../../components/Sidebar'
 import PanelDrill from '../../../../../components/entrenamiento/PanelDrill'
 import { getCentroNombre } from '../../../../actions/centros'
 import { colaFirmas } from '../../../../actions/entrenamiento-oficio'
-
-const ROL = { administradora: 'Administradora', asistente: 'Asistente' }
+// Cómo se nombra cada puesto delante de una persona: una sola fuente. Aquí
+// había una sexta copia con dos entradas, y el Coach y el Coordinador —que
+// ahora también entran a esta cola— habrían salido como "coach" y
+// "coordinador", en minúscula y sin acento.
+import { nombreDeRol } from '../../../../../lib/entrenamiento/oficio/progreso'
 
 export default async function FirmasPage({ params }) {
   const { id } = await params
@@ -55,14 +58,29 @@ export default async function FirmasPage({ params }) {
     </>)
   }
 
+  // AGRUPADA POR PUESTO. La action ya las devuelve ordenadas por rol; aquí solo
+  // se abre un encabezado cuando cambia, con su conteo. Sin esto la
+  // Administradora con cuatro Coaches y una Asistente veía cinco tarjetas
+  // intercaladas y no sabía de un vistazo qué puesto tiene atrasado.
+  const cuentaDe = (rol) => {
+    const suyas = cola.filas.filter((x) => x.rol === rol)
+    const maniobras = suyas.reduce((n, x) => n + x.modulos.length, 0)
+    return `${suyas.length} ${suyas.length === 1 ? 'persona' : 'personas'} · ${maniobras} ${maniobras === 1 ? 'maniobra' : 'maniobras'}`
+  }
+
   return shell('ready', <>
     {cabecera}
-    {cola.filas.map((f) => (
-      <section key={f.usuarioId} className="ofi-cola" aria-labelledby={`alumno-${f.usuarioId}`}>
+    {cola.filas.map((f, i) => (
+      <div key={f.usuarioId}>
+      {(i === 0 || cola.filas[i - 1].rol !== f.rol) && (
+        <h2 className="ent-seccion__titulo">{nombreDeRol(f.rol)} <span className="ent-pill">{cuentaDe(f.rol)}</span></h2>
+      )}
+      <section className="ofi-cola" aria-labelledby={`alumno-${f.usuarioId}`}>
         <div className="ofi-cola__head">
           <div>
-            <h2 id={`alumno-${f.usuarioId}`}>{f.nombre}</h2>
-            <p className="h-sub" style={{ margin: 0 }}>{ROL[f.rol] || f.rol} · {f.centro} · {f.email}</p>
+            {/* h3 y no h2: el h2 es ahora el puesto que agrupa. */}
+            <h3 id={`alumno-${f.usuarioId}`}>{f.nombre}</h3>
+            <p className="h-sub" style={{ margin: 0 }}>{f.centro} · {f.email}</p>
           </div>
           <span className={`ent-pill${f.modulos.some((m) => (m.dias ?? 0) >= 7) ? ' ent-pill--bad' : ' ent-pill--mid'}`}>
             {f.modulos.length} {f.modulos.length === 1 ? 'maniobra pendiente' : 'maniobras pendientes'}
@@ -82,6 +100,7 @@ export default async function FirmasPage({ params }) {
           </div>
         ))}
       </section>
+      </div>
     ))}
   </>)
 }

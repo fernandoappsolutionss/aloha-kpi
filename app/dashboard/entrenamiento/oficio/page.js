@@ -12,8 +12,9 @@ import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import { matrizOficio } from '../../../actions/entrenamiento-oficio'
 import { listCentros } from '../../../actions/centros'
-
-const ROL = { administradora: 'Administradora', asistente: 'Asistente' }
+// El nombre de cada puesto sale de la misma fuente que el resto del oficio.
+// progreso.js es cálculo puro (no arrastra el catálogo ni la prosa al bundle).
+import { nombreDeRol } from '../../../../lib/entrenamiento/oficio/progreso'
 
 function Celda({ c }) {
   if (!c || c.total === 0) return <td style={{ textAlign: 'center', color: 'var(--text-faint)' }}>—</td>
@@ -26,16 +27,16 @@ function Celda({ c }) {
   )
 }
 
-// Los dos planes que la gerencia puede LEER. No es un permiso —quién puede
-// abrirlos lo decide cargarOficio() en el servidor con rolesQueRevisa()—: es el
-// enlace inverso del que ya existía. La lectura enlazaba de vuelta a esta
-// matriz y la matriz no enlazaba a la lectura, así que Fernando, que vive en
-// /dashboard, tenía que adivinar: entrar a un centro, abrir Entrenamiento y
-// encontrar el carril.
-const PLANES = [
-  { rol: 'administradora', nombre: 'la Administradora' },
-  { rol: 'asistente', nombre: 'la Asistente' },
-]
+// Los planes que la gerencia puede LEER. No es un permiso —quién puede abrirlos
+// lo decide cargarOficio() en el servidor con rolesQueRevisa()—: es el enlace
+// inverso del que ya existía. La lectura enlazaba de vuelta a esta matriz y la
+// matriz no enlazaba a la lectura, así que Fernando, que vive en /dashboard,
+// tenía que adivinar: entrar a un centro, abrir Entrenamiento y encontrar el
+// carril.
+//
+// Salen de la respuesta de la action, no de una lista escrita aquí: eran dos y
+// hoy son cuatro (se sumaron el Coach y el Coordinador Operativo), y una lista
+// a mano se queda corta sin que nada lo diga.
 
 export default function EntrenamientoOficioAdminPage() {
   const [data, setData] = useState(null)
@@ -76,14 +77,14 @@ export default function EntrenamientoOficioAdminPage() {
               entrenador después de tomarle la maniobra. La columna <b>Cola de firmas</b> abre la pantalla donde se toma y se firma, en el centro de esa
               persona. <Link className="tour-card__link" href="/dashboard/entrenamiento">Ver el entrenamiento del sistema (los 9 recorridos)</Link>
             </p>
-            {centroLectura && (
+            {centroLectura && (data?.planes || []).length > 0 && (
               <p className="h-sub" style={{ marginTop: 4 }}>
                 Leer el entrenamiento completo, módulo por módulo:{' '}
-                {PLANES.map((pl, i) => (
+                {(data?.planes || []).map((pl, i) => (
                   <span key={pl.rol}>
                     {i > 0 && ' · '}
                     <Link className="tour-card__link" href={`/centro/${centroLectura}/entrenamiento/oficio?revisar=${pl.rol}`}>
-                      el plan de {pl.nombre}
+                      el plan de {pl.rolNombre}
                     </Link>
                   </span>
                 ))}
@@ -113,20 +114,25 @@ export default function EntrenamientoOficioAdminPage() {
               <tbody>
                 {data.usuarios.length === 0 && (
                   <tr><td colSpan={data.cursos.length + 6} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>
-                    Sin administradoras ni asistentes en este filtro.
+                    Nadie con plan de puesto en este filtro.
                   </td></tr>
                 )}
                 {data.usuarios.map((u) => (
                   <tr key={u.id}>
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
-                    <td>{ROL[u.rol] || u.rol}</td>
-                    <td>{u.centro}</td>
+                    <td>{nombreDeRol(u.rol)}</td>
+                    {/* Un Coordinador no tiene un centro: tiene varios, y la
+                        columna los nombra todos en vez de un guion. */}
+                    <td title={(u.centros || []).length > 1 ? `${u.centros.length} centros` : undefined}>{u.centro}</td>
                     {/* La única pantalla desde la que se firma una maniobra vive dentro
                         del centro. Desde /dashboard no había ninguna ruta hasta
-                        ella: quien firma tenía que escribir la URL. */}
+                        ella: quien firma tenía que escribir la URL.
+                        `centroFirma` y no `centroId`: para el Coordinador
+                        Operativo el centro propio es NULL —sus centros viven en
+                        usuario_centros— y este enlace le salía siempre roto. */}
                     <td>
-                      {u.centroId
-                        ? <Link className="tour-card__link" href={`/centro/${u.centroId}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
+                      {u.centroFirma
+                        ? <Link className="tour-card__link" href={`/centro/${u.centroFirma}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
                         : <span style={{ color: 'var(--text-faint)' }}>sin centro</span>}
                     </td>
                     {data.cursos.map((c) => <Celda key={c.id} c={u.porCurso[c.id]} />)}
@@ -137,8 +143,8 @@ export default function EntrenamientoOficioAdminPage() {
               </tbody>
             </table>
             <div style={{ padding: '10px 16px', color: 'var(--text-dim)', fontSize: 12 }}>
-              El plan no es el mismo para los dos puestos: la asistente no lleva el curso del Centro y la administradora no lleva el de Zoho. Un
-              guion (—) significa que ese curso no es de su puesto, no que vaya atrasada.
+              El plan no es el mismo para los cuatro puestos: la asistente no lleva el curso del Centro, la administradora no lleva el de Zoho, y el
+              Coach y el Coordinador Operativo llevan cada uno el suyo. Un guion (—) significa que ese curso no es de su puesto, no que vaya atrasada.
             </div>
           </div>
         )}

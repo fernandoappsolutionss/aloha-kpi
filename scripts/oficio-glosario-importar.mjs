@@ -56,14 +56,14 @@ function limpiar(md, { negrita = false } = {}) {
 // "**Qué es.**"; el de Zoho abre con el párrafo suelto. Los dos usan
 // "**Ejemplo:**" / "**Ejemplo.**" y "**No lo confundas con**".
 // ── Slugs congelados: cambió el TÉRMINO VISIBLE, no la clave ───────────────
-// El vocabulario del método se renombró (Entrenamiento a Bordo): hat → puesto,
+// El vocabulario del método se renombró (Entrenamiento en Cubierta): hat → puesto,
 // drill → maniobra, masa → lo que va a la vista, y así. El slug es la clave con
 // la que los módulos piden un término (`palabras`, `quiz[].repasa`) y el ancla
 // del glosario (#t-<slug>): renombrarlo dejaría nueve palabras sin definición y
 // rompería enlaces ya repartidos. Así que el término nuevo apunta al slug de
 // siempre. Mapa: slug que produciría el término nuevo → slug que se conserva.
 const SLUG_FIJO = {
-  'puesto-a-bordo': 'hat',
+  'puesto-en-cubierta': 'hat',
   'producto-del-puesto': 'producto-final-valioso',
   'lo-que-va-a-la-vista': 'masa',
   'orden-de-los-pasos': 'gradiente',
@@ -189,8 +189,8 @@ const SINONIMOS = {
   'producto-final-valioso': ['pfv', 'producto final valioso', 'productos finales valiosos', 'producto de tu puesto'],
   // 'tu puesto' NO va: en of-met-1 caía sobre "aplicación en tu puesto de
   // trabajo" y se gastaba ahí el único enlace del módulo, dejando sin marcar la
-  // frase que sí define. La forma larga "tu puesto a bordo" la caza 'puesto a
-  // bordo'.
+  // frase que sí define. La forma larga "tu puesto en cubierta" la caza la
+  // variante 'puesto en cubierta' del propio término.
   hat: ['hat', 'hats'],
   drill: ['drill', 'drills'],
   masa: ['masa', 'masas'],

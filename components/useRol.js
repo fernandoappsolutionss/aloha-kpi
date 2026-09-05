@@ -26,4 +26,5 @@ export const ETIQUETA_ROL = {
   coordinador: 'Coordinador Operativo',
   administradora: 'Administrador de Centro',
   asistente: 'Asistente de Centro',
+  coach: 'Coach',
 }

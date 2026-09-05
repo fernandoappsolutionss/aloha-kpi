@@ -8,10 +8,21 @@ import Link from 'next/link'
 import Sidebar from '../../../../../components/Sidebar'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarOficio } from '../../../../actions/entrenamiento-oficio'
-import { CURSOS } from '../../../../../lib/entrenamiento/oficio/catalogo'
-import { estudiado } from '../../../../../lib/entrenamiento/oficio/progreso'
+import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../lib/entrenamiento/oficio/catalogo'
+import { estudiado, esDePapel, puedeImprimirPapel } from '../../../../../lib/entrenamiento/oficio/progreso'
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short' }) : ''
+
+// El plan mide horas, no minutos: "395 min" no le dice a nadie cuánto es.
+// El carril de revisión ya redondeaba a horas enteras (7 h para 6 h 35), que
+// para el revisor da igual y para quien lo va a estudiar no: se dicen las dos
+// unidades.
+const formatoDuracion = (min) => {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
 
 export default async function OficioPage({ params, searchParams }) {
   const { id } = await params
@@ -48,17 +59,47 @@ export default async function OficioPage({ params, searchParams }) {
     ? `${oficiales.map((o) => o.nombre).join(' o ')} (${oficiales[0].rolNombre || oficiales[0].rol})`
     : ''
 
+  // LAS HOJAS QUE SE ENTREGAN EN PAPEL. No están en el plan de nadie —planDeRol
+  // ignora los módulos con `roles: []`— así que el plan las dejaba fuera y NO
+  // HABÍA UN SOLO ENLACE hacia ellas en todo el sistema: of-ase-0 le dice a la
+  // Asistente "imprime las seis hojas del paquete desde este sistema" y la
+  // única forma de abrirlas era escribir la URL a mano. La máquina estaba
+  // completa por detrás (la página de la hoja y su botón de imprimir); faltaba
+  // la puerta.
+  //
+  // Dos candados, y los dos ya existían: puedeImprimirPapel() —la MISMA guarda
+  // que aplica la página de destino— dice QUIÉN puede abrirlas, y el curso del
+  // plan que se está mirando dice DÓNDE se pintan. Por eso la Administradora no
+  // se las encuentra dentro de su propio plan (no lleva el curso del aseo) sino
+  // cuando abre el plan de su Asistente, que es de quien son.
+  const hojasQuePuedeImprimir = MODULOS_OFICIO
+    .filter((m) => esDePapel(m) && puedeImprimirPapel(rol, m, MODULOS_OFICIO))
+    .slice()
+    .sort((a, b) => a.orden - b.orden)
+  const hojasDe = (modulos, bloque) => {
+    const cursos = new Set((modulos || []).map((m) => m.curso))
+    return hojasQuePuedeImprimir.filter((m) => cursos.has(m.curso) && CURSOS[m.curso]?.bloque === bloque)
+  }
+
   // ── REVISIÓN ────────────────────────────────────────────────────────────
   // ponytail: la revisión vive en ESTA misma ruta con ?revisar=<rol>, no en una
   // /oficio/revision/<rol> propia. El techo: no se puede enlazar un estado más
   // fino que "qué plan estoy mirando". Si la gerencia llega a necesitar dejar
   // notas de revisión o filtrar por curso, eso ya es una ruta con su página.
-  // Gerencia y coordinador no se entrenan aquí, pero tienen que poder LEER el
-  // entrenamiento que le dan a su gente. Es la misma prosa, sin nada de lo que
-  // es del alumno: no hay barras de avance, no hay "tu siguiente paso", no hay
-  // cuestionario y no se firma nada desde esta pantalla.
-  if (modo === 'revision' && (revision || []).length > 0) {
-    const elegido = (revision || []).find((r) => r.rol === sp?.revisar) || null
+  // Quien le FIRMA el hat a alguien tiene que poder LEER ese hat. Es la misma
+  // prosa, sin nada de lo que es del alumno: no hay barras de avance, no hay
+  // "tu siguiente paso", no hay cuestionario y no se firma nada desde aquí.
+  //
+  // El plan que se revisa se elige con ?revisar=<rol> y se acepta solo si el
+  // servidor lo mandó en `revision`. Ya NO basta con `modo === 'revision'`: la
+  // Administradora y el Coordinador Operativo tienen plan propio Y revisan
+  // planes ajenos, así que su modo es 'entrenamiento' y aun así entran aquí.
+  const elegido = (revision || []).find((r) => r.rol === sp?.revisar) || null
+  if (elegido || (modo === 'revision' && (revision || []).length > 0)) {
+    // Quien tiene plan propio vuelve a SU puesto; quien no, al selector.
+    const volverDeRevision = modo === 'entrenamiento'
+      ? { href: base, texto: '← Volver a mi puesto' }
+      : { href: base, texto: '← Volver a la revisión' }
     const encabezado = (
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Entrenamiento de oficio · Revisión</div>
@@ -76,7 +117,7 @@ export default async function OficioPage({ params, searchParams }) {
         <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
         {encabezado}
         <section className="ofi-checksheet" aria-labelledby="revision-planes">
-          <h2 id="revision-planes">Los dos planes</h2>
+          <h2 id="revision-planes">Los planes que firmas</h2>
           <ul className="ofi-carril__cursos">
             {revision.map((r) => (
               <li key={r.rol}>
@@ -98,7 +139,7 @@ export default async function OficioPage({ params, searchParams }) {
 
     const suPlan = elegido.plan || []
     return shell('ready', <>
-      <Link className="tour-card__link" href={base}>← Volver a la revisión</Link>
+      <Link className="tour-card__link" href={volverDeRevision.href}>{volverDeRevision.texto}</Link>
       {encabezado}
       <div className="alert alert--warn" role="note">
         Estás revisando el plan de {elegido.rolNombre}. Es lectura: nada de lo que abras aquí cuenta como entrenamiento tuyo.
@@ -106,12 +147,15 @@ export default async function OficioPage({ params, searchParams }) {
       <section className="ofi-checksheet" aria-labelledby="revision-checksheet">
         <h2 id="revision-checksheet">Los {suPlan.length} módulos, en orden</h2>
         <p className="h-sub">El orden no es decorativo: cada módulo abre con el anterior estudiado. Los que llevan maniobra son los que tú le vas a tomar y firmar.</p>
-        {['A', 'B'].map((b) => {
+        {BLOQUES.map((b) => {
           const suyos = suPlan.filter((m) => CURSOS[m.curso]?.bloque === b)
-          if (suyos.length === 0) return null
+          const hojas = hojasDe(suyos, b)
+          if (suyos.length === 0 && hojas.length === 0) return null
           return (
             <div key={b} className="ofi-checksheet__bloque">
-              <div className="label">Bloque {b} · {b === 'A' ? 'antes de tocar nada' : 'su puesto'}</div>
+              {/* En revisión se habla de OTRA persona: "tu puesto" y "lo que
+                  entregas" son de ella, no del que revisa. */}
+              <div className="label">Bloque {b} · {b === 'B' ? 'su puesto' : b === 'C' ? 'lo que entrega en papel' : TITULO_BLOQUE[b]}</div>
               <ol className="ofi-checksheet__lista">
                 {suyos.map((m) => (
                   <li key={m.id}>
@@ -136,6 +180,35 @@ export default async function OficioPage({ params, searchParams }) {
                   </li>
                 ))}
               </ol>
+              {hojas.length > 0 && (
+                <>
+                  <div className="label" style={{ marginTop: 10 }}>
+                    Las {hojas.length} hojas del paquete, en papel
+                  </div>
+                  <p className="h-sub" style={{ marginTop: 0 }}>
+                    Esta persona no las estudia en pantalla: las imprime y se las toma a quien no tiene cuenta en el
+                    sistema. Ábrelas para verlas o para mandarlas a imprimir tú.
+                  </p>
+                  <ol className="ofi-checksheet__lista">
+                    {hojas.map((m, i) => (
+                      <li key={m.id}>
+                        <Link className="ofi-fila" href={`${base}/${m.id}`}>
+                          <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
+                          <span className="ent-route__content">
+                            <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
+                            <strong>{m.titulo}</strong>
+                            <span className="ofi-fila__estados">
+                              <span className="ent-pill">Se entrega impresa</span>
+                              <span className="ent-pill">Se firma en tinta</span>
+                            </span>
+                          </span>
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
             </div>
           )
         })}
@@ -155,14 +228,29 @@ export default async function OficioPage({ params, searchParams }) {
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Mi centro · Entrenamiento de oficio</div>
         <h1 className="h-title">El oficio se estudia por puesto</h1>
-        <p className="h-sub">Este entrenamiento es de la Administradora del Centro y de la Asistente Administrativo. Tu rol ({rol}) no lleva plan propio: lo tuyo es tomar las maniobras y firmarlas.</p>
+        <p className="h-sub">
+          Cada puesto tiene su propio plan. El tuyo ({rolNombre || rol}) todavía no lleva uno cargado en el sistema.
+        </p>
       </div></div>
-      <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento/firmas`}>Ver las firmas pendientes <span aria-hidden="true">→</span></Link>
+      {/* Solo si de verdad le firma a alguien: ofrecerle la cola a quien no
+          firma a nadie es mandarlo a una pantalla vacía. */}
+      {(oficio.puedeFirmarA || []).length > 0 && (
+        <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento/firmas`}>Ver las firmas pendientes <span aria-hidden="true">→</span></Link>
+      )}
     </>)
   }
 
   const hat = plan.find((m) => m.curso === 'hat')
-  const bloques = ['A', 'B']
+
+  // EL TAMAÑO DEL PLAN, DICHO DE FRENTE. El total en horas SOLO lo veía el
+  // revisor; al alumno se le daban los minutos módulo a módulo y nunca la
+  // suma, así que empezaba sin saber en qué se estaba metiendo y no podía
+  // repartirlo. Son horas de ESTUDIO, no un turno: se hacen en tandas, y por
+  // eso además del total se le dice un ritmo con el que cabe en la semana.
+  const RITMO_MIN_DIA = 20
+  const minutosPlan = plan.reduce((n, m) => n + (m.duracionMin || 0), 0)
+  const conManiobra = plan.filter((m) => m.drills > 0).length
+  const semanasPlan = Math.max(1, Math.round(minutosPlan / (RITMO_MIN_DIA * 5)))
 
   return shell('ready', <>
     <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
@@ -178,6 +266,10 @@ export default async function OficioPage({ params, searchParams }) {
         {quien
           ? <>Tu jefe entrenador: <b>{quien}</b>. Es quien te toma las maniobras y las firma.</>
           : <>Todavía no tienes un jefe entrenador asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con maniobra.</>}
+      </p>
+      <p className="h-sub" style={{ marginTop: 4 }}>
+        Tu plan completo: <b>{plan.length} módulos</b> · {formatoDuracion(minutosPlan)} de estudio · {conManiobra} con maniobra que te toman y te firman.
+        {' '}A {RITMO_MIN_DIA} minutos por día son unas {semanasPlan} semanas.
       </p>
     </div></div>
 
@@ -217,12 +309,13 @@ export default async function OficioPage({ params, searchParams }) {
     <section className="ofi-checksheet" aria-labelledby="checksheet-titulo">
       <h2 id="checksheet-titulo">Tu plan</h2>
       <p className="h-sub">Tu plan de puesto, en orden. El orden no es decorativo: cada módulo abre con el anterior estudiado. Leer siempre se puede; responder sus preguntas, no.</p>
-      {bloques.map((b) => {
+      {BLOQUES.map((b) => {
         const suyos = plan.filter((m) => CURSOS[m.curso]?.bloque === b)
-        if (suyos.length === 0) return null
+        const hojas = hojasDe(suyos, b)
+        if (suyos.length === 0 && hojas.length === 0) return null
         return (
           <div key={b} className="ofi-checksheet__bloque">
-            <div className="label">Bloque {b} · {b === 'A' ? 'antes de tocar nada' : 'tu puesto'}</div>
+            <div className="label">Bloque {b} · {TITULO_BLOQUE[b]}</div>
             <ol className="ofi-checksheet__lista">
               {suyos.map((m) => {
                 const p = progreso[m.id]
@@ -256,10 +349,65 @@ export default async function OficioPage({ params, searchParams }) {
                 )
               })}
             </ol>
+            {/* Las hojas van APARTE y sin estado: no se estudian, no llevan
+                cuestionario y no cuentan para tu avance. Se abren, se imprimen
+                y se firman en tinta con la persona delante. */}
+            {hojas.length > 0 && (
+              <>
+                <div className="label" style={{ marginTop: 10 }}>
+                  Las {hojas.length} hojas del paquete, en papel
+                </div>
+                <p className="h-sub" style={{ marginTop: 0 }}>
+                  No se estudian ni cuentan para tu avance. Imprímelas y tómaselas a la persona con ella delante:
+                  las dos firman al pie, en tinta, y la hoja va al file del colaborador.
+                </p>
+                <ol className="ofi-checksheet__lista">
+                  {hojas.map((m, i) => (
+                    <li key={m.id}>
+                      <Link className="ofi-fila" href={`${base}/${m.id}`}>
+                        <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
+                        <span className="ent-route__content">
+                          <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
+                          <strong>{m.titulo}</strong>
+                          <span className="ofi-fila__estados">
+                            <span className="ent-pill">Se entrega impresa</span>
+                            <span className="ent-pill">Se firma en tinta</span>
+                          </span>
+                        </span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
           </div>
         )
       })}
       {plan.length === 0 && <p className="h-sub">El contenido de tu plan todavía no está cargado.</p>}
     </section>
+
+    {/* EL SEGUNDO CARRIL. Quien tiene plan propio Y le firma el hat a alguien
+        —la Administradora al Coach y a la Asistente; el Coordinador Operativo a
+        los tres— necesita las dos cosas en la misma pantalla. Antes el servidor
+        elegía una: el que revisaba perdía su plan, o el que estudiaba perdía la
+        lectura de los planes que audita. */}
+    {(revision || []).length > 0 && (
+      <section className="ofi-checksheet" aria-labelledby="revisa-titulo">
+        <h2 id="revisa-titulo">Los planes que tú firmas</h2>
+        <p className="h-sub">
+          No son tuyos y no cuentan para tu avance: los abres en lectura para prepararte las maniobras que le vas a tomar
+          a esa persona y para ver qué se le está enseñando.
+        </p>
+        <div className="ofi-nav">
+          {revision.map((r) => (
+            <Link key={r.rol} className="btn" href={`${base}?revisar=${r.rol}`}>
+              Plan de {r.rolNombre} · {r.total} módulos
+            </Link>
+          ))}
+          <Link className="btn" href={`/centro/${id}/entrenamiento/firmas`}>Firmas pendientes</Link>
+        </div>
+      </section>
+    )}
   </>)
 }

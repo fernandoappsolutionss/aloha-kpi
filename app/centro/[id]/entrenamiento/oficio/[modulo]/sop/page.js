@@ -12,8 +12,8 @@ import SopHoja from '../../../../../../../components/entrenamiento/SopHoja'
 import { derivarSop } from '../../../../../../../components/entrenamiento/sop-derivar.mjs'
 import { getCentroNombre } from '../../../../../../actions/centros'
 import { cargarOficio } from '../../../../../../actions/entrenamiento-oficio'
-import { CURSOS, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
-import { rolesQueFirma } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+import { CURSOS, MODULOS_OFICIO, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
+import { rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../../lib/entrenamiento/oficio/progreso'
 
 // Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
 // Administradora es la jefa entrenadora de la Asistente, así que
@@ -64,16 +64,32 @@ export default async function SopPage({ params, searchParams }) {
   }
 
   const { rol, oficiales } = oficio
-  const esMio = m.roles.includes(rol)
-  const rolPlan = esMio ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
-  const cola = esMio ? '' : `?revisar=${rolPlan}`
-  if (!esMio && !puedeLeerComoOficial(rol, m)) {
+  // HOJA DE PAPEL. El personal de aseo no tiene cuenta: su módulo entero ES
+  // esta hoja. La imprime quien reparte el paquete —la Asistente, que sí lleva
+  // su propio módulo de entrenar y supervisar al aseo— y quien le firma a ella.
+  // Se reusa esta misma ruta a propósito: no hay un segundo sistema de
+  // impresión, es la hoja SOP de siempre con otro pie.
+  const papel = esDePapel(m)
+  // Quién se la toma a la persona de aseo: el primer rol de rolesDelPapel() es
+  // el dueño del paquete (la Asistente), no uno de sus jefes.
+  const tomador = papel ? (rolesDelPapel(m, MODULOS_OFICIO)[0] || '') : ''
+  const esMio = !papel && m.roles.includes(rol)
+  const puedeVerla = papel
+    ? puedeImprimirPapel(rol, m, MODULOS_OFICIO)
+    : esMio || puedeLeerComoOficial(rol, m)
+  // El ?revisar= es del carril de revisión y no aplica a una hoja de papel: no
+  // hay plan ajeno que arrastrar, porque no está en el plan de nadie.
+  const rolPlan = esMio || papel ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
+  const cola = esMio || papel ? '' : `?revisar=${rolPlan}`
+  if (!puedeVerla) {
     return shell('error', <>
       <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Procedimiento operativo</div>
         <h1 className="h-title">Este procedimiento no es de tu puesto</h1>
-        <p className="h-sub">&quot;{m.titulo}&quot; es del entrenamiento de {m.roles.join(' y ')}. Tu plan está en tu puesto.</p>
+        <p className="h-sub">
+          &quot;{m.titulo}&quot; es del entrenamiento de {(papel ? rolesDelPapel(m, MODULOS_OFICIO) : m.roles).map(nombreDeRol).join(' y ')}. Tu plan está en tu puesto.
+        </p>
       </div></div>
     </>)
   }
@@ -95,9 +111,11 @@ export default async function SopPage({ params, searchParams }) {
       {/* Lo que la hoja no puede sostener se dice aquí, no se rellena abajo:
           así el que escribe los procedimientos ve el hueco al abrirla. */}
       <span className="h-sub">
-        {hoja.escrito
-          ? 'Procedimiento escrito para esta hoja.'
-          : 'Hoja derivada del módulo: los pasos, las reglas y los errores salen de su contenido, sin agregar nada.'}
+        {papel
+          ? 'Esta hoja es el módulo completo: se imprime, se toma con la persona delante y se firma en tinta. No queda registro en el sistema; la hoja firmada va al file del colaborador.'
+          : hoja.escrito
+            ? 'Procedimiento escrito para esta hoja.'
+            : 'Hoja derivada del módulo: los pasos, las reglas y los errores salen de su contenido, sin agregar nada.'}
         {hoja.vacios.length > 0 && ` Todavía sin declarar: ${hoja.vacios.join(', ')}.`}
       </span>
     </div>
@@ -108,6 +126,7 @@ export default async function SopPage({ params, searchParams }) {
       curso={CURSOS[m.curso]?.titulo || 'Oficio'}
       emision={emision}
       oficial={oficial}
+      tomador={tomador ? nombreDeRol(tomador) : ''}
     />
   </>)
 }

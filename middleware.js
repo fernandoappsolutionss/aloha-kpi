@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 import { resolveSessionSecret } from './lib/session-secret.mjs'
-import { vePanelGerencia, canAccessCentro } from './lib/current-user.mjs'
+import { vePanelGerencia, canAccessCentro, ROL_COACH } from './lib/current-user.mjs'
 
 // El middleware corre en el Edge Runtime: solo verifica el JWT de la cookie
 // (no toca la base de datos). Esto protege las rutas en el servidor, de modo
@@ -33,12 +33,29 @@ function centroInicial(payload) {
   return payload?.centro_id ?? payload?.centros?.[0] ?? null
 }
 
+// EL COACH NO OPERA EL CENTRO. Tiene cuenta para una sola cosa: estudiar su
+// puesto y que se lo firmen. Su trabajo del día —marcar la asistencia de su
+// grupo— vive en /coach/<token>, que no pasa por la sesión ni por este
+// matcher. Así que dentro de /centro/<id> solo alcanza el árbol de
+// entrenamiento; el KPI, el cuadro y los grupos le quedan cerrados aquí, en el
+// Edge, antes de que se pinte una sola pantalla.
+//
+// Esto NO sustituye las guardas del servidor: las acciones destructivas se le
+// niegan además en lib/current-user.mjs (puedeCerrarMes / puedeEliminar).
+function rutaDelCoach(pathname, centroId) {
+  const entrenamiento = `/centro/${centroId}/entrenamiento`
+  return pathname === entrenamiento || pathname.startsWith(`${entrenamiento}/`)
+}
+
 // A dónde mandar a alguien que no puede estar donde está. Un usuario sin
 // centro asignado va a /perfil: redirigirlo a /centro/null daría un bucle.
+// El Coach aterriza en SU entrenamiento, que es lo único que tiene: mandarlo
+// al resumen del centro lo dejaría rebotando contra la guarda de abajo.
 function destino(payload) {
   if (verPanel(payload)) return '/dashboard'
   const centro = centroInicial(payload)
-  return centro ? `/centro/${centro}` : '/perfil'
+  if (!centro) return '/perfil'
+  return payload?.rol === ROL_COACH ? `/centro/${centro}/entrenamiento` : `/centro/${centro}`
 }
 
 export async function middleware(req) {
@@ -77,6 +94,12 @@ export async function middleware(req) {
     if (centroId && !canAccessCentro(payload, centroId)) {
       const url = req.nextUrl.clone()
       url.pathname = destino(payload)
+      return NextResponse.redirect(url)
+    }
+    // El Coach entra a su centro solo por el entrenamiento.
+    if (centroId && payload?.rol === ROL_COACH && !rutaDelCoach(pathname, centroId)) {
+      const url = req.nextUrl.clone()
+      url.pathname = `/centro/${centroId}/entrenamiento`
       return NextResponse.redirect(url)
     }
   }

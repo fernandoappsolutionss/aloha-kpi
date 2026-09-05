@@ -4,7 +4,9 @@ import { requireSession, requireCentroAccess, requireCurrentAdmin, centrosDe } f
 import { fallo } from '../../lib/errores'
 
 const PAISES = ['PA', 'VE']
-const ORDEN_ROL = ['coordinador', 'administradora', 'asistente']
+// Orden del equipo en la ficha del centro: primero quien manda, despues quien
+// opera, y el Coach al final (es del centro, pero no lo administra).
+const ORDEN_ROL = ['coordinador', 'administradora', 'asistente', 'coach']
 
 // Solo los centros del usuario: gerencia todos, el coordinador los suyos,
 // administradora/asistente el propio. Alimenta el selector "Ir a centro".

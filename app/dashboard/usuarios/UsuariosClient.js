@@ -14,9 +14,10 @@ const ROLES = {
   coordinador: { label: 'Coordinador Operativo', help: 'Administra cuentas operativas únicamente dentro de los centros que le asignes.' },
   administradora: { label: 'Administradora', help: 'Opera todo su centro, incluido cerrar y reabrir el mes.' },
   asistente: { label: 'Asistente', help: 'Registra la operación del día, pero no cierra ni reabre el mes ni elimina registros.' },
+  coach: { label: 'Coach', help: 'Entra solo a su entrenamiento: no opera el centro. Si da clases en dos centros, se le asigna su centro base — el de la administradora que le firma.' },
 }
 const roleLabel = role => ROLES[role]?.label || role
-const UN_CENTRO = ['administradora', 'asistente']
+const UN_CENTRO = ['administradora', 'asistente', 'coach']
 const centerNames = user => user.centerNames.join(' · ') || (['admin_general', 'supervisor'].includes(user.role) ? 'Todos los centros' : 'Sin centro asignado')
 
 function UserActions({ user, disabled, pendingAction, onEdit, onAccess, onDelete }) {

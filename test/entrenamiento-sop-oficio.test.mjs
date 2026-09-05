@@ -13,6 +13,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { MODULOS_OFICIO, moduloOficio } from '../lib/entrenamiento/oficio/catalogo.js'
 import { derivarSop, TOPE, nombreDeRol } from '../components/entrenamiento/sop-derivar.mjs'
+import { esDePapel } from '../lib/entrenamiento/oficio/progreso.js'
 
 const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8')
 const bloqueCss = (sel) => css.slice(css.indexOf(`${sel} {`)).split('}')[0]
@@ -89,7 +90,7 @@ test('derivarSop: los topes recortan el NÚMERO, nunca el TEXTO de un paso', () 
   assert.deepEqual(h.pasos, largo.slice(0, TOPE.pasos), 'ni un paso recortado a la mitad: ahí viven las cifras y los plazos')
 })
 
-// ── 2. LAS 40 HOJAS ───────────────────────────────────────────────────────
+// ── 2. TODAS LAS HOJAS ────────────────────────────────────────────────────
 // Los cinco módulos de método y hat no declaran `sop` todavía. Su hoja derivada
 // imprime el TEMARIO bajo el título "Los pasos" —una taxonomía, no un
 // procedimiento—, y por eso NO se les ofrece desde ninguna pantalla (la píldora
@@ -100,7 +101,11 @@ const SIN_SOP_ESCRITO = new Set(['of-met-1', 'of-met-2', 'of-met-3', 'of-hat-adm
 // errores típicos, este test pide que salga de aquí.
 const VACIOS_CONOCIDOS = { 'of-met-1': ['errores'] }
 
-test('las 40 hojas: nada queda fuera del papel y lo que falta se declara', () => {
+// El conteo NO va en el nombre: el catálogo crece (40 → los del Coach, los del
+// Coordinador y las seis hojas de papel del aseo) y un número en el título
+// envejece en silencio mientras el test sigue en verde. El barrido es sobre
+// MODULOS_OFICIO entero, que es la afirmación de verdad.
+test('cada hoja del oficio: nada queda fuera del papel y lo que falta se declara', () => {
   const sinEscribir = []
   for (const m of MODULOS_OFICIO) {
     const h = derivarSop(m)
@@ -114,7 +119,16 @@ test('las 40 hojas: nada queda fuera del papel y lo que falta se declara', () =>
     // se escribió más largo de lo que cabe y hay que partirlo en dos procesos.
     assert.equal(h.pasosOmitidos, 0, `${m.id}: quedan ${h.pasosOmitidos} pasos fuera de la hoja`)
     assert.deepEqual(h.vacios, VACIOS_CONOCIDOS[m.id] || [], `${m.id}: secciones que la hoja no puede sostener`)
-    assert.deepEqual(h.aplicaA, m.roles.map(nombreDeRol), `${m.id}: la hoja tiene que decir de qué puestos es`)
+    // De qué puesto es la hoja. Se deriva de `roles`, salvo en las hojas DE
+    // PAPEL: el personal de aseo no es un rol del sistema —no tiene cuenta— y
+    // su nombre solo puede venir escrito en el `sop` del módulo.
+    if (esDePapel(m)) {
+      assert.ok(h.papel, `${m.id}: la hoja de un módulo sin roles tiene que marcarse como papel`)
+      assert.ok(h.aplicaA.length > 0, `${m.id}: una hoja de papel tiene que decir a quién se le entrega (escríbelo en sop.aplicaA)`)
+    } else {
+      assert.equal(h.papel, false, `${m.id}: solo un módulo sin roles es de papel`)
+      assert.deepEqual(h.aplicaA, m.roles.map(nombreDeRol), `${m.id}: la hoja tiene que decir de qué puestos es`)
+    }
     if (!h.escrito) sinEscribir.push(m.id)
   }
   assert.deepEqual(
@@ -132,8 +146,11 @@ test('una hoja = un proceso: of-cen-9 dejó de arrastrar las reglas de permisos'
   assert.equal(cen9.decide.length, 1)
   assert.doesNotMatch(JSON.stringify(cen9.decide), /permiso/i, 'los permisos son otro proceso: van en la hoja de of-nor-6')
   const nor6 = derivarSop(moduloOficio('of-nor-6'))
-  assert.match(nor6.proceso, /permiso/i, 'of-nor-6 es la hoja de los permisos, y la llevan los dos puestos')
-  assert.deepEqual(moduloOficio('of-nor-6').roles.slice().sort(), ['administradora', 'asistente'])
+  assert.match(nor6.proceso, /permiso/i, 'of-nor-6 es la hoja de los permisos, y la lleva todo cargo')
+  // La normativa es bloque A: la estudian los CUATRO puestos, no dos. Si esta
+  // lista vuelve a quedarse en dos, es que al Coach o al Coordinador se le cayó
+  // el bloque A y entrarían a su curso de puesto sin haber leído el Manual.
+  assert.deepEqual(moduloOficio('of-nor-6').roles.slice().sort(), ['administradora', 'asistente', 'coach', 'coordinador'])
 })
 
 // ── 3. QUE QUEPA EN UNA HOJA ──────────────────────────────────────────────
@@ -191,6 +208,33 @@ export function altoEstimado(h) {
   return FIJO + cabeza + producto + pasos + cierre
 }
 
+// LA HOJA DE PAPEL. El paquete del personal de aseo se imprime desde ESTA misma
+// ruta —no hay un segundo sistema de impresión—, con dos diferencias: quién
+// puede abrirla y el pie, que lleva tres firmas en tinta en vez de la del jefe
+// entrenador. Las tres van en UNA FILA del grid: si envolvieran, el pie
+// crecería y el presupuesto de alto de abajo dejaría de valer sin avisar.
+test('la hoja de papel se marca, nombra a quién se le entrega y firma en tinta', () => {
+  const base = { id: 'of-ase-9', titulo: 'Hoja suelta', roles: [], pfv: 'El producto.', bloques: [], drills: [] }
+  const sinNombre = derivarSop(base)
+  assert.equal(sinNombre.papel, true)
+  assert.deepEqual(sinNombre.aplicaA, [], 'sin roles y sin sop.aplicaA no hay a quién nombrar: la hoja lo declara vacío, no lo inventa')
+
+  const conNombre = derivarSop({ ...base, sop: { proceso: 'P', aplicaA: ['Personal de Aseo'], pasos: ['Uno.'] } })
+  assert.deepEqual(conNombre.aplicaA, ['Personal de Aseo'], 'el nombre del puesto que no es rol del sistema solo puede venir escrito')
+  assert.equal(conNombre.papel, true)
+
+  // Y un módulo con roles NUNCA es de papel, aunque escriba aplicaA.
+  const normal = derivarSop({ ...base, roles: ['asistente'], sop: { proceso: 'P', aplicaA: ['Otra cosa'], pasos: ['Uno.'] } })
+  assert.equal(normal.papel, false)
+
+  const hoja = readFileSync(new URL('../components/entrenamiento/SopHoja.js', import.meta.url), 'utf8')
+  assert.match(hoja, /hoja\.papel \? ' sop-firmas--papel' : ''/, 'el pie de papel tiene que pedir su propia rejilla')
+  assert.match(hoja, /Quien lo recibió/, 'firma quien recibió el entrenamiento')
+  assert.match(hoja, /Quien lo tomó/, 'y firma quien se lo tomó')
+  const papelCss = bloqueCss('.sop-firmas--papel')
+  assert.match(papelCss, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) 34mm/, 'tres columnas en UNA fila: el pie no puede crecer')
+})
+
 test('el CSS del que cuelga la estimación no se movió', () => {
   const hoja = bloqueCss('.sop-hoja')
   assert.match(hoja, /width:\s*210mm/, 'la hoja dejó de medir 210 mm de ancho: vuelve a medir los CPL')
@@ -207,7 +251,7 @@ test('el CSS del que cuelga la estimación no se movió', () => {
   assert.match(css, /@media screen and \(max-width: 899px\)/, 'debajo de 900 px la hoja fluye en una columna para poder leerse en el teléfono')
 })
 
-test('las 40 hojas caben en una A4', () => {
+test('cada hoja del oficio cabe en una A4', () => {
   const desbordan = []
   for (const m of MODULOS_OFICIO) {
     const alto = altoEstimado(derivarSop(m))
