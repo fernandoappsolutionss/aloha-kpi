@@ -1,5 +1,5 @@
-// Cola del Oficial de Entrenamiento: quién tiene módulos ESTUDIADOS esperando
-// que le tomen el drill, y hace cuántos días. La página solo se pinta si
+// Cola del jefe entrenador: quién tiene módulos ESTUDIADOS esperando
+// que le tomen la maniobra, y hace cuántos días. La página solo se pinta si
 // puedeFirmar() lo permite — y el servidor lo vuelve a comprobar en
 // firmarDrill(), que es donde de verdad importa.
 //
@@ -20,30 +20,32 @@ export default async function FirmasPage({ params }) {
     colaFirmas(Number(id)),
   ])
 
-  const shell = (contenido) => (
+  const shell = (estado, contenido) => (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre || 'Centro'} centroId={id} />
-      <main className="main ent-page">
+      {/* id + data-page-state: el "Saltar al contenido" del layout apunta a
+          #main-content, y sin el estado la ruta no entra al barrido R10. */}
+      <main className="main ent-page" id="main-content" data-page-state={estado}>
         <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
         {contenido}
       </main>
     </div>
   )
 
-  if (cola?.error) return shell(<div className="alert alert--error" role="alert">{cola.error}</div>)
+  if (cola?.error) return shell('error', <div className="alert alert--error" role="alert">{cola.error}</div>)
 
   const cabecera = (
     <div className="main__head"><div>
-      <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Oficial de Entrenamiento</div>
-      <h1 className="h-title">Drills por firmar</h1>
+      <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Jefe entrenador</div>
+      <h1 className="h-title">Maniobras por firmar</h1>
       <p className="h-sub">
-        Estudiar no es saber hacer. Tómale el drill, tilda los criterios que de verdad cumplió y firma. Si no los cumple, no firmes: devuélvelo al módulo.
+        Estudiar no es saber hacer. Tómale la maniobra, tilda los criterios que de verdad cumplió y firma. Si no los cumple, no firmes: devuélvelo al módulo.
       </p>
     </div></div>
   )
 
   if (!cola.filas.length) {
-    return shell(<>
+    return shell('ready', <>
       {cabecera}
       <div className="card" style={{ padding: 24 }}>
         <p className="h-sub" style={{ margin: 0 }}>
@@ -53,7 +55,7 @@ export default async function FirmasPage({ params }) {
     </>)
   }
 
-  return shell(<>
+  return shell('ready', <>
     {cabecera}
     {cola.filas.map((f) => (
       <section key={f.usuarioId} className="ofi-cola" aria-labelledby={`alumno-${f.usuarioId}`}>
@@ -63,16 +65,16 @@ export default async function FirmasPage({ params }) {
             <p className="h-sub" style={{ margin: 0 }}>{ROL[f.rol] || f.rol} · {f.centro} · {f.email}</p>
           </div>
           <span className={`ent-pill${f.modulos.some((m) => (m.dias ?? 0) >= 7) ? ' ent-pill--bad' : ' ent-pill--mid'}`}>
-            {f.modulos.length} {f.modulos.length === 1 ? 'drill pendiente' : 'drills pendientes'}
+            {f.modulos.length} {f.modulos.length === 1 ? 'maniobra pendiente' : 'maniobras pendientes'}
           </span>
         </div>
         {f.modulos.map((m) => (
           <div key={m.id} className="ofi-cola__modulo">
             <div className="label">
               {m.titulo} · estudiado hace {m.dias == null ? '—' : m.dias} {m.dias === 1 ? 'día' : 'días'}
-              {m.drills.length > 1 ? ` · ${m.drills.length} drills en este módulo` : ''}
+              {m.drills.length > 1 ? ` · ${m.drills.length} maniobras en este módulo` : ''}
             </div>
-            {/* UN panel por MÓDULO, no por drill: la firma es del módulo (una
+            {/* UN panel por MÓDULO, no por maniobra: la firma es del módulo (una
                 sola columna drill_firmado_at por usuario y módulo). Con cuatro
                 botones, tomar uno firmaba los cuatro. */}
             <PanelDrill drills={m.drills} indice={`${f.usuarioId}-${m.id}`} usuarioId={f.usuarioId} moduloId={m.id}

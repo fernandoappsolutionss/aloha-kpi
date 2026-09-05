@@ -32,7 +32,7 @@ export default function EntrenamientoAdminPage() {
   }, [centroId, recarga])
 
   async function reiniciar(u) {
-    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las firmas de drill de su Oficial de Entrenamiento.\n\nÚsalo cuando entra una administradora nueva que usa el mismo correo del centro.`)
+    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando entra una administradora nueva que usa el mismo correo del centro.`)
     if (!ok) return
     const r = await reiniciarProgreso(u.id)
     if (r?.error) { setError(r.error); return }

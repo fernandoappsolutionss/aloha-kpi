@@ -11,6 +11,17 @@ import { CENTER_LEVELS } from '../../../lib/growth/constants.mjs'
 
 const MEDAL = { 1:'🥇', 2:'🥈', 3:'🥉' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+// El color del centro lo pinta PRODUCTO, no el checklist.
+const colorSemaforo = (c) => c?.semaforo?.color === 'verde' ? 'var(--ok)' : c?.semaforo?.color === 'rojo' ? 'var(--bad)' : 'var(--warn)'
+// Orden del ranking: primero si el centro crece y cumple, después cuánto crece,
+// y sólo al final la disciplina. Ordenar por el checklist ponía a ANCLAS en el
+// podio con 88% mientras perdía 2,7 niños al mes.
+const RANGO = { verde: 0, amarillo: 1, rojo: 2 }
+const ordenProducto = (a, b) =>
+  (RANGO[a?.semaforo?.color] ?? 1) - (RANGO[b?.semaforo?.color] ?? 1)
+  || (a.metasFallidas ?? 0) - (b.metasFallidas ?? 0)
+  || (b.netMensual ?? -Infinity) - (a.netMensual ?? -Infinity)
+  || b.nuevos - a.nuevos
 const podioAccent = (pos) => pos === 1 ? 'var(--ts-green)' : pos === 2 ? 'var(--text-muted)' : 'var(--text-dim)'
 
 export default function RankingPage() {
@@ -28,7 +39,7 @@ export default function RankingPage() {
     getCentrosKpi(period.year, period.quarter)
       .then((data) => {
         if (!active) return
-        const sorted = [...(data || [])].sort((a, b) => b.cumpl - a.cumpl || b.nuevos - a.nuevos)
+        const sorted = [...(data || [])].sort(ordenProducto)
         setCentros(sorted.map((c, i) => ({ ...c, pos: i + 1 })))
       })
       .catch(() => { if (active) setError('No se pudo cargar ranking. Intenta de nuevo.') })
@@ -44,7 +55,7 @@ export default function RankingPage() {
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Ranking · {label}</div>
             <h1 className="h-title">Ranking de centros</h1>
-            <p className="h-sub">Clasificación por % de cumplimiento — {label}</p>
+            <p className="h-sub">Clasificación por producto: ¿el centro crece y cumple sus metas? — {label}</p>
           </div>
           <PeriodSelector value={period} onChange={changePeriod} />
         </div>
@@ -67,8 +78,10 @@ export default function RankingPage() {
                   <div style={{ fontSize: 30, marginBottom: 8 }}>{MEDAL[c.pos]}</div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{c.nombre}</div>
                   <div className="label" style={{ marginBottom: 14 }}>{c.admin}</div>
-                  <div className="kpi__value" style={{ color: cumplColor(c.cumpl) }}>{c.cumpl}%</div>
-                  <div className="kpi__sub">cumplimiento</div>
+                  <div className="kpi__value" style={{ color: colorSemaforo(c) }}>
+                    <span aria-hidden="true">{c.semaforo?.forma} </span>{c.semaforo?.estado || '—'}
+                  </div>
+                  <div className="kpi__sub">{c.semaforo?.titulo || ''}</div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 18, marginTop: 16 }} className="num">
                     <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>{c.nuevos} nuevos</span>
                     <span style={{ color: 'var(--text-muted)' }}>{c.ninos} niños</span>
@@ -94,7 +107,7 @@ export default function RankingPage() {
                 <table className="table operations-table--ranking">
                   <caption className="sr-only">Clasificación completa · {label}</caption>
                   <thead>
-                    <tr>{['Pos.','Centro','Administradora','Cumplimiento','Nuevos ing.','Niños activos','Nivel','Tendencia'].map(h =>
+                    <tr>{['Pos.','Centro','Administradora','Estado','Disciplina','Nuevos ing.','Niños activos','Nivel','Crecimiento'].map(h =>
                       <th key={h}>{h}</th>
                     )}</tr>
                   </thead>
@@ -107,15 +120,17 @@ export default function RankingPage() {
                         <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
                         <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{c.cumpl}%</span>
-                            <div className="bar"><div className="bar__fill" style={{ width: `${c.cumpl}%`, background: cumplColor(c.cumpl) }} /></div>
-                          </div>
+                          <span className={`pill ${c.semaforo?.color === 'verde' ? 'pill--ok' : c.semaforo?.color === 'rojo' ? 'pill--bad' : 'pill--warn'}`} title={c.semaforo?.motivo}>
+                            <span className="dot" /><span aria-hidden="true">{c.semaforo?.forma}</span> {c.semaforo?.estado}
+                          </span>
                         </td>
+                        <td className="num" style={{ color: 'var(--text-muted)' }}>{c.disciplina ?? c.cumpl}%</td>
                         <td className="num" style={{ color: 'var(--text)' }}>{c.nuevos}</td>
                         <td className="num" style={{ color: 'var(--text-muted)' }}>{c.ninos}</td>
                         <td><NivelBadge nivel={c.nivel} size="sm" /></td>
-                        <td style={{ color: c.trend === '↑' ? 'var(--ok)' : c.trend === '↓' ? 'var(--bad)' : 'var(--text-dim)' }}>{c.trend === '↑' ? 'Al alza' : c.trend === '↓' ? 'A la baja' : 'Estable'}</td>
+                        <td className="num" style={{ color: c.netMensual == null ? 'var(--text-dim)' : c.netMensual > 0 ? 'var(--ok)' : 'var(--bad)' }}>
+                          {c.netMensual == null ? 'sin dato' : `${c.netMensual > 0 ? '+' : ''}${c.netMensual} niños/mes`}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -126,9 +141,10 @@ export default function RankingPage() {
                 {centros.map(c => <OperationalCard key={c.id} headingLevel={3} title={`${c.pos}. ${c.nombre}`} subtitle={c.admin}
                   fields={[
                     { label: 'Posición', value: c.pos }, { label: 'Administradora', value: c.admin || '—' },
-                    { label: 'Cumplimiento', value: `${c.cumpl}%` }, { label: 'Nuevos ingresos', value: c.nuevos },
+                    { label: 'Estado', value: `${c.semaforo?.estado || '—'} — ${c.semaforo?.titulo || ''}` },
+                    { label: 'Disciplina', value: `${c.disciplina ?? c.cumpl}%` }, { label: 'Nuevos ingresos', value: c.nuevos },
                     { label: 'Niños activos', value: c.ninos }, { label: 'Nivel', value: <NivelBadge nivel={c.nivel} /> },
-                    { label: 'Tendencia', value: c.trend === '↑' ? 'Al alza' : c.trend === '↓' ? 'A la baja' : 'Estable' },
+                    { label: 'Crecimiento', value: c.netMensual == null ? 'sin dato' : `${c.netMensual > 0 ? '+' : ''}${c.netMensual} niños/mes` },
                   ]} />)}
               </div>
             </div>

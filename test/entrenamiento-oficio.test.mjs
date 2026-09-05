@@ -25,10 +25,18 @@ const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota'])
 const TONOS = new Set(['regla', 'ojo', 'alerta'])
 
 // Recorre cada string de un módulo (textos, items, celdas, criterios…).
+// EXCEPTO `voz`: ese campo no es contenido de pantalla, es el guion que se le
+// manda a ElevenLabs, y lleva marcas de respiración <break time="0.3s"/> —
+// obligatorias para que la locución no suene a robot. Nunca se pinta en el
+// navegador (no viaja en metadatosOficio ni lo recibe ninguna isla cliente),
+// así que el invariante anti-HTML de abajo no aplica ahí. Su forma la blinda
+// test/entrenamiento-oficio-voz.test.mjs, que exige la marca y prohíbe el
+// markdown, los "B/." y los "%".
+const SIN_BARRIDO = new Set(['voz'])
 function textos(v, out = []) {
   if (typeof v === 'string') out.push(v)
   else if (Array.isArray(v)) for (const x of v) textos(x, out)
-  else if (v && typeof v === 'object') for (const k of Object.keys(v)) textos(v[k], out)
+  else if (v && typeof v === 'object') for (const k of Object.keys(v)) { if (!SIN_BARRIDO.has(k)) textos(v[k], out) }
   return out
 }
 
@@ -204,11 +212,11 @@ test('el plan de cada rol es el suyo: la asistente no ve el curso del Centro ni 
   }
 })
 
-// ── 8. HCA EN LOS DATOS ───────────────────────────────────────────────────
+// ── 8. el método EN LOS DATOS ───────────────────────────────────────────────────
 const VERBO_VAGO = /\b(entiende|sabe|conoce|comprende)\b/i
 const VERBO_ACCION = /\b(hace|registra|explica|dice|arma|abre|llena|entrega|muestra|ejecuta|corrige|identifica|aplica|calcula|redacta|clasifica|ubica|anota|reporta|resuelve|demuestra|completa|revisa|firma|carga|emite|cierra|convierte|localiza|cita|responde|toma|coloca|verifica|separa|compara|prepara|actualiza|contacta|escribe|nombra|repite|simula|conduce|atiende)\b/i
 
-test('HCA: masa, palabras del glosario y drills con criterios observables', () => {
+test('método: lo que va a la vista, palabras del glosario y maniobras con criterios observables', () => {
   for (const m of MODULOS_OFICIO) {
     assert.ok(m.masa.length >= 1, `${m.id}: sin masa`)
     assert.ok(m.pfv && m.pfv.length > 10, `${m.id}: pfv vacío o de una palabra`)
@@ -353,6 +361,40 @@ test('marcarTerminos: no pierde ni un carácter, marca solo lo permitido y respe
   // El más largo gana: "cuentas por cobrar" no se parte en "cuentas".
   const largo = marcarTerminos('Revisa cuentas por cobrar hoy.', { ...GLO, cuentas: { termino: 'Cuentas', variantes: ['cuentas'], que: 'x' } }, ['cuentas', 'cuentas-por-cobrar'], new Set())
   assert.deepEqual(largo.filter((s) => s.t === 'termino').map((s) => s.texto), ['cuentas por cobrar'])
+})
+
+// ── 12 bis. EL TERCER SENTIDO DE "CICLO" ──────────────────────────────────
+// En ALOHA "ciclo" nombra dos cosas oficiales y el entrenamiento las separa con
+// dos tarjetas: `ciclo` (el del Programa: Ciclo 1 y Ciclo 2) y
+// `ciclo-de-matricula` (el paquete que pagó el padre). Pero hay un TERCER uso
+// vivo en el contenido —"cerrar el ciclo" de un reclamo, "el ciclo completo de
+// las operaciones"— que no es ninguno de los dos.
+//
+// Hoy no sale ningún tooltip equivocado porque ningún módulo con esos textos
+// declara 'ciclo' en `palabras`. Nada lo sostenía: el día que alguien agregue
+// 'ciclo' a of-nor-3 o a of-cen-8, "cerrar el ciclo" se lleva el popover
+// "Ciclo 1: los niveles 1 al 4" delante de la persona que está estudiando cómo
+// atender un reclamo. Esto lo caza en CI.
+const TERCER_SENTIDO = /cerrar el ciclo|cierra el ciclo|ciclo completo de las operaciones/i
+// Lo que BloquesOficio pasa por el auto-enlace: `tabla` y `sub` se pintan planos.
+const textoEnlazable = (m) => (m.bloques || []).flatMap((b) => {
+  if (b.t === 'p' || b.t === 'nota') return [b.texto]
+  if (b.t === 'lista' || b.t === 'pasos') return b.items || []
+  return []
+})
+
+test('ningún módulo que declare "ciclo" usa la palabra en su tercer sentido', () => {
+  const choques = []
+  for (const m of MODULOS_OFICIO) {
+    if (!(m.palabras || []).includes('ciclo')) continue
+    for (const t of textoEnlazable(m)) {
+      if (TERCER_SENTIDO.test(t)) choques.push(`${m.id}: "${String(t).match(TERCER_SENTIDO)[0]}"`)
+    }
+  }
+  assert.deepEqual(
+    choques, [],
+    'este módulo declara la tarjeta `ciclo` (la etapa del Programa) y su texto usa "ciclo" con el sentido de "hasta cerrar el caso": el auto-enlace le va a poner el tooltip equivocado. Cambia la redacción a "hasta cerrar el caso" o saca `ciclo` de `palabras`',
+  )
 })
 
 // ── 13. HIGIENE DE BUNDLE ─────────────────────────────────────────────────

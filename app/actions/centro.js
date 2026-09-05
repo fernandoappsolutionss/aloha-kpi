@@ -3,7 +3,6 @@ import { sql } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { nivelPorNinos, siguienteNivel } from '../../lib/nivel'
 import { quarterMetrics } from '../../lib/kpi-calc'
-import { cumplimientoPct } from '../../lib/checklist'
 import { fechaIso10, hoyISO } from '../../lib/operaciones'
 import { iniciosClaseMes, periodosAbiertosOperativos, proyeccionSiguienteMes, resumenConCuadroVivo, fechaInicioClasesConfiable } from '../../lib/inicios-clase.mjs'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
@@ -114,12 +113,11 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const nivelEnCurso = nivel
   const sig = siguienteNivel(cur.ninos)
 
-  // Cumplimiento REAL = checklist (hoja "Cumplimiento" de los Excel) del trimestre.
-  const cumpRows = await sql`
-    SELECT cu.* FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
-    WHERE t.centro_id = ${centroId} AND t.anio = ${year} AND t.trimestre = ${trimestre}
-  `
-  const cumplChecklist = cumplimientoPct(cumpRows)
+  // El % del checklist sobre los 33 criterios YA NO SE DEVUELVE. Era el 88% que
+  // daba la falsa confianza, y aunque ninguna pantalla lo pintaba ya, seguía
+  // viajando listo en el payload esperando a que alguien volviera a usarlo.
+  // La disciplina —ponderada y con su denominador de meses— la sirve
+  // getDisciplinaTrimestre (app/actions/cumplimiento.js).
 
   // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
   // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
@@ -200,7 +198,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     total: proyeccionSiguienteMes({ cierreActual, bajasPotenciales, iniciosProgramados }),
   }
 
-  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, meses: cur.months, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, cumplimientoPct: cumplChecklist, graduacion, proyeccion }
+  return { nombre: c?.nombre || '', metas: metas || null, rs, ks, meses: cur.months, nivel, nivelEnCurso, sig, ninosActual: cur.ninos, desOkActual: cur.desOk, graduacion, proyeccion }
 }
 
 // Todos los meses con datos (para la vista de historial/tendencias del centro).

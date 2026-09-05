@@ -62,6 +62,23 @@ export default function KPIPage() {
   // advertencia; null = mes cerrado o anterior al gate (todo manual).
   const [kpiAuto, setKpiAuto] = useState(null)
 
+  // Mes por enlace: /centro/3/kpi?year=2026&month=8 abre agosto directamente.
+  // Lo usa la alerta de higiene de datos, que nombra el mes que falta cerrar —
+  // decirle a alguien "cierra agosto" y dejarlo buscando el selector es la
+  // diferencia entre una tarea y un reclamo.
+  // ponytail: se lee de window.location en vez de useSearchParams (techo: no
+  // reacciona si el query cambia sin recargar, cosa que hoy no ocurre; salida:
+  // useSearchParams el día que la página se envuelva en un Suspense propio —
+  // hoy ese hook obligaría a un boundary sólo para esto).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const query = new URLSearchParams(window.location.search)
+    const y = Number(query.get('year'))
+    const m = Number(query.get('month'))
+    if (Number.isInteger(y) && y >= 2000 && y <= 2999) setYear(y)
+    if (Number.isInteger(m) && m >= 1 && m <= 12) setMonth(m)
+  }, [])
+
   const loadData = useCallback(async () => {
     const sequence = ++loadSequence.current
     setLoadError('')

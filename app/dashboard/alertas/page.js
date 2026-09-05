@@ -3,7 +3,10 @@ import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
-import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
+import { getMetasMarcadasPanel } from '../../actions/cumplimiento'
+import AvisoDiscrepanciaMetas from '../../../components/AvisoDiscrepanciaMetas'
+import AvisoDiscrepanciaHistorico from '../../../components/AvisoDiscrepanciaHistorico'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel, quarterMonths } from '../../../lib/period'
 
 const COLORS = {
   critico: { bg:'var(--bad-bg)', border:'var(--bad-line)', title:'var(--bad-text)', dot:'var(--bad)' },
@@ -19,18 +22,21 @@ const nivelTxt = (n) => (n ? `Nivel ${n}` : 'Sin nivel')
 function buildAlertas(centros, prevNivel, label) {
   const out = []
   for (const c of centros) {
-    // ── Cumplimiento (siempre se muestra, según su banda) ──
+    // ── PRODUCTO (siempre se muestra, según su semáforo) ──
+    // Antes esta rama salía del checklist de 33 criterios: un centro que
+    // decrecía emitía "Buen cumplimiento (88%)" en banda VERDE. El mensaje lo
+    // escribe ahora el propio semáforo, que ya trae el motivo con su número.
+    const s = c.semaforo
+    const motivo = s?.motivo || ''
     if (c.estado === 'Crítico') {
       out.push({ tipo:'critico', centro:c.nombre, fecha: label,
-        msg:`Cumplimiento crítico (${c.cumpl}%). Nuevos ingresos ${c.nuevos}/${c.meta} y ${c.desercion} deserciones en el trimestre.` })
+        msg:`${motivo} Ventas ${c.ventasQ}/${c.metaQ} y ${c.desercionReal} bajas reales en el periodo.` })
     } else if (c.estado === 'Parcial') {
       out.push({ tipo:'advertencia', centro:c.nombre, fecha: label,
-        msg: c.nuevos < c.meta
-          ? `Cumplimiento parcial (${c.cumpl}%). Faltan ${c.meta - c.nuevos} nuevos ingresos para la meta.`
-          : `Cumplimiento parcial (${c.cumpl}%). Revisar deserción y cobranza.` })
+        msg:`${motivo}${c.ventasQ < c.metaQ ? ` Faltan ${c.metaQ - c.ventasQ} ventas para la meta.` : ''}` })
     } else {
       out.push({ tipo:'info', centro:c.nombre, fecha: label,
-        msg:`Buen cumplimiento (${c.cumpl}%), ${c.nuevos} nuevos ingresos${c.nivel ? ` · ${nivelTxt(c.nivel)}` : ''}.` })
+        msg:`${motivo}${c.nivel ? ` · ${nivelTxt(c.nivel)}` : ''}` })
     }
 
     // ── Críticas adicionales: bajada de nivel y niños por grupo ──
@@ -57,6 +63,16 @@ export default function AlertasPage() {
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Contraste entre lo GUARDADO en `cumplimiento` y lo CALCULADO. Va aparte de
+  // `alertas` porque no es una alerta de gestión: es un aviso de que dos
+  // fuentes del propio sistema no dicen lo mismo, y no se puede descartar.
+  const [centrosKpi, setCentrosKpi] = useState([])
+  const [metasMarcadas, setMetasMarcadas] = useState([])
+  // Un fallo al leer las metas guardadas NO puede verse igual que "no hay
+  // discrepancias": antes se tragaba con .catch(() => []) y la tarjeta
+  // desaparecía sin decir nada, así que el supervisor concluía que ya estaba
+  // corregido. Se guarda y se dice.
+  const [errorMetas, setErrorMetas] = useState('')
   const [period, setPeriod] = useState(getCurrentPeriod())
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -64,18 +80,32 @@ export default function AlertasPage() {
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
     let active = true
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setErrorMetas('')
     const prevQ = period.quarter > 1 ? period.quarter - 1 : 4
     const prevY = period.quarter > 1 ? period.year : period.year - 1
     Promise.all([
       getCentrosKpi(period.year, period.quarter),
       getCentrosKpi(prevY, prevQ),
+      // Las alertas de gestión siguen sirviendo aunque esta lectura falle,
+      // pero el fallo se REPORTA: se marca con `fallo` en vez de degradar a
+      // lista vacía, que se leería como "no hay nada que corregir".
+      getMetasMarcadasPanel(period.year, period.quarter).catch((causa) => {
+        console.error('[Alertas] no se pudieron leer las metas guardadas:', causa)
+        return { fallo: true }
+      }),
     ])
-      .then(([cur, prev]) => {
+      .then(([cur, prev, marcadas]) => {
         if (!active) return
         const prevNivel = {}
         for (const c of (prev || [])) prevNivel[c.id] = c.nivel
         setAlertas(buildAlertas(cur || [], prevNivel, label))
+        setCentrosKpi(cur || [])
+        if (marcadas && marcadas.fallo) {
+          setMetasMarcadas([])
+          setErrorMetas('No se pudo contrastar las metas guardadas de este trimestre contra el cálculo. Recarga la página: esto no quiere decir que no haya discrepancias.')
+        } else {
+          setMetasMarcadas(marcadas || [])
+        }
       })
       .catch(() => { if (active) setError('No se pudo cargar alertas. Intenta de nuevo.') })
       .finally(() => { if (active) setLoading(false) })
@@ -98,6 +128,25 @@ export default function AlertasPage() {
           </div>
           <PeriodSelector value={period} onChange={changePeriod} />
         </div>
+
+        {/* Va ARRIBA de las alertas de gestión y fuera de su lista: esto no es
+            "un centro va mal", es "el sistema no está de acuerdo consigo
+            mismo". Se queda hasta que las dos fuentes coincidan.
+
+            El histórico completo va PRIMERO y NO recibe período: es el número
+            que no se puede apagar cambiando el trimestre de arriba. Debajo, la
+            tarjeta del trimestre seleccionado, con el detalle por centro. */}
+        <AvisoDiscrepanciaHistorico />
+
+        {errorMetas && <p role="status" className="discrepancia-historico__error">{errorMetas}</p>}
+        {!loading && !error && !errorMetas && (
+          <AvisoDiscrepanciaMetas
+            centros={centrosKpi}
+            marcadas={metasMarcadas}
+            mesesDelTrimestre={quarterMonths(period.quarter)}
+            periodo={label}
+          />
+        )}
 
         {error ? <p role="alert" className="alert alert--error">{error}</p> : loading ? (
           <div role="status" className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Generando alertas…</div>

@@ -1,14 +1,14 @@
 'use client'
-// El drill: el ejercicio práctico que cierra el módulo. No lo aprueba el
-// sistema — lo firma el Oficial de Entrenamiento (el jefe inmediato) después de
-// tomárselo. Por eso hay dos vistas: la del alumno (qué le van a pedir) y la de
+// La maniobra: el ejercicio práctico que cierra el módulo. No la aprueba el
+// sistema — la firma el jefe entrenador (el jefe inmediato) después de
+// tomársela. Por eso hay dos vistas: la del alumno (qué le van a pedir) y la de
 // quien firma (los criterios observables, uno por uno, y el botón).
 //
-// LA FIRMA ES DEL MÓDULO, NO DE UN DRILL SUELTO. entrenamiento_progreso tiene un
-// solo drill_firmado_at por (usuario, módulo), así que este panel recibe TODOS
-// los drills del módulo y pone UN botón con los criterios de todos juntos.
-// Pintar un botón por drill haría creer que se firman de a uno cuando en
-// realidad los cuatro reescriben la misma fila.
+// LA FIRMA ES DEL MÓDULO, NO DE UNA MANIOBRA SUELTA. entrenamiento_progreso
+// tiene un solo drill_firmado_at por (usuario, módulo), así que este panel
+// recibe TODAS las maniobras del módulo y pone UN botón con los criterios de
+// todas juntas. Pintar un botón por maniobra haría creer que se firman de a una
+// cuando en realidad las cuatro reescriben la misma fila.
 //
 // Recibe todo por props: no importa el catálogo ni el glosario.
 import { useState } from 'react'
@@ -16,13 +16,13 @@ import { firmarDrill, quitarFirmaDrill } from '../../app/actions/entrenamiento-o
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
 
-// Los criterios de los N drills, en una sola lista. Con más de uno se dice de
-// cuál viene cada criterio para que el Oficial no pierda el hilo al tildar.
+// Los criterios de las N maniobras, en una sola lista. Con más de una se dice
+// de cuál viene cada criterio para que quien firma no pierda el hilo al tildar.
 function criteriosDe(lista) {
   const varios = lista.length > 1
   return lista.flatMap((d, i) => (d.criterios || []).map((c) => ({
     texto: c,
-    de: varios ? `Drill ${i + 1}` : '',
+    de: varios ? `Maniobra ${i + 1}` : '',
   })))
 }
 
@@ -74,7 +74,7 @@ function Firma({ criterios, usuarioId, moduloId, firmadoAt, firmadoPor }) {
       ) : (
         <div className="ofi-drill__acciones">
           <button className="btn btn--primary" onClick={firmar} disabled={!todos || guardando}>
-            {guardando ? 'Firmando…' : 'Firmar el drill'}
+            {guardando ? 'Firmando…' : 'Firmar la maniobra'}
           </button>
           {!todos && <span className="h-sub" style={{ margin: 0 }}>Se firma cuando cumple los {criterios.length} criterios.</span>}
         </div>
@@ -86,14 +86,14 @@ function Firma({ criterios, usuarioId, moduloId, firmadoAt, firmadoPor }) {
 function Cuerpo({ drill, numero }) {
   return (
     <div className="ofi-drill__uno">
-      {numero > 0 && <div className="label" style={{ marginTop: 14 }}>Drill {numero} de la lista</div>}
+      {numero > 0 && <div className="label" style={{ marginTop: 14 }}>Maniobra {numero} de la lista</div>}
       <h3 className="ofi-sub" style={{ marginTop: numero > 0 ? 4 : 0 }}>{drill.titulo}</h3>
       {drill.proposito && <p className="ofi-p"><b>Para qué:</b> {drill.proposito}</p>}
-      {drill.gradiente && <div className="ofi-nota ofi-nota--ojo"><strong>Gradiente</strong><p>{drill.gradiente}</p></div>}
+      {drill.gradiente && <div className="ofi-nota ofi-nota--ojo"><strong>Antes de esta maniobra</strong><p>{drill.gradiente}</p></div>}
 
       {(drill.masa || []).length > 0 && (
         <>
-          <div className="label" style={{ marginTop: 14 }}>Ten esto delante</div>
+          <div className="label" style={{ marginTop: 14 }}>Ten esto a la vista</div>
           <ul className="ofi-lista">{drill.masa.map((m, i) => <li key={i}>{m}</li>)}</ul>
         </>
       )}
@@ -123,11 +123,11 @@ export default function PanelDrill({ drills, indice, usuarioId, moduloId, modulo
     <section className="card ofi-drill" aria-labelledby={`drill-${indice}`}>
       <div className="label" style={{ marginBottom: 6 }}>
         {varios
-          ? `${lista.length} drills · se toman los ${lista.length} y se firma una sola vez, porque la firma es del módulo`
-          : 'Drill · lo toma y lo firma tu Oficial de Entrenamiento'}
+          ? `${lista.length} maniobras · se toman las ${lista.length} y se firma una sola vez, porque la firma es del módulo`
+          : 'Maniobra · te la toma y la firma tu jefe entrenador'}
       </div>
       <h2 id={`drill-${indice}`} style={{ fontSize: 20, margin: '0 0 8px' }}>
-        {varios ? (moduloTitulo || 'Los drills de este módulo') : lista[0].titulo}
+        {varios ? (moduloTitulo || 'Las maniobras de este módulo') : lista[0].titulo}
       </h2>
 
       {lista.map((d, i) => <Cuerpo key={i} drill={d} numero={varios ? i + 1 : 0} />)}
@@ -137,18 +137,18 @@ export default function PanelDrill({ drills, indice, usuarioId, moduloId, modulo
       ) : (
         <div className="ofi-drill__estado">
           {firmadoAt ? (
-            <span className="ent-pill ent-pill--ok">✓ Drill firmado {fmt(firmadoAt)}{firmadoPor?.nombre ? ` por ${firmadoPor.nombre}` : ''}</span>
+            <span className="ent-pill ent-pill--ok">✓ Maniobra firmada {fmt(firmadoAt)}{firmadoPor?.nombre ? ` por ${firmadoPor.nombre}` : ''}</span>
           ) : (
             <>
-              <span className="ent-pill ent-pill--mid">Falta que te lo firmen</span>
+              <span className="ent-pill ent-pill--mid">Falta que te la firmen</span>
               <p className="h-sub" style={{ margin: '8px 0 0' }}>
                 {estudiado
-                  ? `Ya lo estudiaste. ${quien ? `Te lo toma ${quien}` : 'Pídele a tu Oficial de Entrenamiento que te lo tome'}; los criterios de aprobación son los que va a tildar.`
-                  : `Primero estudia el módulo y responde sus preguntas; después ${quien ? `pídele a ${quien}` : 'pídele a tu Oficial de Entrenamiento'} que te tome el drill.`}
+                  ? `Ya lo estudiaste. ${quien ? `Te la toma ${quien}` : 'Pídele a tu jefe entrenador que te la tome'}; los criterios de aprobación son los que va a tildar.`
+                  : `Primero estudia el módulo y responde sus preguntas; después ${quien ? `pídele a ${quien}` : 'pídele a tu jefe entrenador'} que te tome la maniobra.`}
               </p>
               {!quien && (
                 <p className="h-sub" style={{ margin: '4px 0 0' }}>
-                  Todavía no tienes un Oficial de Entrenamiento asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con drill.
+                  Todavía no tienes un jefe entrenador asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con maniobra.
                 </p>
               )}
             </>

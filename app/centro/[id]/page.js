@@ -8,16 +8,19 @@ import Sidebar from '../../../components/Sidebar'
 import { tienePanel } from '../../../components/useRol'
 import { getCentroResumen } from '../../actions/centro'
 import { getCentroGrowth } from '../../actions/growth'
+import { getDisciplinaTrimestre } from '../../actions/cumplimiento'
 import { resumenProgreso } from '../../actions/entrenamiento'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import PeriodSelector from '../../../components/PeriodSelector'
 import GrowthSummaryBand from '../../../components/growth/GrowthSummaryBand'
 import GrowthBriefing from '../../../components/growth/GrowthBriefing'
+import SemaforoProducto, { SemaforoPill } from '../../../components/SemaforoProducto'
+import { evaluarProducto, mesesProducto, normalizarMetas, semaforo as calcularSemaforo, verdictoCrecimiento, dec1 } from '../../../lib/marcadores.mjs'
+import AlertaDesercionCoach from '../../../components/coach/AlertaDesercionCoach'
+import AlertaHigieneDatos from '../../../components/higiene/AlertaHigieneDatos'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const Q_MONTHS = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] }
-
-const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 
 function Bar({ val, max, color = 'var(--ts-green)' }) {
   const pct = Math.min((val / (max || 1)) * 100, 100)
@@ -108,9 +111,10 @@ export default function CentroPage() {
     origen: { marketing: 0, centro: 0, activaciones: 0, referidos: 0, medios: 0 },
   })
   const [meta, setMeta] = useState({ nuevos: 20, desercion: 18.4, cobranza: 1 })
-  const [cumplReal, setCumplReal] = useState(null)
+  const [disciplina, setDisciplina] = useState(null)
   const [graduacion, setGraduacion] = useState(null)
   const [growth, setGrowth] = useState(null)
+  const [growthFallo, setGrowthFallo] = useState(false)
   const [ent, setEnt] = useState(null)
 
   useEffect(() => {
@@ -129,58 +133,65 @@ export default function CentroPage() {
     ;(async () => {
       setLoading(true)
       setError('')
+      setGrowthFallo(false)
       try {
         const year = period.year
         const trimestre = period.quarter
         const months = Q_MONTHS[trimestre] || [1, 2, 3]
 
-        const [summary, growthData] = await Promise.all([
+        const [summary, growthData, disciplinaData] = await Promise.all([
           getCentroResumen(id, year, trimestre),
           getCentroGrowth(id).catch((error) => {
             console.error('[CentroPage] no se pudo cargar la ruta de nivel:', error)
+            // `null` = no se pudo CALCULAR. No es lo mismo que "no hay
+            // tendencia": si esto se confundiera, un centro que se desangra
+            // bajaría de ROJO a AMARILLO por un fallo de red.
+            setGrowthFallo(true)
+            return null
+          }),
+          getDisciplinaTrimestre(id, year, trimestre).catch((error) => {
+            console.error('[CentroPage] no se pudo cargar la disciplina operativa:', error)
             return null
           }),
         ])
         if (!active) return
         if (!summary || summary.error) throw new Error(summary?.error || 'No se pudo cargar el resumen.')
-        const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, cumplimientoPct, graduacion: grad } = summary
+        const { nombre: cNombre, metas: m, rs, ks, meses: mesesCalc, graduacion: grad } = summary
         if (cNombre) setNombre(cNombre)
-        setCumplReal(cumplimientoPct ?? null)
+        setDisciplina(disciplinaData || null)
         setGraduacion(grad || null)
         setGrowth(growthData)
 
-        const metaFetched = {
-          nuevos: m?.meta_nuevos_ingresos_mes ?? 20,
-          desercion: Number(m?.meta_desercion_mes ?? 8),
-          cobranza: m?.meta_cobranza_max ?? 1,
-        }
+        // Una sola normalización de metas en todo el producto. Neon devuelve
+        // las columnas `numeric` como STRING ("8", "3"): aquí se normalizaba a
+        // mano y `cobranza` se quedaba sin Number(), que es exactamente la
+        // trampa de "8" > 8.9 que ya nos mordió una vez.
+        const metaFetched = normalizarMetas(m)
         setMeta(metaFetched)
 
-        const mensual = months.map(mo => {
-          const r = (rs || []).find(x => x.month === mo)
-          const ws = (ks || []).filter(x => x.month === mo)
-          const nuevos = ws.reduce((s, w) => s + (w.ing_d1 || 0) + (w.ing_d2 || 0) + (w.ing_d3 || 0) + (w.ing_d4 || 0) + (w.ing_d5 || 0), 0)
-          const desercionSemanal = ws.reduce((s, w) => s + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
-          let cobMes = 0
-          if (ws.length) {
-            const lastSem = [...ws].sort((a, b) => b.semana - a.semana)[0]
-            cobMes = lastSem.cob_d5 || lastSem.cob_d4 || lastSem.cob_d3 || lastSem.cob_d2 || lastSem.cob_d1 || 0
-          }
-          // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
-          // heredado del cierre anterior y cierre real del mes cuando existe.
-          const calc = (mesesCalc || []).find(x => x.mo === mo)
-          const desercion = r?.retiros_operativos_mes ?? desercionSemanal
-          const ninosInicio = calc ? calc.ninosInicio : (r?.ninos_inicio_mes || 0)
-          const nuevosActivosMes = r?.nuevos_activos_mes || 0
-          const ninosFin = calc ? calc.ninosFinal : Math.max(0, ninosInicio + nuevosActivosMes - desercion)
-          const desPctMes = ninosInicio > 0 ? (desercion / ninosInicio) * 100 : (desercion > 0 ? 100 : 0)
-          const cumple = nuevos >= metaFetched.nuevos && desPctMes <= metaFetched.desercion && cobMes <= metaFetched.cobranza
+        // El encadenamiento lo resuelve el servidor (quarterMetrics): inicio
+        // heredado del cierre anterior y cierre real del mes cuando existe.
+        // La derivación mes a mes vive en lib/marcadores.mjs para que el
+        // Resumen y la pantalla de Cumplimiento juzguen las metas con el mismo
+        // número. Ahí se corrige además la deserción: el % se mide sobre la
+        // deserción REAL (bajas − graduados), no sobre las bajas brutas —
+        // graduarse es un logro y no puede tumbarte la meta.
+        const mensual = mesesProducto({ months, rs, ks, mesesCalc }).map((m) => {
+          // Un mes sin cobranza declarada NO cumple la meta del mes: no se
+          // aprueba por silencio (antes un mes en blanco valía 0 = perfecto).
+          const cumple = m.tieneDatos
+            && m.ventas >= metaFetched.nuevos
+            && m.desPct <= metaFetched.desercion
+            && m.cobranzaRegistrada
+            && m.cobranza <= metaFetched.cobranza
           return {
-            mes: NOMBRES_MES[mo - 1],
-            mesNum: mo,
-            nuevos, desercion, desPct: desPctMes, cobranza: cobMes, ninos: ninosFin,
-            ninosInicio, nuevosActivos: nuevosActivosMes,
-            cumpl: cumple ? 'Sí' : 'No'
+            ...m,
+            mes: NOMBRES_MES[m.mesNum - 1],
+            // Alias del vocabulario que ya usa el resto de la pantalla.
+            nuevos: m.ventas,
+            desercion: m.bajas,
+            ninos: m.ninosFin,
+            cumpl: cumple ? 'Sí' : 'No',
           }
         })
         setMeses(mensual)
@@ -232,23 +243,52 @@ export default function CentroPage() {
   </div>
 
   const cumplCount = meses.filter(m => m.cumpl === 'Sí').length
-  const cumplPctMetas = meses.length ? Math.round((cumplCount / meses.length) * 100) : 0
-  const cumplPct = cumplReal != null ? cumplReal : cumplPctMetas
   const maxMot = Math.max(totals.motivos.tecnica, totals.motivos.perdida, totals.motivos.economico, totals.motivos.horario, totals.motivos.graduado, 1)
   const maxOri = Math.max(totals.origen.marketing, totals.origen.centro, totals.origen.activaciones, totals.origen.referidos, totals.origen.medios, 1)
-  const metaNuevosTrim = meta.nuevos * meses.length
-  const desercionAlta = meses.some(m => (m.desPct || 0) > meta.desercion)
   const graduadosQ = totals.motivos.graduado || 0
   const desReal = Math.max(0, totals.desercion - graduadosQ)
 
-  // Cumplimiento por indicador (para el KPI trimestral por rol y la cobranza)
-  const mesesConDatos = meses.filter(m => m.ninosInicio > 0 || m.nuevos > 0 || m.desercion > 0 || m.nuevosActivos > 0)
-  const nuevosOk = totals.nuevosIngresos >= metaNuevosTrim
-  const desercionOk = !desercionAlta
-  // Gestión de cobranza: se cumple si en cada mes con datos la cobranza vencida quedó dentro de la meta.
-  const cobranzaEval = mesesConDatos.length > 0
-  const cobranzaOk = cobranzaEval && mesesConDatos.every(m => (m.cobranza || 0) <= meta.cobranza)
-  const ultCobranza = mesesConDatos.length ? (mesesConDatos[mesesConDatos.length - 1].cobranza || 0) : 0
+  // ── MARCADOR 1 · PRODUCTO (manda y pinta el semáforo) ──────────────────────
+  // Las tres metas de resultado se juzgan en UN solo sitio (lib/marcadores.mjs)
+  // y de ahí salen tanto el semáforo como los KPI por rol. El crecimiento no se
+  // recalcula: es el monthlyNet que el motor ya produce con medianas de los 6
+  // cierres anteriores (growth.projection.scenarios.base).
+  const producto = evaluarProducto({ meses, metas: meta, anio: period.year })
+  // El motor de crecimiento NO recibe periodo: `calculateCentroGrowth` siempre
+  // proyecta desde HOY. Estampar ese número sobre un trimestre pasado es
+  // mentir: al abrir ANCLAS en Q3-2025 el semáforo seguía diciendo "pierde 2,7
+  // niños al mes", que es el dato de septiembre de 2026. Mientras el motor no
+  // acepte una ventana, la tendencia sólo se muestra en el trimestre corriente.
+  const periodoActual = getCurrentPeriod()
+  const esPeriodoCorriente = period.year === periodoActual.year && period.quarter === periodoActual.quarter
+  const netMensual = esPeriodoCorriente ? (growth?.projection?.scenarios?.base?.monthlyNet ?? null) : null
+  const crecimiento = verdictoCrecimiento(netMensual)
+  const estado = calcularSemaforo({
+    metasFallidas: producto.metasFallidas,
+    metasQueFallan: producto.metasQueFallan,
+    crecimiento,
+    netMensual,
+    confianza: esPeriodoCorriente ? (growth?.metrics?.confidence?.level ?? null) : null,
+    sinDatos: producto.sinDatos,
+    registroCompleto: producto.registroCompleto,
+    mesesSinRegistrar: producto.mesesSinRegistrar,
+    mesesSinCobranza: producto.mesesSinCobranza,
+    graduadosMedianos: esPeriodoCorriente ? (growth?.metrics?.medians?.graduates ?? null) : null,
+    retirosMedianos: esPeriodoCorriente ? (growth?.metrics?.medians?.withdrawals ?? null) : null,
+    crecimientoNoDisponible: esPeriodoCorriente && growthFallo,
+  })
+  const metaNuevosTrim = producto.metaQ
+  const desercionAlta = producto.P2 === false
+  const nuevosOk = producto.P1 === true
+  const desercionOk = producto.P2 === true
+  const cobranzaEval = !producto.sinDatos
+  const cobranzaOk = producto.P3 === true
+  // La tarjeta enseña el PEOR mes de cobranza, no el último: el centro fallaba
+  // por Julio (16 vencidas) y la pantalla mostraba el número de Septiembre.
+  // Un mes sin ningún cob_* escrito ya NO vale 0 ("cobranza perfecta"): vale
+  // "sin registrar", y se dice.
+  const peorCobranza = producto.peorCobranza ? producto.peorCobranza.cobranza : '—'
+  const peorCobranzaMes = producto.peorCobranza ? NOMBRES_MES[producto.peorCobranza.mesNum - 1] : null
   const promGrupo = totals.grupos > 0 ? (totals.ninosActivos / totals.grupos) : 0
   const pcv = promGrupo > 0 ? (120 / promGrupo) + 16 : 0
   const gpn = totals.ninosActivos > 0 ? ((totals.ninosActivos * 108) * (1 - pcv / 100) - 7800) / totals.ninosActivos : 0
@@ -268,18 +308,39 @@ export default function CentroPage() {
           </div>
           <div className="center-summary-actions">
             <PeriodSelector value={period} onChange={changePeriod} />
-            <span className={`pill ${cumplColor(cumplPct) === 'var(--ok)' ? 'pill--ok' : cumplColor(cumplPct) === 'var(--warn)' ? 'pill--warn' : 'pill--bad'}`}>
-              <span className="dot" />{cumplPct}% cumplimiento
-            </span>
+            <SemaforoPill semaforo={estado} />
           </div>
         </div>
 
-        {!isAdmin && ent && ent.completados < ent.total && (
-          <div className="alert center-summary-actions" style={{ marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)' }}>
+        {/* El semáforo va ARRIBA de todo y a ancho completo: si el centro no
+            está creciendo, eso tiene que ser lo primero que se vea. */}
+        <SemaforoProducto semaforo={estado} producto={producto} />
+
+        {/* "Dónde se está yendo la gente" — justo debajo del semáforo, como
+            pidió Fernando. Se dibuja sola sólo si algún coach dispara los 4
+            candados; sin alerta no ocupa espacio. */}
+        <AlertaDesercionCoach centroId={id} anio={period.year} trimestre={period.quarter} />
+
+        {/* "Lo que falta por cargar" — la confianza baja bloquea el VERDE del
+            semáforo, y hasta ahora eso se veía como una etiqueta gris sin
+            salida. Esta lista dice qué falta, con nombre y número, y no se
+            puede descartar: se va sola cuando el dato está cargado. Recibe el
+            payload de crecimiento que la página ya tiene en memoria para no
+            volver a correr el motor. */}
+        <AlertaHigieneDatos centroId={id} growth={growth} />
+
+        {/* El entrenamiento va DESPUÉS del semáforo y sin fondo verde: antes
+            era la primera caja con color de la pantalla, y en un centro en rojo
+            lo primero que se veía era un banner verde hablando de módulos de
+            curso. Con el centro en alerta roja, la siguiente acción no es
+            terminar un módulo: se oculta. */}
+        {!isAdmin && ent && ent.completados < ent.total && estado.color !== 'rojo' && (
+          <div className="alert center-summary-actions" style={{ marginBottom: 16, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <span>Tu entrenamiento: <b>{ent.completados} de {ent.total}</b> módulos completados.</span>
             <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento`}>Continuar →</Link>
           </div>
         )}
+
         <div data-tour="resumen.ruta"><GrowthSummaryBand data={growth} onOpen={() => router.push(`/centro/${id}/ruta-nivel`)} /></div>
 
         {/* KPI Trimestral por rol — cada rol ve sus propios indicadores */}
@@ -288,16 +349,16 @@ export default function CentroPage() {
             rol="Administrador"
             sub="Ventas y deserción"
             items={[
-              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
-              { l: 'Deserción real', v: desReal, meta: 'Meta: <' + meta.desercion + '% mensual', ok: desercionOk, eval: true },
+              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: producto.P1 !== null },
+              { l: 'Deserción real', v: desReal, meta: producto.peorDesercion ? 'Peor mes ' + dec1(producto.peorDesercion.pct) + '% · meta ≤' + meta.desercion + '%' : 'Meta: ≤' + meta.desercion + '% mensual', ok: desercionOk, eval: producto.P2 !== null },
             ]}
           />
           <RoleKpi
             rol="Asistente"
             sub="Ventas y gestión de cobranza"
             items={[
-              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: true },
-              { l: 'Gestión de cobranza', v: ultCobranza, meta: 'Meta: ≤ ' + meta.cobranza + ' cobranza vencida', ok: cobranzaOk, eval: cobranzaEval },
+              { l: 'Nuevos ingresos venta', v: totals.nuevosIngresos, meta: 'Meta: ' + metaNuevosTrim, ok: nuevosOk, eval: producto.P1 !== null },
+              { l: 'Gestión de cobranza', v: peorCobranza, meta: (peorCobranzaMes ? 'Peor mes: ' + peorCobranzaMes + ' · ' : producto.mesesSinCobranza.length ? 'Sin registrar en ' + producto.mesesSinCobranza.length + ' mes(es) · ' : '') + 'meta ≤ ' + meta.cobranza + ' vencidas', ok: cobranzaOk, eval: producto.P3 !== null },
             ]}
           />
         </div>
@@ -330,11 +391,14 @@ export default function CentroPage() {
                   <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{m.mes}</td>
                   <td className="num" style={{ fontWeight: 600, color: m.nuevos >= meta.nuevos ? 'var(--ok)' : 'var(--bad)' }}>{m.nuevos}</td>
                   <td className="num" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{m.nuevosActivos}</td>
-                  <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desercion}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%</span></td>
+                  {/* Deserción REAL (bajas − graduados), que es contra lo que
+                      se juzga la meta. Las bajas totales quedan a la vista para
+                      que el graduado no desaparezca del relato. */}
+                  <td className="num" style={{ color: (m.desPct || 0) > meta.desercion ? 'var(--bad)' : 'var(--text-muted)' }}>{m.desReal}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> · {(m.desPct || 0).toFixed(1)}%{m.graduados > 0 ? ` (${m.bajas} bajas, ${m.graduados} 🎓)` : ''}</span></td>
                   <td className="num" style={{ color: 'var(--text)' }}>{m.ninos}</td>
-                  <td className="num" style={{ color: m.cobranza <= meta.cobranza ? 'var(--ok)' : 'var(--bad)', fontWeight: 600 }}>
-                    {m.cobranza}
-                    <span style={{ fontSize: 13, fontWeight: 400 }}> {m.cobranza <= meta.cobranza ? '✓' : '✗'}</span>
+                  <td className="num" style={{ color: !m.cobranzaRegistrada ? 'var(--text-dim)' : m.cobranza <= meta.cobranza ? 'var(--ok)' : 'var(--bad)', fontWeight: 600 }}>
+                    {m.cobranzaRegistrada ? m.cobranza : 'sin registrar'}
+                    {m.cobranzaRegistrada && <span style={{ fontSize: 13, fontWeight: 400 }}> {m.cobranza <= meta.cobranza ? '✓' : '✗'}</span>}
                   </td>
                   <td>
                     <span className={`pill ${m.cumpl === 'Sí' ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{m.cumpl}</span>
@@ -347,9 +411,9 @@ export default function CentroPage() {
               {meses.map(m => <OperationalCard key={m.mesNum} title={m.mes} fields={[
                 { label: 'Ventas', value: m.nuevos },
                 { label: 'Nuevos activos', value: m.nuevosActivos },
-                { label: 'Deserción', value: `${m.desercion} · ${m.desPct.toFixed(1)}%` },
+                { label: 'Deserción real', value: `${m.desReal} · ${m.desPct.toFixed(1)}%${m.graduados > 0 ? ` (${m.bajas} bajas)` : ''}` },
                 { label: 'Niños', value: m.ninos },
-                { label: 'Cobranza', value: m.cobranza },
+                { label: 'Cobranza', value: m.cobranzaRegistrada ? m.cobranza : 'sin registrar' },
                 { label: 'Meta', value: m.cumpl },
               ]} />)}
             </div>
@@ -422,18 +486,29 @@ export default function CentroPage() {
             ))}
           </div>
 
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={sectionTitle}>Cumplimiento trimestral</h3>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 500, color: cumplColor(cumplPct), marginBottom: 10, letterSpacing: '-0.02em', lineHeight: 1 }}>{cumplPct}%</div>
-            <div className="bar" style={{ height: 10, marginBottom: 16 }}>
-              <div className="bar__fill" style={{ width: cumplPct + '%', background: cumplColor(cumplPct) }} />
+          {/* MARCADOR 2 · DISCIPLINA OPERATIVA. Es soporte: va deliberadamente
+              más pequeño, sin barra de color propia y sin promediarse jamás con
+              Producto. Un 100% de disciplina junto a un semáforo rojo se lee
+              como texto, no como logro. El denominador de meses va siempre a la
+              vista: ahí es donde se escondía el 88% fantasma. */}
+          <div className="card disciplina" style={{ padding: 20 }}>
+            <h3 style={sectionTitle}>Disciplina operativa</h3>
+            <div className="disciplina__valor">{disciplina?.pct != null ? `${disciplina.pct}%` : 'Sin registrar'}</div>
+            <div className="disciplina__denominador">
+              {disciplina
+                ? `${disciplina.mesesRegistrados} de ${meses.length || 3} meses registrados · ${disciplina.puntos} de ${disciplina.maximo} puntos`
+                : 'No se pudo cargar el checklist del trimestre.'}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <Kpi l="Meses cumplidos" v={cumplCount + '/' + meses.length} />
+            <p className="disciplina__nota">
+              Son las 30 actividades del checklist. No pintan el semáforo: el producto valioso es que el centro crezca.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+              <Kpi l="Meses en meta" v={cumplCount + '/' + meses.length} />
               <Kpi l="Niños inicio trim." v={meses[0]?.ninosInicio || 0} />
               <Kpi l="Niños final trim." v={totals.ninosActivos} />
               <Kpi l="Nuevos ingresos venta" v={totals.nuevosIngresos} />
             </div>
+            <Link className="btn" style={{ marginTop: 14 }} href={`/centro/${id}/cumplimiento`}>Ver el checklist →</Link>
           </div>
         </div>
       </main>

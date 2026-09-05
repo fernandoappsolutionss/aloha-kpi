@@ -93,7 +93,7 @@ export default function DashboardPage() {
     { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
     { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el período', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
-    { label: 'Cumplimiento prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'promedio general', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
+    { label: 'Disciplina prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'checklist, no el producto', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
     { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },
   ]
 
@@ -232,7 +232,7 @@ export default function DashboardPage() {
                 { label: 'Nuevos', value: `${c.nuevos} / ${c.meta}` },
                 { label: 'Deserción', value: c.desercion },
                 { label: 'Cobranza', value: c.cobranza },
-                { label: 'Cumplimiento', value: `${c.cumpl}%` },
+                { label: 'Disciplina', value: `${c.disciplina ?? c.cumpl}%` },
                 { label: 'Tendencia', value: c.nuevos >= c.meta ? 'Al alza' : 'A la baja' },
                 { label: 'Nivel', value: <NivelBadge nivel={c.nivel} /> },
               ]} actions={<Link className="btn" href="/dashboard/ranking" aria-label={`Ver ranking de ${c.nombre}`}>Ver ranking</Link>} />)}
