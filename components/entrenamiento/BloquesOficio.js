@@ -6,7 +6,7 @@
 //
 // No importa el catálogo ni el glosario: recibe por props solo los términos de
 // SU módulo. Así la prosa de los 40 módulos nunca entra al bundle del cliente.
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { marcarTerminos } from '../../lib/entrenamiento/oficio/progreso'
 
 // "a **b** c" → [{b:false,t:'a '},{b:true,t:'b'},{b:false,t:' c'}]
@@ -49,8 +49,8 @@ function Termino({ texto, termino }) {
 
 // Texto con **negrita** y auto-enlace del glosario. `ya` es el Set compartido
 // del módulo: cada término se marca UNA vez, en su primera aparición.
-function Rico({ texto, terminos, ya }) {
-  const slugs = useMemo(() => Object.keys(terminos || {}), [terminos])
+function renderRico({ texto, terminos, ya }) {
+  const slugs = Object.keys(terminos || {})
   const piezas = []
   let k = 0
   for (const trozo of partirNegrita(texto)) {
@@ -88,7 +88,7 @@ function Tabla({ bloque }) {
 export default function BloquesOficio({ bloques, terminos }) {
   // Un solo Set por render: el auto-enlace no repite el mismo término párrafo
   // tras párrafo, solo la primera vez que aparece en el módulo.
-  const ya = useMemo(() => new Set(), [bloques, terminos])
+  const ya = new Set()
   return (
     <div className="ofi-bloques">
       {(bloques || []).map((b, i) => {
@@ -96,18 +96,18 @@ export default function BloquesOficio({ bloques, terminos }) {
           case 'sub':
             return <h3 key={i} className="ofi-sub">{b.texto}</h3>
           case 'p':
-            return <p key={i} className="ofi-p"><Rico texto={b.texto} terminos={terminos} ya={ya} /></p>
+            return <p key={i} className="ofi-p">{renderRico({ texto: b.texto, terminos, ya })}</p>
           case 'lista':
-            return <ul key={i} className="ofi-lista">{(b.items || []).map((it, j) => <li key={j}><Rico texto={it} terminos={terminos} ya={ya} /></li>)}</ul>
+            return <ul key={i} className="ofi-lista">{(b.items || []).map((it, j) => <li key={j}>{renderRico({ texto: it, terminos, ya })}</li>)}</ul>
           case 'pasos':
-            return <ol key={i} className="ofi-pasos">{(b.items || []).map((it, j) => <li key={j}><Rico texto={it} terminos={terminos} ya={ya} /></li>)}</ol>
+            return <ol key={i} className="ofi-pasos">{(b.items || []).map((it, j) => <li key={j}>{renderRico({ texto: it, terminos, ya })}</li>)}</ol>
           case 'tabla':
             return <Tabla key={i} bloque={b} />
           case 'nota':
             return (
               <div key={i} className={`ofi-nota ofi-nota--${b.tono}`}>
                 <strong>{b.titulo}</strong>
-                <p><Rico texto={b.texto} terminos={terminos} ya={ya} /></p>
+                <p>{renderRico({ texto: b.texto, terminos, ya })}</p>
               </div>
             )
           default:
