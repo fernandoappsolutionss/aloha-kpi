@@ -701,7 +701,7 @@ cambio, no un descuido.
 
 ### File del colaborador
 
-**Qué es.** La carpeta física de cada persona del equipo, que reposa en el centro. Debe contener hoja de vida, documentos de soporte, cédula y carnet de seguro social, contrato, recibido de la copia del contrato, recibido de equipos, certificados de incapacidad, solicitudes de permiso, evaluaciones y correspondencia interna.
+**Qué es.** La carpeta física de cada persona del equipo, que reposa en el centro. El Manual enumera once documentos: hoja de vida, documentos de soporte, cédula y carnet de seguro social, contrato, recibido de la copia del contrato, recibido de equipos, certificados de incapacidad, solicitudes de permiso, evaluaciones, correspondencia interna y cualquier otro documento del colaborador.
 
 **Ejemplo.** Toda solicitud de permiso autorizada termina en el file del colaborador; si no está ahí, no existe.
 

@@ -1,0 +1,745 @@
+// ============================================================
+// BANCO DE PREGUNTAS - CURSO 4: COACH ALOHA
+// ALOHA Mental Arithmetic
+// Importar en Moodle: Banco de preguntas > Importar > formato GIFT
+// ============================================================
+
+$CATEGORY: Coach ALOHA/M1 Perfil del Coach
+
+::C1-01:: El perfil del Coach ALOHA contempla profesionales de entre... {
+=22 a 45 anos
+~18 a 30 anos
+~25 a 50 anos
+~20 a 40 anos
+}
+
+::C1-02:: La experiencia requerida es en manejo de grupos de ninos comprendidos entre las edades de... {
+=4 a 16 anos
+~4 a 13 anos
+~6 a 12 anos
+~3 a 10 anos
+}
+
+::C1-03:: El perfil exige disponibilidad de tiempo de lunes a viernes en el horario de... {
+=3 a 8 p.m.
+~8 a.m. a 1 p.m.
+~1 a 5 p.m.
+~4 a 6 p.m.
+}
+
+::C1-04:: Un Coach puede solicitar o recibir dinero de un representante para promover un interes politico o religioso siempre que lo haga fuera del Centro.{F}
+
+::C1-05:: Si un Coach no puede seguir cumpliendo sus obligaciones, que exige el Manual? {
+=Que organice para quien asuma el cargo los registros y datos necesarios para llevar a cabo el trabajo
+~Que avise el mismo dia de su salida
+~Que entregue solo las llaves del salon
+~Nada, esa gestion es del Administrador
+}
+
+::C1-06:: El uso del chaleco oficial ALOHA al momento de impartir clases es obligatorio para el Coach.{T}
+
+::C1-07:: Un Coach puede eliminar registros de los archivos del Centro cuando considera que ya no sirven.{F}
+
+::C1-08:: Sobre la libertad de culto, el Manual establece que el Coach... {
+=tiene libertad para asistir a la iglesia y adorar, pero no debe usar su posicion e influencia para hacer proselitismo
+~no puede profesar ninguna religion mientras trabaje en ALOHA
+~puede invitar a los padres de su grupo a su congregacion
+~puede compartir su fe en clase si los ninos preguntan
+}
+
+::C1-09:: Cual de estos requisitos indispensables corresponde al Coach ALOHA? {
+=Cumplir con los protocolos del Programa, las politicas de los Centros y las observaciones de su Administrador
+~Tener titulo de contador publico
+~Vivir a menos de una hora del Centro
+~Tener automovil propio
+}
+
+$CATEGORY: Coach ALOHA/M2 Confidencialidad
+
+::C2-01:: La tecnica ALOHA se considera informacion confidencial del Programa.{T}
+
+::C2-02:: Firmar un acuerdo de no divulgacion es... {
+=una condicion de empleo para todos los colaboradores
+~opcional para los Coaches por servicios profesionales
+~un requisito solo para el Administrador
+~algo que se firma al cumplir un ano
+}
+
+::C2-03:: Un colaborador divulga informacion confidencial pero no obtiene ningun beneficio de ello. Segun el Manual... {
+=igual queda sujeto a accion disciplinaria, extincion de la relacion laboral y accion legal
+~no hay consecuencia porque no hubo lucro
+~solo aplica un llamado de atencion verbal
+~se evalua caso por caso sin sancion posible
+}
+
+::C2-04:: La lista de ninos de tu grupo con nombres y contactos es informacion confidencial porque constituye lista de clientes.{T}
+
+::C2-05:: Cual de estos NO figura entre los ejemplos de informacion confidencial del Manual? {
+=El calendario de feriados nacionales publicado por el Estado
+~La informacion sobre la compensacion
+~Las estrategias de comercializacion
+~Las referencias de clientes
+}
+
+::C2-06:: Que documento adjunta el Manual como referencia, junto al modelo de contrato de confidencialidad? {
+=La Ley 81 del 2019 de proteccion de datos personales
+~La Ley 45 de educacion
+~La Ley de Caja de Seguro Social
+~Ninguno, es solo una politica interna
+}
+
+::C2-07:: Lo que gana otro Coach es informacion sobre la compensacion y por lo tanto es confidencial.{T}
+
+::C2-08:: Un Coach puede compartir con un colega de otra institucion una foto del material de mentales si aclara que es solo de referencia.{F}
+
+$CATEGORY: Coach ALOHA/M3 Entrenamiento y niveles
+
+::C3-01:: Quien es el unico encargado de certificar los niveles del Programa? {
+=El Master Coach
+~El Administrador de Centro
+~El Coordinador Operativo
+~El Coach mas antiguo del Centro
+}
+
+::C3-02:: Cual es la nota minima para pasar el examen de entrenamiento en el primer intento? {
+=80 por ciento
+~70 por ciento
+~90 por ciento
+~60 por ciento
+}
+
+::C3-03:: Si el Coach no pasa el examen en el primer intento, debe volver a presentarlo dentro de un mes calendario y pasarlo con un minimo de... {
+=90 por ciento
+~80 por ciento
+~85 por ciento
+~la misma nota de 80 por ciento
+}
+
+::C3-04:: Si el Coach no pasa la segunda presentacion del examen, la consecuencia es... {
+=volver a cursar nuevamente todo el entrenamiento con el Master Coach
+~un tercer intento a los quince dias
+~pasar automaticamente con acompanamiento del Administrador
+~quedar habilitado solo para grupos Tiny Tots
+}
+
+::C3-05:: Cuantos niveles del Programa certifica el Master Coach? {
+=Del nivel 1 al 8
+~Del nivel 1 al 5
+~Del nivel 1 al 10
+~Solo los niveles 1 y 2
+}
+
+::C3-06:: El proceso de observacion del entrenamiento exige presenciar... {
+=dos clases completas de KIDS y TINY y una Clase de Padres
+~una clase de KIDS unicamente
+~tres clases de Tiny Tots
+~un Campeonato Nacional
+}
+
+::C3-07:: La Clase de Prueba que dicta el Coach en formacion debe darse con presencia de un supervisor.{T}
+
+::C3-08:: Antes de realizar el Cierre de Nivel de su propio grupo, el Coach debe haber visto un Cierre de Nivel.{T}
+
+::C3-09:: La duracion aproximada de la capacitacion de los niveles 3 al 8 es de... {
+=16 horas
+~32 horas
+~8 horas
+~40 horas
+}
+
+::C3-10:: La duracion aproximada de la capacitacion de los niveles 1 y 2 es de... {
+=32 horas
+~16 horas
+~24 horas
+~48 horas
+}
+
+$CATEGORY: Coach ALOHA/M4 Asignacion de grupos
+
+::C4-01:: Que define principalmente si un Coach puede dar cierto grupo? {
+=El nivel de entrenamiento que tenga aprobado
+~Su antiguedad en el Centro
+~La cantidad de grupos que ya tiene
+~La cercania de su casa al Centro
+}
+
+::C4-02:: Al asignar grupos tambien se considera que hay Coaches que funcionan mejor con TINY TOTS y otros que funcionan mejor con KIDS.{T}
+
+::C4-03:: Cual de estos NO es un criterio de escogencia del Coach para asignacion de grupos? {
+=El promedio academico de su titulo universitario
+~El cumplimiento de la asistencia
+~Haber pasado por los entrenamientos trimestrales
+~La asistencia a Campeonatos
+}
+
+::C4-04:: Las asistencias a las convocatorias de homologacion se toman en cuenta al momento de la asignacion de grupos.{T}
+
+::C4-05:: Cual de estas actividades figura en la lista de convocatorias de homologacion? {
+=Reuniones trimestrales con el equipo ALOHA Panama
+~Reuniones semestrales con la aseguradora
+~Visitas mensuales a los colegios de la zona
+~Auditorias contables del Centro
+}
+
+::C4-06:: Cuantas copias se sacan del contrato por servicios profesionales del Coach y cual es su destino? {
+=Dos, una para el Coach y otra para el expediente del Coach
+~Una sola, para el Coach
+~Tres, Coach, Administrador y corporativo
+~Dos, ambas para el archivo del Centro
+}
+
+::C4-07:: En que momento debe firmarse el contrato por servicios profesionales? {
+=A la tercera clase dada
+~Antes de la primera clase
+~Al cierre del nivel
+~Al mes de haber iniciado el grupo
+}
+
+::C4-08:: Si el Coach necesita cambiar algo de la planificacion o el calendario que se le entrego, debe... {
+=notificarlo al Administrador antes de realizar el cambio
+~informarlo en el reporte de fin de nivel
+~hacerlo y anotarlo en la bitacora
+~consultarlo con el Master Coach
+}
+
+::C4-09:: Las planificaciones y calendarios de grupo deben estar en formato DRIVE compartido.{T}
+
+$CATEGORY: Coach ALOHA/M5 Responsabilidades y ausencias
+
+::C5-01:: Sobre el ambiente de clase, la responsabilidad del Coach establece que... {
+=no hay lugar para las comparaciones entre companeros y se respetan las individualidades de cada uno
+~se debe premiar publicamente al mejor de cada clase
+~la competencia entre ninos acelera el aprendizaje
+~el orden lo impone el nino mas avanzado
+}
+
+::C5-02:: Entregar el aula de clase en iguales condiciones a las recibidas es una responsabilidad del Coach.{T}
+
+::C5-03:: Cuando el Coach debe ausentarse de una clase, el primer paso es... {
+=coordinar las posibles alternativas de reemplazo con otro Coach del nivel requerido
+~avisar al padre de familia
+~cancelar la clase y reponerla despues
+~notificar al Master Coach
+}
+
+::C5-04:: Con cuanta anticipacion minima deben solicitarse los permisos, y en que forma? {
+=Por escrito, con un minimo de tres dias de anticipacion
+~Verbalmente, el mismo dia
+~Por escrito, con un dia de anticipacion
+~Por escrito, con una semana de anticipacion
+}
+
+::C5-05:: El Coach coordina su suplencia basandose en el nivel que requiere el grupo y el nivel que tenga el Coach que lo va a suplir.{T}
+
+::C5-06:: Para efectos del bono, la puntualidad del Coach se mide llegando... {
+=20 minutos antes de su hora de inicio de clase, con tolerancia de 15 minutos
+~a la hora exacta de inicio de clase
+~10 minutos antes, sin tolerancia
+~30 minutos antes, con tolerancia de 10 minutos
+}
+
+::C5-07:: El bono mensual por puntualidad perfecta de un Coach con un solo grupo asignado es de... {
+=B/.15.00
+~B/.5.00
+~B/.25.00
+~B/.50.00
+}
+
+::C5-08:: Para un Coach con dos o mas grupos, el bono por puntualidad perfecta agrega por cada grupo adicional... {
+=B/.5.00 mensuales
+~B/.15.00 mensuales
+~B/.10.00 mensuales
+~nada adicional
+}
+
+::C5-09:: En que fecha se paga la bonificacion por puntualidad perfecta? {
+=Los 30 de cada mes
+~Los 13 de cada mes
+~Los 28 de cada mes
+~Al cierre de cada nivel
+}
+
+::C5-10:: Ante un accidente en clase, el Coach o personal presente debe brindar primeros auxilios basicos y notificar de forma inmediata al Administrador del Centro.{T}
+
+::C5-11:: Un accidente leve que no dejo lesion visible puede no reportarse para no alarmar al padre.{F}
+
+$CATEGORY: Coach ALOHA/M6 Padres
+
+::C6-01:: Un representante le pide al Coach su numero de telefono para coordinar mejor. El Coach debe... {
+=dar el celular del Centro para que sea atendido por medio de la administracion
+~dar su numero personal solo para temas academicos
+~dar su numero y avisarle al Administrador
+~dar el numero de otro Coach del Centro
+}
+
+::C6-02:: En la comunicacion con los padres se permite tutear cuando ya hay confianza.{F}
+
+::C6-03:: Quien es el unico encargado de responder por una situacion en la que se involucra al padre? {
+=El Administrador del Centro
+~El Coach del grupo
+~El Asistente Administrativo
+~El Master Coach
+}
+
+::C6-04:: Las reuniones con padres deben realizarse... {
+=siempre en presencia del Administrador
+~a solas con el Coach para mayor confianza
+~por videollamada unicamente
+~solo cuando el padre lo solicite por escrito
+}
+
+::C6-05:: Cuando hay que comunicar comportamientos destructivos de un nino, el Coach... {
+=debe hacerlo en conjunto con el Administrador del Centro
+~lo comunica solo, con tacto
+~lo escribe en Class Dojo y espera respuesta
+~lo delega al Asistente Administrativo
+}
+
+::C6-06:: Que documento se usa cuando de una reunion con el representante se desprenden cambios estructurales o acuerdos consensuados? {
+=El Resumen de Reunion Colaborativa, firmado por los representantes del Centro y del estudiante
+~El reporte de accidente escolar
+~La bitacora diaria de clases
+~La plantilla de retroalimentacion a ninos
+}
+
+::C6-07:: Donde debe reposar el Resumen de Reunion Colaborativa? {
+=En los archivos digitales del centro y en el portafolio de Class Dojo del estudiante
+~Solo en el expediente del Coach
+~Solo en el correo del Administrador
+~En el file fisico del representante unicamente
+}
+
+::C6-08:: Todo problema o inquietud de un padre se debe seguir hasta cerrar el ciclo de la situacion, es decir, hasta dar respuesta con solucion a satisfaccion.{T}
+
+::C6-09:: Que formato usa el Coach para dejar por escrito una inquietud sobre una situacion especifica? {
+=El formato de situaciones especiales
+~El cuadro de deserciones
+~La hoja de supervision de Coach
+~El calendario y asistencia
+}
+
+$CATEGORY: Coach ALOHA/M7 Asistencia, calendario y bitacora
+
+::C7-01:: A partir de cuantas faltas consecutivas de un estudiante debe el Coach informar a la Asistente Administrativa? {
+=Dos faltas consecutivas
+~Tres faltas consecutivas
+~Una falta
+~Cuatro faltas en el mes
+}
+
+::C7-02:: En el formato Calendario y Asistencia, como se indica un Mental Day? {
+=MD
+~M
+~MDay
+~D
+}
+
+::C7-03:: En el formato Calendario y Asistencia, para referirse a una semana se coloca... {
+=la letra S seguida del numero de la semana
+~la palabra completa Semana
+~la letra R seguida del numero
+~el numero de la semana solo
+}
+
+::C7-04:: En el formato Calendario y Asistencia, la letra R se usa para... {
+=los repasos
+~los recesos
+~las reposiciones
+~los reforzamientos
+}
+
+::C7-05:: Cuando debe el Coach llenar la asistencia? {
+=Al instante de dar su clase
+~Al final de la semana
+~Antes de empezar la clase
+~Cuando lo solicite el Administrador
+}
+
+::C7-06:: La asistencia en el formato de Drive se marca siguiendo una leyenda de colores amarillo y rojo.{T}
+
+::C7-07:: El formato Calendario y Asistencia se divide por hoja, y cada hoja debe tener el nombre de cada Coach con sus respectivas clases.{T}
+
+::C7-08:: La bitacora que debe llevar el Coach es... {
+=diaria de clases, evaluando aptitudes de cada nino y el conocimiento adquirido en cada clase
+~semanal, solo con la asistencia
+~mensual, con el resumen del grupo
+~por nivel, al cerrar el grupo
+}
+
+::C7-09:: Donde se comparte la bitacora del Coach? {
+=En el DRIVE entregado por el Administrador del Centro
+~En el grupo de WhatsApp del Centro
+~En el cuaderno fisico del salon
+~En el correo personal del Coach
+}
+
+$CATEGORY: Coach ALOHA/M8 Evaluacion y sandwich
+
+::C8-01:: Cada cuanto se realiza la evaluacion en el libro o el sistema indicado? {
+=Cada 3 semanas de trabajo en el libro
+~Cada semana
+~Cada mes calendario
+~Solo al cierre de nivel
+}
+
+::C8-02:: Con que frecuencia debe el Coach realizar la retroalimentacion a los ninos? {
+=Por semana
+~Cada tres semanas
+~Cada mes
+~Al cierre de nivel
+}
+
+::C8-03:: Donde se coloca la retroalimentacion de cada nino? {
+=En el portafolio de cada nino en su grupo del app Class Dojo
+~En la bitacora de clases
+~En el formato de calendario y asistencia
+~En el expediente fisico del Centro
+}
+
+::C8-04:: Cual es la estructura del sandwich de retroalimentacion? {
+=Se abre con lo positivo, en el medio va lo que hay que trabajar y se cierra con confianza
+~Se abre con lo que falta y se cierra con lo positivo
+~Solo se escribe lo positivo
+~Se alternan tres criticas y tres elogios
+}
+
+::C8-05:: Si el nino es excelente, se puede omitir el sandwich y escribir solo la nota.{F}
+
+::C8-06:: Escribir en la retroalimentacion NO HIZO LA TAREA o NO SE PORTA BIEN... {
+=se ve realmente feo y puede traer problemas con los padres
+~es correcto porque es la verdad
+~se permite si el padre ya fue advertido
+~es obligatorio para dejar constancia
+}
+
+::C8-07:: Siempre que se habla de una deficiencia del nino, el Coach debe decir que trabajaremos en ello, incluyendose como Coach, porque somos un equipo.{T}
+
+::C8-08:: Cual de estas es una frase intermedia valida del sandwich? {
+=La concentracion es la clave del exito, vamos a seguir trabajando en ella
+~Su hijo no rinde en clase
+~No practica y por eso va mal
+~Le recomiendo buscar otro programa
+}
+
+::C8-09:: Las frases sugeridas del sandwich son obligatorias y no se pueden cambiar.{F}
+
+$CATEGORY: Coach ALOHA/M9 Reforzamiento y reposicion
+
+::C9-01:: La Clase de Reforzamiento esta disenada para el nino que... {
+=a pesar de tener excelente asistencia no esta comprendiendo un contenido importante
+~falto a varias clases con contenido nuevo
+~quiere adelantar el nivel siguiente
+~necesita practicar para el Campeonato
+}
+
+::C9-02:: Quien autoriza la Clase de Reforzamiento? {
+=El Administrador de Centro
+~El Coach del nino
+~El Asistente Administrativo
+~El representante
+}
+
+::C9-03:: Cual es el costo de la Clase de Reforzamiento para el padre? {
+=No tiene costo para el padre, pero si es pagada al Coach que la imparte
+~Tiene el mismo costo que una clase de reposicion
+~La paga el padre y no se le paga al Coach
+~Es gratis y tampoco se le paga al Coach
+}
+
+::C9-04:: Cuantas asistencias consecutivas debe tener el nino para que se le otorgue una Clase de Reforzamiento? {
+=Tres asistencias consecutivas
+~Dos asistencias consecutivas
+~Cuatro asistencias consecutivas
+~No hay requisito de asistencia
+}
+
+::C9-05:: Uno de los requisitos para otorgar la Clase de Reforzamiento es que el nino no tenga Clase de Repaso siguiente a la peticion.{T}
+
+::C9-06:: Si el representante no esta paz y salvo, que ocurre con la Clase de Reforzamiento? {
+=El Asistente Administrativo lo llama para informarle que se considera necesaria y que para llevarse a cabo debe estar paz y salvo
+~Se realiza igual y se cobra despues
+~Se cancela definitivamente el caso
+~La autoriza el Coach por excepcion
+}
+
+::C9-07:: Con cuanta anticipacion minima debe confirmarse la Clase de Reforzamiento con el representante y con el Coach designado? {
+=Minimo 1 dia de anticipacion
+~Minimo 3 dias de anticipacion
+~Minimo 2 horas de anticipacion
+~El mismo dia
+}
+
+::C9-08:: Quien no debe dar la Clase de Reforzamiento de un nino? {
+=El Coach del nino
+~El Administrador de Centro
+~Un Coach con el nivel requerido
+~Cualquier Coach disponible del Centro
+}
+
+::C9-09:: La Clase de Reposicion es para el nino que falto a una o varias clases con contenido nuevo, y puede ser dictada por el mismo Coach del nino.{T}
+
+::C9-10:: Cual es el costo de la Clase de Reposicion? {
+=B/.25.00
+~B/.15.00
+~No tiene costo
+~B/.35.00
+}
+
+::C9-11:: Con cuanta anticipacion debe notificarse la inasistencia a una Clase de Reposicion para no incurrir en el recargo de 15 dolares? {
+=Minimo 2 horas de anticipacion
+~Minimo 1 dia de anticipacion
+~Minimo 3 dias de anticipacion
+~No hay recargo en ningun caso
+}
+
+::C9-12:: Esta permitido que el Coach aborde un tema delicado de un nino a solas con los padres si ya tiene confianza con ellos.{F}
+
+$CATEGORY: Coach ALOHA/M10 Estructura de clase y calendario
+
+::C10-01:: Cuantos pasos tiene la estructura de clase del Programa ALOHA? {
+=10
+~8
+~12
+~6
+}
+
+::C10-02:: Cual es el primer paso de la estructura de clase? {
+=Juego de entrada
+~ALOHA Dojo Kun
+~Repaso de la semana anterior
+~Revision de libros
+}
+
+::C10-03:: En el paso de Actividad, que corresponde hacer? {
+=Dos de las tres actividades entre Flashcard, Dictado de numero y Test de velocidad
+~Las tres actividades siempre
+~Solo Flashcard
+~Solo Test de velocidad
+}
+
+::C10-04:: Cual es el ultimo paso de la estructura de clase? {
+=Pasaporte de salida ALOHA
+~Juego final
+~Recordatorio de proximas actividades
+~Revision de libros
+}
+
+::C10-05:: Cada cuantas clases se debe sustituir una actividad por una ficha de Campeonato? {
+=Cada dos clases
+~Cada clase
+~Cada cuatro clases
+~Solo en semana de repaso
+}
+
+::C10-06:: Las clases y la programacion estan estructuradas y deben ser respetadas.{T}
+
+::C10-07:: Si el Coach necesita cambiar la programacion, esos cambios... {
+=deben ser consultados y aprobados por el Administrador del Centro
+~los decide el Coach y luego los informa
+~los aprueba el Master Coach
+~se pueden hacer si el grupo va atrasado
+}
+
+::C10-08:: La revision de libros incluye la clase y la practica en casa de la semana anterior.{T}
+
+::C10-09:: El ALOHA Dojo Kun forma parte de la estructura obligatoria de cada clase.{T}
+
+$CATEGORY: Coach ALOHA/M11 Cierres de nivel
+
+::C11-01:: Cual de estos es un objetivo del Cierre de Nivel? {
+=Incentivar la inscripcion al siguiente nivel, reforzando el compromiso con el Programa
+~Comparar el rendimiento de los ninos entre grupos
+~Recaudar el pago de las mensualidades pendientes
+~Evaluar al Coach frente a los padres
+}
+
+::C11-02:: A partir de que momento se practican los Cierres de Nivel con los ninos? {
+=A partir del ultimo Mental Day y el repaso de examen
+~En la primera semana del nivel
+~El mismo dia del cierre
+~A partir de la semana 4
+}
+
+::C11-03:: En un grupo de 8 estudiantes de Kids, el reparto sugerido de tecnicas es... {
+=2 con manos, 2 con abaco, 2 mentales y 2 en lectura de Flashcard
+~4 con abaco y 4 mentales
+~todos hacen las cuatro tecnicas
+~8 mentales, que es lo mas vistoso
+}
+
+::C11-04:: Cual es la palabra que se dice para que los ninos den el resultado al unisono? {
+=YA
+~AHORA
+~ALOHA
+~LISTO
+}
+
+::C11-05:: El Coach debe asistir como observador a un Cierre de Nivel antes de hacer el suyo por primera vez.{T}
+
+::C11-06:: Como se escogen los ninos para la demostracion? {
+=Por tecnica se escoge a los mejores, con el fin de que todos los ninos se luzcan
+~Se escoge solo a los tres mejores del grupo
+~Se escoge al azar el mismo dia
+~Los escogen los padres
+}
+
+::C11-07:: Cuales reconocimientos entrega el Coach en el Cierre de Nivel? {
+=Asistencia al 100 por ciento, practicas en casa al 100 por ciento y reconocimientos especiales como perseverancia y excelencia
+~Solo el certificado de nivel
+~Primer, segundo y tercer lugar del grupo
+~Un reconocimiento al mejor promedio
+}
+
+::C11-08:: Antes de finalizar el Cierre de Nivel se le pide a los padres que respondan la encuesta de satisfaccion enviada al correo y whatsapp.{T}
+
+::C11-09:: Para coordinar mejor el Cierre de Nivel, el Coach puede abrir un grupo de WhatsApp con los padres del salon.{F}
+
+::C11-10:: La logistica de la demostracion del Cierre de Nivel queda... {
+=a criterio del Coach y al espacio que tenga para realizar las demostraciones
+~definida por el corporativo para todos los centros
+~a criterio del Asistente Administrativo
+~definida por los padres el mismo dia
+}
+
+$CATEGORY: Coach ALOHA/M12 Examenes y situacion especial
+
+::C12-01:: En cuantas clases se divide el Examen y Cierre de Nivel? {
+=Tres clases
+~Dos clases
+~Cuatro clases
+~Una sola clase
+}
+
+::C12-02:: Que se hace en la Clase 1 del examen? {
+=Un repaso general y luego comenzar el examen iniciando con los orales
+~Culminar el examen y entregar certificados
+~Solo repasar, sin examen
+~Realizar el Cierre de Nivel
+}
+
+::C12-03:: Un nino falto a la Clase 1 del examen. Cuando lo presenta? {
+=En la Clase 2, que es para culminar el examen
+~En la Clase 3, junto con el cierre
+~En una clase de reposicion pagada
+~Pierde el examen y repite nivel
+}
+
+::C12-04:: En el caso de los Tiny, el Coach debe explicar graficamente, utilizando el pizarron, como debe realizarse cada parte del examen.{T}
+
+::C12-05:: Que hace el Coach con los examenes y las notas del grupo? {
+=Entrega los examenes a la Administracion del Centro, sube las notas al DRIVE y notifica que ya estan en la plataforma
+~Los guarda en su carpeta personal
+~Solo entrega los examenes fisicos
+~Sube las notas al DRIVE sin avisar a nadie
+}
+
+::C12-06:: Cuando el Coach preve que un nino no pasara el examen, que certificado corresponde? {
+=Certificado de Participacion, notificando con tiempo al Administrador
+~Certificado de culminacion y cumplimiento igual que los demas
+~Ningun certificado
+~Certificado condicionado hasta el proximo nivel
+}
+
+::C12-07:: El nino que recibira Certificado de Participacion queda fuera de la Presentacion de Cierre de Nivel.{F}
+
+::C12-08:: Cuando un nino no pasa el examen, quien comunica al padre que debe repetirlo? {
+=El Administrador, junto con el Asistente Administrativo, por correo
+~El Coach directamente al padre
+~El Master Coach
+~Nadie, se entera en el cierre
+}
+
+::C12-09:: Antes de repetir el examen, lo optimo es que el nino... {
+=reciba un repaso de lo que especificamente no comprendio
+~lo presente de inmediato para no perder tiempo
+~pase directo al siguiente nivel
+~cambie de Coach
+}
+
+::C12-10:: Si el nino tuvo repaso, repitio el examen y no lo paso, debe repetir el Nivel. Cuales son las dos opciones? {
+=Repetir el Nivel con un grupo completamente nuevo, o seguir en su grupo trabajando su Nivel mientras los demas avanzan, convirtiendo la clase en multinivel
+~Repetir solo el examen una tercera vez, o retirarse
+~Pasar de nivel con seguimiento, o repetir el ciclo completo del itinerario
+~Cambiar de itinerario, o esperar seis meses
+}
+
+::C12-11:: El Coach debe reportar al Administrador el caso del nino con dificultad a ultimo momento, cuando ya se acerca el examen.{F}
+
+::C12-12:: Si un nino debe repetir el Nivel, el Administrador se comunica con el Coach para... {
+=obtener informacion sobre el progreso del nino en otras areas antes de hablar con el representante
+~pedirle que lo convenza el mismo
+~asignarle otro grupo al Coach
+~solicitar el reintegro del bono de puntualidad
+}
+
+$CATEGORY: Coach ALOHA/M13 Casos integradores
+
+::C13-01:: Una mama te espera afuera del salon y te pide hablar cinco minutos sobre la conducta de su hijo, que ha estado pegandole a otros ninos. Que haces? {
+=Le indico que la administracion coordinara una reunion y hablo primero con el Administrador
+~Converso con ella ahi mismo, que es mas rapido
+~Le doy mi numero para hablar con calma en la noche
+~Le pido que lo escriba en Class Dojo
+}
+
+::C13-02:: Tienes examen la proxima clase y un nino de asistencia perfecta sigue sin entender los amigos menores. Cuando debiste activar el reforzamiento? {
+=Apenas detecte que no cumplia las expectativas de avance, no a ultimo momento
+~En la clase de repaso previa al examen
+~Despues de que repruebe el examen
+~Al cierre de nivel, si el padre reclama
+}
+
+::C13-03:: Te ofrecen un grupo de nivel 5 y tu ultimo nivel certificado por el Master Coach es el 4. Que corresponde? {
+=No puedo tomar ese grupo, el nivel aprobado es lo que habilita a dar la clase
+~Lo tomo, porque tengo mas de cinco anos de experiencia
+~Lo tomo si el Administrador me autoriza por escrito
+~Lo tomo y presento el examen del nivel 5 despues del cierre
+}
+
+::C13-04:: No vas a poder dar tu clase del jueves. Cual es la secuencia correcta? {
+=Consigo suplente con el nivel del grupo, solicito el permiso por escrito con tres dias de anticipacion, notifico al Administrador y entrego la programacion al suplente
+~Aviso al Administrador el mismo jueves y que el resuelva
+~Le escribo a los padres que la clase se pospone
+~Cancelo la clase y la repongo la semana siguiente
+}
+
+::C13-05:: Un nino lleva dos ausencias consecutivas. Que corresponde hacer? {
+=Notificar al Asistente Administrativo para que contacte al representante y ofrezca clase de reposicion
+~Esperar a la tercera ausencia
+~Llamar yo mismo al representante
+~Anotarlo solo en la bitacora
+}
+
+::C13-06:: Un padre te dice en la puerta que quiere retirar a su hijo porque no ve avance. Que haces primero? {
+=Escucho con respeto y traslado la situacion al Administrador, que es quien responde ante el padre
+~Le explico el metodo y trato de convencerlo ahi mismo
+~Le ofrezco clases de reforzamiento gratis
+~Le doy mi numero para conversarlo con calma
+}
+
+::C13-07:: Llevas tres clases dadas con tu grupo nuevo y nadie te ha entregado el contrato por servicios profesionales. Que corresponde? {
+=Solicitarlo, porque el contrato debe firmarse a la tercera clase dada
+~Esperar al cierre de nivel
+~Seguir sin contrato, basta el acuerdo verbal
+~Pedirselo al Master Coach
+}
+
+::C13-08:: Un nino de tu grupo se cae en el juego de entrada y se golpea la cabeza, pero se levanta riendo y sigue la clase. Que corresponde? {
+=Brindar primeros auxilios basicos y notificar de inmediato al Administrador, porque todo accidente por leve que parezca se reporta
+~Observarlo el resto de la clase y avisar solo si empeora
+~Avisarle a la mama a la salida y no reportarlo
+~Anotarlo en la bitacora al final del dia
+}
+
+::C13-09:: Vas atrasado dos semanas con el calendario del grupo. Que corresponde? {
+=Consultar con el Administrador y que el apruebe el ajuste de la planificacion
+~Eliminar los juegos de entrada y de salida para recuperar
+~Saltar el Mental Day
+~Adelantar contenido en casa por Class Dojo
+}
+
+::C13-10:: Terminaste el nivel y subiste las notas al DRIVE. Que falta? {
+=Notificar que las notas ya estan en la plataforma
+~Nada, con subirlas es suficiente
+~Enviarlas por correo a cada padre
+~Imprimirlas y pegarlas en el salon
+}

@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import { getCentroNombre } from '../../../actions/centros'
+import { getNavigationContext } from '../../../actions/navigation'
 import { cargarProgreso } from '../../../actions/entrenamiento'
 import CarrilOficio from '../../../../components/entrenamiento/CarrilOficio'
 import { MODULOS, ERRORES_GLOBALES, FAQ } from '../../../../lib/entrenamiento/modulos'
@@ -18,6 +19,29 @@ export default function EntrenamientoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retry, setRetry] = useState(0)
+  // EL COACH NO OPERA EL CENTRO, así que los 9 recorridos no son para él: los
+  // nueve arrancan en /ruta-nivel, /grupos, /eventos, /cuadro o /kpi
+  // (lib/entrenamiento/modulos.js), y el middleware le rebota esas cinco rutas
+  // de vuelta aquí. Es además la pantalla donde ATERRIZA: destino() lo manda a
+  // este árbol, o sea que lo primero que veía al entrar era una barra
+  // "0 de 9 recorridos" que no puede llenar nunca, con su plan real debajo.
+  // El rol se pregunta al servidor, como hace el menú; no se deduce de la ruta.
+  // null mientras no se sabe; 'desconocido' si el servidor no contestó. Se
+  // distinguen a propósito: la pista de los recorridos NO se pinta mientras el
+  // rol está en el aire (si no, al Coach le parpadea delante lo que después se
+  // le quita), pero SÍ se pinta si la consulta falló — dejar a todo el mundo
+  // sin los 9 recorridos por un error de red sería peor que el parpadeo.
+  const [rolActor, setRolActor] = useState(null)
+  const esCoach = rolActor === 'coach'
+  const veRecorridos = rolActor !== null && !esCoach
+
+  useEffect(() => {
+    let activo = true
+    getNavigationContext()
+      .then((c) => { if (activo) setRolActor(c?.actor?.role || 'desconocido') })
+      .catch(() => { if (activo) setRolActor('desconocido') })
+    return () => { activo = false }
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -64,13 +88,21 @@ export default function EntrenamientoPage() {
             <div className="label" style={{ marginBottom: 10 }}>Mi centro · Entrenamiento</div>
             <h1 className="h-title">Tu entrenamiento</h1>
             <p className="h-sub">
-              {nombre} · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).
+              {/* La frase espera al rol por lo mismo que la sección de abajo:
+                  prometerle al Coach "dos cosas distintas" y quitarle una es
+                  peor que decir el nombre del centro medio segundo antes. */}
+              {nombre}
+              {veRecorridos && <> · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).</>}
+              {esCoach && <> · Los módulos de tu puesto, cada uno con su maniobra. Los recorridos de cómo operar el sistema no son de tu puesto: tu trabajo del día lo marcas desde tu enlace de Coach.</>}
             </p>
           </div>
         </div>
 
         {/* Pista 1 — cómo usar el sistema (los 9 tours). Intacta: el oficio se
-            SUMA debajo y, si su action falla, este carril sigue funcionando solo. */}
+            SUMA debajo y, si su action falla, este carril sigue funcionando solo.
+            Al Coach no se le pinta: son nueve recorridos por pantallas que su
+            cuenta no abre. Los tours en sí NO se tocan. */}
+        {veRecorridos && (
         <section aria-labelledby="ent-sistema-titulo">
         <h2 id="ent-sistema-titulo" className="ent-seccion__titulo">Cómo usar el sistema</h2>
 
@@ -146,6 +178,7 @@ export default function EntrenamientoPage() {
           </>
         )}
         </section>
+        )}
 
         {/* Pista 2 — el oficio del puesto. Va INMEDIATAMENTE después de la
             pista 1 y antes de los acordeones de ayuda: son 389 minutos de
@@ -153,6 +186,10 @@ export default function EntrenamientoPage() {
             el pie de página de la otra pista. */}
         <CarrilOficio centroId={id} />
 
+        {/* Los dos acordeones hablan de los 9 recorridos y enlazan a ellos
+            módulo por módulo: al Coach le ofrecerían justo lo que no puede
+            abrir. Sus dudas se aclaran en el glosario, dentro de su puesto. */}
+        {veRecorridos && (
         <div className="ent-resources">
           <h2>¿Necesitas ayuda con algo puntual?</h2>
           <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema. Las dudas de tu oficio se aclaran en el glosario, dentro de tu puesto.</p>
@@ -182,6 +219,7 @@ export default function EntrenamientoPage() {
             </div>
           </details>
         </div>
+        )}
       </main>
     </div>
   )

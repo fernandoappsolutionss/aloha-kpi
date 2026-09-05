@@ -8,10 +8,21 @@ import Link from 'next/link'
 import Sidebar from '../../../../../components/Sidebar'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarOficio } from '../../../../actions/entrenamiento-oficio'
-import { CURSOS, BLOQUES, TITULO_BLOQUE } from '../../../../../lib/entrenamiento/oficio/catalogo'
-import { estudiado } from '../../../../../lib/entrenamiento/oficio/progreso'
+import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../lib/entrenamiento/oficio/catalogo'
+import { estudiado, esDePapel, puedeImprimirPapel } from '../../../../../lib/entrenamiento/oficio/progreso'
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short' }) : ''
+
+// El plan mide horas, no minutos: "395 min" no le dice a nadie cuánto es.
+// El carril de revisión ya redondeaba a horas enteras (7 h para 6 h 35), que
+// para el revisor da igual y para quien lo va a estudiar no: se dicen las dos
+// unidades.
+const formatoDuracion = (min) => {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
 
 export default async function OficioPage({ params, searchParams }) {
   const { id } = await params
@@ -47,6 +58,28 @@ export default async function OficioPage({ params, searchParams }) {
   const quien = (oficiales || []).length > 0
     ? `${oficiales.map((o) => o.nombre).join(' o ')} (${oficiales[0].rolNombre || oficiales[0].rol})`
     : ''
+
+  // LAS HOJAS QUE SE ENTREGAN EN PAPEL. No están en el plan de nadie —planDeRol
+  // ignora los módulos con `roles: []`— así que el plan las dejaba fuera y NO
+  // HABÍA UN SOLO ENLACE hacia ellas en todo el sistema: of-ase-0 le dice a la
+  // Asistente "imprime las seis hojas del paquete desde este sistema" y la
+  // única forma de abrirlas era escribir la URL a mano. La máquina estaba
+  // completa por detrás (la página de la hoja y su botón de imprimir); faltaba
+  // la puerta.
+  //
+  // Dos candados, y los dos ya existían: puedeImprimirPapel() —la MISMA guarda
+  // que aplica la página de destino— dice QUIÉN puede abrirlas, y el curso del
+  // plan que se está mirando dice DÓNDE se pintan. Por eso la Administradora no
+  // se las encuentra dentro de su propio plan (no lleva el curso del aseo) sino
+  // cuando abre el plan de su Asistente, que es de quien son.
+  const hojasQuePuedeImprimir = MODULOS_OFICIO
+    .filter((m) => esDePapel(m) && puedeImprimirPapel(rol, m, MODULOS_OFICIO))
+    .slice()
+    .sort((a, b) => a.orden - b.orden)
+  const hojasDe = (modulos, bloque) => {
+    const cursos = new Set((modulos || []).map((m) => m.curso))
+    return hojasQuePuedeImprimir.filter((m) => cursos.has(m.curso) && CURSOS[m.curso]?.bloque === bloque)
+  }
 
   // ── REVISIÓN ────────────────────────────────────────────────────────────
   // ponytail: la revisión vive en ESTA misma ruta con ?revisar=<rol>, no en una
@@ -116,10 +149,13 @@ export default async function OficioPage({ params, searchParams }) {
         <p className="h-sub">El orden no es decorativo: cada módulo abre con el anterior estudiado. Los que llevan maniobra son los que tú le vas a tomar y firmar.</p>
         {BLOQUES.map((b) => {
           const suyos = suPlan.filter((m) => CURSOS[m.curso]?.bloque === b)
-          if (suyos.length === 0) return null
+          const hojas = hojasDe(suyos, b)
+          if (suyos.length === 0 && hojas.length === 0) return null
           return (
             <div key={b} className="ofi-checksheet__bloque">
-              <div className="label">Bloque {b} · {b === 'B' ? 'su puesto' : TITULO_BLOQUE[b]}</div>
+              {/* En revisión se habla de OTRA persona: "tu puesto" y "lo que
+                  entregas" son de ella, no del que revisa. */}
+              <div className="label">Bloque {b} · {b === 'B' ? 'su puesto' : b === 'C' ? 'lo que entrega en papel' : TITULO_BLOQUE[b]}</div>
               <ol className="ofi-checksheet__lista">
                 {suyos.map((m) => (
                   <li key={m.id}>
@@ -144,6 +180,35 @@ export default async function OficioPage({ params, searchParams }) {
                   </li>
                 ))}
               </ol>
+              {hojas.length > 0 && (
+                <>
+                  <div className="label" style={{ marginTop: 10 }}>
+                    Las {hojas.length} hojas del paquete, en papel
+                  </div>
+                  <p className="h-sub" style={{ marginTop: 0 }}>
+                    Esta persona no las estudia en pantalla: las imprime y se las toma a quien no tiene cuenta en el
+                    sistema. Ábrelas para verlas o para mandarlas a imprimir tú.
+                  </p>
+                  <ol className="ofi-checksheet__lista">
+                    {hojas.map((m, i) => (
+                      <li key={m.id}>
+                        <Link className="ofi-fila" href={`${base}/${m.id}`}>
+                          <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
+                          <span className="ent-route__content">
+                            <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
+                            <strong>{m.titulo}</strong>
+                            <span className="ofi-fila__estados">
+                              <span className="ent-pill">Se entrega impresa</span>
+                              <span className="ent-pill">Se firma en tinta</span>
+                            </span>
+                          </span>
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
             </div>
           )
         })}
@@ -177,6 +242,16 @@ export default async function OficioPage({ params, searchParams }) {
 
   const hat = plan.find((m) => m.curso === 'hat')
 
+  // EL TAMAÑO DEL PLAN, DICHO DE FRENTE. El total en horas SOLO lo veía el
+  // revisor; al alumno se le daban los minutos módulo a módulo y nunca la
+  // suma, así que empezaba sin saber en qué se estaba metiendo y no podía
+  // repartirlo. Son horas de ESTUDIO, no un turno: se hacen en tandas, y por
+  // eso además del total se le dice un ritmo con el que cabe en la semana.
+  const RITMO_MIN_DIA = 20
+  const minutosPlan = plan.reduce((n, m) => n + (m.duracionMin || 0), 0)
+  const conManiobra = plan.filter((m) => m.drills > 0).length
+  const semanasPlan = Math.max(1, Math.round(minutosPlan / (RITMO_MIN_DIA * 5)))
+
   return shell('ready', <>
     <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
 
@@ -191,6 +266,10 @@ export default async function OficioPage({ params, searchParams }) {
         {quien
           ? <>Tu jefe entrenador: <b>{quien}</b>. Es quien te toma las maniobras y las firma.</>
           : <>Todavía no tienes un jefe entrenador asignado en el sistema. Avísale a gerencia: sin él no puedes cerrar ningún módulo con maniobra.</>}
+      </p>
+      <p className="h-sub" style={{ marginTop: 4 }}>
+        Tu plan completo: <b>{plan.length} módulos</b> · {formatoDuracion(minutosPlan)} de estudio · {conManiobra} con maniobra que te toman y te firman.
+        {' '}A {RITMO_MIN_DIA} minutos por día son unas {semanasPlan} semanas.
       </p>
     </div></div>
 
@@ -232,7 +311,8 @@ export default async function OficioPage({ params, searchParams }) {
       <p className="h-sub">Tu plan de puesto, en orden. El orden no es decorativo: cada módulo abre con el anterior estudiado. Leer siempre se puede; responder sus preguntas, no.</p>
       {BLOQUES.map((b) => {
         const suyos = plan.filter((m) => CURSOS[m.curso]?.bloque === b)
-        if (suyos.length === 0) return null
+        const hojas = hojasDe(suyos, b)
+        if (suyos.length === 0 && hojas.length === 0) return null
         return (
           <div key={b} className="ofi-checksheet__bloque">
             <div className="label">Bloque {b} · {TITULO_BLOQUE[b]}</div>
@@ -269,6 +349,38 @@ export default async function OficioPage({ params, searchParams }) {
                 )
               })}
             </ol>
+            {/* Las hojas van APARTE y sin estado: no se estudian, no llevan
+                cuestionario y no cuentan para tu avance. Se abren, se imprimen
+                y se firman en tinta con la persona delante. */}
+            {hojas.length > 0 && (
+              <>
+                <div className="label" style={{ marginTop: 10 }}>
+                  Las {hojas.length} hojas del paquete, en papel
+                </div>
+                <p className="h-sub" style={{ marginTop: 0 }}>
+                  No se estudian ni cuentan para tu avance. Imprímelas y tómaselas a la persona con ella delante:
+                  las dos firman al pie, en tinta, y la hoja va al file del colaborador.
+                </p>
+                <ol className="ofi-checksheet__lista">
+                  {hojas.map((m, i) => (
+                    <li key={m.id}>
+                      <Link className="ofi-fila" href={`${base}/${m.id}`}>
+                        <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
+                        <span className="ent-route__content">
+                          <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
+                          <strong>{m.titulo}</strong>
+                          <span className="ofi-fila__estados">
+                            <span className="ent-pill">Se entrega impresa</span>
+                            <span className="ent-pill">Se firma en tinta</span>
+                          </span>
+                        </span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
           </div>
         )
       })}

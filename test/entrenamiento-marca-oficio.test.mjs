@@ -1,4 +1,4 @@
-// PRESUPUESTO DE MARCA DEL ENTRENAMIENTO A BORDO.
+// PRESUPUESTO DE MARCA DEL ENTRENAMIENTO EN CUBIERTA.
 //
 // Por qué existe. Las reglas de prosa se erosionan solas: hoy el reparto de
 // imágenes marítimas está en su sitio, pero nada impide que el redactor que
@@ -20,7 +20,7 @@
 //      los módulos.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { MODULOS_OFICIO } from '../lib/entrenamiento/oficio/catalogo.js'
 
 // ── Qué cuenta como texto visible ──────────────────────────────────────────
@@ -181,16 +181,44 @@ test('no queda vocabulario viejo en el texto visible de los 40 módulos', () => 
 // Los archivos que pintan la pantalla. Se miden los STRINGS, no los comentarios
 // ni los identificadores: `drill_firmado_at`, `avanceDrills`, GLOSARIO['hat'] y
 // las clases CSS `ofi-masa`/`ofi-drill` son código y se quedan como están.
+//
+// LA LISTA SE BARRE, NO SE ESCRIBE. Escrita a mano dejaba fuera justo el
+// archivo cuyo rótulo esta red presume proteger: components/Sidebar.js, que es
+// donde vive "Firmas de maniobra". Y dejaba fuera las páginas del árbol de
+// entrenamiento, que es por donde entra la persona. Un componente nuevo en
+// components/entrenamiento/ o una página nueva bajo .../entrenamiento/ quedan
+// cubiertos el día que se crean, sin que nadie se acuerde de agregarlos aquí.
+const RAIZ = new URL('../', import.meta.url)
+
+const jsDe = (dir) => readdirSync(new URL(dir, RAIZ))
+  .filter((f) => f.endsWith('.js'))
+  .map((f) => `${dir}/${f}`)
+
+// Todo .js que cuelgue de una carpeta llamada `entrenamiento`.
+function paginasDeEntrenamiento(dir, out = []) {
+  for (const e of readdirSync(new URL(dir, RAIZ), { withFileTypes: true })) {
+    if (e.isDirectory()) paginasDeEntrenamiento(`${dir}/${e.name}`, out)
+    else if (e.name.endsWith('.js') && /(^|\/)entrenamiento(\/|$)/.test(dir)) out.push(`${dir}/${e.name}`)
+  }
+  return out
+}
+
 const UI = [
-  '../app/actions/entrenamiento-oficio.js',
-  '../components/entrenamiento/PanelDrill.js',
-  '../components/entrenamiento/MasaOficio.js',
-  '../components/entrenamiento/QuizOficio.js',
-  '../components/entrenamiento/SopHoja.js',
-  '../components/entrenamiento/PortadaModulo.js',
-  '../components/entrenamiento/CarrilOficio.js',
-  '../components/entrenamiento/GlosarioOficio.js',
-]
+  'app/actions/entrenamiento-oficio.js',
+  'components/Sidebar.js',
+  ...jsDe('components/entrenamiento'),
+  ...paginasDeEntrenamiento('app/centro'),
+  ...paginasDeEntrenamiento('app/dashboard'),
+].sort()
+
+test('la red de rótulos cubre el menú y las páginas, no una lista a mano', () => {
+  assert.ok(UI.includes('components/Sidebar.js'), 'el menú tiene que estar barrido: ahí vive "Firmas de maniobra"')
+  assert.ok(
+    UI.includes('app/centro/[id]/entrenamiento/oficio/page.js'),
+    'la página del plan de puesto tiene que estar barrida',
+  )
+  assert.ok(UI.length >= 15, `el barrido encontró ${UI.length} archivos de UI; algo se rompió en el recorrido`)
+})
 
 // Solo los literales de texto de UNA línea: así se miran las frases que se
 // pintan y no los identificadores ni las rutas de import. La restricción a una
@@ -210,7 +238,7 @@ function frasesDe(src) {
 
 test('los rótulos de pantalla tampoco arrastran vocabulario viejo', () => {
   for (const ruta of UI) {
-    const frases = frasesDe(readFileSync(new URL(ruta, import.meta.url), 'utf8'))
+    const frases = frasesDe(readFileSync(new URL(ruta, RAIZ), 'utf8'))
     for (const [nombre, re] of Object.entries(VIEJO)) {
       assert.ok(
         !re.test(frases),

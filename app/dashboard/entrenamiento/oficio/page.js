@@ -114,20 +114,25 @@ export default function EntrenamientoOficioAdminPage() {
               <tbody>
                 {data.usuarios.length === 0 && (
                   <tr><td colSpan={data.cursos.length + 6} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>
-                    Sin administradoras ni asistentes en este filtro.
+                    Nadie con plan de puesto en este filtro.
                   </td></tr>
                 )}
                 {data.usuarios.map((u) => (
                   <tr key={u.id}>
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
                     <td>{nombreDeRol(u.rol)}</td>
-                    <td>{u.centro}</td>
+                    {/* Un Coordinador no tiene un centro: tiene varios, y la
+                        columna los nombra todos en vez de un guion. */}
+                    <td title={(u.centros || []).length > 1 ? `${u.centros.length} centros` : undefined}>{u.centro}</td>
                     {/* La única pantalla desde la que se firma una maniobra vive dentro
                         del centro. Desde /dashboard no había ninguna ruta hasta
-                        ella: quien firma tenía que escribir la URL. */}
+                        ella: quien firma tenía que escribir la URL.
+                        `centroFirma` y no `centroId`: para el Coordinador
+                        Operativo el centro propio es NULL —sus centros viven en
+                        usuario_centros— y este enlace le salía siempre roto. */}
                     <td>
-                      {u.centroId
-                        ? <Link className="tour-card__link" href={`/centro/${u.centroId}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
+                      {u.centroFirma
+                        ? <Link className="tour-card__link" href={`/centro/${u.centroFirma}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
                         : <span style={{ color: 'var(--text-faint)' }}>sin centro</span>}
                     </td>
                     {data.cursos.map((c) => <Celda key={c.id} c={u.porCurso[c.id]} />)}
@@ -138,8 +143,8 @@ export default function EntrenamientoOficioAdminPage() {
               </tbody>
             </table>
             <div style={{ padding: '10px 16px', color: 'var(--text-dim)', fontSize: 12 }}>
-              El plan no es el mismo para los dos puestos: la asistente no lleva el curso del Centro y la administradora no lleva el de Zoho. Un
-              guion (—) significa que ese curso no es de su puesto, no que vaya atrasada.
+              El plan no es el mismo para los cuatro puestos: la asistente no lleva el curso del Centro, la administradora no lleva el de Zoho, y el
+              Coach y el Coordinador Operativo llevan cada uno el suyo. Un guion (—) significa que ese curso no es de su puesto, no que vaya atrasada.
             </div>
           </div>
         )}

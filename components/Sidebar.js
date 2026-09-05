@@ -6,7 +6,7 @@ import { getNavigationContext } from '../app/actions/navigation'
 import { logout as logoutAction } from '../app/actions/auth'
 import { resumenProgreso } from '../app/actions/entrenamiento'
 import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
-import { rolesQueFirma } from '../lib/entrenamiento/oficio/progreso'
+import { rolesQueFirma, tienePlanPropio } from '../lib/entrenamiento/oficio/progreso'
 import { hrefActivo } from './nav-activo.mjs'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
@@ -192,9 +192,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
   useEffect(() => {
-    if (loading || !context || isPanel || !centroId || context.capabilities.viewUsers) return
+    // El Coach queda fuera: los 9 recorridos arrancan en pantallas que su
+    // cuenta no abre, así que un badge "0/9" sería una tarea imposible colgada
+    // del menú. Su avance real es el de su plan de puesto.
+    if (loading || !context || isPanel || esCoach || !centroId || context.capabilities.viewUsers) return
     resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
-  }, [loading, context, isPanel, centroId])
+  }, [loading, context, isPanel, esCoach, centroId])
 
   // Firmas pendientes del oficio: solo para quien puede firmarle a alguien
   // (administradora, coordinador, gerencia). El permiso real lo decide el
@@ -224,7 +227,11 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
     // La matriz del oficio va aparte: la de tours filtra rol='administradora'
     // y dejaría fuera justo a las asistentes. Misma capacidad de gerencia.
-    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Oficio (hats)', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
+    // ES LO QUE REVISAS DE OTROS, no lo que estudias tú: por eso dice "de la
+    // gente" y por eso el plan propio vive en su propia sección, más abajo.
+    // (Decía "Oficio (hats)"; el vocabulario del sistema es puesto, no hat —
+    // el menú ya dice "Firmas de maniobra", no "Firmas de drill".)
+    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Puestos de la gente', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
   ]
   const configItems = [
     ...(context?.capabilities.viewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
@@ -246,9 +253,39 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
     ...(firmaDrills ? [{ label: 'Firmas de maniobra', icon: 'check', href: `/centro/${centroId}/entrenamiento/firmas`, badge: firmas > 0 ? String(firmas) : null }] : []),
   ]
+  // El Coach solo alcanza el árbol de entrenamiento (lo encierra el
+  // middleware). El rótulo es el mismo que en centroItems —los 9 recorridos del
+  // sistema— para que no compita con "Mi plan de puesto", que es otra cosa.
   const coachItems = [
-    { label: 'Mi entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento` },
+    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento` },
   ]
+
+  // ── LO QUE TÚ ESTUDIAS ────────────────────────────────────────────────────
+  // Tu plan de puesto, que NO es la matriz de arriba: aquella es lo que revisas
+  // de otros. El Coordinador Operativo es isPanel, así que su menú es
+  // adminItems, y ahí no había ni una ruta hacia /centro/<id>/entrenamiento/
+  // oficio: tiene su plan completo y ninguna puerta para entrar a él. La
+  // Administradora y la Asistente llegaban por dentro de la página de los 9
+  // recorridos; ahora es un ítem, como debe ser.
+  //
+  // El plan vive DENTRO de un centro (la ruta es /centro/<id>/…), así que se
+  // entra por el centro propio; el Coordinador no tiene uno —sus centros están
+  // en usuario_centros— y entra por el primero que coordina.
+  //
+  // SIN CENTRO NO HAY URL, PERO SÍ HAY PLAN. Es el caso del Coordinador
+  // Operativo al que todavía nadie le asignó centros: tiene sus 23 módulos
+  // cargados y ninguna forma de abrirlos. Antes el ítem simplemente no se
+  // pintaba y el plan desaparecía sin un solo mensaje en pantalla. Ahora se
+  // pinta apagado y con el motivo: un bloqueo dicho se resuelve; uno callado
+  // se queda meses. (El middleware tampoco lo dejaría entrar: su alcance de
+  // centros también sale de usuario_centros.)
+  const centroDelPlan = centroId || centros[0]?.id || null
+  const tienePlan = tienePlanPropio(actorRole)
+  const miPuestoItems = tienePlan && centroDelPlan
+    ? [{ label: 'Mi plan de puesto', icon: 'shield', href: `/centro/${centroDelPlan}/entrenamiento/oficio` }]
+    : []
+  const planSinCentro = tienePlan && !centroDelPlan
+
   const items = isPanel
     ? (isCenterContext ? centroItems : adminItems)
     : centroId ? (esCoach ? coachItems : isCenterActor ? centroItems : []) : []
@@ -267,7 +304,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   // /dashboard/entrenamiento/oficio y en /centro/<id>/entrenamiento/firmas. La
   // decide components/nav-activo.mjs, que es la misma función que usa el
   // barrido R10 para saber qué enlace exigir activo en cada ruta.
-  const activo = hrefActivo(path, [...items, ...configItems, { href: '/perfil' }].map((i) => i.href))
+  const activo = hrefActivo(path, [...items, ...miPuestoItems, ...configItems, { href: '/perfil' }].map((i) => i.href))
   const isActive = (href) => href === activo
   const isCenterActive = (centerId) => {
     const prefix = `/centro/${centerId}`
@@ -316,6 +353,26 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       <nav className="sb__nav">
         <div className="sb__section label">{isCenterContext ? 'Centro' : isPanel ? 'Panel' : 'Mi centro'}</div>
         {items.map(item => navigationLink(item))}
+
+        {/* Sección aparte a propósito: "Mi puesto" es lo que ESTA persona
+            estudia y le firman. Mezclarlo con el resto del menú lo confunde
+            con la matriz de gerencia, que es lo que revisa de otros. */}
+        {(miPuestoItems.length > 0 || planSinCentro) && (
+          <>
+            <div className="sb__section label" style={{ marginTop: 6 }}>Mi puesto</div>
+            {miPuestoItems.map(item => navigationLink(item))}
+            {planSinCentro && (
+              <>
+                <span className="sb__item" aria-disabled="true" style={{ opacity: 0.55, cursor: 'default' }}>
+                  <Icon name="shield" /><span>Mi plan de puesto</span>
+                </span>
+                <div className="sb__section label" style={{ paddingTop: 0 }}>
+                  Pídele a gerencia que te asigne un centro para abrirlo.
+                </div>
+              </>
+            )}
+          </>
+        )}
 
         {/* Centros expandible (admin) */}
         {isPanel && centros.length > 0 && (

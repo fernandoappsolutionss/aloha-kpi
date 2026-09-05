@@ -1,0 +1,342 @@
+// ============================================================
+// BANCO DE PREGUNTAS - CURSO 6: PERSONAL DE APOYO Y ASEO
+// ALOHA Mental Arithmetic
+// Importar en Moodle: Banco de preguntas > Importar > formato GIFT
+// ============================================================
+
+$CATEGORY: Apoyo y Aseo/M1 Tu puesto
+
+::A1-01:: El objetivo de la posicion de Personal de Apoyo y Aseo es... {
+=realizar labores de limpieza y mantenimiento de orden en todas las areas del Centro, para garantizar el buen funcionamiento y ambiente optimo del Programa
+~limpiar los salones cuando el Coach lo solicite
+~apoyar a la Asistente Administrativa en tareas de oficina
+~mantener la entrada principal presentable en horas de visita
+}
+
+::A1-02:: Aseo y Mantenimiento son dos de las cinco areas de aplicacion que reconoce el Manual, junto con Operativa, Administrativa y Ejecutiva.{T}
+
+::A1-03:: Segun el perfil del puesto, el rango de edad establecido para el personal de apoyo y aseo es de... {
+=25 a 50 anos
+~18 a 30 anos
+~20 a 45 anos
+~30 a 60 anos
+}
+
+::A1-04:: Las cuatro competencias del perfil del puesto son estabilidad emocional, orientacion al logro, actitud de servicio y rigor profesional, y las cuatro se exigen en nivel alto.{T}
+
+::A1-05:: Rigor profesional, en el Manual, significa... {
+=usar la informacion dada, las normas, los procedimientos y las politicas de la empresa con precision y eficacia para lograr los estandares de calidad en tiempo y forma
+~trabajar mas horas de las contratadas cuando hay actividad
+~ser exigente con los companeros de trabajo
+~no cometer errores nunca
+}
+
+::A1-06:: Quien supervisa tu trabajo y realiza tu evaluacion de desempeno, segun el Manual? {
+=El Asistente Administrativo del Centro
+~El Coach del grupo que este en clase
+~El Corporativo ALOHA
+~Cualquier companero con mas antiguedad
+}
+
+::A1-07:: El personal de limpieza trabaja bajo contrato de trabajo, igual que los administradores y los asistentes administrativos.{F}
+
+::A1-08:: El contrato de servicios profesionales, segun el Manual, se utiliza unicamente para... {
+=los Coaches y el Servicio de Limpieza
+~los administradores de Centro
+~los asistentes administrativos
+~todo el personal del Centro sin distincion
+}
+
+::A1-09:: Un padre te aborda en el pasillo para quejarse del avance de su hijo. Que corresponde hacer? {
+=Recibirlo con atencion y dirigirlo a mi supervisor inmediato
+~Explicarle lo que yo he visto en las clases
+~Decirle que hable con el Coach cuando salga
+~Ignorarlo y seguir trabajando
+}
+
+$CATEGORY: Apoyo y Aseo/M2 Horario, pago y permisos
+
+::A2-01:: El horario del personal de limpieza de lunes a viernes es... {
+=de 12 y 30 a 3 de la tarde
+~de 8 de la manana a 12 del mediodia
+~de 3 a 6 de la tarde
+~de 7 de la manana a 3 de la tarde
+}
+
+::A2-02:: El horario del personal de limpieza los sabados es... {
+=de 12 a 1 de la tarde
+~de 8 a 10 de la manana
+~de 12 y 30 a 3 de la tarde
+~los sabados no se labora
+}
+
+::A2-03:: El pago del personal de limpieza es quincenal.{T}
+
+::A2-04:: Si el personal de limpieza falta un dia de trabajo... {
+=se le descuenta
+~lo repone otro dia sin afectar el pago
+~se le paga igual si avisa con anticipacion
+~se descuenta solo si falta dos veces en la quincena
+}
+
+::A2-05:: Con cuanta anticipacion minima debe solicitarse un permiso? {
+=Tres dias, y por escrito
+~El mismo dia, avisando temprano
+~Un dia antes, de palabra
+~Una semana antes, por correo del Centro
+}
+
+::A2-06:: Presentar la solicitud de permiso equivale a tener el permiso aprobado.{F}
+
+::A2-07:: Cuando el permiso lo solicita el propio colaborador, el Manual establece que... {
+=no se maneja con tiempo compensatorio
+~se repone con horas el sabado siguiente
+~se descuenta del periodo de vacaciones
+~se acumula para el mes siguiente
+}
+
+::A2-08:: Un permiso otorgado es una justificacion ante la empresa, pero no una justificacion para el pago del tiempo solicitado.{T}
+
+::A2-09:: El personal de limpieza puede acomodar el calendario de trabajo segun le convenga, siempre que el Centro quede limpio.{F}
+
+::A2-10:: El tope de 18 permisos al ano con justificacion medica que aparece en el Manual esta escrito para... {
+=los colaboradores que forman parte de la planilla
+~el personal de limpieza contratado por servicios
+~los Coaches unicamente
+~todo el personal del Centro por igual
+}
+
+$CATEGORY: Apoyo y Aseo/M3 Funciones
+
+::A3-01:: Cual de estas NO es una funcion del personal de apoyo y aseo segun el Manual? {
+=Reparar instalaciones electricas y de plomeria del Centro
+~Limpieza de banos completos
+~Retiro de basuras de todas las areas
+~Verificacion visual de mantener en orden todas las areas del Centro
+}
+
+::A3-02:: El Manual nombra de forma expresa la limpieza de mesas, patas de mesas y sillas.{T}
+
+::A3-03:: Sobre los implementos de limpieza, la funcion escrita en el Manual es... {
+=asegurar contar con todos los implementos y notificar su proximo reemplazo, anticipandose
+~avisar el dia en que se termine el producto
+~comprar los productos y pedir el reembolso
+~esperar a que el Asistente Administrativo pregunte
+}
+
+::A3-04:: Un producto de limpieza se esta agotando y todavia queda para trabajar. Que corresponde hacer? {
+=notificar su proximo reemplazo en ese momento, porque la funcion escrita es anticiparse
+~esperar a que se acabe para no reportar de mas
+~guardarlo y usar otro producto mientras tanto
+~comprarlo tu misma y avisar despues
+}
+
+::A3-05:: El proveedor de los Centros ALOHA para mantenimiento, entendido como pintura, instalaciones y reparaciones, es... {
+=SUPLIDORES DEL ISTMO S.A.
+~C y C Soluciones Integrales S.A.
+~el personal de apoyo y aseo del propio Centro
+~cualquier proveedor que consiga el personal de limpieza
+}
+
+::A3-07:: El monto maximo que el Manual establece para considerar una compra como compra menor de Caja Menuda es... {
+=B/.45,00
+~B/.25,00
+~B/.100,00
+~B/.15,00
+}
+
+::A3-08:: La verificacion visual de mantener en orden todas las areas del Centro es una funcion escrita del puesto.{T}
+
+::A3-09:: Sobre el calendario de funciones, lo que el Manual establece con claridad es que el personal de limpieza... {
+=recibira y respetara los calendarios y horarios establecidos por las autoridades del Centro
+~propondra su propio calendario cada mes
+~acordara el calendario con los Coaches de cada grupo
+~trabajara sin calendario, segun lo que encuentre cada dia
+}
+
+::A3-10:: Puntualidad y asistencia en los horarios convenidos aparece en la lista formal de funciones del puesto, junto con las tareas de limpieza.{T}
+
+$CATEGORY: Apoyo y Aseo/M4 Imagen, trato y confidencialidad
+
+::A4-01:: Sobre la vestimenta del personal de limpieza, el Manual establece que... {
+=aunque no usen uniforme oficial de ALOHA, deben vestir de forma adecuada a sus funciones, con ropa limpia y en buen estado
+~deben usar el uniforme oficial de ALOHA como el resto del personal
+~no hay regla de vestimenta porque no atienden clientes
+~deben usar el chaleco oficial ALOHA
+}
+
+::A4-02:: No usar uniforme oficial exime al personal de limpieza del protocolo de imagen del Centro.{F}
+
+::A4-03:: Dos funciones de conducta que aparecen en la lista del puesto son... {
+=realizar el trabajo con vestimenta de decoro y profesionalismo, y utilizar expresiones y vocabulario adecuado dentro del Centro
+~llegar temprano y quedarse hasta tarde
+~saludar a los padres por su nombre y ofrecerles cafe
+~atender el telefono y recibir a los visitantes
+}
+
+::A4-04:: Segun el Manual, los clientes juzgan a la organizacion por el trato que reciben de cada colaborador, sin importar el cargo.{T}
+
+::A4-05:: Cual de estas es informacion confidencial segun el Manual? {
+=Las listas de clientes del Centro
+~El horario de apertura del Centro
+~La direccion fisica del Centro
+~El nombre del Programa
+}
+
+::A4-06:: Que consecuencia establece el Manual para quien divulgue o utilice de manera impropia informacion confidencial? {
+=Accion disciplinaria, extincion de la relacion laboral y accion legal, aun cuando no reciba beneficio real
+~Un llamado de atencion verbal
+~Un descuento en la quincena
+~Ninguna, si no obtuvo dinero por ello
+}
+
+::A4-07:: Todos los colaboradores deben firmar un acuerdo de no divulgacion.{T}
+
+::A4-08:: La ley que el Manual cita para la proteccion de datos personales es... {
+=la Ley 81 de 2019
+~la Ley 45 de 2007
+~el Codigo de Trabajo
+~no cita ninguna ley
+}
+
+::A4-09:: Una vecina te pregunta cuanto paga de mensualidad la familia de un nino del Centro. Que corresponde? {
+=No dar la informacion, porque es informacion confidencial del Centro
+~Darsela, porque no es un dato del nino sino del padre
+~Darsela solo si ya no esta inscrito
+~Consultarlo con otra companera de limpieza
+}
+
+$CATEGORY: Apoyo y Aseo/M5 Accidentes
+
+::A5-01:: El protocolo de accidentes de ALOHA aplica al personal de apoyo y aseo que se encuentre dentro de las instalaciones.{T}
+
+::A5-02:: Segun el Manual, que accidentes o incidentes deben reportarse? {
+=Todos, por leve que parezca el hecho
+~Solo los que requieren traslado a un centro medico
+~Solo los que el padre reclame despues
+~Solo los que ocurren durante la clase
+}
+
+::A5-03:: Si estas presente cuando un nino se accidenta, tus dos primeras acciones son... {
+=brindar primeros auxilios basicos y asegurar la integridad del nino, y notificar de inmediato al Administrador del Centro
+~llamar al padre del nino y esperar instrucciones
+~terminar la tarea que estabas haciendo y avisar al salir
+~pedirle al Coach que decida si vale la pena reportarlo
+}
+
+::A5-04:: La notificacion de un accidente debe hacerse al terminar el turno, para no interrumpir las clases.{F}
+
+::A5-05:: Como testigo de un accidente, que datos te van a pedir para el reporte? {
+=Hora exacta, como ocurrio, donde ocurrio y quienes estaban presentes
+~Solo tu nombre y tu firma
+~El nombre del padre y su telefono
+~El costo estimado de la atencion medica
+}
+
+::A5-06:: Un accidente no reportado constituye... {
+=una falla grave en el protocolo de seguridad, que puede derivar en sancion administrativa
+~un descuido menor sin consecuencias
+~una falta solo si el nino resulto lesionado
+~responsabilidad exclusiva del Coach del grupo
+}
+
+::A5-07:: El Manual permite suavizar la descripcion de un accidente en el reporte para no alarmar al representante.{F}
+
+::A5-08:: El traslado de un estudiante a un centro medico por el servicio de ambulancia contratado se realiza... {
+=siempre con la autorizacion del representante
+~por decision del personal que este presente
+~automaticamente en cualquier accidente
+~solo si el padre no contesta el telefono
+}
+
+$CATEGORY: Apoyo y Aseo/M6 Control de calidad
+
+::A6-01:: Quien realiza las evaluaciones de desempeno del personal de apoyo y aseo? {
+=El Asistente Administrativo
+~La Junta Directiva
+~El Master Coach
+~El Corporativo ALOHA
+}
+
+::A6-02:: Cual de estos NO es uno de los seis parametros de evaluacion del puesto? {
+=Antiguedad en el Centro
+~Asistencia y puntualidad
+~Cumplimiento de calendarios de trabajo
+~Buena presencia y buenas maneras, verbal y no verbal
+}
+
+::A6-03:: El parametro de buena ejecucion de los trabajos realizados se mide por velocidad y efectividad, las dos juntas.{T}
+
+::A6-04:: El parametro de buena presencia y buenas maneras incluye la comunicacion... {
+=verbal y no verbal
+~solo verbal
+~solo escrita
+~solo con los padres, no con los companeros
+}
+
+::A6-05:: Buen trato y disposicion de servicios es uno de los parametros formales de la evaluacion de desempeno.{T}
+
+::A6-06:: Cumplimiento de calendarios de trabajo se evalua contra... {
+=el calendario que establecieron las autoridades del Centro
+~el orden que la persona de limpieza considere mas practico
+~lo que pida el Coach de turno
+~el promedio de lo que hacen los demas Centros
+}
+
+::A6-07:: Se acabo un producto de limpieza y el area no quedo como debia. Que funcion escrita del puesto quedo sin cumplir? {
+=Asegurar contar con todos los implementos de limpieza y notificar su proximo reemplazo, anticipandose
+~Ninguna, el area es responsabilidad exclusiva de la Administracion
+~Comprar el producto con mi dinero y pedir el reembolso
+~Comentarle la falta de producto a una companera
+}
+
+::A6-09:: La mejor forma de prepararte para tu evaluacion de desempeno es... {
+=tener a la vista el calendario de trabajo y avisar con anticipacion si alguna funcion no cabe en el horario
+~esperar la evaluacion y explicar despues lo que no se pudo hacer
+~pedirle al Asistente Administrativo que no evalue ese periodo
+~trabajar mas rapido la semana de la evaluacion
+}
+
+$CATEGORY: Apoyo y Aseo/Casos integradores
+
+::A7-01:: Es viernes. Te enteras de que el lunes tienes una diligencia personal a media manana. Que haces? {
+=Presento la solicitud de permiso por escrito de una vez, sabiendo que son tres dias de anticipacion minima y que ese dia se me descuenta
+~Aviso el lunes temprano por mensaje
+~Cambio mi horario del lunes por el del sabado
+~Le pido a una companera que cubra mi turno
+}
+
+::A7-02:: Terminas tu turno y el salon 3 quedo sin sacudir las esquinas altas porque te tomo mas tiempo el bano. Que corresponde? {
+=Informarlo a mi supervisor inmediato antes de irme, porque la evaluacion mide realizacion de funciones y cumplimiento de calendario
+~No decir nada, total nadie mira las esquinas altas
+~Anotarlo para hacerlo la semana siguiente sin avisar
+~Pedirle al Coach que no use ese salon manana
+}
+
+::A7-03:: Una excompanera te escribe pidiendo el telefono de una representante para ofrecerle un servicio. Que haces? {
+=Me niego, porque las listas y referencias de clientes son informacion confidencial protegida por el acuerdo de no divulgacion y la Ley 81 de 2019
+~Se lo doy, porque ella tambien trabajo en el Centro
+~Le doy el nombre pero no el telefono
+~Le pregunto primero a la representante
+}
+
+::A7-04:: Mientras limpias, ves a un nino resbalar y golpearse el codo. Se levanta solo y dice que no le duele. Que haces? {
+=Notifico de inmediato al Administrador del Centro y anoto hora, lugar y como ocurrio, porque todo incidente por leve que parezca debe reportarse
+~No hago nada, porque el nino dijo que estaba bien
+~Se lo comento al Coach cuando salga del salon
+~Lo anoto y lo reporto si el padre pregunta
+}
+
+::A7-05:: Notas que el desinfectante alcanza para dos dias mas. Que corresponde hacer hoy? {
+=Notificar hoy el proximo reemplazo a mi supervisor inmediato, porque la funcion es anticiparse
+~Esperar a que se acabe para reportarlo con certeza
+~Diluirlo mas para que rinda mas dias
+~Usar otro producto y no reportar nada
+}
+
+::A7-06:: Una representante te pide, mientras limpias la recepcion, que le des tu opinion sobre el Coach de su hija. Que haces? {
+=La escucho con amabilidad, no opino, y llevo la situacion a mi supervisor inmediato
+~Le doy mi opinion sincera, porque veo las clases todos los dias
+~Le digo que el Coach es nuevo y que ya se acostumbrara
+~Le pido su telefono para avisarle luego
+}

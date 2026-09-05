@@ -1,9 +1,18 @@
 // ANDAMIAJE del entrenamiento de OFICIO: el contrato de forma + el motor puro.
-// Pasa en VERDE con el catálogo VACÍO — todas sus aserciones son "para cada
-// módulo…" (vacuamente ciertas mientras no haya contenido) o sobre funciones
-// puras. Lo que exige volumen (40 módulos, cobertura del GIFT, trazabilidad
-// contra docs/entrenamiento/fuente/) vive en entrenamiento-oficio-contenido.test.mjs,
-// del frente de contenido: así ninguna rama depende de la otra para estar verde.
+//
+// NACIÓ pasando en verde con el catálogo VACÍO —sus aserciones eran "para cada
+// módulo…", vacuamente ciertas mientras no hubiera contenido— y esa comodidad
+// costó caro: con el Coach y el Coordinador escritos pero sin enchufar, la
+// suite daba 960 verdes mientras dos de los cuatro puestos leían "tu puesto
+// todavía no lleva plan cargado". Un test que pasa con la mitad del producto
+// apagado mide actividad, no producto.
+//
+// Por eso ahora hay pisos: todo curso declarado tiene módulos, todo puesto que
+// se entrena tiene plan y puerta, y el módulo de papel existe de verdad. Lo que
+// exige VOLUMEN y trazabilidad línea a línea contra docs/entrenamiento/fuente/
+// (cobertura del banco GIFT, que cada bloque venga de una línea del Manual) no
+// está escrito todavía: no lo delegues a un archivo que no existe — hasta que
+// se escriba, esa red no está puesta.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -17,6 +26,7 @@ import {
   UMBRAL, minimoAprobacion, corregirQuizOficio, estudiado, firmado, hatted,
   planDeRol, avanceOficio, siguienteOficio, gradienteAbierto, marcarTerminos,
   OFICIAL_DE, puedeFirmar, rolesQueFirma, esDePapel, rolesDelPapel,
+  ROLES_CON_PLAN, tienePlanPropio,
 } from '../lib/entrenamiento/oficio/progreso.js'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
@@ -56,6 +66,24 @@ test('los ids de oficio llevan prefijo of- y no colisionan con los 9 tours', () 
   assert.equal(MODULO_IDS_OFICIO.size, idsOficio.length)
   for (const id of idsOficio) assert.equal(moduloOficio(id).id, id)
   assert.equal(moduloOficio('meta'), null, 'moduloOficio no puede devolver un tour')
+})
+
+// ── 1 bis. NI UN CURSO FANTASMA, NI UN PUESTO APAGADO ─────────────────────
+// CURSOS declaraba `aseo` con su bloque C, su título y su prefijo en ID_OFICIO
+// —y BLOQUES se deriva de CURSOS, así que el checksheet pintaba un bloque C
+// entero— sin que existiera un solo módulo con ese curso. No se veía en
+// pantalla porque las dos pasadas hacen `if (suyos.length === 0) return null`:
+// latente, y nada en la suite lo detectaba. Es una línea y cierra la clase.
+test('todo curso declarado tiene módulos y todo puesto que se entrena tiene plan', () => {
+  assert.ok(MODULOS_OFICIO.length > 0, 'el catálogo está vacío: ningún test de este archivo prueba nada')
+  for (const id of Object.keys(CURSOS)) {
+    const suyos = MODULOS_OFICIO.filter((m) => m.curso === id)
+    assert.ok(suyos.length > 0, `curso "${id}" declarado en CURSOS y sin un solo módulo: pinta su bloque en el checksheet y no tiene nada dentro`)
+  }
+  assert.ok(ROLES.length > 0, 'ningún módulo declara roles: los planes están todos vacíos')
+  for (const rol of ROLES) {
+    assert.ok(planDeRol(rol, MODULOS_OFICIO).length > 0, `${rol} aparece en los roles del catálogo y su plan sale vacío`)
+  }
 })
 
 // ── 2. NO SON TOURS ───────────────────────────────────────────────────────
@@ -123,9 +151,16 @@ test('bloques: vocabulario cerrado, tablas cuadradas y NI UN "<" en todo el cont
 })
 
 // ── 5. QUIZ ───────────────────────────────────────────────────────────────
+// El rango 4..10 se le exige al módulo QUE SE ESTUDIA EN PANTALLA. El módulo
+// DE PAPEL no lleva cuestionario y no es un olvido: quien lo recibe no tiene
+// cuenta en el sistema, así que no hay nadie que pueda responderlo (lo blinda
+// el test 10 bis, que le exige `quiz: []`). Su clave sí existe y es `[]`, para
+// que las claves y el catálogo sigan cuadrando módulo por módulo — que es la
+// aserción del final de este test.
 test('quiz: 4-10 preguntas, sin el índice correcto en el cliente, y clave completa', () => {
   for (const m of MODULOS_OFICIO) {
-    assert.ok(m.quiz.length >= 4 && m.quiz.length <= 10, `${m.id}: ${m.quiz.length} preguntas (4..10)`)
+    const enPantalla = !esDePapel(m)
+    if (enPantalla) assert.ok(m.quiz.length >= 4 && m.quiz.length <= 10, `${m.id}: ${m.quiz.length} preguntas (4..10)`)
     for (const q of m.quiz) {
       assert.ok(q.pregunta && q.explicacion, `${m.id}: pregunta o explicación vacía`)
       assert.ok(q.opciones.length >= 2 && q.opciones.length <= 4, `${m.id}: opciones 2..4`)
@@ -155,6 +190,31 @@ test('quiz: ningún módulo se aprueba eligiendo siempre la misma opción', () =
       assert.ok(n < minimo, `${m.id}: eligiendo siempre la opción ${Number(idx) + 1} se acierta ${n} de ${clave.length} y el mínimo es ${minimo}`)
     }
   }
+})
+
+// ── 5 ter. LA FUENTE SE PUEDE ABRIR ───────────────────────────────────────
+// `fuente` es la promesa de que cada módulo se puede auditar contra el material
+// del que salió. Los cursos del Coach y del aseo la declaraban contra archivos
+// que vivían FUERA del repo (curso-4-coach.html y curso-6-apoyo-aseo.html
+// estaban solo en plataformas/aloha/training-moodle/), así que la clave de
+// respuestas del Coach no se podía revisar desde aquí — que es exactamente lo
+// que su cabecera promete que se puede hacer.
+//
+// Solo se comprueban los .html y .gift del banco: `manual-operaciones-completo.md`
+// vive fuera del repo a propósito (es el Manual de la empresa), los `lib/…` y
+// `app/…` son rutas de este código, y los tres anclajes sin extensión son
+// fuentes habladas del dueño o hallazgos del sistema, que no son archivos.
+test('cada archivo de banco que un módulo declara como fuente existe en docs/entrenamiento/fuente/', () => {
+  const enDisco = new Set(readdirSync(join(ROOT, 'docs/entrenamiento/fuente')))
+  const faltan = new Set()
+  for (const m of MODULOS_OFICIO) {
+    for (const f of m.fuente || []) {
+      const archivo = String(f).split('#')[0]
+      if (!/\.(html|gift)$/.test(archivo)) continue
+      if (!enDisco.has(archivo)) faltan.add(`${archivo} (lo declara ${m.id})`)
+    }
+  }
+  assert.deepEqual([...faltan].sort(), [], 'estos módulos dicen venir de un archivo que no está en el repo: su contenido y su clave de respuestas no se pueden auditar desde aquí')
 })
 
 // ── 6. GRADIENTE SIN CICLOS ───────────────────────────────────────────────
@@ -234,6 +294,34 @@ test('el plan de cada rol es el suyo: la asistente no ve el curso del Centro ni 
     assert.equal(meta.quiz, undefined)
     assert.equal(typeof meta.drills, 'number')
   }
+})
+
+// ── 7 bis. LA PUERTA AL PROPIO PLAN ───────────────────────────────────────
+// Un puesto puede tener sus 23 módulos cargados y NINGUNA forma de llegar a
+// ellos. Le pasó al Coordinador Operativo: es `isPanel`, su menú es adminItems,
+// y ahí no había una sola ruta a /centro/<id>/entrenamiento/oficio. El catálogo
+// estaba bien y la persona leía "tu puesto todavía no lleva plan cargado".
+//
+// El menú es 'use client' y no puede importar el catálogo (test 13), así que
+// pregunta por tienePlanPropio(), que sale de OFICIAL_DE. Esto amarra esa lista
+// contra los `roles` del catálogo: si entra un quinto puesto, no puede quedarse
+// sin puerta sin que CI lo diga.
+test('todo puesto con plan propio tiene puerta en el menú', () => {
+  assert.deepEqual(
+    ROLES_CON_PLAN.slice().sort(), ROLES.slice().sort(),
+    'ROLES_CON_PLAN (lo que el menú sabe) y los roles del catálogo se desincronizaron: hay un puesto con plan y sin puerta, o una puerta a un plan que no existe',
+  )
+  for (const rol of ROLES) {
+    assert.ok(tienePlanPropio(rol), `${rol} tiene plan y el menú no le abre la puerta`)
+    assert.ok(planDeRol(rol, MODULOS_OFICIO).length > 0, `${rol} tiene puerta a un plan vacío`)
+  }
+  for (const rol of ['supervisor', 'admin_general']) {
+    assert.equal(tienePlanPropio(rol), false, `${rol} no se entrena: no puede llevar "Mi plan de puesto" en el menú`)
+  }
+  // Y el menú tiene que seguir preguntándolo, no listar puestos a mano.
+  const sidebar = readFileSync(join(ROOT, 'components/Sidebar.js'), 'utf8')
+  assert.match(sidebar, /tienePlanPropio\(actorRole\)/, 'el menú decide la puerta con tienePlanPropio, no con una lista de roles escrita ahí')
+  assert.match(sidebar, /entrenamiento\/oficio`/, 'el menú no enlaza a ningún plan de puesto')
 })
 
 // ── 8. el método EN LOS DATOS ───────────────────────────────────────────────────
@@ -341,6 +429,10 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
 // en entrenamiento_progreso. Su entrenamiento es papel con id.
 test('los módulos de papel no piden cuenta, no piden quiz y solo los abre quien los reparte', () => {
   const papel = MODULOS_OFICIO.filter(esDePapel)
+  // Sin esta línea el test entero itera sobre un array vacío y pasa en verde
+  // sin ejercitar una sola de sus aserciones, que fue exactamente lo que pasó
+  // mientras el paquete del aseo no existía.
+  assert.ok(papel.length > 0, 'no hay ni un módulo de papel: este test no está probando nada')
   for (const m of papel) {
     assert.deepEqual(m.roles, [], `${m.id}: un módulo de papel no lleva roles`)
     assert.deepEqual(m.quiz || [], [], `${m.id}: un módulo de papel no pide cuestionario (nadie puede responderlo: no tiene cuenta)`)
@@ -544,6 +636,19 @@ test('marcarEstudiado: solo ids de oficio y solo módulos del puesto de quien es
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(body, /m\.roles\.includes\(u\.rol\)/)
   assert.match(body, /INSERT INTO entrenamiento_progreso/)
+})
+
+// EL COORDINADOR TIENE DÓNDE FIRMARLE. usuarios.centro_id es NULL para él —sus
+// centros viven en usuario_centros— y la columna "Cola de firmas" armaba el
+// enlace con ese campo: para todo un puesto salía "sin centro" y la única
+// pantalla desde la que se le toma la maniobra quedaba inalcanzable.
+test('matrizOficio trae los centros de usuario_centros y la pantalla arma el enlace con el que exista', () => {
+  const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'matrizOficio')
+  assert.match(body, /ARRAY_AGG\(uc\.centro_id/, 'matrizOficio tiene que devolver los centros de usuario_centros, no solo filtrar por ellos')
+  assert.match(body, /centroFirma/, 'la fila tiene que decir por qué centro se entra a firmarle')
+  const pagina = readFileSync(join(ROOT, 'app/dashboard/entrenamiento/oficio/page.js'), 'utf8')
+  assert.match(pagina, /u\.centroFirma/, 'la columna Cola de firmas sigue armando el enlace con el centro propio')
+  assert.doesNotMatch(pagina, /\$\{u\.centroId\}\/entrenamiento\/firmas/, 'el enlace de la firma no puede depender de usuarios.centro_id: para el Coordinador es NULL')
 })
 
 test('las actions del oficio no tocan las de los 9 tours', () => {

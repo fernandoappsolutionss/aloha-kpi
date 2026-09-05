@@ -1,5 +1,6 @@
 'use server'
-// Progreso del entrenamiento de OFICIO (administradora y asistente). Vive
+// Progreso del entrenamiento de OFICIO — los cuatro puestos que se entrenan:
+// administradora, asistente, coach y coordinador (ver ROLES_ALUMNO). Vive
 // aparte de app/actions/entrenamiento.js: los 9 tours de "cómo usar el
 // sistema" no se tocan. Comparte la tabla entrenamiento_progreso, donde el
 // campo `modulo` es TEXT libre y los ids de oficio llevan prefijo `of-`.
@@ -113,9 +114,13 @@ async function oficialesDe(alumno) {
   return []
 }
 
-// Los planes que este rol puede REVISAR: leerlos sin entrenarse en ellos. Es
-// para gerencia y coordinador, que no tienen plan propio (planDeRol → []) y
-// hasta ahora no veían NADA del entrenamiento que le dan a su gente.
+// Los planes que este rol puede REVISAR: leerlos sin entrenarse en ellos.
+// Gerencia no tiene plan propio (planDeRol → []) y hasta ahora no veía NADA del
+// entrenamiento que le da a su gente. El Coordinador Operativo SÍ tiene el
+// suyo —23 módulos— y además revisa: por eso los dos carriles viajan juntos en
+// la respuesta y `modo` solo dice cuál es el principal. Quien lea esto para
+// "optimizar" dando por hecho que el coordinador no estudia le vuelve a quitar
+// la puerta a su plan.
 //
 // LA DECISIÓN ES DEL SERVIDOR. rolesQueRevisa() sale de OFICIAL_DE (quien firma
 // un hat puede leerlo), no de una lista de roles escrita a mano, y la pantalla
@@ -407,7 +412,14 @@ export async function colaFirmas(centroId = null) {
     const candidatos = cid
       ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.nombre`
       : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) ORDER BY c.nombre, u.nombre`
-    const mios = candidatos.filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
+    const mios = candidatos
+      .filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
+      // AGRUPADAS POR PUESTO. El SQL ordena por centro y por nombre, y a una
+      // Administradora con cuatro Coaches y una Asistente le salían las cinco
+      // tarjetas intercaladas alfabéticamente: no se puede ver de un vistazo si
+      // lo atrasado es de los Coaches o de la Asistente. El orden de los
+      // puestos no se escribe otra vez: es el de ROLES_ALUMNO.
+      .sort((a, b) => ROLES_ALUMNO.indexOf(a.rol) - ROLES_ALUMNO.indexOf(b.rol))
     const ids = mios.map((a) => Number(a.id))
     const rows = ids.length
       ? await sql`
@@ -489,15 +501,59 @@ export async function contadorFirmas(centroId = null) {
 
 // Gerencia: matriz del oficio. A diferencia de matrizProgreso (que filtra
 // rol='administradora' y dejaría fuera justo a las asistentes), aquí entran
-// los dos puestos, cada uno con SU plan.
+// los CUATRO puestos que se entrenan, cada uno con SU plan.
 // → { cursos:[{id,titulo,bloque}], usuarios:[{…, porCurso, avance}] }
+//
+// POR QUÉ EL COORDINADOR OPERATIVO NO ENTRA AQUÍ, teniendo como tiene firma
+// sobre los otros tres puestos (OFICIAL_DE). Es una decisión, no un olvido:
+// esta consulta, sin `centroId`, devuelve a TODA la gente de TODOS los centros,
+// y el alcance del Coordinador son los suyos (usuario_centros). Abrirle la
+// pantalla sin filtrar sería darle la red completa; abrírsela filtrada es otra
+// pantalla —capacidad propia en navigation.js, layout propio bajo
+// /dashboard/entrenamiento/oficio y un WHERE por sus centros en las dos ramas
+// de abajo— y eso no entra en este paquete.
+// Lo que su puesto sí alcanza hoy, y no está en duda: la cola de firmas de cada
+// centro que coordina (/centro/<id>/entrenamiento/firmas) y la lectura de los
+// tres planes que le firma, en el carril "Los planes que tú firmas". El día que
+// haga falta la vista de red, el cambio es el de arriba, no un `||` aquí.
 export async function matrizOficio(centroId = null) {
   return runAction('matrizOficio', async () => {
     await requireCurrentAdmin()
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
+    // Los centros de usuario_centros VIAJAN, no solo filtran. Para el
+    // Coordinador Operativo `usuarios.centro_id` es NULL —manda en varios
+    // centros a la vez— así que sin esto su fila salía con el centro en "—" y
+    // la celda de la cola de firmas decía "sin centro": la única pantalla
+    // desde la que se le toma la maniobra quedaba sin enlace.
+    //
+    // Los ids salen como int[] (el mismo ARRAY_AGG que ya usa oficialesDe) y
+    // los NOMBRES como una sola cadena con STRING_AGG, no como un segundo
+    // array: así no hay dos agregados que tengan que quedar alineados índice a
+    // índice, y el texto es literalmente lo que se pinta en la columna.
     const usuarios = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${ROLES_ALUMNO}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.rol, u.nombre`
-      : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${ROLES_ALUMNO}) ORDER BY c.nombre, u.rol, u.nombre`
+      ? await sql`
+          SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro,
+                 COALESCE(ARRAY_AGG(uc.centro_id ORDER BY cm.nombre, uc.centro_id) FILTER (WHERE uc.centro_id IS NOT NULL), '{}') AS centro_ids,
+                 STRING_AGG(cm.nombre, ' · ' ORDER BY cm.nombre, uc.centro_id) AS centros_texto
+          FROM usuarios u
+          LEFT JOIN centros c ON c.id = u.centro_id
+          LEFT JOIN usuario_centros uc ON uc.usuario_id = u.id
+          LEFT JOIN centros cm ON cm.id = uc.centro_id
+          WHERE u.rol = ANY(${ROLES_ALUMNO})
+            AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros x WHERE x.usuario_id = u.id AND x.centro_id = ${cid}))
+          GROUP BY u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre
+          ORDER BY c.nombre, u.rol, u.nombre`
+      : await sql`
+          SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro,
+                 COALESCE(ARRAY_AGG(uc.centro_id ORDER BY cm.nombre, uc.centro_id) FILTER (WHERE uc.centro_id IS NOT NULL), '{}') AS centro_ids,
+                 STRING_AGG(cm.nombre, ' · ' ORDER BY cm.nombre, uc.centro_id) AS centros_texto
+          FROM usuarios u
+          LEFT JOIN centros c ON c.id = u.centro_id
+          LEFT JOIN usuario_centros uc ON uc.usuario_id = u.id
+          LEFT JOIN centros cm ON cm.id = uc.centro_id
+          WHERE u.rol = ANY(${ROLES_ALUMNO})
+          GROUP BY u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre
+          ORDER BY c.nombre, u.rol, u.nombre`
     const ids = usuarios.map((u) => Number(u.id))
     const rows = ids.length
       ? await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id = ANY(${ids}) AND modulo LIKE 'of-%'`
@@ -525,9 +581,20 @@ export async function matrizOficio(centroId = null) {
             hatted: suyos.filter((m) => hatted(progreso[m.id], m)).length,
           }
         }
+        // `centros` son los ids de usuario_centros; `centroId` sigue siendo el
+        // propio. La pantalla arma el enlace de la firma con el que exista:
+        // ver el comentario de la columna "Cola de firmas".
+        const centros = (u.centro_ids || []).map(Number)
+        const propio = u.centro_id == null ? null : Number(u.centro_id)
         return {
           id: Number(u.id), nombre: u.nombre, email: u.email, rol: u.rol,
-          centro: u.centro || '—', centroId: u.centro_id,
+          centro: u.centro || u.centros_texto || '—',
+          centroId: propio, centros,
+          // El centro DESDE EL QUE se le toma la maniobra: el propio si lo
+          // tiene; si no, el que la gerencia tenga filtrado (cuando es uno de
+          // los suyos) y en último caso el primero que coordina. Sin esto el
+          // enlace de la cola de firmas salía roto para todo un puesto.
+          centroFirma: propio ?? (cid && centros.includes(cid) ? cid : (centros[0] ?? null)),
           porCurso, avance: avanceOficio(plan, progreso),
         }
       }),

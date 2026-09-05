@@ -146,8 +146,11 @@ test('una hoja = un proceso: of-cen-9 dejó de arrastrar las reglas de permisos'
   assert.equal(cen9.decide.length, 1)
   assert.doesNotMatch(JSON.stringify(cen9.decide), /permiso/i, 'los permisos son otro proceso: van en la hoja de of-nor-6')
   const nor6 = derivarSop(moduloOficio('of-nor-6'))
-  assert.match(nor6.proceso, /permiso/i, 'of-nor-6 es la hoja de los permisos, y la llevan los dos puestos')
-  assert.deepEqual(moduloOficio('of-nor-6').roles.slice().sort(), ['administradora', 'asistente'])
+  assert.match(nor6.proceso, /permiso/i, 'of-nor-6 es la hoja de los permisos, y la lleva todo cargo')
+  // La normativa es bloque A: la estudian los CUATRO puestos, no dos. Si esta
+  // lista vuelve a quedarse en dos, es que al Coach o al Coordinador se le cayó
+  // el bloque A y entrarían a su curso de puesto sin haber leído el Manual.
+  assert.deepEqual(moduloOficio('of-nor-6').roles.slice().sort(), ['administradora', 'asistente', 'coach', 'coordinador'])
 })
 
 // ── 3. QUE QUEPA EN UNA HOJA ──────────────────────────────────────────────
