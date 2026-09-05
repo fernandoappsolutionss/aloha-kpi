@@ -363,6 +363,40 @@ test('marcarTerminos: no pierde ni un carácter, marca solo lo permitido y respe
   assert.deepEqual(largo.filter((s) => s.t === 'termino').map((s) => s.texto), ['cuentas por cobrar'])
 })
 
+// ── 12 bis. EL TERCER SENTIDO DE "CICLO" ──────────────────────────────────
+// En ALOHA "ciclo" nombra dos cosas oficiales y el entrenamiento las separa con
+// dos tarjetas: `ciclo` (el del Programa: Ciclo 1 y Ciclo 2) y
+// `ciclo-de-matricula` (el paquete que pagó el padre). Pero hay un TERCER uso
+// vivo en el contenido —"cerrar el ciclo" de un reclamo, "el ciclo completo de
+// las operaciones"— que no es ninguno de los dos.
+//
+// Hoy no sale ningún tooltip equivocado porque ningún módulo con esos textos
+// declara 'ciclo' en `palabras`. Nada lo sostenía: el día que alguien agregue
+// 'ciclo' a of-nor-3 o a of-cen-8, "cerrar el ciclo" se lleva el popover
+// "Ciclo 1: los niveles 1 al 4" delante de la persona que está estudiando cómo
+// atender un reclamo. Esto lo caza en CI.
+const TERCER_SENTIDO = /cerrar el ciclo|cierra el ciclo|ciclo completo de las operaciones/i
+// Lo que BloquesOficio pasa por el auto-enlace: `tabla` y `sub` se pintan planos.
+const textoEnlazable = (m) => (m.bloques || []).flatMap((b) => {
+  if (b.t === 'p' || b.t === 'nota') return [b.texto]
+  if (b.t === 'lista' || b.t === 'pasos') return b.items || []
+  return []
+})
+
+test('ningún módulo que declare "ciclo" usa la palabra en su tercer sentido', () => {
+  const choques = []
+  for (const m of MODULOS_OFICIO) {
+    if (!(m.palabras || []).includes('ciclo')) continue
+    for (const t of textoEnlazable(m)) {
+      if (TERCER_SENTIDO.test(t)) choques.push(`${m.id}: "${String(t).match(TERCER_SENTIDO)[0]}"`)
+    }
+  }
+  assert.deepEqual(
+    choques, [],
+    'este módulo declara la tarjeta `ciclo` (la etapa del Programa) y su texto usa "ciclo" con el sentido de "hasta cerrar el caso": el auto-enlace le va a poner el tooltip equivocado. Cambia la redacción a "hasta cerrar el caso" o saca `ciclo` de `palabras`',
+  )
+})
+
 // ── 13. HIGIENE DE BUNDLE ─────────────────────────────────────────────────
 function archivosJs(dir) {
   const out = []

@@ -2,9 +2,9 @@
 // malentendida. Herramienta de desarrollo: NO corre en Vercel, no la importa la app.
 //
 // Lee las dos fuentes congeladas en docs/entrenamiento/fuente/
-//   glosario-aloha.md  (185 términos, del Manual de Operaciones)
+//   glosario-aloha.md  (186 términos, del Manual de Operaciones)
 //   glosario-zoho.md   (73 términos, del Curso 2 de Zoho para Asistentes)
-// y escribe lib/entrenamiento/oficio/glosario.js con 237 entradas: los 258
+// y escribe lib/entrenamiento/oficio/glosario.js con 238 entradas: los 259
 // términos de las dos fuentes reconciliando a UNA definición los 21 que
 // aparecen en las dos.
 //
@@ -124,6 +124,12 @@ const PLURAL_A_MANO = {
 // Abreviaturas y sinónimos que la gente usa en el Centro y en los módulos.
 const SINONIMOS = {
   'producto-final-valioso': ['pfv'],
+  // Las dos acepciones de "ciclo" se distinguen por una tilde, así que la
+  // forma sin tilde tiene que apuntar a la misma tarjeta: si no, cae en
+  // 'ciclo' (el del Programa) justo donde se habla de lo que el padre pagó.
+  'ciclo-de-matricula': ['ciclo de matricula', 'ciclos de matricula'],
+  // Como aparece escrito en el catálogo de Zoho y en la factura del padre.
+  'primer-ciclo': ['1er ciclo'],
   'oficial-de-entrenamiento': ['oficial de entrenamiento'],
   'caja-menuda': ['caja chica'],
   'informe-de-antiguedad-de-saldos': ['antigüedad de saldos'],
@@ -222,7 +228,7 @@ export function renderArchivo({ salida, compartidos }) {
   return `// GLOSARIO del oficio — la masa de la barrera de palabra malentendida.
 //
 // GENERADO por scripts/oficio-glosario-importar.mjs desde las fuentes
-// congeladas en docs/entrenamiento/fuente/: glosario-aloha.md (185 términos del
+// congeladas en docs/entrenamiento/fuente/: glosario-aloha.md (186 términos del
 // Manual de Operaciones) y glosario-zoho.md (73 del Curso 2). Son ${slugs.length} entradas:
 // los ${compartidos.length} términos que aparecen en las dos fuentes están reconciliados a UNA
 // definición, con la del Manual como canónica (la del curso rellena los huecos).

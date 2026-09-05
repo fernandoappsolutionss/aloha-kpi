@@ -14,7 +14,7 @@
 **Qué trae cada entrada.** *Qué es*, en palabras que cualquier adulto entiende; *un ejemplo*
 real del centro; y, cuando dos términos se mezclan, *con qué no confundirlo*.
 
-Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
+Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **186 términos**
 
 ---
 
@@ -246,11 +246,19 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Ciclo
 
-**Qué es.** Dos niveles seguidos. La matrícula anual cubre un ciclo completo (por ejemplo, niveles 1 y 2). Dentro de un ciclo no se dejan semanas de vacaciones; al terminarlo sí se deja una semana antes del siguiente.
+**Qué es.** Una de las dos etapas en que está dividido cada itinerario del Programa. Ciclo 1: los niveles 1 al 4, igual en Tiny Tots y en Kids; ahí el niño aprende los fundamentos del cálculo con ábaco y de la aritmética mental. Ciclo 2: los niveles 5 al 10 en Tiny Tots y los niveles 5 al 8 en Kids; ahí se potencia la aritmética mental y se busca la estimulación máxima de las capacidades intelectuales. Por eso Tiny Tots tiene 10 niveles en total y Kids tiene 8. Fuente: la web oficial de la empresa, alohapanama.com/program.
 
-**Ejemplo.** Entre el nivel 1 y el 2 no hay vacaciones; al cerrar el nivel 2 y pasar al 3 sí se programa una semana libre.
+**Ejemplo.** Un niño de Kids que va en el nivel 6 está en el Ciclo 2 y le faltan dos niveles para terminar su itinerario; uno de Tiny Tots en el nivel 6 también está en el Ciclo 2, pero le faltan cuatro.
 
-**No lo confundas con** el **nivel**: el nivel es un libro, el ciclo son dos.
+**No lo confundas con** el **ciclo de matrícula**: el Ciclo 1 y el Ciclo 2 son etapas del aprendizaje y no cambian nunca; el ciclo de matrícula es el paquete de niveles que el padre pagó, y puede ser de 1, 2 o 3 niveles según lo que contrató (el Manual describe el caso de dos).
+
+### Ciclo de matrícula
+
+**Qué es.** El paquete de niveles que el representante compra y que su matrícula cubre. El Manual describe el caso normal: una matrícula anual que comprende 2 niveles, de unos 5 meses cada uno (19 a 22 semanas de clases). De ahí sale la regla del calendario: dentro del ciclo de matrícula no se deja semana de vacaciones, y al terminarlo y pasar al siguiente sí se deja una. En el catálogo de Zoho el paquete no siempre son dos niveles: hay artículos de "1er ciclo Matrícula" de 1, 2 y 3 niveles, y las matrículas se numeran por ciclo (1er ciclo, 2do Ciclo, 3er Ciclo, 4to, 5to y Ciclo Especial), según lo que se le vendió al padre.
+
+**Ejemplo.** No hay vacaciones entre el nivel 1 y el 2 del mismo ciclo de matrícula; al cerrar el 2 y pasar al 3 sí se programa una semana libre. Y antes de facturar, confirma cuántos niveles contrató: el artículo de 2 niveles y el de 3 se ven casi iguales en la lista y tienen precios distintos.
+
+**No lo confundas con** el **Ciclo** del Programa: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 va del 5 al 10 en Tiny Tots y del 5 al 8 en Kids, en todos los niños por igual. El ciclo de matrícula es lo que este padre pagó, y puede ser de 1, 2 o 3 niveles.
 
 ### Cierre de nivel
 
@@ -800,7 +808,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Itinerario
 
-**Qué es.** La ruta que sigue un niño dentro del programa según su edad. Hay tres: Kinder, Tiny Tots y Kids. El itinerario define qué libros, qué kit y cuántos niveles le corresponden.
+**Qué es.** La ruta que sigue un niño dentro del programa según su edad. Hay tres: Kinder, Tiny Tots y Kids. El itinerario define qué libros, qué kit y cuántos niveles le corresponden: Tiny Tots tiene 10 niveles y Kids tiene 8, y los dos están divididos en Ciclo 1 (niveles 1 al 4) y Ciclo 2 (del 5 al 10 en Tiny Tots, del 5 al 8 en Kids), según la web oficial de la empresa. Kinder es preescolar y no lleva esa numeración de ciclos.
 
 **Ejemplo.** En toda constancia escolar hay que escribir el itinerario asignado (Kinder / Tiny / Kids) y el nivel actual del estudiante.
 
@@ -820,7 +828,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Kids
 
-**Qué es.** El itinerario de los niños más grandes. Un grupo Kids solo admite niños nuevos hasta la semana 2 del libro, así que la ventana para inscribir es mucho más corta que en Tiny. El Manual no fija cuántos niveles tiene el itinerario; sí fija el mínimo de apertura, que se define para el nivel 1 y para los niveles 2 a 10.
+**Qué es.** El itinerario de los niños más grandes, de 8 a 13 años. Tiene 8 niveles, repartidos en dos ciclos: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 los niveles 5 al 8 (fuente: la web oficial de la empresa, alohapanama.com/program). Un grupo Kids solo admite niños nuevos hasta la semana 2 del libro, así que la ventana para inscribir es mucho más corta que en Tiny. El mínimo de apertura del Manual se escribe en una sola regla para los dos itinerarios: una cifra para el nivel 1 y otra para los niveles 2 al 10.
 
 **Ejemplo.** Todo niño que se gradúa de Tiny Tots 10 y quiere seguir entra en Kids nivel 5; no empieza en Kids 1.
 
@@ -828,7 +836,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Kinder
 
-**Qué es.** El itinerario de los más pequeñitos, alrededor de los 4 años; el Manual lo llama Kinder Tiny Tots y prepara al niño para entrar después a Tiny Tots. El Manual no dice cuántos niveles tiene (solo menciona la existencia de un "Kinder 3"): ese dato se confirma con el corporativo antes de usarlo con un padre.
+**Qué es.** El itinerario de los más pequeñitos, alrededor de los 4 años; el Manual lo llama Kinder Tiny Tots y prepara al niño para entrar después a Tiny Tots. Cuántos niveles tiene no está fijado: el Manual solo menciona la existencia de un "Kinder 3", y la web oficial divide en Ciclo 1 y Ciclo 2 los itinerarios Tiny Tots y Kids, pero a Kinder no le asigna esa numeración. Así que no le atribuyas un Ciclo 1 ni un Ciclo 2, y confirma el número de niveles con el corporativo antes de usarlo con un padre.
 
 **Ejemplo.** Los grupos Kinder van normalmente martes y jueves en el bloque de la tarde temprano, nunca en sábado ni en horario caliente.
 
@@ -916,7 +924,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Matrícula
 
-**Qué es.** El pago anual de inscripción, que cubre un ciclo de dos niveles e incluye seguro estudiantil, mochila, suéter, ábaco, lápiz y los libros de los dos niveles.
+**Qué es.** El pago anual de inscripción, que cubre el ciclo de matrícula contratado —el Manual describe dos niveles y el catálogo de Zoho vende artículos de 1, 2 y 3— e incluye seguro estudiantil, mochila, suéter, ábaco, lápiz y los libros de esos niveles.
 
 **Ejemplo.** La matrícula se paga una vez al año; reponer un material perdido tiene costo adicional.
 
@@ -968,7 +976,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 **Ejemplo.** El calendario del grupo se arma de modo que el nivel siguiente arranque el mismo mes en que termina el actual, para no cortarle el flujo de caja al centro.
 
-**No lo confundas con** el **ciclo**: un ciclo son dos niveles seguidos.
+**No lo confundas con** el **ciclo de matrícula**, que son los niveles que el padre pagó de una vez (dos, según el Manual), ni con el **Ciclo** del Programa, que es la etapa del aprendizaje: Ciclo 1 los niveles 1 al 4, Ciclo 2 del 5 al 10 en Tiny Tots y del 5 al 8 en Kids.
 
 ### Nivel del centro
 
@@ -1296,7 +1304,7 @@ Fuente: `plataformas/aloha/manual-operaciones-completo.md` · **185 términos**
 
 ### Tiny Tots
 
-**Qué es.** El itinerario de los niños pequeños. Va del nivel 1 al 10, y el nivel 10 es la graduación. Un grupo Tiny puede recibir niños nuevos hasta la semana 4 del libro.
+**Qué es.** El itinerario de los niños pequeños, de 5 a 7 años. Tiene 10 niveles y va del 1 al 10, repartidos en dos ciclos: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 los niveles 5 al 10 (fuente: la web oficial de la empresa, alohapanama.com/program). El nivel 10 es la graduación. Un grupo Tiny puede recibir niños nuevos hasta la semana 4 del libro.
 
 **Ejemplo.** El grupo BG-T-03 está en Tiny nivel 6, o sea que le faltan cuatro niveles para graduarse.
 
@@ -1369,7 +1377,8 @@ Repásalos antes de operar: casi todos los errores de un colaborador nuevo salen
 | Cotización | Factura | La cotización propone un precio. La factura ya cobra y genera cuenta por cobrar. |
 | Contrato de trabajo | Contrato de servicios profesionales | Trabajo: administradores y asistentes, con seguro social. Servicios profesionales: Coaches y limpieza, contra factura. |
 | Matrícula | Mensualidad | La matrícula se paga una vez al año y trae los materiales. La mensualidad se paga cada mes y paga las clases. |
-| Tiny Tots | Kinder | Kinder son 3 niveles para los más chiquitos. Tiny Tots son 10 niveles y termina en graduación. |
+| Tiny Tots | Kinder | Kinder es preescolar y prepara para Tiny; cuántos niveles tiene lo confirma el corporativo. Tiny Tots son 10 niveles y termina en graduación. |
+| Ciclo (del Programa) | Ciclo de matrícula | El Ciclo del Programa es lo que el niño aprende: Ciclo 1 los niveles 1 al 4, Ciclo 2 del 5 al 10 en Tiny y del 5 al 8 en Kids. El ciclo de matrícula es lo que el padre pagó: 1, 2 o 3 niveles según el artículo. |
 | Mental Day | Día de repaso | En el Mental Day todo es mental y en juego. En el repaso el niño usa ábaco, libro y lápiz. |
 | Certificado de nivel | Constancia escolar | El certificado lo entrega el Coach en el cierre. La constancia solo la emite el Corporativo. |
 | Certificado de nivel | Certificado de participación | El de nivel certifica que aprobó. El de participación reconoce que estuvo, sin aprobar. |

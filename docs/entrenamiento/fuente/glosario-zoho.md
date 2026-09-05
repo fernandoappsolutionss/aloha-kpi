@@ -267,19 +267,21 @@ Es el cobro mensual por las clases del programa. Se emite sola, mes a mes, a tra
 
 **Ojo:** Su descripción pide nombre del alumno, cédula, fecha de nacimiento, edad y grupo.
 
-### Ciclo
+### Ciclo de matrícula
 
 Es el bloque de niveles que el niño contrata y cursa. El catálogo tiene un artículo de matrícula por cada ciclo.
 
 **Ejemplo:** En Calle 50 existen «Matricula Calle 50 1er ciclo», «Matricula Calle 50 2do Ciclo», «Matricula Calle 50 3er Ciclo», 4to, 5to y «Ciclo Especial».
 
-**No lo confundas con:** **nivel**. El ciclo agrupa varios niveles; el nivel es cada etapa que el niño cierra con su examen.
+**No lo confundas con:** el **Ciclo** del Programa. En Zoho «1er ciclo» es el paquete de matrícula que compró el padre; en la web de la empresa el «Ciclo 1» son los niveles 1 al 4 del itinerario. Los dos números son oficiales y no significan lo mismo.
 
 ### Primer ciclo
 
 Es el ciclo de entrada al programa, el del niño nuevo. Su matrícula es la más completa porque incluye el kit inicial entero.
 
 **Ejemplo:** El artículo «1er ciclo Matricula Kinder Calle 50 2 nivles» incluye suéter, ábaco, libro de clases, lápiz y mochila.
+
+**No lo confundas con:** el **Ciclo 1** del Programa. «1er ciclo» es el nombre del artículo de matrícula del niño nuevo, y trae 1, 2 o 3 niveles según lo que contrató; el Ciclo 1 son siempre los niveles 1 al 4 del itinerario.
 
 **Ojo:** Cada matrícula de primer ciclo facturada debe corresponder a un niño nuevo del mes y a un kit pedido. Los tres números se cuadran al cierre.
 
@@ -299,7 +301,7 @@ Es la ruta del programa según la edad del niño (por ejemplo Kinder, Kids, Tiny
 
 ### Seguro de accidentes opción 1
 
-Es la afiliación al seguro de accidentes con la cobertura básica, que se cobra por ciclo junto con la matrícula.
+Es la afiliación al seguro de accidentes con la cobertura básica, que se cobra una vez por ciclo de matrícula, junto con la matrícula.
 
 **Ejemplo:** «Afiliación Seguro de accidente opción 1 Calle 50», B/.3.50. Cubre gastos médicos por accidente 1.000,00, muerte accidental 5.000,00 y ambulancia incluida.
 
@@ -307,7 +309,7 @@ Es la afiliación al seguro de accidentes con la cobertura básica, que se cobra
 
 ### Seguro de accidentes opción 2
 
-Es la afiliación al seguro de accidentes con la cobertura ampliada, también por ciclo.
+Es la afiliación al seguro de accidentes con la cobertura ampliada, también una vez por ciclo de matrícula.
 
 **Ejemplo:** «Afiliación Seguro de accidente opción 2 Calle 50», B/.7.00. Cubre gastos médicos por accidente 2.000,00, muerte accidental 10.000,00 y ambulancia incluida.
 
