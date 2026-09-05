@@ -21,7 +21,9 @@ const MARGEN = 12
 const AVISO_MS = 2500 // a los 2,5 s se avisa "todavía no veo…", pero se sigue buscando
 
 export default function TourHost() {
+  const pathname = usePathname()
   const sp = useSearchParams()
+  if (pathname?.includes('/entrenamiento/oficio')) return null
   const tourId = sp.get('tour')
   if (!tourId) return null
   return <TourActivo key={tourId} tourId={tourId} />

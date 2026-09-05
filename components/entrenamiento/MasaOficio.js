@@ -7,22 +7,18 @@
 // burocrático: es la primera barrera del método, y quien tilda sin tenerlo a la
 // vista se delata solo en la maniobra.
 import { useState } from 'react'
-import { marcarEstudiado } from '../../app/actions/entrenamiento-oficio'
+import { useGuia } from './GuiaModulo'
 
 export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, motivoBloqueo }) {
+  const guia = useGuia()
   const [tildados, setTildados] = useState(() => masa.map(() => false))
   const [listo, setListo] = useState(Boolean(yaEstudiado))
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState('')
   const todos = tildados.length > 0 && tildados.every(Boolean)
 
-  async function declarar() {
-    setGuardando(true); setError('')
-    try {
-      const r = await marcarEstudiado(moduloId)
-      if (r?.error) { setError(r.error); return }
-      setListo(true)
-    } catch { setError('No se pudo guardar. Recarga la página e intenta de nuevo.') } finally { setGuardando(false) }
+  function declararVista() {
+    if (!todos) return
+    setListo(true)
+    guia?.completar('vista')
   }
 
   return (
@@ -42,7 +38,6 @@ export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, mot
           </li>
         ))}
       </ul>
-      {error && <div className="alert alert--error" role="alert">{error}</div>}
       {/* El orden lo vuelve a comprobar el servidor en marcarEstudiado: aquí
           solo se evita ofrecer un botón que va a devolver error. */}
       {bloqueado && !listo && (
@@ -50,13 +45,19 @@ export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, mot
       )}
       <div className="ofi-masa__acciones" aria-live="polite">
         {listo ? (
-          <span className="ent-pill ent-pill--ok">✓ Estudiado con todo a la vista</span>
+          <span className="ent-pill ent-pill--ok">✓ Todo a la vista</span>
         ) : bloqueado ? null : (
           <>
-            <button className="btn btn--primary" onClick={declarar} disabled={!todos || guardando}>
-              {guardando ? 'Guardando…' : 'Ya lo estudié'}
-            </button>
-            {!todos && <span className="h-sub" style={{ margin: 0 }}>Tilda las {masa.length} cosas de la lista para habilitar el botón.</span>}
+            {guia ? (
+              <button type="button" className="btn btn--primary" onClick={declararVista} disabled={!todos}>
+                Ya lo tengo a la vista
+              </button>
+            ) : null}
+            <span className="h-sub" style={{ margin: 0 }}>
+              {todos
+                ? (guia ? 'Sigue al próximo paso.' : 'Listo: ahora lee el módulo con esto delante.')
+                : `Tilda las ${masa.length} cosas de la lista antes de seguir.`}
+            </span>
           </>
         )}
       </div>

@@ -9,12 +9,13 @@
 // (nunca sobre un id que venga del cliente, salvo la FIRMA, que es un tercero
 // autorizado y se verifica con puedeFirmar); las respuestas del quiz viven en
 // respuestas-oficio/ (solo servidor) y jamás llegan al cliente.
-import { sql } from '../../lib/db'
+import { sql, withTransaction } from '../../lib/db'
 import { requireSession, requireCurrentUser, requireCurrentAdmin, isAdminRole } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
 import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/todas'
+import { validarConcepto } from '../../lib/entrenamiento/oficio/guia-pasos'
 import {
   minimoAprobacion, corregirQuizOficio, estudiado, hatted, planDeRol,
   avanceOficio, avanceDrills, siguienteOficio, gradienteAbierto, puedeFirmar,
@@ -80,6 +81,10 @@ async function progresoDeUsuario(usuarioId) {
   const out = {}
   for (const r of rows) out[r.modulo] = aCamel(r)
   return out
+}
+
+function palabrasVivas(m) {
+  return [...new Set(m?.palabras || [])].filter((slug) => GLOSARIO[slug])
 }
 
 // Quién le puede firmar la maniobra a esta persona, con nombre y apellido. Todo
@@ -164,18 +169,19 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
 // se revisa no se estorban: son dos listas distintas en la misma respuesta.
 export async function cargarOficio() {
   return runAction('cargarOficio', async () => {
-    const s = await requireSession()
-    const plan = planDeRol(s.rol, MODULOS_OFICIO)
+    const u = await requireCurrentUser()
+    const plan = planDeRol(u.rol, MODULOS_OFICIO)
     // `conPlan` agrega los metadatos módulo a módulo: es lo que la pantalla de
     // revisión pinta como checksheet del plan ajeno.
-    const revision = planesDeRevision(s.rol, { conPlan: true })
+    const revision = planesDeRevision(u.rol, { conPlan: true })
     const modo = plan.length > 0 ? 'entrenamiento' : revision.length > 0 ? 'revision' : 'ninguno'
     const comun = {
       modo,
-      rol: s.rol,
-      rolNombre: NOMBRE_ROL[s.rol] || s.rol,
-      veMatriz: isAdminRole(s.rol),
-      puedeFirmarA: rolesQueFirma(s.rol),
+      usuarioId: Number(u.id),
+      rol: u.rol,
+      rolNombre: NOMBRE_ROL[u.rol] || u.rol,
+      veMatriz: isAdminRole(u.rol),
+      puedeFirmarA: rolesQueFirma(u.rol),
       revision,
     }
     // Sin plan propio no se le carga progreso: no lo acumula.
@@ -191,8 +197,8 @@ export async function cargarOficio() {
       }
     }
     const [progreso, oficiales] = await Promise.all([
-      progresoDeUsuario(s.uid),
-      oficialesDe({ id: Number(s.uid), rol: s.rol, centroId: s.centro_id == null ? null : Number(s.centro_id) }),
+      progresoDeUsuario(u.id),
+      oficialesDe({ id: Number(u.id), rol: u.rol, centroId: u.centro_id == null ? null : Number(u.centro_id) }),
     ])
     const sig = siguienteOficio(plan, progreso)
     return {
@@ -260,6 +266,68 @@ export async function resumenOficio() {
   })
 }
 
+export async function cargarConceptos(modulo) {
+  return runAction('cargarConceptos', async () => {
+    const u = await requireCurrentUser()
+    if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
+    const m = moduloOficio(modulo)
+    if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
+    const vivos = palabrasVivas(m)
+    if (vivos.length === 0) return { conceptos: {} }
+    const rows = await sql`
+      SELECT ec.slug, ec.texto
+      FROM entrenamiento_conceptos ec
+      WHERE ec.usuario_id = ${u.id} AND ec.modulo = ${modulo} AND ec.slug = ANY(${vivos})
+    `
+    const conceptos = {}
+    for (const row of rows) conceptos[row.slug] = row.texto
+    return { conceptos }
+  })
+}
+
+export async function guardarConcepto(modulo, slug, texto) {
+  return runAction('guardarConcepto', async () => {
+    const u = await requireCurrentUser()
+    if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
+    const m = moduloOficio(modulo)
+    if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
+    const vivos = palabrasVivas(m)
+    if (!vivos.includes(slug)) return { error: 'Esta palabra no pertenece a este módulo.' }
+    const previo = await progresoDeUsuario(u.id)
+    if (!gradienteAbierto(m, previo)) {
+      return { error: 'Antes de guardar conceptos de este módulo tienes que estudiar el anterior.' }
+    }
+
+    return await withTransaction(async (query) => {
+      await query`SELECT pg_advisory_xact_lock(hashtext('conceptos:' || ${u.id} || ':' || ${modulo}))`
+      const otros = await query`
+        SELECT ec.texto
+        FROM entrenamiento_conceptos ec
+        WHERE ec.usuario_id = ${u.id}
+          AND ec.modulo = ${modulo}
+          AND ec.slug = ANY(${vivos})
+          AND ec.slug <> ${slug}
+      `
+      const validado = validarConcepto(texto, GLOSARIO[slug], otros.map((row) => row.texto))
+      if (!validado.ok) return { error: validado.error }
+      await query`
+        INSERT INTO entrenamiento_conceptos (usuario_id, modulo, slug, texto, updated_at)
+        VALUES (${u.id}, ${modulo}, ${slug}, ${validado.texto}, now())
+        ON CONFLICT (usuario_id, modulo, slug) DO UPDATE
+          SET texto = EXCLUDED.texto, updated_at = now()
+      `
+      const conteo = await query`
+        SELECT COUNT(DISTINCT slug)::int AS n
+        FROM entrenamiento_conceptos
+        WHERE usuario_id = ${u.id} AND modulo = ${modulo} AND slug = ANY(${vivos})
+      `
+      const guardados = Number(conteo[0]?.n || 0)
+      const faltan = Math.max(0, vivos.length - guardados)
+      return { ok: true, texto: validado.texto, completo: guardados === vivos.length, faltan }
+    }, { isolationLevel: 'ReadCommitted' })
+  })
+}
+
 // "Ya lo estudié": la persona declara que leyó el módulo con la masa delante.
 // Releé el usuario en la base (requireCurrentUser): una cookie de 7 días de
 // alguien borrado o con el rol cambiado no debe poder escribir.
@@ -276,6 +344,20 @@ export async function marcarEstudiado(modulo) {
     const previo = await progresoDeUsuario(u.id)
     if (!gradienteAbierto(m, previo)) {
       return { error: 'Antes de marcar este módulo tienes que estudiar el anterior.' }
+    }
+    if (previo[modulo]?.tourVistoAt) return { ok: true }
+    const vivos = palabrasVivas(m)
+    if (vivos.length > 0) {
+      const conteo = await sql`
+        SELECT COUNT(DISTINCT slug)::int AS n
+        FROM entrenamiento_conceptos
+        WHERE usuario_id = ${u.id} AND modulo = ${modulo} AND slug = ANY(${vivos})
+      `
+      const guardados = Number(conteo[0]?.n || 0)
+      const faltan = Math.max(0, vivos.length - guardados)
+      if (faltan > 0) {
+        return { error: `Antes de marcar este módulo escribe con tus palabras las ${faltan} palabras que faltan.` }
+      }
     }
     await sql`
       INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
@@ -305,6 +387,9 @@ export async function responderQuizOficio(modulo, respuestas) {
     const progreso = await progresoDeUsuario(u.id)
     if (!gradienteAbierto(m, progreso)) {
       return { error: 'Antes de responder este módulo tienes que estudiar el anterior.' }
+    }
+    if (!progreso[modulo]?.tourVistoAt) {
+      return { error: 'Antes de responder marca la lección como realizada.' }
     }
     // Forma estricta: tantos enteros como preguntas. Un payload malformado no
     // cuenta como intento.

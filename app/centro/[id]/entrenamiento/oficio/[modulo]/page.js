@@ -8,7 +8,8 @@
 //   6. la maniobra → te la toma y la firma tu jefe entrenador
 //
 // Server Component: la prosa se queda en el servidor. Las islas cliente
-// (a la vista, bloques, cuestionario, maniobra) reciben solo lo que pintan.
+// reciben solo lo que pintan; la guía progresiva coordina los pasos como una
+// isla cliente sobre slots ya renderizados.
 import Link from 'next/link'
 import Sidebar from '../../../../../../components/Sidebar'
 import BloquesOficio from '../../../../../../components/entrenamiento/BloquesOficio'
@@ -17,30 +18,29 @@ import Diapositivas from '../../../../../../components/entrenamiento/Diapositiva
 import MasaOficio from '../../../../../../components/entrenamiento/MasaOficio'
 import QuizOficio from '../../../../../../components/entrenamiento/QuizOficio'
 import PanelDrill from '../../../../../../components/entrenamiento/PanelDrill'
+import GuiaModulo from '../../../../../../components/entrenamiento/GuiaModulo'
+import ConceptosOficio from '../../../../../../components/entrenamiento/ConceptosOficio'
+import MarcarEstudiado from '../../../../../../components/entrenamiento/MarcarEstudiado'
 import { getCentroNombre } from '../../../../../actions/centros'
-import { cargarOficio } from '../../../../../actions/entrenamiento-oficio'
+import { cargarOficio, cargarConceptos } from '../../../../../actions/entrenamiento-oficio'
 import { CURSOS, MODULOS_OFICIO, moduloOficio, temarioDe, objetivoDe, pfvAparte, laminasDe } from '../../../../../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../../../../../lib/entrenamiento/oficio/glosario'
-// La locución del módulo (voz clonada de Fernando). Mismo patrón que la página
-// de los tours: si el módulo no tiene clip en el manifest, no se pinta nada.
-// Los 40 guiones están escritos y probados; los mp3 se generan aparte con
-// `npm run entrenamiento:audio -- --solo oficio` y el manifest los publica.
 import manifestVoz from '../../../../../../lib/entrenamiento/audio-manifest-oficio.json'
-import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
+import manifestGuia from '../../../../../../lib/entrenamiento/audio-manifest-guia.json'
+import { pasosDe, hechosDe } from '../../../../../../lib/entrenamiento/oficio/guia-pasos'
+import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
 
-// Quien FIRMA un módulo puede LEERLO: necesita ver con qué va a evaluar. El
-// permiso sale de rolesQueFirma(), que es la regla real — la Administradora es
-// la jefa entrenadora de la Asistente, así que tiene que poder abrir
-// los 13 módulos de Zoho y el puesto de la asistente para prepararse las maniobras.
-// No lo estudia ni lo responde: solo lee.
-const puedeLeerComoOficial = (rol, m) => rolesQueFirma(rol).some((r) => m.roles.includes(r))
+const QUIZ_SIN_LECCION = 'Antes de responder marca la lección como realizada.'
+
+function clipDePaso(m, pasoId) {
+  if (pasoId === 'portada') return manifestVoz[`oficio/${m.id}`]?.file || null
+  if (['vista', 'palabras', 'cierre'].includes(pasoId)) return manifestGuia[`guia/${m.id}/${pasoId}`]?.file || null
+  if (['laminas', 'lectura', 'preguntas'].includes(pasoId)) return manifestGuia[`guia/general/${pasoId}`]?.file || null
+  return null
+}
 
 export default async function ModuloOficioPage({ params, searchParams }) {
   const { id, modulo: moduloId } = await params
-  // ?revisar=<rol> lo trae el plan de la REVISIÓN, para que el "volver" y
-  // el "siguiente" se queden dentro del plan que se está revisando. Es una
-  // preferencia de vista: abajo solo se acepta si el rol pedido es uno de los
-  // del módulo, y quién puede leerlo lo sigue decidiendo cargarOficio().
   const sp = searchParams ? await searchParams : {}
   const [nombre, oficio] = await Promise.all([
     getCentroNombre(id).catch(() => null),
@@ -61,15 +61,10 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const m = moduloOficio(moduloId)
   if (!m) return shell('error', <>{volverAlHat}<div className="alert alert--error" role="alert">Este módulo no existe.</div></>)
 
-  const { rol, progreso, oficiales } = oficio
+  const { rol, progreso = {}, oficiales = [] } = oficio
 
-  // ── EL MÓDULO DE PAPEL ──────────────────────────────────────────────────
-  // Los seis módulos del personal de aseo no llevan `roles`: no están en el
-  // plan de nadie, no piden cuestionario y no escriben progreso. Esta página
-  // no tiene nada que enseñarles —con `roles: []` la frase de arriba decía
-  // literalmente "es del entrenamiento de ."—, así que manda a la hoja, que es
-  // el módulo entero. Quién puede abrirla la decide rolesDelPapel(): quien
-  // reparte el paquete (la Asistente, con of-ase-0) y quien le firma a ella.
+  // Los módulos de papel mantienen la salida anterior: no tienen guía digital,
+  // conceptos guardados ni progreso en base.
   if (esDePapel(m)) {
     if (!puedeImprimirPapel(rol, m, MODULOS_OFICIO)) {
       return shell('error', <>
@@ -103,9 +98,15 @@ export default async function ModuloOficioPage({ params, searchParams }) {
     </>)
   }
 
-  const esMio = m.roles.includes(rol)
-  const esOficial = puedeLeerComoOficial(rol, m)
-  if (!esMio && !esOficial) {
+  const revisionSolicitada = (oficio.revision || []).find((r) =>
+    r.rol === sp?.revisar && (r.plan || []).some((x) => x.id === m.id))
+  const revisionDisponible = (oficio.revision || []).find((r) =>
+    (r.plan || []).some((x) => x.id === m.id))
+  const modoRevision = Boolean(revisionSolicitada)
+  const esAlumno = !modoRevision && m.roles.includes(oficio.rol)
+  const esOficial = Boolean(revisionSolicitada || revisionDisponible)
+
+  if (!esAlumno && !esOficial) {
     return shell('error', <>
       {volverAlHat}
       <div className="main__head"><div>
@@ -119,79 +120,205 @@ export default async function ModuloOficioPage({ params, searchParams }) {
     </>)
   }
 
-  const p = progreso[m.id]
-  const yaEstudiado = estudiado(p)
-  const abierto = gradienteAbierto(m, progreso)
+  const p = esAlumno ? (progreso?.[m.id] || {}) : null
+  const yaEstudiado = esAlumno ? estudiado(p) : false
+  const abierto = esAlumno && gradienteAbierto(m, progreso || {})
   const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
-  // EL PLAN QUE SE ESTÁ MIRANDO. Para el alumno es el suyo. Para quien revisa,
-  // planDeRol(su rol) es [] —gerencia y coordinador no se entrenan—, y con eso
-  // no había "Módulo 15 de …", no había "Siguiente" y revisar los 26 módulos de
-  // la Administradora eran 26 idas y vueltas al selector de planes.
-  const rolPlan = esMio ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
+  const rolPlan = esAlumno ? oficio.rol : (revisionSolicitada || revisionDisponible).rol
   const plan = planDeRol(rolPlan, MODULOS_OFICIO)
-  // Una sola raíz para las frases de bloqueo de las tres pantallas: la portada y
-  // lo que va a la vista hablan de MARCAR el módulo, el cuestionario de RESPONDERLO, que es
-  // exactamente lo que contesta el servidor en cada caso (marcarEstudiado y
-  // responderQuizOficio). Escribirlas aparte es como se desincronizan.
-  const bloqueo = (verbo) => anterior
-    ? `Antes de ${verbo} este módulo tienes que estudiar "${anterior.titulo}". Puedes leer este texto igual: el método dice devuélvete, no te prohíbe mirar.`
-    : ''
-  const bloqueoMarcar = bloqueo('marcar')
   const idx = plan.findIndex((x) => x.id === m.id)
   const siguiente = idx >= 0 ? plan[idx + 1] : null
-  // La revisión arrastra su ?revisar= por todos los enlaces internos: sin eso,
-  // cada salto devuelve a gerencia al selector de planes.
-  const cola = esMio ? '' : `?revisar=${rolPlan}`
-  const volver = esMio
+  const cola = esAlumno ? '' : `?revisar=${rolPlan}`
+  const volver = esAlumno
     ? volverAlHat
     : <Link className="tour-card__link" href={`${base}${cola}`}>← Volver al plan de {nombreDeRol(rolPlan)}</Link>
 
-  // Solo los términos de ESTE módulo viajan al cliente, no los del glosario entero.
-  // Y solo los que de verdad resuelven: si un slug no está en el GLOSARIO no se
-  // promete una tarjeta ni un subrayado que después no se pintan.
-  const palabrasVivas = (m.palabras || []).filter((slug) => GLOSARIO[slug])
+  const bloqueo = (verbo) => anterior
+    ? `Antes de ${verbo} este módulo tienes que estudiar "${anterior.titulo}". Puedes leer este texto igual: el método dice devuélvete, no te prohíbe mirar.`
+    : ''
+  const bloqueoMarcar = !abierto && esAlumno ? bloqueo('marcar') : ''
+  const bloqueoResponder = !abierto && esAlumno ? bloqueo('responder') : ''
+  const quizBloqueado = esAlumno && (!abierto || !p?.tourVistoAt)
+  const motivoQuiz = !abierto ? bloqueoResponder : QUIZ_SIN_LECCION
+
+  const laminas = laminasDe(m)
+  const palabrasVivas = [...new Set(m.palabras || [])].filter((slug) => GLOSARIO[slug])
   const terminos = {}
   for (const slug of palabrasVivas) terminos[slug] = GLOSARIO[slug]
-
+  const terminosGuia = palabrasVivas.map((slug) => ({ slug, ...GLOSARIO[slug] }))
+  const preguntasQuiz = m.quiz || []
+  const drills = m.drills || []
+  const minimoQuiz = preguntasQuiz.length > 0 ? minimoAprobacion(preguntasQuiz.length) : 0
   const clipVoz = manifestVoz[`oficio/${m.id}`]
 
-  return shell('ready', <>
-    {volver}
+  let conceptosIniciales = {}
+  if (esAlumno && abierto) {
+    const carga = await cargarConceptos(m.id)
+    if (carga?.error) return shell('error', <>{volver}<div className="alert alert--error" role="alert">{carga.error}</div></>)
+    conceptosIniciales = carga?.conceptos || {}
+  }
 
+  const descriptor = {
+    vista: (m.masa || []).length,
+    palabras: palabrasVivas.length,
+    laminas: laminas.length,
+    preguntas: preguntasQuiz.length,
+    drills: drills.length,
+  }
+  const pasos = pasosDe(descriptor).map((paso) => ({ ...paso, clip: clipDePaso(m, paso.id) }))
+  const hechosServidor = esAlumno ? [...hechosDe(p || {}, conceptosIniciales, palabrasVivas, [])] : []
+
+  const portada = (
+    <PortadaModulo
+      key="portada"
+      objetivo={objetivoDe(m)}
+      pfv={pfvAparte(m)}
+      temario={temarioDe(m)}
+      preguntas={preguntasQuiz.length}
+      minimo={minimoQuiz}
+      drills={drills.length}
+      leccionHecha={esAlumno && Boolean(p?.tourVistoAt)}
+      quizAprobado={esAlumno && Boolean(p?.quizAprobadoAt)}
+      drillFirmado={esAlumno && Boolean(p?.drillFirmadoAt)}
+      firmadoPor={p?.drillFirmadoPor?.nombre || ''}
+      bloqueoLeccion={bloqueoMarcar}
+      bloqueoQuiz={bloqueoResponder}
+      esMio={esAlumno}
+    />
+  )
+
+  const masa = (m.masa || []).length > 0 ? (
+    <MasaOficio
+      key="vista"
+      moduloId={m.id}
+      masa={m.masa}
+      yaEstudiado={esAlumno && Boolean(p?.tourVistoAt)}
+      bloqueado={Boolean(bloqueoMarcar)}
+      motivoBloqueo={bloqueoMarcar}
+    />
+  ) : null
+
+  const palabrasPreview = palabrasVivas.length > 0 ? (
+    <section key="palabras-preview" className="card ofi-palabras" aria-labelledby="palabras-titulo">
+      <div className="label" style={{ marginBottom: 6 }}>Aclara estas palabras primero</div>
+      <h2 id="palabras-titulo" style={{ fontSize: 20, margin: '0 0 8px' }}>Lo que tiene que significar algo</h2>
+      <p className="h-sub" style={{ marginTop: 0 }}>
+        Una sola palabra que pasaste por encima te deja en blanco tres párrafos después. En el texto aparecen subrayadas: púlsalas cuando quieras.
+      </p>
+      <dl className="ofi-palabras__lista">
+        {palabrasVivas.map((slug) => {
+          const g = GLOSARIO[slug]
+          return (
+            <div key={slug}>
+              <dt>{g.termino}</dt>
+              <dd>{g.que}{g.ejemplo ? <span className="h-sub"> · Ejemplo: {g.ejemplo}</span> : null}</dd>
+            </div>
+          )
+        })}
+      </dl>
+      <Link className="tour-card__link" href={`${base}/glosario`}>Ver el glosario completo <span aria-hidden="true">→</span></Link>
+    </section>
+  ) : null
+
+  const conceptos = palabrasVivas.length > 0 ? (
+    <ConceptosOficio key="palabras" moduloId={m.id} terminos={terminosGuia} iniciales={conceptosIniciales} />
+  ) : null
+
+  const diapositivas = <Diapositivas key="laminas" laminas={laminas} moduloId={m.id} />
+  const lectura = (
+    <section key="lectura" className="card ent-module-card" aria-label="Contenido del módulo">
+      <BloquesOficio bloques={m.bloques} terminos={terminos} />
+      {esAlumno && (
+        <MarcarEstudiado
+          moduloId={m.id}
+          yaEstudiado={Boolean(p?.tourVistoAt)}
+          bloqueado={!abierto}
+          motivoBloqueo={bloqueoMarcar}
+        />
+      )}
+    </section>
+  )
+
+  const quiz = esAlumno && preguntasQuiz.length > 0 ? (
+    <QuizOficio
+      key="preguntas"
+      moduloId={m.id}
+      preguntas={preguntasQuiz.map((q) => ({ pregunta: q.pregunta, opciones: q.opciones }))}
+      minimo={minimoQuiz}
+      yaAprobado={Boolean(p?.quizAprobadoAt)}
+      tieneDrill={drills.length > 0}
+      hrefGlosario={`${base}/glosario`}
+      bloqueado={quizBloqueado}
+      motivoBloqueo={motivoQuiz}
+    />
+  ) : null
+
+  const drill = drills.length > 0 ? (
+    <PanelDrill
+      key="drill"
+      drills={drills}
+      indice={m.id}
+      usuarioId={null}
+      moduloId={m.id}
+      moduloTitulo={m.titulo}
+      firmadoAt={p?.drillFirmadoAt || null}
+      firmadoPor={p?.drillFirmadoPor || null}
+      puedoFirmar={false}
+      estudiado={yaEstudiado}
+      oficiales={esAlumno ? oficiales : []}
+    />
+  ) : null
+
+  const navegacion = (
+    <div key="navegacion" className="ofi-nav">
+      <Link className="btn" href={`${base}${cola}`}>
+        {esAlumno ? 'Volver a mi puesto' : `Volver al plan de ${nombreDeRol(rolPlan)}`}
+      </Link>
+      {m.sop && (
+        <Link className="btn" href={`${base}/${m.id}/sop${cola}`}>Hoja del proceso (imprimible)</Link>
+      )}
+      {siguiente && <Link className="btn btn--primary" href={`${base}/${siguiente.id}${cola}`}>Siguiente: {siguiente.titulo} <span aria-hidden="true">→</span></Link>}
+    </div>
+  )
+
+  const encabezado = (
     <div className="main__head"><div>
-      {/* La portada de cada módulo nombra el método: no hay método nuevo, es la
-          misma O·L·A aplicada a un puesto en vez de a un negocio. */}
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
         Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
       </div>
       <h1 className="h-title">{m.titulo}</h1>
-      {!esMio && esOficial && (
+      {!esAlumno && esOficial && (
         <div className="alert alert--warn" role="note">
-          Estás leyendo un módulo del puesto de {m.roles.map(nombreDeRol).join(' y ')} como su jefe entrenador. No cuenta para tu avance.
+          Estás leyendo el plan de {nombreDeRol(rolPlan)} como jefe entrenador. Aquí no se marca tu avance.
         </div>
       )}
     </div></div>
+  )
 
-    {/* La portada va ANTES de lo que va a la vista: la persona tiene que saber
-        para qué es este módulo y qué le van a pedir antes de buscar nada. */}
-    <PortadaModulo
-      objetivo={objetivoDe(m)}
-      pfv={pfvAparte(m)}
-      temario={temarioDe(m)}
-      preguntas={(m.quiz || []).length}
-      minimo={(m.quiz || []).length > 0 ? minimoAprobacion(m.quiz.length) : 0}
-      drills={(m.drills || []).length}
-      leccionHecha={esMio && Boolean(p?.tourVistoAt)}
-      quizAprobado={esMio && Boolean(p?.quizAprobadoAt)}
-      drillFirmado={esMio && Boolean(p?.drillFirmadoAt)}
-      firmadoPor={p?.drillFirmadoPor?.nombre || ''}
-      bloqueoLeccion={esMio && !abierto ? bloqueoMarcar : ''}
-      bloqueoQuiz={esMio && !abierto ? bloqueo('responder') : ''}
-      esMio={esMio}
-    />
+  if (esAlumno && abierto) {
+    return shell('ready', <>
+      {volver}
+      {encabezado}
+      <GuiaModulo
+        usuarioId={oficio.usuarioId}
+        moduloId={m.id}
+        pasos={pasos}
+        hechosServidor={hechosServidor}
+        portada={portada}
+        vista={masa}
+        palabras={conceptos}
+        laminas={diapositivas}
+        lectura={lectura}
+        preguntas={quiz}
+        cierre={<div key="cierre" className="ofi-guia__slot ofi-guia__slot--cierre">{drill}{navegacion}</div>}
+      />
+    </>)
+  }
 
-    {/* La presentación hablada del módulo. Va dentro de un <details> cerrado,
-        como en los tours: es opcional y no debe empujar el contenido. */}
+  return shell('ready', <>
+    {volver}
+    {encabezado}
+    {portada}
     {clipVoz && (
       <details className="card ofi-voz">
         <summary>Escuchar la presentación de este módulo (opcional)</summary>
@@ -204,88 +331,12 @@ export default async function ModuloOficioPage({ params, searchParams }) {
         />
       </details>
     )}
-
-    {esMio && (m.masa || []).length > 0 && (
-      <MasaOficio
-        moduloId={m.id}
-        masa={m.masa}
-        yaEstudiado={Boolean(p?.tourVistoAt)}
-        bloqueado={!abierto}
-        motivoBloqueo={bloqueoMarcar}
-      />
-    )}
-
-    {palabrasVivas.length > 0 && (
-      <section className="card ofi-palabras" aria-labelledby="palabras-titulo">
-        <div className="label" style={{ marginBottom: 6 }}>Aclara estas palabras primero</div>
-        <h2 id="palabras-titulo" style={{ fontSize: 20, margin: '0 0 8px' }}>Lo que tiene que significar algo</h2>
-        <p className="h-sub" style={{ marginTop: 0 }}>
-          Una sola palabra que pasaste por encima te deja en blanco tres párrafos después. En el texto aparecen subrayadas: púlsalas cuando quieras.
-        </p>
-        <dl className="ofi-palabras__lista">
-          {palabrasVivas.map((slug) => {
-            const g = GLOSARIO[slug]
-            return (
-              <div key={slug}>
-                <dt>{g.termino}</dt>
-                <dd>{g.que}{g.ejemplo ? <span className="h-sub"> · Ejemplo: {g.ejemplo}</span> : null}</dd>
-              </div>
-            )
-          })}
-        </dl>
-        <Link className="tour-card__link" href={`${base}/glosario`}>Ver el glosario completo <span aria-hidden="true">→</span></Link>
-      </section>
-    )}
-
-    {/* Las láminas explican; los bloques son la fuente. Van antes porque
-        entrar por la lámina hace que el texto de abajo signifique algo. */}
-    <Diapositivas laminas={laminasDe(m)} moduloId={m.id} />
-
-    <section className="card ent-module-card" aria-label="Contenido del módulo">
-      <BloquesOficio bloques={m.bloques} terminos={terminos} />
-    </section>
-
-    {esMio && (m.quiz || []).length > 0 && (
-      <QuizOficio
-        moduloId={m.id}
-        preguntas={m.quiz.map((q) => ({ pregunta: q.pregunta, opciones: q.opciones }))}
-        minimo={minimoAprobacion(m.quiz.length)}
-        yaAprobado={Boolean(p?.quizAprobadoAt)}
-        tieneDrill={(m.drills || []).length > 0}
-        hrefGlosario={`${base}/glosario`}
-        bloqueado={!abierto}
-        motivoBloqueo={bloqueo('responder')}
-      />
-    )}
-
-    {(m.drills || []).length > 0 && (
-      <PanelDrill
-        drills={m.drills}
-        indice={m.id}
-        usuarioId={null}
-        moduloId={m.id}
-        moduloTitulo={m.titulo}
-        firmadoAt={p?.drillFirmadoAt || null}
-        firmadoPor={p?.drillFirmadoPor || null}
-        puedoFirmar={false}
-        estudiado={yaEstudiado}
-        oficiales={esMio ? oficiales : []}
-      />
-    )}
-
-    <div className="ofi-nav">
-      <Link className="btn" href={`${base}${cola}`}>
-        {esMio ? 'Volver a mi puesto' : `Volver al plan de ${nombreDeRol(rolPlan)}`}
-      </Link>
-      {/* LA HOJA DEL PROCESO. Existía la ruta, existían los 35 procedimientos
-          escritos y no había un solo enlace: solo se llegaba escribiendo la URL.
-          Se ofrece únicamente cuando el módulo declara `sop`: la derivación es la
-          red de seguridad del módulo nuevo, no una hoja que se le proponga a
-          nadie (en método y puesto imprimiría el temario bajo "Los pasos"). */}
-      {m.sop && (
-        <Link className="btn" href={`${base}/${m.id}/sop${cola}`}>Hoja del proceso (imprimible)</Link>
-      )}
-      {siguiente && <Link className="btn btn--primary" href={`${base}/${siguiente.id}${cola}`}>Siguiente: {siguiente.titulo} <span aria-hidden="true">→</span></Link>}
-    </div>
+    {masa}
+    {palabrasPreview}
+    {diapositivas}
+    {lectura}
+    {quiz}
+    {drill}
+    {navegacion}
   </>)
 }
