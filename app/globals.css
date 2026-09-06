@@ -2517,3 +2517,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .higiene { padding: 16px; border-left-width: 6px; }
   .higiene__pie { flex-direction: column; align-items: flex-start; }
 }
+
+/* --- El orden es un candado: la puerta del módulo y la fila que aún no abre --- */
+.ofi-puerta { padding: 28px; margin-top: 18px; border-left: 3px solid var(--warn-line); }
+.ofi-puerta h2 { font-family: var(--font-serif); font-size: 22px; margin: 6px 0 12px; }
+.ofi-puerta p { max-width: 70ch; line-height: 1.7; margin: 0 0 10px; }
+.ofi-puerta .ofi-nav { margin-top: 18px; }
+/* La fila sigue siendo pulsable —al entrar se explica por qué—, pero se lee
+   como lo que es: todavía no te toca. */
+.ofi-fila--bloqueada { opacity: 0.62; border-style: dashed; }
+.ofi-fila--bloqueada:hover, .ofi-fila--bloqueada:focus-visible { opacity: 1; }

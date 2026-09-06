@@ -13,7 +13,8 @@ import { derivarSop } from '../../../../../../../components/entrenamiento/sop-de
 import { getCentroNombre } from '../../../../../../actions/centros'
 import { cargarOficio } from '../../../../../../actions/entrenamiento-oficio'
 import { CURSOS, MODULOS_OFICIO, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
-import { rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+import { rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+import { puertaCerrada } from '../../../../../../../lib/entrenamiento/oficio/guia-pasos'
 
 // Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
 // Administradora es la jefa entrenadora de la Asistente, así que
@@ -63,7 +64,7 @@ export default async function SopPage({ params, searchParams }) {
     </>)
   }
 
-  const { rol, oficiales } = oficio
+  const { rol, oficiales, progreso = {} } = oficio
   // HOJA DE PAPEL. El personal de aseo no tiene cuenta: su módulo entero ES
   // esta hoja. La imprime quien reparte el paquete —la Asistente, que sí lleva
   // su propio módulo de entrenar y supervisar al aseo— y quien le firma a ella.
@@ -91,6 +92,34 @@ export default async function SopPage({ params, searchParams }) {
           &quot;{m.titulo}&quot; es del entrenamiento de {(papel ? rolesDelPapel(m, MODULOS_OFICIO) : m.roles).map(nombreDeRol).join(' y ')}. Tu plan está en tu puesto.
         </p>
       </div></div>
+    </>)
+  }
+
+  // EL MISMO CANDADO QUE EL MÓDULO. La hoja es el procedimiento de este
+  // módulo: contenido. Sin esta guarda, el orden se salta escribiendo /sop en
+  // la barra de direcciones. Solo aplica a quien lo estudia: quien la abre para
+  // tomar la maniobra necesita la hoja completa. `esRevision` reusa el ?revisar=
+  // que esta página ya acarrea, para que revisar un módulo que además es tuyo no
+  // te cierre la hoja.
+  // `esMio` ya es "está en mi plan": ni el ?revisar= de la URL lo apaga, que es
+  // justo el hueco por el que se colaba el módulo compartido.
+  if (puertaCerrada(!papel && esMio, gradienteAbierto(m, progreso), progreso[m.id])) {
+    const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
+    return shell('bloqueado', <>
+      <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
+      <div className="main__head"><div>
+        <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Procedimiento operativo</div>
+        <h1 className="h-title">{m.titulo}</h1>
+      </div></div>
+      <section className="card ofi-puerta" role="note">
+        <div className="label">Todavía no</div>
+        <h2><span aria-hidden="true">🔒</span> No te saltes el paso</h2>
+        <p>La hoja de este proceso se abre con el módulo, y el módulo se abre cuando termines <b>&quot;{anterior?.titulo || 'el anterior de tu plan'}&quot;</b>.</p>
+        <div className="ofi-nav">
+          {anterior && <Link className="btn btn--primary" href={`${base}/${anterior.id}`}>Ir a &quot;{anterior.titulo}&quot; <span aria-hidden="true">→</span></Link>}
+          <Link className="btn" href={base}>Volver a mi plan</Link>
+        </div>
+      </section>
     </>)
   }
 
