@@ -74,7 +74,7 @@ assert.equal(validarConcepto('Aquí describo mi responsabilidad concreta y expli
 **Files:** audios/manifests generados, informe de evidencia, memoria y PR.
 
 - [x] Revisar cada frente y reparar bloqueantes antes de generar audio.
-- [ ] Generar64 presentaciones y195 guías con voz aprobada, incrementalmente; conservar66 tours. Comprobar MP3s decodificables, cobertura y correspondencia de hashes.
-- [ ] Correr `npm test` y `npm run build`. Probar en navegador cuenta local: portada→lista→seis conceptos→lectura→quiz→cierre, recarga parcial, pegar/copia rechazados, silencio, revisión y móvil.
+- [x] Generar64 presentaciones y195 guías con voz aprobada, incrementalmente; conservar66 tours. Comprobar MP3s decodificables, cobertura y correspondencia de hashes.
+- [x] Correr `npm test` y `npm run build`. Probar en navegador cuenta local: portada→lista→seis conceptos→lectura→quiz→cierre, recarga parcial, pegar/copia rechazados, silencio, revisión y móvil.
 - [x] Revisión independiente del diff completo y de los hallazgos corregidos.
-- [ ] Commit de la rama y PR listo para probar; entregar evidencia y pedir únicamente autorización final de publicación si sigue siendo necesaria.
+- [x] Commit de la rama y PR listo para probar; entregar evidencia y pedir únicamente autorización final de publicación si sigue siendo necesaria.

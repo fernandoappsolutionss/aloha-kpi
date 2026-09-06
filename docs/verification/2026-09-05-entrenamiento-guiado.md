@@ -28,7 +28,14 @@ Fecha: 2026-09-05. Base: `1628642`. Implementación revisada: `c2bcb55`.
 
 Los tests de base de datos requieren `E2E_DATABASE_CONFIRM=disposable` y una URL de base de prueba. No se aplicaron migraciones ni se modificaron alumnos en producción.
 
-## Pendiente para cerrar la entrega con voz
+## Voz generada (2026-09-05, noche)
+
+- Fernando aprobó de oído la voz provisional (`MUPKcfGINNwjsSaWv8yx`, receta A) con una audición de 4 clips.
+- `node scripts/entrenamiento-audio.mjs --concurrencia 3`: 259 clips generados (64 presentaciones + 192 de guía + 3 generales), 168.471 caracteres, 0 errores; los 66 tours quedaron intactos. Manifests: oficio 64, guía 195, tour 66; 0 archivos faltantes; los 259 mp3 decodifican (ffprobe); 89,3 MB y 186 min de audio en `public/entrenamiento`.
+- `npm test` con los mp3 en disco: 993 pruebas, 0 fallas, 0 omitidas. `next build` limpio.
+- Navegador con los clips reales: Empezar reproduce la presentación; cada transición cambia al clip del paso (`oficio/of-met-1.mp3` → `guia/of-met-1/vista.mp3` → `…/palabras.mp3` → `…/cierre.mp3`); un solo `<audio>` también con `?tour=meta`; módulo cerrado por orden → página plana con `.ofi-voz`.
+
+## Pendiente para cerrar la entrega
 
 1. Autorizar el envío a ElevenLabs de los 259 guiones pendientes (168.471 caracteres), usando la voz aprobada y los créditos existentes. La revisión automática exige confirmación actual y rechazó usar como autorización el historial recuperado.
 2. Ejecutar `node scripts/entrenamiento-audio.mjs --concurrencia 3`, comprobar hashes, cobertura y decodificación de todos los MP3, y repetir las pruebas de audio que hoy se omiten.
