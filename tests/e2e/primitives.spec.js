@@ -107,6 +107,21 @@ test('TableScroller crea la única región horizontal y conserva la primera colu
   expect(Math.abs(geometry[1].x - geometry[0].x)).toBeLessThanOrEqual(2)
 })
 
+test('el aviso de deslizar solo sale cuando la tabla de verdad desborda', async ({ page }) => {
+  await openHarness(page)
+  const region = page.getByRole('region', { name: 'Comparación de prueba' })
+  const aviso = region.getByText('Desliza para comparar')
+  await expect(aviso).toBeVisible()
+
+  // Caja más ancha que la tabla: no hay nada que deslizar, el aviso sobra.
+  await region.evaluate((node) => { node.style.maxWidth = 'none'; node.style.width = '1100px' })
+  await expect(aviso).toBeHidden()
+
+  // Y al volver a quedar chica, el aviso reaparece solo.
+  await region.evaluate((node) => { node.style.width = '320px' })
+  await expect(aviso).toBeVisible()
+})
+
 test('OperationalCard respeta el nivel de heading y omite campos vacíos', async ({ page }) => {
   await openHarness(page)
   const card = page.locator('.operational-card')
