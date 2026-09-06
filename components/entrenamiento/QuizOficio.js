@@ -8,8 +8,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { responderQuizOficio } from '../../app/actions/entrenamiento-oficio'
+import { useGuia } from './GuiaModulo'
 
 export default function QuizOficio({ moduloId, preguntas, minimo, yaAprobado, tieneDrill, hrefGlosario, bloqueado, motivoBloqueo }) {
+  const guia = useGuia()
   const total = preguntas.length
   const [sel, setSel] = useState(() => preguntas.map(() => null))
   const [resultado, setResultado] = useState(null)
@@ -24,6 +26,7 @@ export default function QuizOficio({ moduloId, preguntas, minimo, yaAprobado, ti
       const r = await responderQuizOficio(moduloId, sel)
       if (r?.error) { setResultado({ error: r.error }); return }
       setResultado(r)
+      if (r.aprobado) guia?.completar('preguntas', { durable: true })
     } catch {
       setResultado({ error: 'No se pudo corregir. Recarga la página e intenta de nuevo.' })
     } finally { setEnviando(false) }

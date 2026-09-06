@@ -572,11 +572,11 @@ const fuentesApp = () => [...archivosJs(join(ROOT, 'app')), ...archivosJs(join(R
 // Un comentario que nombra la ruta NO cuenta como import.
 const sinComentarios = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
-test('ningún componente cliente importa el catálogo, los cursos ni el glosario', () => {
+test('ningún componente cliente importa el catálogo, los cursos, el glosario ni guia.js del oficio', () => {
   const malos = fuentesApp().filter((p) => {
     const src = readFileSync(p, 'utf8')
     if (!/^\s*['"]use client['"]/m.test(src)) return false
-    return /['"][^'"]*entrenamiento\/oficio\/(catalogo|cursos|glosario)[^'"]*['"]/.test(sinComentarios(src))
+    return /['"][^'"]*entrenamiento\/oficio\/(?:catalogo|cursos|glosario|guia(?:\.js)?)(?:['"]|\/)/.test(sinComentarios(src))
   })
   assert.deepEqual(malos, [], `la prosa del oficio se le va al navegador de cada centro: ${malos.join(', ')}`)
 })

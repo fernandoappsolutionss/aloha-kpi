@@ -14,6 +14,7 @@
 // Si un día se afloja una guarda, esta pantalla miente: se cambian las dos.
 
 const RESTRICCION_DRILL = 'la Lección esté marcada como realizada y el Cuestionario aprobado.'
+const RESTRICCION_QUIZ = 'la Lección esté marcada como realizada.'
 
 // El estado de una actividad, con el mismo vocabulario de píldoras del resto
 // del entrenamiento (.ent-pill).
@@ -61,6 +62,10 @@ export default function PortadaModulo({
   // dos condiciones. Para el jefe que solo está leyendo el módulo de otro puesto
   // nunca desaparece: ahí la línea no es su estado, es la regla del módulo.
   const drillAbierto = esMio && leccionHecha && quizAprobado
+  const restriccionQuiz = [
+    bloqueoQuiz,
+    esMio && !leccionHecha ? RESTRICCION_QUIZ : '',
+  ].filter(Boolean).join(' ')
 
   return (
     <section className="card ofi-portada" aria-labelledby="ofi-portada-titulo">
@@ -108,7 +113,7 @@ export default function PortadaModulo({
                 : `${preguntas} preguntas · las aprueba con ${minimo} correctas · reintento ilimitado.`}
               estado={esMio ? (quizAprobado ? '✓ Aprobado' : 'Por responder') : ''}
               tono={quizAprobado ? 'ok' : ''}
-              restriccion={bloqueoQuiz}
+              restriccion={restriccionQuiz}
             />
           )}
           {drills > 0 && (

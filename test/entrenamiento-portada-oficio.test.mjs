@@ -191,6 +191,9 @@ test('la restricción que pinta la portada es la que el servidor aplica', () => 
   // Lección y Cuestionario: el gradiente.
   assert.match(actions, /export async function marcarEstudiado[\s\S]*?gradienteAbierto\(m, previo\)/)
   assert.match(actions, /export async function responderQuizOficio[\s\S]*?gradienteAbierto\(m, progreso\)/)
+  // Cuestionario: además exige que la lección esté marcada en este mismo módulo.
+  assert.match(actions, /export async function responderQuizOficio[\s\S]*?tourVistoAt[\s\S]*?Antes de responder marca la lección como realizada\./)
+  assert.match(portada, /RESTRICCION_QUIZ = 'la Lección esté marcada como realizada\.'/)
   // Drill: lección marcada Y cuestionario aprobado (eso es estudiado()).
   assert.match(actions, /export async function firmarDrill[\s\S]*?if \(!estudiado\(suyo\[modulo\]\)\)/)
   assert.match(portada, /RESTRICCION_DRILL = 'la Lección esté marcada como realizada y el Cuestionario aprobado\.'/)

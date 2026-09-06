@@ -43,7 +43,7 @@ test('rolesQueRevisa es exactamente rolesQueFirma, tenga o no plan propio', () =
 test('la action manda su plan Y los planes que revisa en la misma respuesta', () => {
   const src = leer('app/actions/entrenamiento-oficio.js')
   const cargar = src.slice(src.indexOf('export async function cargarOficio'), src.indexOf('export async function marcarEstudiado'))
-  assert.match(cargar, /planesDeRevision\(s\.rol, \{ conPlan: true \}\)/, 'cargarOficio calcula la revisión SIEMPRE, no solo cuando el plan propio está vacío')
+  assert.match(cargar, /planesDeRevision\(u\.rol, \{ conPlan: true \}\)/, 'cargarOficio calcula la revisión SIEMPRE, no solo cuando el plan propio está vacío')
   assert.doesNotMatch(cargar, /if \(plan\.length === 0\) \{\s*const revision/, 'la revisión no puede volver a colgar de "no tengo plan"')
   // El carril del índice también: `revision` viaja en las DOS formas, y en la
   // de 'entrenamiento' sale junto a las barras de avance del plan propio.

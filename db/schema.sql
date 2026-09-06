@@ -833,6 +833,19 @@ CREATE TABLE IF NOT EXISTS entrenamiento_progreso (
 ALTER TABLE entrenamiento_progreso ADD COLUMN IF NOT EXISTS drill_firmado_at  TIMESTAMPTZ;
 ALTER TABLE entrenamiento_progreso ADD COLUMN IF NOT EXISTS drill_firmado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
 
+-- Conceptos escritos por el alumno, aislados por usuario, módulo y slug vivo.
+-- No reemplazan entrenamiento_progreso: son la barrera nueva antes de marcar
+-- la lección en los módulos digitales de oficio.
+CREATE TABLE IF NOT EXISTS entrenamiento_conceptos (
+  id          SERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  modulo     TEXT NOT NULL,
+  slug       TEXT NOT NULL,
+  texto      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (usuario_id, modulo, slug)
+);
+
 -- Conexión OAuth con Zoho Books (fila única): la autorización con la que el
 -- cron de cobranza (/api/cron/cobranza-zoho) lee las facturas de las 4
 -- organizaciones. Se crea desde /dashboard/zoho — solo el correo autorizado

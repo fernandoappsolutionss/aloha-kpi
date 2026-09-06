@@ -1674,6 +1674,37 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .ofi-palabras__lista dt { font-weight: 600; }
 .ofi-palabras__lista dd { color: var(--text-muted); line-height: 1.6; }
 
+/* Guía progresiva del módulo */
+.ofi-guia { padding: 24px; display: grid; gap: 18px; }
+.ofi-guia__head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.ofi-guia__head h2 { font-family: var(--font-serif); font-size: clamp(22px, 2.4vw, 30px); margin: 0; }
+.ofi-guia__audio { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.ofi-guia__audio .btn { min-height: 44px; }
+.ofi-guia__indice { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.ofi-guia__idx button { min-height: 46px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text-muted); cursor: pointer; }
+.ofi-guia__idx button:disabled { cursor: not-allowed; opacity: .58; }
+.ofi-guia__idx span { width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--surface-2); color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+.ofi-guia__idx--actual button { border-color: var(--ts-green); color: var(--text); box-shadow: 0 0 0 3px var(--ts-green-soft); }
+.ofi-guia__idx--hecho button { border-color: var(--ts-green-line); color: var(--ts-green-deep); }
+.ofi-guia__cuerpo { display: grid; gap: 16px; }
+.ofi-guia__paso { border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; background: var(--surface-1); }
+.ofi-guia__paso[hidden] { display: none; }
+.ofi-guia__paso-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.ofi-guia__paso-head h3 { font-family: var(--font-serif); font-size: 21px; margin: 4px 0 0; }
+.ofi-guia__acciones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.ofi-guia__acciones .btn { min-height: 48px; }
+
+.ofi-conceptos { display: grid; gap: 14px; }
+.ofi-conceptos h2 { font-family: var(--font-serif); font-size: 21px; margin: 0; }
+.ofi-conceptos__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.ofi-concepto { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+.ofi-concepto h3 { margin: 0; font-size: 17px; }
+.ofi-concepto p { margin: 0; color: var(--text-muted); line-height: 1.6; }
+.ofi-concepto textarea { width: 100%; min-height: 96px; resize: vertical; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-1); color: var(--text); font: inherit; line-height: 1.5; }
+.ofi-concepto textarea:focus-visible { outline: 3px solid var(--ts-green-soft); border-color: var(--ts-green); }
+.ofi-marcar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); }
+.ofi-marcar .btn { min-height: 48px; }
+
 /* Bloques de contenido.
    ponytail: la medida de lectura la lleva la TARJETA, no el texto de adentro.
    Antes .ofi-bloques se limitaba a 82ch dentro de una tarjeta a todo el ancho,
@@ -1735,7 +1766,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 @media (max-width: 680px) {
   .ofi-carril, .ofi-pfv, .ofi-masa, .ofi-palabras, .ofi-drill { padding: 18px 14px; }
-  .ofi-carril__head .btn, .ofi-nav .btn, .ofi-masa__acciones .btn, .ofi-drill__acciones .btn { width: 100%; }
+  .ofi-carril__head .btn, .ofi-nav .btn, .ofi-masa__acciones .btn, .ofi-drill__acciones .btn, .ofi-guia__acciones .btn { width: 100%; }
+  .ofi-guia { padding: 18px 14px; }
+  .ofi-guia__audio { justify-content: flex-start; }
+  .ofi-guia__idx { flex: 1 1 100%; }
+  .ofi-guia__idx button { width: 100%; justify-content: flex-start; }
+  .ofi-guia__paso { padding: 14px; }
+  .ofi-conceptos__grid { grid-template-columns: 1fr; }
   .ofi-fila { padding: 12px; gap: 10px; }
   .ofi-bloques { max-width: 100%; }
   /* Tablas en tarjetas: en un teléfono una tabla de 5 columnas no se lee. */
