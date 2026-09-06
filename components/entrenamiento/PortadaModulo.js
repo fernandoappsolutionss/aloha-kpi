@@ -51,7 +51,10 @@ export default function PortadaModulo({
   // módulo…" (marcarEstudiado) y "antes de RESPONDER este módulo…"
   // (responderQuizOficio). Una sola frase para las dos actividades hacía que la
   // pantalla y el servidor nombraran distinto la misma guarda.
-  bloqueoLeccion,
+  // El orden ya NO se avisa aquí: desde 2026-09-06 un módulo cerrado no se abre
+  // (la puerta "No te saltes el paso"), así que la Lección nunca tiene
+  // restricción que pintar. Quedan las dos que sí se cumplen dentro del módulo:
+  // el cuestionario exige la lección marcada, y la maniobra exige las dos.
   bloqueoQuiz,
   // Falso cuando quien lee es el jefe entrenador y no el alumno: el
   // módulo no es de su puesto, así que no tiene progreso propio que mostrar.
@@ -103,7 +106,6 @@ export default function PortadaModulo({
               : 'Esto es lo que ella tiene que leer, con todo a la vista, y marcar como realizada.'}
             estado={esMio ? (leccionHecha ? '✓ Realizada' : 'Por hacer') : ''}
             tono={leccionHecha ? 'ok' : ''}
-            restriccion={bloqueoLeccion}
           />
           {preguntas > 0 && (
             <Actividad
@@ -128,7 +130,7 @@ export default function PortadaModulo({
               // firmarDrill() rechaza al alumno que no tenga las dos marcas.
               // Se deja de mostrar en cuanto se cumple: un candado que sigue
               // ahí con la condición ya cumplida enseña a ignorar los candados.
-              restriccion={bloqueoLeccion || (drillAbierto ? '' : RESTRICCION_DRILL)}
+              restriccion={drillAbierto ? '' : RESTRICCION_DRILL}
             />
           )}
         </ul>

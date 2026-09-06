@@ -27,7 +27,7 @@ import { CURSOS, MODULOS_OFICIO, moduloOficio, temarioDe, objetivoDe, pfvAparte,
 import { GLOSARIO } from '../../../../../../lib/entrenamiento/oficio/glosario'
 import manifestVoz from '../../../../../../lib/entrenamiento/audio-manifest-oficio.json'
 import manifestGuia from '../../../../../../lib/entrenamiento/audio-manifest-guia.json'
-import { pasosDe, hechosDe } from '../../../../../../lib/entrenamiento/oficio/guia-pasos'
+import { pasosDe, hechosDe, puertaCerrada } from '../../../../../../lib/entrenamiento/oficio/guia-pasos'
 import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
 
 const QUIZ_SIN_LECCION = 'Antes de responder marca la lección como realizada.'
@@ -120,9 +120,17 @@ export default async function ModuloOficioPage({ params, searchParams }) {
     </>)
   }
 
-  const p = esAlumno ? (progreso?.[m.id] || {}) : null
+  // EL MÓDULO ESTÁ EN MI PLAN, revise o no. Es lo que decide la puerta, y no lo
+  // cambia ningún parámetro de la URL: `esAlumno` se apaga con ?revisar=, y con
+  // eso la Administradora se abría un módulo compartido con la Asistente que
+  // ella todavía no puede estudiar. Leerlo como jefa entrenadora no la exime:
+  // le toca estudiarlo igual, y en orden.
+  const esSuyo = m.roles.includes(oficio.rol)
+  const propio = progreso?.[m.id] || {}
+  const abiertoParaMi = gradienteAbierto(m, progreso || {})
+  const p = esAlumno ? propio : null
   const yaEstudiado = esAlumno ? estudiado(p) : false
-  const abierto = esAlumno && gradienteAbierto(m, progreso || {})
+  const abierto = esAlumno && abiertoParaMi
   const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
   const rolPlan = esAlumno ? oficio.rol : (revisionSolicitada || revisionDisponible).rol
   const plan = planDeRol(rolPlan, MODULOS_OFICIO)
@@ -133,13 +141,56 @@ export default async function ModuloOficioPage({ params, searchParams }) {
     ? volverAlHat
     : <Link className="tour-card__link" href={`${base}${cola}`}>← Volver al plan de {nombreDeRol(rolPlan)}</Link>
 
-  const bloqueo = (verbo) => anterior
-    ? `Antes de ${verbo} este módulo tienes que estudiar "${anterior.titulo}". Puedes leer este texto igual: el método dice devuélvete, no te prohíbe mirar.`
-    : ''
-  const bloqueoMarcar = !abierto && esAlumno ? bloqueo('marcar') : ''
-  const bloqueoResponder = !abierto && esAlumno ? bloqueo('responder') : ''
+  // ── LA PUERTA ───────────────────────────────────────────────────────────
+  // Hasta hoy este módulo se abría igual y solo se bloqueaban las escrituras:
+  // la pantalla decía "puedes leer este texto igual". Se podía saltar el paso,
+  // que es justo lo que el orden existe para impedir. Ahora el módulo no se
+  // abre, y se dice por qué.
+  //
+  // Va ANTES de todo lo demás a propósito: sin la puerta abierta no se consulta
+  // el progreso de conceptos del alumno ni se arma una línea del contenido.
+  if (puertaCerrada(esSuyo, abiertoParaMi, propio)) {
+    const falta = anterior?.titulo || 'el módulo anterior de tu plan'
+    return shell('bloqueado', <>
+      {volver}
+      <div className="main__head"><div>
+        <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
+          Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length}
+        </div>
+        <h1 className="h-title">{m.titulo}</h1>
+      </div></div>
+      <section className="card ofi-puerta" role="note" aria-labelledby="ofi-puerta-titulo">
+        <div className="label">Todavía no</div>
+        <h2 id="ofi-puerta-titulo"><span aria-hidden="true">🔒</span> No te saltes el paso</h2>
+        <p>
+          Este módulo se abre cuando termines <b>&quot;{falta}&quot;</b>.
+        </p>
+        <p className="h-sub">
+          No es un trámite. Cada módulo se para sobre el anterior, y entrar antes de tiempo es lo que hace
+          que después no entiendas, te aburras y lo dejes. Termina el que falta y este se abre solo.
+        </p>
+        <div className="ofi-nav">
+          {anterior && (
+            <Link className="btn btn--primary" href={`${base}/${anterior.id}`}>
+              Ir a &quot;{anterior.titulo}&quot; <span aria-hidden="true">→</span>
+            </Link>
+          )}
+          <Link className="btn" href={`${base}${cola}`}>{esAlumno ? 'Volver a mi plan' : `Volver al plan de ${nombreDeRol(rolPlan)}`}</Link>
+        </div>
+      </section>
+    </>)
+  }
+
+  // El cuestionario sigue teniendo su propio candado, y tiene que decir lo MISMO
+  // que rechaza el servidor. Ojo con el caso que abre la red de progreso: quien
+  // ya marcó este módulo entra aunque su anterior deje de estar estudiado (un
+  // `requiere` que cambió, una fila vieja), y ahí responderQuizOficio lo sigue
+  // rechazando por orden. Mirando solo la lección, la pantalla le ofrecería un
+  // cuestionario que el servidor va a rechazar.
   const quizBloqueado = esAlumno && (!abierto || !p?.tourVistoAt)
-  const motivoQuiz = !abierto ? bloqueoResponder : QUIZ_SIN_LECCION
+  const motivoQuiz = !abierto
+    ? `Antes de responder tienes que estudiar "${anterior?.titulo || 'el módulo anterior'}".`
+    : QUIZ_SIN_LECCION
 
   const laminas = laminasDe(m)
   const palabrasVivas = [...new Set(m.palabras || [])].filter((slug) => GLOSARIO[slug])
@@ -181,8 +232,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       quizAprobado={esAlumno && Boolean(p?.quizAprobadoAt)}
       drillFirmado={esAlumno && Boolean(p?.drillFirmadoAt)}
       firmadoPor={p?.drillFirmadoPor?.nombre || ''}
-      bloqueoLeccion={bloqueoMarcar}
-      bloqueoQuiz={bloqueoResponder}
+      bloqueoQuiz={esAlumno && !abierto ? motivoQuiz : ''}
       esMio={esAlumno}
     />
   )
@@ -193,8 +243,6 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       moduloId={m.id}
       masa={m.masa}
       yaEstudiado={esAlumno && Boolean(p?.tourVistoAt)}
-      bloqueado={Boolean(bloqueoMarcar)}
-      motivoBloqueo={bloqueoMarcar}
     />
   ) : null
 
@@ -232,8 +280,6 @@ export default async function ModuloOficioPage({ params, searchParams }) {
         <MarcarEstudiado
           moduloId={m.id}
           yaEstudiado={Boolean(p?.tourVistoAt)}
-          bloqueado={!abierto}
-          motivoBloqueo={bloqueoMarcar}
         />
       )}
     </section>

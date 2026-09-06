@@ -92,11 +92,30 @@ export default async function FirmasPage({ params }) {
               {m.titulo} · estudiado hace {m.dias == null ? '—' : m.dias} {m.dias === 1 ? 'día' : 'días'}
               {m.drills.length > 1 ? ` · ${m.drills.length} maniobras en este módulo` : ''}
             </div>
-            {/* UN panel por MÓDULO, no por maniobra: la firma es del módulo (una
-                sola columna drill_firmado_at por usuario y módulo). Con cuatro
-                botones, tomar uno firmaba los cuatro. */}
-            <PanelDrill drills={m.drills} indice={`${f.usuarioId}-${m.id}`} usuarioId={f.usuarioId} moduloId={m.id}
-              moduloTitulo={m.titulo} firmadoAt={null} firmadoPor={null} puedoFirmar estudiado />
+            {/* NO SE TOMA LO QUE UNO NO HA ESTUDIADO. Si este módulo también es
+                del puesto de quien firma y la puerta se lo cierra, la action ni
+                siquiera manda la maniobra: aquí se dice por qué y qué le falta.
+                La persona no queda colgada — a cada puesto le puede firmar más
+                de un escalón (ver OFICIAL_DE). */}
+            {m.cerradoParaMi ? (
+              <div className="alert alert--warn" role="note">
+                <p style={{ margin: '0 0 8px' }}>
+                  <b>Este módulo también es de tu puesto y todavía no lo has estudiado.</b> No se toma una maniobra que
+                  uno no domina: estúdialo y vuelve, o pídele a tu jefe entrenador que se la tome él.
+                </p>
+                {m.meFalta && (
+                  <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento/oficio/${m.meFalta.id}`}>
+                    Seguir por &quot;{m.meFalta.titulo}&quot; <span aria-hidden="true">→</span>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              /* UN panel por MÓDULO, no por maniobra: la firma es del módulo (una
+                 sola columna drill_firmado_at por usuario y módulo). Con cuatro
+                 botones, tomar uno firmaba los cuatro. */
+              <PanelDrill drills={m.drills} indice={`${f.usuarioId}-${m.id}`} usuarioId={f.usuarioId} moduloId={m.id}
+                moduloTitulo={m.titulo} firmadoAt={null} firmadoPor={null} puedoFirmar estudiado />
+            )}
           </div>
         ))}
       </section>

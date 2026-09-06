@@ -9,7 +9,8 @@ import Sidebar from '../../../../../components/Sidebar'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarOficio } from '../../../../actions/entrenamiento-oficio'
 import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../lib/entrenamiento/oficio/catalogo'
-import { estudiado, esDePapel, puedeImprimirPapel } from '../../../../../lib/entrenamiento/oficio/progreso'
+import { estudiado, esDePapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../lib/entrenamiento/oficio/progreso'
+import { puertaCerrada } from '../../../../../lib/entrenamiento/oficio/guia-pasos'
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short' }) : ''
 
@@ -106,7 +107,7 @@ export default async function OficioPage({ params, searchParams }) {
         <h1 className="h-title">{elegido ? `Plan de ${elegido.rolNombre}` : 'Revisa el entrenamiento de tu gente'}</h1>
         <p className="h-sub">
           {elegido
-            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: puedes leer cada módulo completo, pero no acumulas progreso, no respondes el cuestionario y la firma de la maniobra se pone en la cola de firmas, después de tomársela a la persona.</>
+            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: no acumulas progreso, no respondes el cuestionario y la firma de la maniobra se pone en la cola de firmas, después de tomársela a la persona. Los módulos que <b>no</b> están en tu propio plan los lees completos; los que sí, en tu orden.</>
             : <>Como {rolNombre || rol} tú no te entrenas en estos planes: los firmas. Ábrelos en modo lectura para prepararte las maniobras, revisar qué se está enseñando o corregir un módulo.</>}
         </p>
       </div></div>
@@ -241,6 +242,11 @@ export default async function OficioPage({ params, searchParams }) {
   }
 
   const hat = plan.find((m) => m.curso === 'hat')
+  // El módulo del propio puesto es de los últimos del bloque A: para quien
+  // empieza está cerrado. Prometerle ahí su producto y un botón "Estudiar mi
+  // puesto" que solo lleva a la puerta es enseñar el final y cerrar la puerta en
+  // la misma pantalla. Mientras esté cerrado se dice qué falta y se manda ahí.
+  const hatBloqueado = hat ? puertaCerrada(true, gradienteAbierto(hat, progreso), progreso[hat.id]) : false
 
   // EL TAMAÑO DEL PLAN, DICHO DE FRENTE. El total en horas SOLO lo veía el
   // revisor; al alumno se le daban los minutos módulo a módulo y nunca la
@@ -273,12 +279,20 @@ export default async function OficioPage({ params, searchParams }) {
       </p>
     </div></div>
 
-    {hat?.pfv && (
+    {hat?.pfv && !hatBloqueado && (
       <section className="ofi-pfv" aria-labelledby="pfv-titulo">
         <div className="label">El producto de tu puesto</div>
         <h2 id="pfv-titulo">{hat.pfv}</h2>
         <p className="h-sub">El reto es decirlo sin leerlo. Si no puedes, todavía no es tuyo: vuelve al módulo de tu puesto.</p>
         <Link className="btn btn--primary" href={`${base}/${hat.id}`}>Estudiar mi puesto <span aria-hidden="true">→</span></Link>
+      </section>
+    )}
+    {hat && hatBloqueado && siguiente && (
+      <section className="ofi-pfv" aria-labelledby="pfv-titulo">
+        <div className="label">El producto de tu puesto</div>
+        <h2 id="pfv-titulo">Lo vas a poder decir en una frase cuando llegues a &quot;{hat.titulo}&quot;.</h2>
+        <p className="h-sub">Ese módulo se abre más adelante en tu plan. Empieza por donde te toca y llegas.</p>
+        <Link className="btn btn--primary" href={`${base}/${siguiente.id}`}>Seguir por &quot;{siguiente.titulo}&quot; <span aria-hidden="true">→</span></Link>
       </section>
     )}
 
@@ -308,7 +322,7 @@ export default async function OficioPage({ params, searchParams }) {
 
     <section className="ofi-checksheet" aria-labelledby="checksheet-titulo">
       <h2 id="checksheet-titulo">Tu plan</h2>
-      <p className="h-sub">Tu plan de puesto, en orden. El orden no es decorativo: cada módulo abre con el anterior estudiado. Leer siempre se puede; responder sus preguntas, no.</p>
+      <p className="h-sub">Tu plan de puesto, en orden. El orden no es decorativo: cada módulo se abre cuando el anterior queda estudiado. Aquí no se salta ningún paso.</p>
       {BLOQUES.map((b) => {
         const suyos = plan.filter((m) => CURSOS[m.curso]?.bloque === b)
         const hojas = hojasDe(suyos, b)
@@ -322,15 +336,21 @@ export default async function OficioPage({ params, searchParams }) {
                 const est = estudiado(p)
                 const firmadoOk = Boolean(p?.drillFirmadoAt)
                 const completo = est && (m.drills === 0 || firmadoOk)
+                // MISMA REGLA QUE LA PÁGINA DEL MÓDULO, no una copia: los
+                // metadatos del plan traen `requiere`, que es lo único que mira
+                // gradienteAbierto. La fila bloqueada SIGUE siendo enlace a
+                // propósito: quien pulse tiene que encontrarse la razón, no un
+                // clic muerto que parezca que el sistema se rompió.
+                const bloqueado = puertaCerrada(true, gradienteAbierto(m, progreso), p)
                 return (
                   <li key={m.id}>
-                    <Link className={`ofi-fila${m.id === siguiente?.id ? ' ofi-fila--siguiente' : ''}`} href={`${base}/${m.id}`}>
-                      <span className={`ent-route__number${completo ? ' ent-route__number--done' : ''}`} aria-hidden="true">{completo ? '✓' : m.orden}</span>
+                    <Link className={`ofi-fila${bloqueado ? ' ofi-fila--bloqueada' : ''}${m.id === siguiente?.id ? ' ofi-fila--siguiente' : ''}`} href={`${base}/${m.id}`}>
+                      <span className={`ent-route__number${completo ? ' ent-route__number--done' : ''}`} aria-hidden="true">{completo ? '✓' : bloqueado ? '🔒' : m.orden}</span>
                       <span className="ent-route__content">
                         <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
                         <strong>{m.titulo}</strong>
                         <span className="ofi-fila__estados">
-                          <span className={`ent-pill${est ? ' ent-pill--ok' : ''}`}>{est ? `✓ Estudiado ${fmt(p.quizAprobadoAt)}` : 'Por estudiar'}</span>
+                          <span className={`ent-pill${est ? ' ent-pill--ok' : ''}`}>{est ? `✓ Estudiado ${fmt(p.quizAprobadoAt)}` : bloqueado ? 'Se abre con el anterior' : 'Por estudiar'}</span>
                           {m.drills > 0 && (
                             <span className={`ent-pill${firmadoOk ? ' ent-pill--ok' : est ? ' ent-pill--mid' : ''}`}>
                               {firmadoOk
