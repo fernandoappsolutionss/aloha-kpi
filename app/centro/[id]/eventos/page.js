@@ -268,7 +268,7 @@ export default function EventosPage() {
         </div>
 
         {!loadError && <div className="panel" data-tour="eventos.lista">
-          {mobileCards ? <div className="operational-list">{visible.map(ev=><OperationalCard headingLevel={2} key={ev.id} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>)}</div> : <TableScroller label="Clases de prueba">
+          {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
             <table className="table">
               <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
@@ -301,7 +301,15 @@ export default function EventosPage() {
                           {eventActions(ev)}
                         </td>
                       </tr>
-
+                      {openId === ev.id && (
+                        <tr style={{ cursor: 'default' }}>
+                          <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
+                            <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}>
+                              <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load} />
+                            </section>
+                          </td>
+                        </tr>
+                      )}
                     </Fragment>
                   )
                 })}
@@ -309,7 +317,6 @@ export default function EventosPage() {
             </table>
           </TableScroller>}
           {mobileCards && !loading && visible.length===0 && <div role="status" className="empty">Sin clases para estos filtros.</div>}
-          {openId && visible.some(ev=>ev.id===openId) && <section id={`registros-${openId}`} aria-label="Registros de la clase"><Registrations key={openId} centroId={id} eventId={openId} grupoId={events.find(ev=>ev.id===openId)?.grupo?.id} onChange={load}/></section>}
         </div>}
       </main>
 
