@@ -104,7 +104,17 @@ Catorce hallazgos revisados uno por uno contra el código; **doce confirmados, d
 9. **El barrido de marca no cubría el copy de la puerta** (`frasesDe()` solo mira literales de una línea y la puerta es texto JSX suelto). Se mide en `entrenamiento-orden.test.mjs` con su propio extractor.
 10. **Un `requiere` mal puesto ahora es un muro permanente**: prueba nueva que recorre cada plan en orden acumulando progreso y exige que todos los módulos lleguen a abrirse. Hoy los cuatro planes pasan.
 
-### Lo que NO entra, y por qué
+### Las dos que faltaban, decididas por Fernando (2026-09-06)
 
-- **La cola de firmas entrega los criterios de la maniobra de un módulo que la puerta le cierra al propio firmante** (módulo compartido que la Administradora aún no estudió, con la Asistente esperando firma). Confirmado. **No se bloquea aquí**: trabaría la operación del centro —una asistente lista se quedaría sin firma porque su jefa va más atrás en su propio plan— y eso es una decisión de Fernando, no una corrección técnica. Queda anotado para él.
-- **Los mp3 del entrenamiento son públicos** (`public/entrenamiento/**`, fuera del matcher del middleware): con la URL se oye la presentación o la guía de cualquier módulo, incluso sin sesión. **Es anterior a esta rama** (viene de #115) y sacarlos de `public/` a una ruta autenticada es un cambio propio, con su impacto en caché y rendimiento. Anotado como pendiente, no arreglado aquí.
+Se le presentaron con su costo y él dijo que sí a las dos.
+
+**La cuarta puerta: la cola de firmas.** Si la Asistente ya estudió un módulo **compartido** y espera firma, su Administradora veía ahí la maniobra completa —lo que va a la vista, los pasos, los criterios y el error típico— de un módulo que la puerta le cierra. Y son los criterios con los que después se la van a tomar a ella. Ahora:
+
+- `colaFirmas()` carga también el progreso **del firmante** y evalúa la misma `puertaCerrada`. Si el módulo es suyo y no lo ha estudiado, la fila viaja con `cerradoParaMi: true`, **`drills: []`** y `meFalta` (el módulo que le toca). El contenido no sale del servidor: esconderlo en la pantalla habría sido inútil, ya habría viajado.
+- La pantalla pinta un aviso en vez del panel: *"Este módulo también es de tu puesto y todavía no lo has estudiado. No se toma una maniobra que uno no domina: estúdialo y vuelve, o pídele a tu jefe entrenador que se la tome él"*, con el botón al módulo que le falta.
+- `firmarDrill()` lo rechaza también en el servidor: la action es pública.
+- **Nadie queda colgado**: `OFICIAL_DE` le da a cada puesto más de un escalón, así que a la Asistente pueden firmarle el Coordinador, el Supervisor o la Gerencia mientras su Administradora se pone al día. Se probó en el navegador: con la Administradora sin estudiar sale el aviso y **ni una** frase de la maniobra viaja al navegador; en cuanto estudia el módulo, aparece el panel con sus cuatro criterios y el botón de firmar.
+
+**El audio deja de ser público.** Los 325 mp3 viven en `public/entrenamiento/**` y el matcher del middleware no los cubría: con la URL se oía la presentación o la guía de cualquier módulo **sin cuenta, desde internet**. Se añadió `'/entrenamiento/:path*'` al matcher, que es donde ya vive la guarda de sesión — sin mover 89 MB de sitio ni meterlos en el bundle de una función. Verificado: sin sesión los tres tipos de clip (tour, presentación y guía) responden `307 → /login`; con sesión, `200 audio/mpeg` con su tamaño exacto.
+
+`ponytail:` el middleware exige **sesión**, no el orden del entrenamiento. Aplicarle la puerta a cada mp3 pediría leer el progreso en la base y el middleware corre en el Edge sin base de datos; haría falta una ruta propia por clip. El agujero que había —audio abierto en internet— queda cerrado; que alguien con cuenta adivine la URL del clip de un módulo que no le toca es otra cosa, y la voz de guía orienta el paso, no enseña el módulo.

@@ -15,7 +15,7 @@ import { fallo } from '../../lib/errores'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
 import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/todas'
-import { validarConcepto } from '../../lib/entrenamiento/oficio/guia-pasos'
+import { validarConcepto, puertaCerrada } from '../../lib/entrenamiento/oficio/guia-pasos'
 import {
   minimoAprobacion, corregirQuizOficio, estudiado, hatted, planDeRol,
   avanceOficio, avanceDrills, siguienteOficio, gradienteAbierto, puedeFirmar,
@@ -459,6 +459,13 @@ export async function firmarDrill(usuarioId, modulo) {
     // pública y el estado resultante es incoherente.
     const suyo = await progresoDeUsuario(alumno.id)
     if (!estudiado(suyo[modulo])) return { error: 'Todavía no lo ha estudiado: no se le puede tomar la maniobra.' }
+    // Y TAMPOCO SE TOMA LO QUE UNO NO HA ESTUDIADO. Si el módulo está en el plan
+    // del propio firmante y la puerta se lo cierra, no puede firmarlo: la cola
+    // ya no le manda la maniobra, pero esta action es pública.
+    const mio = await progresoDeUsuario(firmante.id)
+    if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio), mio[modulo])) {
+      return { error: 'Ese módulo también es de tu puesto y todavía no lo has estudiado: estúdialo antes de tomárselo, o que se la tome el jefe entrenador de esa persona.' }
+    }
     await sql`
       INSERT INTO entrenamiento_progreso (usuario_id, modulo, drill_firmado_at, drill_firmado_por, updated_at)
       VALUES (${alumno.id}, ${modulo}, now(), ${firmante.id}, now())
@@ -508,6 +515,12 @@ export async function colaFirmas(centroId = null) {
       // puestos no se escribe otra vez: es el de ROLES_ALUMNO.
       .sort((a, b) => ROLES_ALUMNO.indexOf(a.rol) - ROLES_ALUMNO.indexOf(b.rol))
     const ids = mios.map((a) => Number(a.id))
+    // EL PROGRESO DE QUIEN FIRMA, no solo el de sus alumnos. La maniobra de un
+    // módulo COMPARTIDO es contenido de ese módulo —lo que va a la vista, los
+    // pasos, los criterios—, y son los criterios con los que a ella se la van a
+    // tomar después. Si la puerta le cierra ese módulo, aquí tampoco se lo
+    // servimos: era la cuarta puerta por la que se saltaba el orden.
+    const suyo = await progresoDeUsuario(firmante.id)
     const rows = ids.length
       ? await sql`
           SELECT * FROM entrenamiento_progreso
@@ -526,6 +539,10 @@ export async function colaFirmas(centroId = null) {
           const m = moduloOficio(r.modulo)
           if (!m || (m.drills || []).length === 0) return null
           const desde = r.quiz_aprobado_at ? new Date(r.quiz_aprobado_at) : null
+          // ¿Este módulo está en MI plan y todavía no lo he estudiado? Misma
+          // regla y mismos datos que la puerta de la página del módulo.
+          const cerradoParaMi = puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, suyo), suyo[m.id])
+          const meFalta = cerradoParaMi && (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
           return {
             id: m.id,
             titulo: m.titulo,
@@ -533,10 +550,15 @@ export async function colaFirmas(centroId = null) {
             orden: m.orden,
             estudiadoAt: desde ? desde.toISOString() : null,
             dias: desde ? Math.max(0, Math.floor((hoy - desde.getTime()) / 86400000)) : null,
+            cerradoParaMi,
+            // Qué le falta a ELLA para poder tomarla, con nombre y enlace.
+            meFalta: meFalta ? { id: meFalta.id, titulo: meFalta.titulo } : null,
             // La cola es la ÚNICA pantalla desde la que se firma: el Oficial
             // necesita los pasos y la masa para poder tomar el ejercicio, no
-            // solo los criterios que va a tildar.
-            drills: m.drills.map((d) => ({
+            // solo los criterios que va a tildar. Pero si el módulo es suyo y no
+            // lo ha estudiado, no sale del servidor: esconderlo en la pantalla
+            // no serviría de nada, el contenido ya habría viajado.
+            drills: cerradoParaMi ? [] : m.drills.map((d) => ({
               titulo: d.titulo,
               proposito: d.proposito,
               gradiente: d.gradiente || '',

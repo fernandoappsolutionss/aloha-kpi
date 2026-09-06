@@ -187,3 +187,63 @@ test('recorriendo cada plan en orden, ningún módulo queda encerrado', async ()
     }
   }
 })
+
+// ── 7. LA CUARTA SUPERFICIE: LA COLA DE FIRMAS ────────────────────────────
+// La auditoría encontró que el candado se saltaba por una ruta que no es una
+// pantalla de estudio: la cola de firmas. Si la Asistente ya estudió un módulo
+// COMPARTIDO y espera firma, su Administradora veía ahí la maniobra completa
+// —lo que va a la vista, los pasos, los criterios y el error típico— de un
+// módulo que a ella la puerta le cierra. Y son los criterios con los que
+// después se la van a tomar a ella.
+//
+// Fernando decidió cerrarlo (2026-09-06). El contenido lo manda el SERVIDOR, así
+// que esconderlo en la pantalla no bastaba: no se envía.
+//
+// La persona no queda colgada: OFICIAL_DE le da a cada puesto más de un
+// escalón, así que a la Asistente puede firmarle el Coordinador, el Supervisor
+// o la Gerencia mientras su Administradora se pone al día.
+
+const ACTIONS = '../app/actions/entrenamiento-oficio.js'
+const FIRMAS = '../app/centro/[id]/entrenamiento/firmas/page.js'
+
+test('la cola de firmas no manda la maniobra de un módulo que el firmante no ha estudiado', () => {
+  const src = sinComentarios(lee(ACTIONS))
+  const i = src.indexOf('export async function colaFirmas')
+  assert.ok(i > 0, 'falta colaFirmas')
+  const cuerpo = src.slice(i, src.indexOf('export async function', i + 10))
+  assert.match(cuerpo, /puertaCerrada\(/, 'la cola usa la misma regla, no una copia')
+  assert.match(cuerpo, /progresoDeUsuario\(firmante\.id\)/,
+    'sin el progreso del FIRMANTE la regla no se puede ni evaluar')
+  assert.match(cuerpo, /cerradoParaMi/, 'la fila tiene que decir que está cerrada para quien firma')
+  // El contenido no viaja: los drills solo se serializan cuando NO está cerrado.
+  assert.match(cuerpo, /cerradoParaMi \? \[\] :/,
+    'con el módulo cerrado, `drills` va vacío: el contenido no puede salir del servidor')
+})
+
+test('firmar tampoco se puede desde el servidor si el módulo es tuyo y no lo estudiaste', () => {
+  const src = sinComentarios(lee(ACTIONS))
+  const i = src.indexOf('export async function firmarDrill')
+  const cuerpo = src.slice(i, src.indexOf('export async function', i + 10))
+  assert.match(cuerpo, /puertaCerrada\(/,
+    'firmarDrill es pública: la pantalla puede esconder el botón, pero la action tiene que rechazar')
+})
+
+test('la cola explica el bloqueo en vez de pintar un panel vacío', () => {
+  const src = lee(FIRMAS)
+  assert.match(src, /cerradoParaMi/)
+  assert.match(src, /no lo has estudiado/i, 'tiene que decir por qué no puede tomarla')
+  assert.match(src, /jefe entrenador/i, 'y por dónde sale la persona que espera la firma')
+})
+
+// ── 8. EL AUDIO DEL ENTRENAMIENTO NO ES PÚBLICO ───────────────────────────
+// Los 325 mp3 viven en public/entrenamiento/**. El matcher del middleware no
+// los cubría, así que cualquiera con la URL oía la presentación o la guía de
+// cualquier módulo SIN SESIÓN, desde internet. No mueve los archivos: los mete
+// dentro del matcher, que es donde ya vive la guarda de sesión.
+
+test('el middleware exige sesión para el audio del entrenamiento', () => {
+  const src = lee('../middleware.js')
+  const matcher = src.slice(src.indexOf('matcher:'))
+  assert.match(matcher, /'\/entrenamiento\/:path\*'/,
+    'sin esto los mp3 se sirven a cualquiera que tenga la URL, sin cuenta')
+})

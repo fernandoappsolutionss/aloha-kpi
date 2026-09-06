@@ -107,6 +107,18 @@ export async function middleware(req) {
   return NextResponse.next()
 }
 
+// `/entrenamiento/:path*` son los 325 mp3 del entrenamiento (public/entrenamiento/**).
+// Estaban fuera del matcher, así que Next los servía como cualquier archivo
+// estático: con la URL se oía la presentación o la guía de cualquier módulo SIN
+// CUENTA, desde internet. Meterlos aquí los pone detrás de la misma guarda de
+// sesión que el resto, sin mover 89 MB de sitio ni meterlos en el bundle.
+//
+// ponytail: esto exige SESIÓN, no el orden del entrenamiento. Aplicarle la
+// puerta a cada mp3 pediría leer el progreso en la base, y el middleware corre
+// en el Edge sin base de datos; haría falta una ruta propia por clip. El agujero
+// que había —audio público en internet— queda cerrado; que alguien con cuenta
+// adivine la URL del clip de un módulo que no le toca es otra cosa, y la voz de
+// guía orienta el paso, no enseña el módulo.
 export const config = {
-  matcher: ['/dashboard/:path*', '/centro/:path*', '/perfil', '/login'],
+  matcher: ['/dashboard/:path*', '/centro/:path*', '/entrenamiento/:path*', '/perfil', '/login'],
 }
