@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { useGuia } from './GuiaModulo'
 
-export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, motivoBloqueo }) {
+export default function MasaOficio({ moduloId, masa, yaEstudiado }) {
   const guia = useGuia()
   const [tildados, setTildados] = useState(() => masa.map(() => false))
   const [listo, setListo] = useState(Boolean(yaEstudiado))
@@ -38,15 +38,10 @@ export default function MasaOficio({ moduloId, masa, yaEstudiado, bloqueado, mot
           </li>
         ))}
       </ul>
-      {/* El orden lo vuelve a comprobar el servidor en marcarEstudiado: aquí
-          solo se evita ofrecer un botón que va a devolver error. */}
-      {bloqueado && !listo && (
-        <div className="alert alert--warn" role="note">{motivoBloqueo || 'Antes de marcar este módulo tienes que estudiar el anterior.'}</div>
-      )}
       <div className="ofi-masa__acciones" aria-live="polite">
         {listo ? (
           <span className="ent-pill ent-pill--ok">✓ Todo a la vista</span>
-        ) : bloqueado ? null : (
+        ) : (
           <>
             {guia ? (
               <button type="button" className="btn btn--primary" onClick={declararVista} disabled={!todos}>

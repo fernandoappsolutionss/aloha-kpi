@@ -95,14 +95,10 @@ export default async function SopPage({ params, searchParams }) {
     </>)
   }
 
-  // EL MISMO CANDADO QUE EL MÓDULO. La hoja es el procedimiento de este
-  // módulo: contenido. Sin esta guarda, el orden se salta escribiendo /sop en
-  // la barra de direcciones. Solo aplica a quien lo estudia: quien la abre para
-  // tomar la maniobra necesita la hoja completa. `esRevision` reusa el ?revisar=
-  // que esta página ya acarrea, para que revisar un módulo que además es tuyo no
-  // te cierre la hoja.
-  // `esMio` ya es "está en mi plan": ni el ?revisar= de la URL lo apaga, que es
-  // justo el hueco por el que se colaba el módulo compartido.
+  // EL MISMO CANDADO QUE EL MÓDULO. La hoja es el procedimiento de este módulo:
+  // contenido. Sin esta guarda, el orden se salta escribiendo /sop en la barra
+  // de direcciones. `esMio` ya significa "está en mi plan" y ningún ?revisar= lo
+  // apaga, que es justo el hueco por el que se colaba el módulo compartido.
   if (puertaCerrada(!papel && esMio, gradienteAbierto(m, progreso), progreso[m.id])) {
     const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
     return shell('bloqueado', <>
@@ -117,7 +113,7 @@ export default async function SopPage({ params, searchParams }) {
         <p>La hoja de este proceso se abre con el módulo, y el módulo se abre cuando termines <b>&quot;{anterior?.titulo || 'el anterior de tu plan'}&quot;</b>.</p>
         <div className="ofi-nav">
           {anterior && <Link className="btn btn--primary" href={`${base}/${anterior.id}`}>Ir a &quot;{anterior.titulo}&quot; <span aria-hidden="true">→</span></Link>}
-          <Link className="btn" href={base}>Volver a mi plan</Link>
+          <Link className="btn" href={`${base}${cola}`}>Volver a mi plan</Link>
         </div>
       </section>
     </>)

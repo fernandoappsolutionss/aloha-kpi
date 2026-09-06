@@ -2524,6 +2524,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .ofi-puerta p { max-width: 70ch; line-height: 1.7; margin: 0 0 10px; }
 .ofi-puerta .ofi-nav { margin-top: 18px; }
 /* La fila sigue siendo pulsable —al entrar se explica por qué—, pero se lee
-   como lo que es: todavía no te toca. */
-.ofi-fila--bloqueada { opacity: 0.62; border-style: dashed; }
-.ofi-fila--bloqueada:hover, .ofi-fila--bloqueada:focus-visible { opacity: 1; }
+   como lo que es: todavía no te toca. Se distingue por BORDE Y FONDO, no por
+   opacidad: bajarle la opacidad al enlace entero tumbaba el contraste del título
+   de 7,9:1 a 3,2:1, justo donde vive la única explicación. Tampoco es solo
+   color: el número se sustituye por un candado. */
+.ofi-fila--bloqueada { border-style: dashed; background: var(--surface-1); }
+.ofi-fila--bloqueada .ent-route__number { color: var(--text-muted); }
+.ofi-fila--bloqueada:hover, .ofi-fila--bloqueada:focus-visible { background: var(--surface-2); }

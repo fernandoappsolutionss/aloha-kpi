@@ -126,3 +126,64 @@ test('las tres actions siguen comprobando el orden en el servidor', () => {
     assert.match(cuerpo, /gradienteAbierto\(/, `${fn} dejó de comprobar el orden`)
   }
 })
+
+// ── 5. EL COPY DE LA PUERTA, BAJO LAS MISMAS REGLAS QUE EL RESTO ──────────
+// El barrido de marca (entrenamiento-marca-oficio.test.mjs) solo mira literales
+// de string de una línea, y el copy de la puerta es texto JSX suelto: se le
+// escapa. Aquí se mide ese texto directamente.
+
+test('la puerta habla como el resto del entrenamiento', () => {
+  const jsx = [MODULO, SOP].map(lee).join('\n')
+  // El texto entre > y < de los dos archivos: es lo que la persona lee. Se
+  // descartan los tramos con sintaxis (`const navegacion = (` cae entre el `<>`
+  // y el `</>` de un fragmento y no es texto de nadie).
+  const visible = (jsx.match(/>[^<>{}]{15,}</g) || [])
+    .filter((t) => !/[=;()]|\bconst\b|\breturn\b/.test(t))
+    .join('\n')
+  assert.ok(visible.includes('No te saltes el paso'), 'el extractor perdió el copy que tiene que medir')
+  const VIEJO = {
+    hat: /\b(el|tu|su|un|los|mi) hats?\b|\bhatted\b/i,
+    drill: /\b(el|los|tu|su|un|mi) drills?\b/i,
+    checksheet: /\bchecksheets?\b/i,
+    masa: /\b(la|tu|su) masa\b/i,
+    gradiente: /\bgradientes?\b/i,
+    PFV: /\bPFV\b|producto final valioso/i,
+    'palabra malentendida': /palabras? malentendidas?/i,
+    'oficial de entrenamiento': /oficial(es)? de entrenamiento/i,
+  }
+  for (const [nombre, re] of Object.entries(VIEJO)) {
+    assert.ok(!re.test(visible), `la puerta dice "${nombre}", que es vocabulario viejo`)
+  }
+  // Imagen marítima: cupo cero. "en cubierta" es el NOMBRE del método y no cuenta.
+  const sinMetodo = visible.replace(/Entrenamiento en Cubierta/gi, '').replace(/\ben cubierta\b/gi, '')
+  assert.doesNotMatch(
+    sinMetodo,
+    /\b(mar|olas?|remar|nadar|tim[oó]n|barcos?|puertos?|mareas?|velas?|n[aá]utic\w*|faros?|br[uú]julas?|navega\w*|zarpar)\b/i,
+    'el copy de la puerta trae una imagen marítima: cupo cero fuera del nombre del método',
+  )
+})
+
+// ── 6. QUE EL CANDADO NO SE VUELVA UN MURO ────────────────────────────────
+// Un `requiere` que apunte a un módulo que NO está en el plan de alguno de sus
+// roles deja ese módulo —y todo lo que dependa de él— cerrado PARA SIEMPRE, sin
+// forma de abrirlo desde la aplicación. Antes eso solo estorbaba un aviso; ahora
+// es una pared. Se recorre cada plan en orden, acumulando lo estudiado, y se
+// exige que todos los módulos lleguen a abrirse.
+test('recorriendo cada plan en orden, ningún módulo queda encerrado', async () => {
+  const { MODULOS_OFICIO } = await import('../lib/entrenamiento/oficio/catalogo.js')
+  const { planDeRol, gradienteAbierto } = await import('../lib/entrenamiento/oficio/progreso.js')
+  const roles = [...new Set(MODULOS_OFICIO.flatMap((m) => m.roles || []))].sort()
+  assert.ok(roles.length >= 2, 'sin roles no se está probando nada')
+  for (const rol of roles) {
+    const plan = planDeRol(rol, MODULOS_OFICIO)
+    const progreso = {}
+    for (const m of plan) {
+      assert.equal(
+        gradienteAbierto(m, progreso), true,
+        `${rol}: "${m.titulo}" (${m.id}) no abre ni estudiando todo lo anterior de su plan. ` +
+        `Requiere ${JSON.stringify(m.requiere)}, que no está antes en este plan: con el candado duro es una pared.`,
+      )
+      progreso[m.id] = { tourVistoAt: '2026-01-01', quizAprobadoAt: '2026-01-01' }
+    }
+  }
+})

@@ -152,7 +152,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   if (puertaCerrada(esSuyo, abiertoParaMi, propio)) {
     const falta = anterior?.titulo || 'el módulo anterior de tu plan'
     return shell('bloqueado', <>
-      {volverAlHat}
+      {volver}
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
           Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length}
@@ -175,15 +175,22 @@ export default async function ModuloOficioPage({ params, searchParams }) {
               Ir a &quot;{anterior.titulo}&quot; <span aria-hidden="true">→</span>
             </Link>
           )}
-          <Link className="btn" href={base}>Volver a mi plan</Link>
+          <Link className="btn" href={`${base}${cola}`}>{esAlumno ? 'Volver a mi plan' : `Volver al plan de ${nombreDeRol(rolPlan)}`}</Link>
         </div>
       </section>
     </>)
   }
 
-  // El orden ya no se avisa aquí: si estuviera cerrado, no se llega. Lo que sí
-  // queda es el candado del cuestionario, que depende de marcar la lección.
-  const quizBloqueado = esAlumno && !p?.tourVistoAt
+  // El cuestionario sigue teniendo su propio candado, y tiene que decir lo MISMO
+  // que rechaza el servidor. Ojo con el caso que abre la red de progreso: quien
+  // ya marcó este módulo entra aunque su anterior deje de estar estudiado (un
+  // `requiere` que cambió, una fila vieja), y ahí responderQuizOficio lo sigue
+  // rechazando por orden. Mirando solo la lección, la pantalla le ofrecería un
+  // cuestionario que el servidor va a rechazar.
+  const quizBloqueado = esAlumno && (!abierto || !p?.tourVistoAt)
+  const motivoQuiz = !abierto
+    ? `Antes de responder tienes que estudiar "${anterior?.titulo || 'el módulo anterior'}".`
+    : QUIZ_SIN_LECCION
 
   const laminas = laminasDe(m)
   const palabrasVivas = [...new Set(m.palabras || [])].filter((slug) => GLOSARIO[slug])
@@ -225,8 +232,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       quizAprobado={esAlumno && Boolean(p?.quizAprobadoAt)}
       drillFirmado={esAlumno && Boolean(p?.drillFirmadoAt)}
       firmadoPor={p?.drillFirmadoPor?.nombre || ''}
-      bloqueoLeccion=""
-      bloqueoQuiz={quizBloqueado ? QUIZ_SIN_LECCION : ''}
+      bloqueoQuiz={esAlumno && !abierto ? motivoQuiz : ''}
       esMio={esAlumno}
     />
   )
@@ -289,7 +295,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       tieneDrill={drills.length > 0}
       hrefGlosario={`${base}/glosario`}
       bloqueado={quizBloqueado}
-      motivoBloqueo={QUIZ_SIN_LECCION}
+      motivoBloqueo={motivoQuiz}
     />
   ) : null
 

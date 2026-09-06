@@ -88,3 +88,23 @@ Con la puerta, el alumno **nunca** ve un módulo cerrado por orden, así que:
 ## 8. Riesgo
 
 Un alumno con el plan a medias verá cerrados los módulos que hoy podía ojear. Es exactamente lo pedido. La red de progreso (`!p?.tourVistoAt`) evita que alguien pierda acceso a algo que ya estudió.
+
+## 9. Auditoría adversarial (3 auditores + verificación, 2026-09-06)
+
+Catorce hallazgos revisados uno por uno contra el código; **doce confirmados, dos falsos positivos**. Corregidos en esta rama:
+
+1. **La portada pintaba la restricción del cuestionario dos veces**: `PortadaModulo` ya deriva `RESTRICCION_QUIZ` sola, y la página le pasaba la misma frase. Ahora solo pasa la del orden (que solo puede darse en el camino de la red de progreso).
+2. **La pantalla ofrecía un cuestionario que el servidor iba a rechazar**: quien entra por la red de progreso (`tourVistoAt`) con el anterior ya no estudiado tenía el quiz habilitado; `responderQuizOficio` lo rechaza por orden. `quizBloqueado` vuelve a mirar las dos condiciones y el motivo dice cuál falta.
+3. **La puerta botaba al revisor fuera de su carril**: sus salidas perdían el `?revisar=`. Ahora el "volver" respeta `cola` en el módulo y en el SOP; el "ir al que falta" no lo lleva, porque esa acción es de alumno.
+4. **Contraste**: `opacity: 0.62` sobre el enlace entero bajaba el título de 7,9:1 a 3,2:1, justo donde vive la única explicación. Se cambió por fondo + borde punteado + candado en lugar del número (no es solo color).
+5. **El índice prometía el producto de un puesto cerrado** y su botón "Estudiar mi puesto" llevaba derecho a la puerta. Mientras esté cerrado se dice cuándo se abre y se manda al módulo que toca.
+6. **El carril de revisión decía "puedes leer cada módulo completo"**, que dejó de ser cierto para los módulos compartidos. Ahora distingue: los que no están en tu plan, completos; los que sí, en tu orden.
+7. **Comentarios caducos**: el de `responderQuizOficio` ("leer siempre se puede") y el del SOP, que describía una variable del borrador que no existe.
+8. **Código muerto**: `bloqueado`/`motivoBloqueo` de `MasaOficio` y `MarcarEstudiado` y `bloqueoLeccion` de `PortadaModulo` ya no los pasa nadie; fuera con sus ramas.
+9. **El barrido de marca no cubría el copy de la puerta** (`frasesDe()` solo mira literales de una línea y la puerta es texto JSX suelto). Se mide en `entrenamiento-orden.test.mjs` con su propio extractor.
+10. **Un `requiere` mal puesto ahora es un muro permanente**: prueba nueva que recorre cada plan en orden acumulando progreso y exige que todos los módulos lleguen a abrirse. Hoy los cuatro planes pasan.
+
+### Lo que NO entra, y por qué
+
+- **La cola de firmas entrega los criterios de la maniobra de un módulo que la puerta le cierra al propio firmante** (módulo compartido que la Administradora aún no estudió, con la Asistente esperando firma). Confirmado. **No se bloquea aquí**: trabaría la operación del centro —una asistente lista se quedaría sin firma porque su jefa va más atrás en su propio plan— y eso es una decisión de Fernando, no una corrección técnica. Queda anotado para él.
+- **Los mp3 del entrenamiento son públicos** (`public/entrenamiento/**`, fuera del matcher del middleware): con la URL se oye la presentación o la guía de cualquier módulo, incluso sin sesión. **Es anterior a esta rama** (viene de #115) y sacarlos de `public/` a una ruta autenticada es un cambio propio, con su impacto en caché y rendimiento. Anotado como pendiente, no arreglado aquí.

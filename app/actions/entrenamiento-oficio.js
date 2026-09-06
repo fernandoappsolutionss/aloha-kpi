@@ -381,9 +381,11 @@ export async function responderQuizOficio(modulo, respuestas) {
     if (!Array.isArray(correctas) || correctas.length !== m.quiz.length) {
       return { error: 'Este módulo todavía no tiene sus preguntas cargadas.' }
     }
-    // El gradiente se comprueba en el SERVIDOR, ANTES de corregir: leer siempre
-    // se puede (el método dice devuélvete, no te prohíbe avanzar), pero el quiz del
-    // módulo N exige el N−1 estudiado.
+    // El orden se comprueba en el SERVIDOR, ANTES de corregir. Desde 2026-09-06 la
+    // pantalla tampoco deja llegar aquí sin el anterior estudiado (la puerta "No
+    // te saltes el paso"), así que esta guarda es la red: la action es pública y
+    // hay un camino legítimo que la cruza —quien ya marcó el módulo puede releerlo
+    // aunque su anterior deje de estar estudiado— y ahí el quiz sí se rechaza.
     const progreso = await progresoDeUsuario(u.id)
     if (!gradienteAbierto(m, progreso)) {
       return { error: 'Antes de responder este módulo tienes que estudiar el anterior.' }

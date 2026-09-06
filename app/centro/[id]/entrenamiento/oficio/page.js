@@ -107,7 +107,7 @@ export default async function OficioPage({ params, searchParams }) {
         <h1 className="h-title">{elegido ? `Plan de ${elegido.rolNombre}` : 'Revisa el entrenamiento de tu gente'}</h1>
         <p className="h-sub">
           {elegido
-            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: puedes leer cada módulo completo, pero no acumulas progreso, no respondes el cuestionario y la firma de la maniobra se pone en la cola de firmas, después de tomársela a la persona.</>
+            ? <>Estás revisando el plan de <b>{elegido.rolNombre}</b>. No es tu entrenamiento: no acumulas progreso, no respondes el cuestionario y la firma de la maniobra se pone en la cola de firmas, después de tomársela a la persona. Los módulos que <b>no</b> están en tu propio plan los lees completos; los que sí, en tu orden.</>
             : <>Como {rolNombre || rol} tú no te entrenas en estos planes: los firmas. Ábrelos en modo lectura para prepararte las maniobras, revisar qué se está enseñando o corregir un módulo.</>}
         </p>
       </div></div>
@@ -242,6 +242,11 @@ export default async function OficioPage({ params, searchParams }) {
   }
 
   const hat = plan.find((m) => m.curso === 'hat')
+  // El módulo del propio puesto es de los últimos del bloque A: para quien
+  // empieza está cerrado. Prometerle ahí su producto y un botón "Estudiar mi
+  // puesto" que solo lleva a la puerta es enseñar el final y cerrar la puerta en
+  // la misma pantalla. Mientras esté cerrado se dice qué falta y se manda ahí.
+  const hatBloqueado = hat ? puertaCerrada(true, gradienteAbierto(hat, progreso), progreso[hat.id]) : false
 
   // EL TAMAÑO DEL PLAN, DICHO DE FRENTE. El total en horas SOLO lo veía el
   // revisor; al alumno se le daban los minutos módulo a módulo y nunca la
@@ -274,12 +279,20 @@ export default async function OficioPage({ params, searchParams }) {
       </p>
     </div></div>
 
-    {hat?.pfv && (
+    {hat?.pfv && !hatBloqueado && (
       <section className="ofi-pfv" aria-labelledby="pfv-titulo">
         <div className="label">El producto de tu puesto</div>
         <h2 id="pfv-titulo">{hat.pfv}</h2>
         <p className="h-sub">El reto es decirlo sin leerlo. Si no puedes, todavía no es tuyo: vuelve al módulo de tu puesto.</p>
         <Link className="btn btn--primary" href={`${base}/${hat.id}`}>Estudiar mi puesto <span aria-hidden="true">→</span></Link>
+      </section>
+    )}
+    {hat && hatBloqueado && siguiente && (
+      <section className="ofi-pfv" aria-labelledby="pfv-titulo">
+        <div className="label">El producto de tu puesto</div>
+        <h2 id="pfv-titulo">Lo vas a poder decir en una frase cuando llegues a &quot;{hat.titulo}&quot;.</h2>
+        <p className="h-sub">Ese módulo se abre más adelante en tu plan. Empieza por donde te toca y llegas.</p>
+        <Link className="btn btn--primary" href={`${base}/${siguiente.id}`}>Seguir por &quot;{siguiente.titulo}&quot; <span aria-hidden="true">→</span></Link>
       </section>
     )}
 
