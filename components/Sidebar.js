@@ -4,8 +4,9 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getNavigationContext } from '../app/actions/navigation'
 import { logout as logoutAction } from '../app/actions/auth'
-import { resumenProgreso } from '../app/actions/entrenamiento'
 import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
+import useResumenEntrenamiento from './entrenamiento/useResumenEntrenamiento'
+import ResumenEntrenamiento from './entrenamiento/ResumenEntrenamiento'
 import { rolesQueFirma, tienePlanPropio } from '../lib/entrenamiento/oficio/progreso'
 import { hrefActivo } from './nav-activo.mjs'
 import Logo from './Logo'
@@ -193,14 +194,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const mostrarRegreso = isCenterContext
   const etiquetaRegreso = esCoordinador ? 'Volver al panel' : 'Volver a Administración'
 
-  const [ent, setEnt] = useState(null) // { completados, total } | null (gerencia no se entrena)
-  useEffect(() => {
-    // El Coach queda fuera: los 9 recorridos arrancan en pantallas que su
-    // cuenta no abre, así que un badge "0/9" sería una tarea imposible colgada
-    // del menú. Su avance real es el de su plan de puesto.
-    if (loading || !context || isPanel || esCoach || !centroId || context.capabilities.viewUsers) return
-    resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
-  }, [loading, context, isPanel, esCoach, centroId])
+  const ent = useResumenEntrenamiento(loading ? null : actorRole, centroDelPlan)
 
   // El pendiente se anuncia en Entrenamiento; la cola vive dentro de esa sección.
   const [firmas, setFirmas] = useState(0)
@@ -223,7 +217,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     ...(context?.capabilities.viewAdminTraining
       ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }]
       : tienePlan && centroDelPlan
-        ? [{ label: 'Entrenamiento', icon: 'book', href: `/centro/${centroDelPlan}/entrenamiento`, badge: firmas > 0 ? `${firmas} firmas` : null }]
+        ? [{ label: 'Entrenamiento', icon: 'book', href: `/centro/${centroDelPlan}/entrenamiento`, entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null }]
         : []),
     // Gerencia conserva la matriz del equipo. El plan propio de cada puesto
     // se encuentra dentro del Entrenamiento de su centro.
@@ -241,15 +235,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos`, tour: 'nav.grupos' },
     { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro`, tour: 'nav.cuadro' },
     { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos`, tour: 'nav.eventos' },
-    // El badge x/9 es el de los 9 tours: la meta alcanzable de la primera
-    // semana. No se mezcla con los 26 módulos de oficio, que viven adentro.
-    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', badge: firmas > 0 ? `${firmas} firmas` : ent && ent.completados < ent.total ? `${ent.completados}/${ent.total}` : null },
+    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null },
   ]
   // El Coach solo alcanza el árbol de entrenamiento (lo encierra el
-  // middleware). El rótulo es el mismo que en centroItems —los 9 recorridos del
-  // sistema— para que no compita con "Mi plan de puesto", que es otra cosa.
+  // middleware). Su contador muestra únicamente el plan de oficio.
   const coachItems = [
-    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento` },
+    { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, entrenamiento: true },
   ]
 
   const items = isPanel
@@ -282,8 +273,15 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
       onClick={() => closeDrawer({ restoreFocus: false })}
       aria-current={isActive(item.href) ? 'page' : undefined}
       className={`sb__item${extraClass}${isActive(item.href) ? ' sb__item--active' : ''}`}>
-      <Icon name={item.icon} /><span>{item.label}</span>
-      {item.badge && <span className="sb__badge" style={{ color: 'var(--text)' }}>{item.badge}</span>}
+      <Icon name={item.icon} />
+      {item.entrenamiento ? (
+        <span className="sb__training">
+          <span>{item.label}</span>
+          <ResumenEntrenamiento datos={ent} compacto />
+          {item.badge && <span className="sb__badge sb__training-firmas">{item.badge}</span>}
+        </span>
+      ) : <span>{item.label}</span>}
+      {!item.entrenamiento && item.badge && <span className="sb__badge" style={{ color: 'var(--text)' }}>{item.badge}</span>}
     </Link>
   )
 
