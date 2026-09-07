@@ -46,6 +46,7 @@ function writeFixture({
   const audit = []
   const coachLinks = []
   const coachUnlinks = []
+  const coachesCreadas = []
   const coachRows = new Map([
     [501, { id: 501, centro_id: 10, nombre: 'CRISTOPHER', activo: true, usuario_id: null }],
     [502, { id: 502, centro_id: 12, nombre: 'DAYANI', activo: true, usuario_id: 77 }],
@@ -158,6 +159,20 @@ function writeFixture({
       centerState.set(Number(userId), [...ids])
       if (relationsError) throw relationsError
     },
+    findCoachByName: async (query, centroId, nombre) => {
+      events.push(`coach-nombre:${query.transaction}:${centroId}`)
+      const buscado = String(nombre || '').trim().toLowerCase()
+      return [...coachRows.values()].find((c) => Number(c.centro_id) === Number(centroId)
+        && String(c.nombre).trim().toLowerCase() === buscado) || null
+    },
+    insertCoach: async (query, { centro_id, nombre }) => {
+      events.push(`coach-insert:${query.transaction}`)
+      writeCount++
+      const ficha = { id: 900 + coachRows.size, centro_id: Number(centro_id), nombre: String(nombre).trim(), activo: true, usuario_id: null }
+      coachRows.set(ficha.id, ficha)
+      coachesCreadas.push(ficha)
+      return ficha
+    },
     lockCoach: async (query, id) => {
       events.push(`coach:${query.transaction}:${id}`)
       return coachRows.get(Number(id)) || null
@@ -233,6 +248,7 @@ function writeFixture({
     audit,
     coachLinks,
     coachUnlinks,
+    coachesCreadas,
     coachRow: (id) => coachRows.get(Number(id)),
     events,
     transactionOptions,
@@ -981,10 +997,37 @@ test('crear coach desde la ficha toma el nombre de la ficha y la enlaza', async 
   assert.deepEqual(orden, ['coach:1:501', 'insert:1', 'coach-link:1:501'])
 })
 
-test('crear coach sin ficha sigue aceptando el nombre tecleado', async () => {
+// UN COACH NUEVO SE REGISTRA UNA SOLA VEZ. Fernando: "lo que hice yo es crear
+// un nuevo coach y ya debería salir como nuevo coach del centro". Sin esto la
+// cuenta nacía sin ficha: no veía un solo grupo y no aparecía en Grupos y
+// Fusiones para asignársela — una cuenta muerta.
+test('crear un coach que no está en la lista le abre su ficha en el centro', async () => {
   const fx = writeFixture()
-  await fx.service.create({ uid: 2 }, { nombre: 'Nueva Coach', email: 'n@aloha.invalid', rol: 'coach', centro_id: 10 })
+  await fx.service.create({ uid: 2 }, { nombre: '  Nueva Coach  ', email: 'n@aloha.invalid', rol: 'coach', centro_id: 10 })
   assert.equal(fx.inserted[0].nombre, 'Nueva Coach')
+  assert.equal(fx.coachesCreadas.length, 1)
+  assert.deepEqual(
+    { centro: fx.coachesCreadas[0].centro_id, nombre: fx.coachesCreadas[0].nombre, activo: fx.coachesCreadas[0].activo },
+    { centro: 10, nombre: 'Nueva Coach', activo: true },
+  )
+  // La ficha recién nacida queda pegada a la cuenta, igual que una escogida.
+  assert.deepEqual(fx.coachLinks, [{ coachId: fx.coachesCreadas[0].id, usuarioId: 30 }])
+})
+
+test('un nombre que ya está en la lista del centro no abre una segunda ficha', async () => {
+  const fx = writeFixture()
+  await assert.rejects(
+    () => fx.service.create({ uid: 2 }, { nombre: '  cristopher ', email: 'c@aloha.invalid', rol: 'coach', centro_id: 10 }),
+    /ya está en la lista del centro/,
+  )
+  assert.deepEqual(fx.coachesCreadas, [])
+  assert.deepEqual(fx.inserted, [])
+})
+
+test('los demás puestos no abren ficha de coach', async () => {
+  const fx = writeFixture()
+  await fx.service.create({ uid: 2 }, validInput())
+  assert.deepEqual(fx.coachesCreadas, [])
   assert.deepEqual(fx.coachLinks, [])
 })
 

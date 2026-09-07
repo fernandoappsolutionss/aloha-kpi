@@ -35,6 +35,8 @@ const ROLES = {
   coach: { label: 'Coach', help: 'Entra solo a su entrenamiento: no opera el centro. Si da clases en dos centros, se le asigna su centro base — el de la administradora que le firma.' },
 }
 const roleLabel = role => ROLES[role]?.label || role
+// Valor centinela del desplegable de fichas: "no está en la lista".
+const NUEVO = 'nuevo'
 const UN_CENTRO = ['administradora', 'asistente', 'coach']
 const TODOS_CENTROS = new Set(['admin_master', 'admin_general', 'supervisor'])
 const centerNames = user => (user.centerNames || []).join(' · ') || (TODOS_CENTROS.has(user.role) ? 'Todos los centros' : 'Sin centro asignado')
@@ -148,7 +150,11 @@ export default function UsuariosClient({ initialData }) {
   // todavía no tiene coaches registrados, se cae al nombre libre (y se dice).
   const coachesDelCentro = useMemo(() => (initialData.coaches || [])
     .filter(coach => Number(coach.centroId) === Number(form.centro_id)), [initialData.coaches, form.centro_id])
-  const eligeFicha = form.rol === 'coach' && !editing && coachesDelCentro.length > 0
+  const esAltaCoach = form.rol === 'coach' && !editing
+  const eligeFicha = esAltaCoach && coachesDelCentro.length > 0
+  // Gente nueva: la ficha no existe todavía y nace con la cuenta. Sin esta
+  // salida, dar de alta un coach que no está en la lista era imposible.
+  const coachNuevo = esAltaCoach && (coachesDelCentro.length === 0 || form.coach_id === NUEVO)
   const scopedUsers = useMemo(() => centerFilter === 'all'
     ? (initialData.users || [])
     : initialData.users.filter(user => (user.centerIds || []).includes(Number(centerFilter))),
@@ -184,7 +190,7 @@ export default function UsuariosClient({ initialData }) {
     return submitOnce('save', async () => {
       setAccessResult(null)
       const snapshot = { nombre: form.nombre, email: form.email }
-      const input = { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id, centros: form.centros, ...(!editing ? { email: form.email, coach_id: form.coach_id } : {}) }
+      const input = { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id, centros: form.centros, ...(!editing ? { email: form.email, coach_id: form.coach_id === NUEVO ? '' : form.coach_id } : {}) }
       const result = editing ? await updateUsuario(editing, input) : await createUsuario(input)
       if (result?.error) { setStatus(`❌ ${result.error}`); return }
       const wasEditing = Boolean(editing)
@@ -284,22 +290,24 @@ export default function UsuariosClient({ initialData }) {
         {!editing && <p>Se generará un enlace para que el usuario cree su propia contraseña.</p>}
         <form aria-label="Editor de usuario" onSubmit={saveUser}>
           <div className="form-grid">
-            <div className="field"><label className="label" htmlFor={eligeFicha ? 'users-coach' : 'users-name'}>{eligeFicha ? 'Coach del centro' : 'Nombre'}</label>
-              {eligeFicha
-                ? <><select id="users-coach" name="coach_id" required className="input" value={form.coach_id}
-                  onChange={event => {
-                    const ficha = coachesDelCentro.find(coach => String(coach.id) === event.target.value)
-                    setForm({ ...form, coach_id: event.target.value, nombre: ficha?.nombre || '' })
-                  }} disabled={disabled}>
-                  <option value="">Escoge un coach…</option>
-                  {coachesDelCentro.map(coach => <option key={coach.id} value={coach.id} disabled={coach.conCuenta}>
-                    {coach.nombre}{coach.conCuenta ? ' · ya tiene cuenta' : ''}
-                  </option>)}
-                </select>
-                <p className="h-sub">Solo falta su correo. La lista sale de los coaches del centro en Grupos y Fusiones.</p></>
-                : <><input id="users-name" name="nombre" type="text" autoComplete="name" required className="input" value={form.nombre} onChange={event => setForm({ ...form, nombre: event.target.value })} disabled={disabled} />
-                  {form.rol === 'coach' && !editing && <p className="h-sub">Este centro todavía no tiene coaches registrados en Grupos y Fusiones. Puedes escribir el nombre, pero la cuenta no quedará ligada a su horario.</p>}</>}
-            </div>
+            {eligeFicha && <div className="field"><label className="label" htmlFor="users-coach">Coach del centro</label>
+              <select id="users-coach" name="coach_id" required className="input" value={form.coach_id}
+                onChange={event => {
+                  const ficha = coachesDelCentro.find(coach => String(coach.id) === event.target.value)
+                  setForm({ ...form, coach_id: event.target.value, nombre: ficha?.nombre || '' })
+                }} disabled={disabled}>
+                <option value="">Escoge un coach…</option>
+                {coachesDelCentro.map(coach => <option key={coach.id} value={coach.id} disabled={coach.conCuenta}>
+                  {coach.nombre}{coach.conCuenta ? ' · ya tiene cuenta' : ''}
+                </option>)}
+                <option value={NUEVO}>➕ No está en la lista: es un coach nuevo</option>
+              </select>
+              <p className="h-sub">La lista sale de los coaches del centro en Grupos y Fusiones. Si escoges uno, solo falta su correo.</p>
+            </div>}
+            {(!eligeFicha || coachNuevo) && <div className="field"><label className="label" htmlFor="users-name">Nombre</label>
+              <input id="users-name" name="nombre" type="text" autoComplete="name" required className="input" value={form.nombre} onChange={event => setForm({ ...form, nombre: event.target.value })} disabled={disabled} />
+              {coachNuevo && <p className="h-sub">Queda registrado como coach de este centro: aparecerá en Grupos y Fusiones para asignarle sus grupos y su certificación.</p>}
+            </div>}
             <div className="field"><label className="label" htmlFor="users-email">Correo</label>
               <input id="users-email" name="email" type="email" autoComplete="email" spellCheck={false} required className="input" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} disabled={disabled || Boolean(editing)} />
             </div>
