@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { posicionDeIndice, estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
+import { estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
 import { planNino, posicionPlanNino } from '../lib/plan-nino.mjs'
 import { semanaEnCurso } from '../lib/itinerario.js'
 
@@ -10,24 +10,27 @@ import { semanaEnCurso } from '../lib/itinerario.js'
 const CAL = [{ vigente_desde: null, dias: [1, 3] }]
 const planDe = (ancla, nivel = 1) => planNino({ ancla, nivel, pais: 'PA', calendarioVersionado: CAL })
 
-// ── posicionDeIndice: la traducción del índice legacy del grupo ──────────────
+// ── El aula usa el mismo motor que el niño ──────────────────────────────────
+// Antes el grupo entraba por el índice de semanaEnCurso, que devuelve "la
+// primera semana que todavía no pasó": en un grupo que aún no arranca eso es la
+// semana 1, y el aula la marcaba como la de HOY. El niño nunca tuvo el fallo
+// porque posicionPlanNino compara contra la primera fecha.
 
-test('índice legacy: -1 es nivel terminado y apunta a la última semana', () => {
-  assert.deepEqual(posicionDeIndice(-1, 20), { estado: 'cerrado', indice: 19 })
+test('grupo que aún no arranca: por_iniciar, sin casilla de hoy y 0%', () => {
+  const plan = planDe('2026-09-26')
+  const pos = posicionPlanNino(plan, '2026-09-06') // 20 días antes de la primera clase
+  assert.equal(pos.estado, 'por_iniciar')
+  assert.equal(plan.semanas.some((_, i) => estadoCasilla(i, pos).hoy), false)
+  const barra = progresoPlan({ total: plan.semanas.length, ...pos, etiqueta: plan.semanas[0].etiqueta })
+  assert.equal(barra.pct, 0)
+  assert.equal(barra.hechas, 0)
+  assert.match(barra.texto, /Aún no arranca/)
 })
 
-test('índice legacy: 0..n es la semana en curso', () => {
-  assert.deepEqual(posicionDeIndice(0, 20), { estado: 'en_curso', indice: 0 })
-  assert.deepEqual(posicionDeIndice(7, 20), { estado: 'en_curso', indice: 7 })
-})
-
-test('índice legacy: sin semanas no hay posición (nunca se inventa una)', () => {
-  assert.deepEqual(posicionDeIndice(3, 0), { estado: 'sin_plan', indice: null })
-  assert.deepEqual(posicionDeIndice(-1, 0), { estado: 'sin_plan', indice: null })
-})
-
-test('índice legacy fuera de rango: se acota a la última semana', () => {
-  assert.deepEqual(posicionDeIndice(99, 20), { estado: 'en_curso', indice: 19 })
+test('el índice crudo de semanaEnCurso apuntaría a la semana 1: por eso no se usa', () => {
+  const plan = planDe('2026-09-26')
+  assert.equal(semanaEnCurso(plan, '2026-09-06'), 0) // "la primera que no ha pasado"
+  assert.equal(posicionPlanNino(plan, '2026-09-06').estado, 'por_iniciar')
 })
 
 // ── estadoCasilla: qué semana se ve hecha y cuál es la de hoy ────────────────
@@ -100,24 +103,12 @@ test('el plan de un niño en curso marca UNA sola casilla de hoy', () => {
   assert.equal(hoys[0].etiqueta, pos.semana.etiqueta)
 })
 
-test('la traducción del índice del grupo coincide con la posición del niño', () => {
+test('nivel ya terminado: cerrado, última semana y 100%', () => {
   const plan = planDe('2026-01-12')
-  const hoy = '2026-02-04'
-  const delGrupo = posicionDeIndice(semanaEnCurso(plan, hoy), plan.semanas.length)
-  const delNino = posicionPlanNino(plan, hoy)
-  assert.equal(delGrupo.estado, delNino.estado)
-  assert.equal(delGrupo.indice, delNino.indice)
-})
-
-test('nivel ya terminado: grupo y niño coinciden en cerrado y en la última semana', () => {
-  const plan = planDe('2026-01-12')
-  const hoy = '2027-01-01' // muy pasado el cierre
-  const delGrupo = posicionDeIndice(semanaEnCurso(plan, hoy), plan.semanas.length)
-  const delNino = posicionPlanNino(plan, hoy)
-  assert.deepEqual(delGrupo, { estado: 'cerrado', indice: plan.semanas.length - 1 })
-  assert.equal(delNino.estado, 'cerrado')
-  assert.equal(delNino.indice, delGrupo.indice)
-  assert.equal(progresoPlan({ total: plan.semanas.length, ...delNino }).pct, 100)
+  const pos = posicionPlanNino(plan, '2027-01-01') // muy pasado el cierre
+  assert.equal(pos.estado, 'cerrado')
+  assert.equal(pos.indice, plan.semanas.length - 1)
+  assert.equal(progresoPlan({ total: plan.semanas.length, ...pos }).pct, 100)
 })
 
 test('niño con ancla futura: por iniciar, 0% y ninguna casilla marcada', () => {
