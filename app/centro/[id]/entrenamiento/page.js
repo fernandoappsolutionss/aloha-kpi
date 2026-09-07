@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
+import CentroNavigation from '../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../actions/centros'
 import { getNavigationContext } from '../../../actions/navigation'
 import { cargarProgreso } from '../../../actions/entrenamiento'
@@ -80,6 +81,7 @@ export default function EntrenamientoPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main ent-page">
+        <CentroNavigation centroId={id} section="entrenamiento" />
         <div className="main__head">
           <div>
             {/* El H1 nombra la PÁGINA, no una de las dos pistas: "Aprende a usar

@@ -182,7 +182,7 @@ export default function CuadroPage() {
             <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download data-tour="cuadro.excel">⬇ Descargar Excel</a>
             <button type="button" onClick={()=>setConfirmAction({type:'sync'})} disabled={syncing || cerrado} className="btn"
               style={cerrado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              title={cerrado ? 'Este mes está cerrado en KPI Semanal. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
+              title={cerrado ? 'Este mes está cerrado en KPI Mensual. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
               {syncing ? 'Sincronizando…' : 'Sincronizar con KPI'}
             </button>
           </div>
@@ -292,7 +292,7 @@ export default function CuadroPage() {
               </div>
               <div style={{ padding: '8px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>
                 {congelado ? (
-                  <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(data.congeladoAt)})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Semanal.</>
+                  <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(data.congeladoAt)})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Mensual.</>
                 ) : (
                   <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
                 )}
@@ -497,7 +497,7 @@ export default function CuadroPage() {
               )}
               {congelado ? (
                 <div style={{ padding: '12px 18px', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
-                  🔒 Mes cerrado: los pedidos quedaron congelados con el cuadro. Reabre el mes en KPI Semanal para modificarlos.
+                  🔒 Mes cerrado: los pedidos quedaron congelados con el cuadro. Reabre el mes en KPI Mensual para modificarlos.
                 </div>
               ) : (
               <>

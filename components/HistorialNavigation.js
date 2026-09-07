@@ -19,7 +19,7 @@ export default function HistorialNavigation() {
   }, [])
 
   return (
-    <nav className="historial-navigation" aria-label="Secciones de Historial" aria-busy={!context && !error}>
+    <nav className="section-navigation" aria-label="Secciones de Historial" aria-busy={!context && !error}>
       {seccionesHistorial(context).map(({ label, href }) => {
         const active = path === href || path.startsWith(`${href}/`)
         return (

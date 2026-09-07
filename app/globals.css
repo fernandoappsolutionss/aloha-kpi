@@ -295,11 +295,12 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .reports-page .btn { min-width: 44px; }
 .history-view-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
 .history-view-tabs .btn { overflow-wrap: normal; word-break: normal; }
-.historial-navigation { display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; margin-bottom: 24px; }
-.historial-navigation .btn { min-height: 44px; white-space: nowrap; }
+.section-navigation { display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; margin-bottom: 24px; }
+.section-navigation .btn { min-height: 44px; white-space: nowrap; }
+.section-navigation .sb__badge { margin-left: 4px; }
 @media (max-width: 767px) {
-  .historial-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .historial-navigation .btn { justify-content: center; }
+  .section-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .section-navigation .btn { justify-content: center; white-space: normal; overflow-wrap: normal; }
   .history-view-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .ent-page .alert p { font-size: 15px; }
   .reports-page .panel__head > .label { flex-basis: 100%; }
