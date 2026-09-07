@@ -13,7 +13,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
 import { rutaDePaso } from '../../lib/entrenamiento/progreso'
-import manifest from '../../lib/entrenamiento/audio-manifest.json'
+import manifest from '../../lib/entrenamiento/audio-catalogo'
 import { marcarTourVisto } from '../../app/actions/entrenamiento'
 
 const ANCHO_TARJETA = 360

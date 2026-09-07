@@ -1,0 +1,74 @@
+{
+  "cierre/ci-3": {
+    "file": "actualizaciones/cierre/ci-3-7c3d5995ba5b.mp3",
+    "hash": "7c3d5995ba5b",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 28465,
+    "segundos": 3.482993,
+    "generadoAt": "2026-09-07T11:30:31.164Z"
+  },
+  "encuestas/intro": {
+    "file": "actualizaciones/encuestas/intro-6c9c74618a26.mp3",
+    "hash": "6c9c74618a26",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 306617,
+    "segundos": 38.266485,
+    "generadoAt": "2026-09-07T11:30:36.816Z"
+  },
+  "encuestas/en-1": {
+    "file": "actualizaciones/encuestas/en-1-77fff88773e6.mp3",
+    "hash": "77fff88773e6",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 172661,
+    "segundos": 21.501678,
+    "generadoAt": "2026-09-07T11:30:40.480Z"
+  },
+  "encuestas/en-2": {
+    "file": "actualizaciones/encuestas/en-2-b42c4ec2a4c2.mp3",
+    "hash": "b42c4ec2a4c2",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T11:30:43.309Z"
+  },
+  "encuestas/en-3": {
+    "file": "actualizaciones/encuestas/en-3-443328b70ba3.mp3",
+    "hash": "443328b70ba3",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T11:30:46.211Z"
+  },
+  "encuestas/en-4": {
+    "file": "actualizaciones/encuestas/en-4-63b9ee501f8e.mp3",
+    "hash": "63b9ee501f8e",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T11:30:49.175Z"
+  },
+  "encuestas/en-5": {
+    "file": "actualizaciones/encuestas/en-5-38f7cff1ecd4.mp3",
+    "hash": "38f7cff1ecd4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T11:30:51.962Z"
+  },
+  "encuestas/en-6": {
+    "file": "actualizaciones/encuestas/en-6-5fab0fde1b46.mp3",
+    "hash": "5fab0fde1b46",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 207560,
+    "segundos": 25.867029,
+    "generadoAt": "2026-09-07T11:30:55.483Z"
+  }
+}

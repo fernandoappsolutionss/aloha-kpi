@@ -7,7 +7,7 @@ import { getCentroNombre } from '../../../../actions/centros'
 import { cargarProgreso, responderQuiz } from '../../../../actions/entrenamiento'
 import { MODULOS } from '../../../../../lib/entrenamiento/modulos'
 import { completado } from '../../../../../lib/entrenamiento/progreso'
-import manifest from '../../../../../lib/entrenamiento/audio-manifest.json'
+import manifest from '../../../../../lib/entrenamiento/audio-catalogo'
 
 export default function ModuloPage() {
   const { id, modulo: moduloId } = useParams()

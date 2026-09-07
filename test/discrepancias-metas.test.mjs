@@ -57,7 +57,7 @@ test('LA PUERTA: ninguna otra ruta escribe en la tabla `cumplimiento`', () => {
   // cerró y esto es lo que impide que se reabra sin querer.
   const accion = read('../app/actions/cumplimiento.js')
   assert.doesNotMatch(accion, /for \(const k of CUMPLIMIENTO_KEYS\) row\[k\] = incoming/)
-  assert.match(accion, /for \(const k of CLAVES_DISCIPLINA\) row\[k\] = incoming/)
+  assert.match(accion, /for \(const k of CLAVES_DISCIPLINA\) \{[\s\S]*?row\[k\] = incoming/)
   assert.match(accion, /clavesDisciplina\(CUMPLIMIENTO_KEYS\)/)
   // Y la pantalla ya no manda las 3 en el guardado.
   assert.doesNotMatch(read('../app/centro/[id]/cumplimiento/page.js'), /productoVals/)

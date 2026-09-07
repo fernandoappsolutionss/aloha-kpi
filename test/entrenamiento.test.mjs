@@ -57,11 +57,11 @@ test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
   assert.deepEqual(corregirQuiz(null, [0, 2, 1]), { puntaje: 0, correctas: [false, false, false], aprobado: false })
 })
 
-test('hay 9 módulos con ids únicos y en orden 1..9', () => {
-  assert.equal(MODULOS.length, 9)
+test('hay 10 módulos con ids únicos y en orden 1..10', () => {
+  assert.equal(MODULOS.length, 10)
   const ids = MODULOS.map((m) => m.id)
-  assert.equal(new Set(ids).size, 9)
-  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+  assert.equal(new Set(ids).size, 10)
+  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 })
 
 test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos y 1-3 errores', () => {
@@ -149,7 +149,7 @@ test('cada target del contenido existe como data-tour (o prop tour) en app/ o co
 // módulo y scripts/entrenamiento-audio.mjs. En PR 1 el manifest está vacío y
 // pasa trivialmente; en PR 2 (solo mp3 + manifest, sin código) es el único seguro.
 test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en public/entrenamiento', () => {
-  const manifest = JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest.json'), 'utf8'))
+  const manifest = { ...JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest.json'), 'utf8')), ...JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest-actualizaciones.json'), 'utf8')) }
   const claves = new Set()
   for (const m of MODULOS) { claves.add(`${m.id}/intro`); for (const p of m.pasos) claves.add(`${m.id}/${p.id}`) }
   for (const [k, v] of Object.entries(manifest)) {

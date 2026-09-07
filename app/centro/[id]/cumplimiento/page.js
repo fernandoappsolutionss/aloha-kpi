@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import EncuestasPanel from '../../../../components/encuestas/EncuestasPanel'
+import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import { loadCumplimiento, saveCumplimiento, getDisciplinaTrimestre, getMetasMarcadas } from '../../../actions/cumplimiento'
@@ -322,6 +324,7 @@ export default function CumplimientoPage() {
             </p>
           </div>
 
+          {year*100+qMonths[mes-1]>=202609 && <div id="encuesta-mensual"><EncuestasPanel key={`${centroId}-${year}-${qMonths[mes-1]}`} centroId={Number(centroId)} anio={year} mes={qMonths[mes-1]} compact onResumen={r=>{setVals(v=>({...v,encuestas_satisfaccion:r.cumple?'si':'no'}));if(r.cumple)setExiste(true);getDisciplinaTrimestre(centroId,year,quarter).then(setDisciplinaQ).catch(()=>{})}} /></div>}
           <div className="disciplina__grupos">
           {DISCIPLINA_GRUPOS.map(group => (
             <div key={group.id} className="card" style={{ padding: '16px 20px' }}>
@@ -331,7 +334,7 @@ export default function CumplimientoPage() {
               </h3>
               <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-dim)' }}>{group.proposito}</p>
                 <table className="table compliance-matrix" aria-label={`${nombreMes} · ${group.titulo}`}><thead><tr><th scope="col">Criterio</th><th scope="col">Sí</th><th scope="col">No</th></tr></thead><tbody>
-                  {group.claves.map(k => <tr key={k}><th scope="row">{CUMPLIMIENTO_LABELS[k]}</th>{['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>)}
+                  {group.claves.map(k => <tr key={k}><th scope="row">{CUMPLIMIENTO_LABELS[k]}</th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>)}
                 </tbody></table>
             </div>
           ))}

@@ -161,7 +161,7 @@ export function textoVozOficio(m) {
 export function clipsDeTours(solo = null) {
   const out = []
   for (const m of MODULOS) {
-    if (solo && m.id !== solo) continue
+    if (m.audioActualizado || (solo && m.id !== solo)) continue
     out.push({
       pista: 'tour',
       clave: `${m.id}/intro`,
@@ -174,7 +174,7 @@ export function clipsDeTours(solo = null) {
         pista: 'tour',
         clave: `${m.id}/${p.id}`,
         file: `${m.id}/${p.id}.mp3`,
-        texto: p.voz || p.texto,
+        texto: p.vozLegacy || p.voz || p.texto,
         receta: RECETAS.tour,
       })
     }
