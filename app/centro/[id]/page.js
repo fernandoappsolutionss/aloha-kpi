@@ -9,7 +9,8 @@ import { tienePanel } from '../../../components/useRol'
 import { getCentroResumen } from '../../actions/centro'
 import { getCentroGrowth } from '../../actions/growth'
 import { getDisciplinaTrimestre } from '../../actions/cumplimiento'
-import { resumenProgreso } from '../../actions/entrenamiento'
+import useResumenEntrenamiento from '../../../components/entrenamiento/useResumenEntrenamiento'
+import ResumenEntrenamiento from '../../../components/entrenamiento/ResumenEntrenamiento'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 import PeriodSelector from '../../../components/PeriodSelector'
 import GrowthSummaryBand from '../../../components/growth/GrowthSummaryBand'
@@ -115,7 +116,8 @@ export default function CentroPage() {
   const [graduacion, setGraduacion] = useState(null)
   const [growth, setGrowth] = useState(null)
   const [growthFallo, setGrowthFallo] = useState(false)
-  const [ent, setEnt] = useState(null)
+  const [rol, setRol] = useState(null)
+  const ent = useResumenEntrenamiento(rol, id)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
@@ -123,7 +125,7 @@ export default function CentroPage() {
     const r = localStorage.getItem('aloha_rol')
     const admin = tienePanel(r)
     setIsAdmin(admin)
-    if (!admin) resumenProgreso().then((res) => { if (res && !res.error) setEnt(res) }).catch(() => {})
+    setRol(r)
   }, [])
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -334,10 +336,10 @@ export default function CentroPage() {
             lo primero que se veía era un banner verde hablando de módulos de
             curso. Con el centro en alerta roja, la siguiente acción no es
             terminar un módulo: se oculta. */}
-        {!isAdmin && ent && ent.completados < ent.total && estado.color !== 'rojo' && (
+        {!isAdmin && (ent?.plataforma || ent?.oficio) && estado.color !== 'rojo' && (
           <div className="alert center-summary-actions" style={{ marginBottom: 16, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-            <span>Tu entrenamiento: <b>{ent.completados} de {ent.total}</b> módulos completados.</span>
-            <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento`}>Continuar →</Link>
+            <ResumenEntrenamiento datos={ent} />
+            <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento`}>Ver entrenamiento →</Link>
           </div>
         )}
 
