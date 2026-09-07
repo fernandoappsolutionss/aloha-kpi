@@ -14,7 +14,7 @@ const manifestPath = resolve('tests/e2e/.auth/r8-fixture-manifest.json')
 const evidencePath = resolve('test-results/r8-cleanup-evidence.json')
 export const R8_YEAR = 2026
 export const R8_MONTH = 9
-export const R8_EVENT = { id: 'e2e-r8-event-980033', account_id: 'c0c81438-bb54-4ae0-a019-b54e0bfcf870', start_date: '2026-09-01T15:00:00-05:00' }
+export const R8_EVENT = { id: 'e2e-r8-event-980033', account_id: 'c0c81438-bb54-4ae0-a019-b54e0bfcf870', start_date: '2026-09-01T15:00:00-05:00', stats: { total: 1, attended: 1, not_attended: 0, pending: 0, paid: 0, total_revenue: 0 } }
 export const R8_REGISTRATION = { id: 'e2e-r8-registration-980053', event_id: R8_EVENT.id, registered_at: '2026-09-01T12:00:00-05:00', attendance_status: 'attended', checked_in_at: '2026-09-01T15:00:00-05:00' }
 export async function r8Crm(action, payload) {
   if (action === 'list_events' && payload.account_id === R8_EVENT.account_id) return { events: [R8_EVENT] }

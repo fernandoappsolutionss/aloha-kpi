@@ -16,6 +16,7 @@ import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
+import { mesClase, mesAnterior, filtrarClasesPorMes, resumirClases } from '../../../../lib/clases-prueba.mjs'
 
 function useMobileCards() {
   const [mobile,setMobile]=useState(false)
@@ -46,16 +47,6 @@ function positionFloating(trigger, menu) {
     left: clamp(8, t.right - m.width, window.innerWidth - m.width - 8),
     top: clamp(8, t.bottom + 6, window.innerHeight - m.height - 8),
   }
-}
-
-function monthKey(date, timeZone = 'America/Panama') {
-  const parts = new Intl.DateTimeFormat('en', { timeZone, year: 'numeric', month: '2-digit' }).formatToParts(date)
-  const year = parts.find((p) => p.type === 'year')?.value
-  const month = parts.find((p) => p.type === 'month')?.value
-  return year && month ? `${year}-${month}` : ''
-}
-function eventMonthKey(event, fallbackTz) {
-  return event?.start_date ? monthKey(new Date(event.start_date), event.timezone || fallbackTz) : ''
 }
 
 // datetime-local (wall-clock) + zona → ISO con offset.
@@ -97,6 +88,7 @@ export default function EventosPage() {
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
   const [filterPeriodo, setFilterPeriodo] = useState('mes_actual')
+  const [mesElegido, setMesElegido] = useState(() => mesClase(new Date(), defaultTz))
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
@@ -119,18 +111,21 @@ export default function EventosPage() {
     setLoading(false)
   }, [id])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const mes = new URLSearchParams(window.location.search).get('mes')
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(mes || '')) {
+      setMesElegido(mes); setFilterPeriodo('mes_elegido')
+    }
+  }, [id])
 
-  const currentMonthKey = monthKey(new Date(), defaultTz)
-  const periodEvents = events.filter((e) =>
-    filterPeriodo === 'todos' || eventMonthKey(e, defaultTz) === currentMonthKey)
+  const currentMonthKey = mesClase(new Date(), defaultTz)
+  const periodo = filterPeriodo === 'mes_actual' ? currentMonthKey
+    : filterPeriodo === 'mes_pasado' ? mesAnterior(currentMonthKey)
+    : filterPeriodo === 'mes_elegido' ? mesElegido : 'todos'
+  const periodEvents = filtrarClasesPorMes(events, periodo, defaultTz)
 
   // Stats agregadas (tarjetas como en el CRM).
-  const agg = periodEvents.reduce((a, e) => {
-    const s = e.stats || {}
-    a.total += s.total || 0; a.attended += s.attended || 0; a.not_attended += s.not_attended || 0
-    a.pending += s.pending || 0; a.paid += s.paid || 0; a.revenue += s.total_revenue || 0
-    return a
-  }, { total: 0, attended: 0, not_attended: 0, pending: 0, paid: 0, revenue: 0 })
+  const agg = resumirClases(periodEvents)
 
   const visible = periodEvents.filter((e) =>
     (filterEstado === 'todos' || e.status === filterEstado) &&
@@ -252,12 +247,15 @@ export default function EventosPage() {
         </div>
 
         {/* Filtros */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div data-tour="eventos.periodo" style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           <input className="input" style={{ maxWidth: 280 }} name="busqueda" aria-label="Buscar clases por nombre" placeholder="Buscar por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
           <select aria-label="Periodo de las clases" className="input" style={{ maxWidth: 180 }} value={filterPeriodo} onChange={(e) => { setFilterPeriodo(e.target.value); setOpenId(null) }}>
             <option value="mes_actual">Este mes</option>
+            <option value="mes_pasado">Mes pasado</option>
+            <option value="mes_elegido">Elegir mes…</option>
             <option value="todos">Todos los meses</option>
           </select>
+          {filterPeriodo === 'mes_elegido' && <input type="month" className="input" aria-label="Mes de las clases" style={{ maxWidth: 200 }} value={mesElegido} onChange={e => { if (e.target.value) { setMesElegido(e.target.value); setOpenId(null) } }} />}
           <select aria-label="Estado de las clases" className="input" style={{ maxWidth: 200 }} value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
             <option value="published">Publicado</option>
@@ -266,6 +264,10 @@ export default function EventosPage() {
             <option value="cancelled">Cancelado</option>
           </select>
         </div>
+        <p className="h-sub" style={{ marginBottom: 14 }}>
+          {periodo === 'todos' ? 'Todos los meses' : new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${periodo}-01T12:00:00Z`))}
+          {' · Totales por fecha de la clase, igual que Invitados y Asistieron en el KPI. Incluyen los registros cancelados.'}
+        </p>
 
         {!loadError && <div className="panel" data-tour="eventos.lista">
           {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
