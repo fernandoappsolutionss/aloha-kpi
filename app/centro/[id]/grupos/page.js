@@ -45,7 +45,7 @@ import { generarItinerario } from '../../../../lib/itinerario'
 import { LineaTiempoPlan, NotasPlan, ProgresoPlan, PlanNinoModal, mesDe } from '../../../../components/PlanNino'
 import { posicionPlanNino } from '../../../../lib/plan-nino.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
-import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
+import { grupoIniciado, fingerprintPlanGrupo, cohorteDeTransicion } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
 import TableScroller from '../../../../components/TableScroller'
 import Dialog, { ModalPortal, useModalLayer, useDialogCallback } from '../../../../components/Dialog'
@@ -83,12 +83,13 @@ const horarioTexto = (horarios) =>
 // derivación batch con memo — aquí NADIE vuelve a derivar). Estados explícitos
 // por_iniciar | en_curso | cerrado | sin_plan: jamás se interpreta un -1.
 
-// Texto compacto de la posición: "S4" (semana 4 de su plan) o el estado.
+// Muestra la semana del libro o la actividad: la posición del calendario
+// incluye inducciones y repasos, por lo que no equivale al número del libro.
 function semanaNinoTexto(plan) {
   if (!plan || plan.estado === 'sin_plan') return 'sin plan'
   if (plan.estado === 'cerrado') return 'cerrado'
   if (plan.estado === 'por_iniciar') return 'por iniciar'
-  return `S${(plan.indiceSemana ?? 0) + 1}`
+  return plan.semana?.etiqueta || `Sesión ${(plan.indiceSemana ?? 0) + 1}`
 }
 
 // Chip "va por S{x}" del roster y las fusiones, con el estado explícito. Con
@@ -99,9 +100,9 @@ const CHIP_PLAN_BASE = { fontSize: 13, background: 'var(--surface-3)', border: '
 function ChipPlanNino({ plan, nombre, onVer, triggerRef }) {
   if (!plan) return null
   const det = plan.semana?.etiqueta ? ` (${plan.semana.etiqueta})` : ''
-  const s = `S${(plan.indiceSemana ?? 0) + 1}`
+  const s = semanaNinoTexto(plan)
   let texto = `va por ${s}`
-  let title = `Va por la semana ${s} de su plan${det} · ancla ${fmtDia(plan.ancla)}.`
+  let title = `${s} · inicio de su nivel: ${fmtDia(plan.ancla)}.`
   let tono = { color: 'var(--text)', borderColor: 'var(--ts-green-line)' }
   if (plan.estado === 'sin_plan') {
     texto = 'sin plan'
@@ -1361,7 +1362,7 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBu
       opciones={sug.opciones} recomendada={sug.recomendada} descartadas={sug.descartadas} hoy={sug.hoy}
       nota={uno
         ? `Es el día en que ${uno.nombre} empezó el nivel que cursa hoy (${etiqueta}). El sistema no la dedujo porque su historia no la demuestra —y no la inventa—: escoge la fuente que la sostenga o escríbela.`
-        : `Los ${ninos.length} niños comparten ${etiqueta}: una sola fecha los resuelve a todos. Solo se ofrecen las fuentes en las que TODOS coinciden.`}
+        : `Confirmaste que estos ${ninos.length} niños empezaron ${etiqueta} el mismo día. Esta fecha se aplicará a todos ellos.`}
       cta={uno ? `Fijar el plan de ${String(uno.nombre).split(' ')[0]}` : `Fijar el plan de los ${ninos.length} niños`}
       onFijar={fijar} onCancelar={onCancelar} onBusyChange={notifyBusy} />
   )
@@ -1373,32 +1374,45 @@ function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
   const [abierto, setAbierto] = useState(null)
   return (
     <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 10, background: 'var(--surface-3)' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-        <span className="label" style={{ color: 'var(--warn)' }}>Sin plan</span>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          {total === 1 ? 'Un niño de este grupo no tiene' : `${total} niños de este grupo no tienen`} la fecha en que empezaron su nivel:
-          sin ella no hay semana, ni cierre, ni aviso de liberación del bloque.
-        </span>
+      <div>
+        <span className="label" style={{ color: 'var(--warn)' }}>Completar planificación · {total} niño{total === 1 ? '' : 's'}</span>
+        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          Registra cuándo empezó cada niño su nivel actual. Si empezaron en fechas distintas, complétalos uno por uno.
+          Si desconoces la fecha, consúltala con la coach antes de guardarla.
+        </p>
       </div>
       {subgrupos.map((sub) => {
-        const n = sub.ninos.length
-        const on = abierto === sub.clave
+        const pendientes = sub.ninos.filter(n => !isoDia(n.fecha_inicio_nivel || n.plan?.ancla))
+        const seleccion = abierto === sub.clave
+          ? pendientes
+          : pendientes.filter(n => abierto === `${sub.clave}:${n.id}`)
         return (
           <div key={sub.clave} className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 0 }}>
-                <b style={{ color: 'var(--text)', fontSize: 13 }}>{sub.etiqueta} · {n} niño{n === 1 ? '' : 's'} sin plan</b>
-                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{sub.ninos.map((x) => x.nombre).join(' · ')}</div>
+            <b style={{ color: 'var(--text)', fontSize: 14 }}>{sub.etiqueta}</b>
+            {sub.ninos.map(n => {
+              const inicio = isoDia(n.fecha_inicio_nivel || n.plan?.ancla)
+              return (
+                <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    {n.nombre}
+                    {inicio && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Inicio: {fmtDia(inicio)}. Falta el horario del aula para calcular su semana.</div>}
+                  </div>
+                  {!inicio && !seleccion.length && (
+                    <button className="btn" aria-label={`Completar inicio de ${n.nombre}`} onClick={() => setAbierto(`${sub.clave}:${n.id}`)}>
+                      Completar inicio
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+            {pendientes.length > 1 && !seleccion.length && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <button className="btn" onClick={() => setAbierto(sub.clave)}>Todos empezaron el mismo día</button>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>Usa una fecha para los {pendientes.length} niños pendientes solo si la coach confirma que comenzaron este nivel juntos.</p>
               </div>
-              {!on && (
-                <button className="btn btn--primary" style={BTN_XS} onClick={() => setAbierto(sub.clave)}
-                  title="Fija el día en que empezaron el nivel que cursan: de ahí sale su plan completo.">
-                  {n === 1 ? `Fijar el plan de ${String(sub.ninos[0].nombre).split(' ')[0]}` : `Fijar el plan de los ${n} niños de ${sub.etiqueta}`}
-                </button>
-              )}
-            </div>
-            {on && (
-              <BloqueCrearPlan centroId={centroId} ninos={sub.ninos} etiqueta={sub.etiqueta}
+            )}
+            {seleccion.length > 0 && (
+              <BloqueCrearPlan key={abierto} centroId={centroId} ninos={seleccion} etiqueta={sub.etiqueta}
                 onCancelar={() => setAbierto(null)}
                 onFijado={(r) => { setAbierto(null); onPlanFijado?.(r) }} />
             )}
@@ -1444,12 +1458,12 @@ function MontonPlan({ m, esReferencia }) {
       {escalonado ? (
         <div style={{ padding: '2px 18px 14px', display: 'grid', gap: 6 }}>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-            Mismo libro, arrancado en fechas distintas: no hay una sola línea de tiempo para el montón. El plan exacto de cada niño está en su chip “va por S{'{x}'}”.
+            Cursan el mismo nivel y empezaron en fechas distintas. Cada fila indica quiénes avanzan juntos. Puedes abrir el plan individual desde la pestaña Niños.
           </div>
           {m.cohortes.map((c) => (
             <div key={c.clave} style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               <b className="num" style={{ color: 'var(--text)' }}>{fmtDia(c.ancla)}</b> · {c.ninos.length} niño{c.ninos.length === 1 ? '' : 's'} ·{' '}
-              {semanaNinoTexto({ estado: c.estado, indiceSemana: c.indiceSemana })} — {c.ninos.map((x) => x.nombre).join(' · ')}
+              {semanaNinoTexto({ estado: c.estado, indiceSemana: c.indiceSemana, semana: c.semana })} — {c.ninos.map((x) => x.nombre).join(' · ')}
             </div>
           ))}
         </div>
@@ -1470,99 +1484,79 @@ function MontonPlan({ m, esReferencia }) {
 }
 
 function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
-  if (!it?.semanas?.length) {
-    return (
-      <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
-        Este grupo todavía no tiene itinerario.
-        <span style={{ fontSize: 12, maxWidth: 340, lineHeight: 1.6 }}>
-          Se arma solo con la <b style={{ color: 'var(--text)' }}>fecha de inicio de clases</b> y el horario del grupo: ponlos y aquí verás las 22 semanas del nivel.
-        </span>
-        <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => onAjustar()}>Armar itinerario</button>
-      </div>
-    )
-  }
-  const total = it.semanas.length
-  // (R3) El aula puede ir toda junta o ir mezclada: MEZCLADA = más de un
-  // libro (itinerario+nivel) conviviendo en el salón, que es el caso de la
-  // fusión. Homogénea (o vacía) se ve como siempre: una sola línea de tiempo,
-  // aunque sus niños hayan entrado en semanas distintas — el manual deja
-  // incorporar hasta la semana 2 (KIDS) o 4 (TINY) y cada uno arranca con SU
-  // fecha, pero es el mismo libro corrido, no otro plan.
-  // Los niños SIN ancla tampoco cuentan como "otro plan" (no hay nada que
-  // dictar): salen en su propio bloque, arriba.
+  // Los planes individuales existen con el horario y el inicio de cada niño,
+  // aunque el aula todavía no tenga una referencia común.
+  const hayReferencia = !!it?.semanas?.length
   const ninos = g.estudiantes || []
   const montones = montonesConPlan(ninos)
-  const mixto = montones.length > 1
-  // Aula homogénea pero escalonada: una sola línea (la del aula) y una línea
-  // de texto que dice quién va por dónde. Nada de 15 calendarios.
-  const escalonadoUnico = !mixto && montones[0]?.cohortes.length > 1 ? montones[0] : null
-  const refAula = { itinerario: g.itinerario, nivel: it.nivel, fecha_inicio: it.fecha_inicio }
   const sinPlan = subgruposSinPlan(ninos)
   const nSinPlan = sinPlan.reduce((s, x) => s + x.ninos.length, 0)
-
-  // El plan del aula, identificado como tal: es la REFERENCIA del grupo, no el
-  // plan de nadie en particular (cada niño va por su ancla).
-  const planDelAula = (
-    <>
-      <LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={(f) => onAjustar(f)} tour="grupo.itinerario-linea" />
-      <NotasPlan it={it} />
-    </>
-  )
+  const refAula = hayReferencia
+    ? { itinerario: g.itinerario, nivel: it.nivel, fecha_inicio: it.fecha_inicio }
+    : null
 
   return (
     <div>
-      <div className="itin-head">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <span className="label" title="Plan de referencia del aula: de aquí sale el itinerario del grupo. Cada niño va por SU ancla (fecha en que empezó el nivel).">Itinerario del nivel</span>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
-              {g.itinerario} · Nivel {it.nivel}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>
-              {fmtDia(it.fecha_inicio)} → {fmtDia(it.fecha_cierre_estimada)} · {total} semanas
-              {it.pais === 'VE' || it.con_feriados === false ? ' · fechas patrias de Venezuela' : ''}
-            </div>
+      <div className="itin-head" data-tour="grupo.planes-ninos">
+        <span className="label">Avance de los niños</span>
+        <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          Cada niño conserva el inicio de su nivel y la semana que cursa, incluso después de una fusión.
+          Completa las fechas que falten con la planificación de la coach.
+        </p>
+        {montones.length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+            {montones.length} nivel{montones.length === 1 ? '' : 'es'} con plan · {distribucionSemanas(ninos)}
           </div>
-          <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} data-tour="grupo.ajustar-itinerario" onClick={() => onAjustar()}>✎ Ajustar itinerario</button>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <ProgresoPlan it={it} estado={pos.estado} indice={pos.indice} />
-        </div>
+        )}
+        {!ninos.length && <p style={{ color: 'var(--text-dim)' }}>Este grupo todavía no tiene niños activos.</p>}
       </div>
 
       {nSinPlan > 0 && (
         <BloqueSinPlanGrupo centroId={centroId} subgrupos={sinPlan} total={nSinPlan} onPlanFijado={onPlanFijado} />
       )}
+      {montones.map((m) => (
+        <MontonPlan key={m.clave} m={m} esReferencia={hayReferencia && siguePlanDelAula(m, refAula)} />
+      ))}
 
-      {escalonadoUnico && (
-        <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-          Todos van en <b style={{ color: 'var(--text-muted)' }}>{escalonadoUnico.etiqueta}</b>, pero arrancaron en{' '}
-          {escalonadoUnico.cohortes.length} fechas distintas
-          {' '}({escalonadoUnico.cohortes.slice(0, 3).map((c) => fmtDia(c.ancla)).join(' · ')}{escalonadoUnico.cohortes.length > 3 ? ' …' : ''}):{' '}
-          <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas(escalonadoUnico.ninos)}</b>.
-          La línea de tiempo de abajo es la del aula; cada niño va por su ancla (su chip lo dice).
-        </div>
-      )}
-
-      {mixto ? (
-        <>
-          {/* Aula mezclada (fusión): primero cómo quedó repartida y después UNA
-              línea de tiempo por montón — así se ve qué se le dicta a quién. */}
-          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-            📚 Este grupo va <b style={{ color: 'var(--text)' }}>mezclado</b>: {montones.length} niveles distintos conviviendo en el salón ·{' '}
-            <b style={{ color: 'var(--text-muted)' }}>{distribucionSemanas(ninos)}</b>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-              Cada niño va por su propia ancla; el plan del aula (abajo) queda como referencia del grupo.
+      <section aria-label="Referencia del aula" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="itin-head">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <span className="label">Referencia del aula</span>
+              {hayReferencia ? (
+                <>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--text)', lineHeight: 1.15, marginTop: 3 }}>
+                    {g.itinerario} · Nivel {it.nivel}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>
+                    {fmtDia(it.fecha_inicio)} → {fmtDia(it.fecha_cierre_estimada)} · {it.semanas.length} semanas
+                    {it.pais === 'VE' || it.con_feriados === false ? ' · fechas patrias de Venezuela' : ''}
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '8px 0 0', lineHeight: 1.7, maxWidth: 620 }}>
+                  Aún no hay una referencia general. Puedes completar y consultar los planes de los niños arriba.
+                  Crea esta referencia con el nivel y la fecha real de la planificación del aula.
+                </p>
+              )}
             </div>
+            <button className="btn" data-tour="grupo.ajustar-itinerario" onClick={() => onAjustar()}>
+              {hayReferencia ? 'Ajustar referencia del aula' : 'Crear referencia del aula'}
+            </button>
           </div>
-          {montones.map((m) => <MontonPlan key={m.clave} m={m} esReferencia={siguePlanDelAula(m, refAula)} />)}
-          <div className="itin-mes" style={{ borderTop: '1px solid var(--border)' }}>Plan del aula (referencia del grupo)</div>
-          {planDelAula}
-        </>
-      ) : (
-        planDelAula
-      )}
+          {hayReferencia && (
+            <div style={{ marginTop: 12 }}>
+              <ProgresoPlan it={it} estado={pos.estado} indice={pos.indice} />
+            </div>
+          )}
+        </div>
+        {hayReferencia && (
+          <>
+            <LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={(f) => onAjustar(f)} tour="grupo.itinerario-linea" />
+            <NotasPlan it={it} />
+          </>
+        )}
+      </section>
     </div>
   )
 }
@@ -1725,7 +1719,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
         {(g.estudiantes || []).map((e) => {
           const cierre = cierreNino(e)
           return (
-          <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel} · ${e.plan?.estado === 'en_curso' ? `va por S${(e.plan.indiceSemana ?? 0) + 1}` : semanaNinoTexto(e.plan)}${cierre.fecha ? ` · cierra ${fmtDia(cierre.fecha)} (${ORIGEN_CIERRE[cierre.origen]})` : ' · sin cierre resoluble'}`}
+          <span key={e.id} title={`${e.nombre} · ${e.itinerario} nivel ${e.nivel} · ${e.plan?.estado === 'en_curso' ? `va por ${semanaNinoTexto(e.plan)}` : semanaNinoTexto(e.plan)}${cierre.fecha ? ` · cierra ${fmtDia(cierre.fecha)} (${ORIGEN_CIERRE[cierre.origen]})` : ' · sin cierre resoluble'}`}
             style={{ fontSize: 13, padding: '2px 7px', borderRadius: 'var(--r-pill)', background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
             {e.nombre.split(' ')[0]} <b style={{ color: 'var(--text)' }}>{nivelCorto(e)}</b> <span style={{ color: e.plan?.estado === 'en_curso' ? 'var(--text)' : 'var(--text-dim)' }}>· {semanaNinoTexto(e.plan)}</span>
           </span>
@@ -2661,7 +2655,8 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
   const it = g.itinerario_clases
   const topeNivel = NIVEL_MAX[g.itinerario] || 10
   const [nivel, setNivel] = useState(String(it?.nivel || 1))
-  const [inicio, setInicio] = useState(isoDia(it?.fecha_inicio || g.fecha_inicio_clases) || hoyISO())
+  const [inicio, setInicio] = useState(isoDia(it?.fecha_inicio || g.fecha_inicio_clases) || '')
+  const cohorte = cohorteDeTransicion(it, g.itinerario, g.estudiantes)
   const [exc, setExc] = useState(() => {
     const base = (it?.excepciones || []).map((e) => ({ ...e }))
     if (nuevaExcepcion && !base.some((e) => e.fecha === nuevaExcepcion)) base.push({ fecha: nuevaExcepcion, motivo: '' })
@@ -2685,6 +2680,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
         nivel: parseInt(nivel) || 1,
         fecha_inicio: inicio,
         excepciones: exc.filter((e) => e.fecha),
+        fingerprint: fingerprintPlanGrupo(it),
       })
       if (res.error) { setErr(res.error); return }
       complete(`Itinerario del grupo ${g.numero} actualizado: nivel ${res.itinerario.nivel}, cierra el ${fmtDia(res.itinerario.fecha_cierre_estimada)}.`)
@@ -2696,26 +2692,38 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Itinerario del grupo ${g.numero}`} width={620} onClose={onClose} closeDisabled={saving}
+    <Modal title={`Referencia del aula · Grupo ${g.numero}`} width={620} onClose={onClose} closeDisabled={saving}
       footer={(
         <>
           <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving || !dias.length}>{saving ? 'Guardando…' : 'Guardar itinerario'}</button>
+          <button className="btn btn--primary" onClick={save} disabled={saving || !dias.length || !inicio}>{saving ? 'Guardando…' : 'Guardar referencia'}</button>
         </>
       )}>
       {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <div style={{ padding: 12, marginBottom: 14, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)', fontSize: 13, lineHeight: 1.7 }}>
+        {it ? (
+          <>
+            Si cambias el nivel o su inicio, se actualizarán los {cohorte.length} niños que siguen esta referencia
+            {cohorte.length > 0 ? `: ${cohorte.map(n => n.nombre).join(' · ')}` : ''}.
+            Los niños con otro nivel o inicio conservan sus datos.
+          </>
+        ) : (
+          <>Crear esta referencia no asigna una fecha de inicio a los niños. Completa cada inicio en «Avance de los niños» con la planificación de la coach.</>
+        )}
+        <div style={{ marginTop: 6 }}>Las clases suspendidas afectan al calendario del aula y pueden mover los cierres individuales.</div>
+      </div>
       {!dias.length && (
         <div className="alert alert--error" style={{ marginBottom: 14 }}>
           El grupo no tiene horario registrado. Sin días de clase no se puede armar el itinerario: edita el grupo y ponle horario.
         </div>
       )}
       <div className="dialog-form-grid">
-        <Field label="Nivel que cursa">
+        <Field label="Nivel de referencia del aula">
           <select className="input" value={nivel} onChange={(e) => setNivel(e.target.value)}>
             {Array.from({ length: topeNivel }, (_, i) => i + 1).map((nv) => <option key={nv} value={nv}>Nivel {nv}</option>)}
           </select>
         </Field>
-        <Field label="Inicio del nivel">
+        <Field label="Inicio de este nivel de referencia">
           <input type="date" className="input" value={inicio} onChange={(e) => setInicio(e.target.value)} />
         </Field>
 
