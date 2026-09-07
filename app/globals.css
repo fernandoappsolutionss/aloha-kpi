@@ -1545,14 +1545,19 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
    pedía 460px dentro de una tarjeta a todo el ancho y dejaba ~1100px muertos al
    lado, tres veces seguidas. En grid se usa el ancho y baja el scroll; por
    debajo de 980px vuelve a una columna sola. */
-.disciplina__grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 12px; align-items: start; }
-@media (max-width: 980px) { .disciplina__grupos { grid-template-columns: 1fr; } }
+.disciplina__grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 980px) { .disciplina__grupos { grid-template-columns: minmax(0, 1fr); } }
 .compliance-matrix { width: 100%; min-width: 430px; table-layout: fixed; }
 .compliance-matrix th:first-child { width: 240px; max-width: 240px; white-space: normal; }
 .compliance-matrix button[aria-pressed="true"] { border-color: var(--ok-text); background: var(--ok-bg); color: var(--ok-text); }
 .chart-data summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
 .reports-page .table { min-width: 600px; }
 .reports-page .compliance-matrix { min-width: 460px; }
+/* El checklist siempre muestra ambas respuestas dentro de la tarjeta. */
+.disciplina__grupos .compliance-matrix { min-width: 0; }
+.disciplina__grupos .compliance-matrix th:first-child { width: auto; max-width: none; text-align: left; padding: 12px 8px; }
+.disciplina__grupos .compliance-matrix thead th:not(:first-child) { width: 64px; }
+.disciplina__grupos .compliance-matrix :is(th,td):not(:first-child) { padding: 12px 4px; text-align: center; }
 .reports-page .table-scroller--sticky th:first-child,.reports-page .table-scroller--sticky td:first-child { max-width: 200px; white-space: normal; }
 .reports-page :is(input,select,textarea) { max-width: 100%; }
 .foda-request-tabs button { min-width: 44px; min-height: 44px; }
