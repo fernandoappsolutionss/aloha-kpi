@@ -1,5 +1,6 @@
 'use server'
 import { randomBytes } from 'crypto'
+import { parseSalonCapacity } from '../../lib/salon-capacidad.mjs'
 import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
@@ -1006,17 +1007,22 @@ export async function saveSalon(centroId, data) {
   await requireCentroAccess(centroId)
   const nombre = data?.nombre?.trim()
   if (!nombre) return { error: 'El nombre es requerido.' }
+  const capacidad = parseSalonCapacity(data?.capacidad_ninos)
+  if (capacidad.error) return { error: capacidad.error }
+  // Una pestaña anterior al despliegue no envía el campo; no debe borrarlo.
+  const cambiaCapacidad = Object.prototype.hasOwnProperty.call(data, 'capacidad_ninos')
   if (data?.id) {
     const r = await sql`
-      UPDATE salones SET nombre = ${nombre}, es_hibrido = ${!!data.es_hibrido}
+      UPDATE salones SET nombre = ${nombre}, es_hibrido = ${!!data.es_hibrido},
+        capacidad_ninos = CASE WHEN ${cambiaCapacidad} THEN ${capacidad.value}::integer ELSE capacidad_ninos END
       WHERE id = ${data.id} AND centro_id = ${centroId} RETURNING id
     `
     if (!r.length) return { error: 'El salón no pertenece a este centro.' }
     return { ok: true, salonId: r[0].id }
   }
   const [s] = await sql`
-    INSERT INTO salones (centro_id, nombre, es_hibrido)
-    VALUES (${centroId}, ${nombre}, ${!!data?.es_hibrido})
+    INSERT INTO salones (centro_id, nombre, es_hibrido, capacidad_ninos)
+    VALUES (${centroId}, ${nombre}, ${!!data?.es_hibrido}, ${capacidad.value})
     RETURNING id
   `
   return { ok: true, salonId: s.id }

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, Children } from 'react'
+import { parseSalonCapacity, roomCapacitySummary } from '../../../../lib/salon-capacidad.mjs'
 import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -253,6 +254,12 @@ export default function GruposPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [tab, setTab] = useState('grupos')
+  useEffect(() => {
+    const abrirSalones = () => { if (window.location.hash === '#salones') setTab('coaches') }
+    abrirSalones()
+    window.addEventListener('hashchange', abrirSalones)
+    return () => window.removeEventListener('hashchange', abrirSalones)
+  }, [])
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
   const [openId, setOpenId] = useState(null)
@@ -2290,6 +2297,7 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
 
 // ── Tab Coaches y salones ────────────────────────────────────────────────────
 function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
+  const capacidad = roomCapacitySummary(salones)
   const [coachModal, setCoachModal] = useState(null)
   const [salonModal, setSalonModal] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -2351,18 +2359,26 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
 
       <div className="panel">
         <div className="panel__head">
-          <h2 className="panel__title">Salones</h2>
+          <h2 id="salones" className="panel__title">Salones</h2>
           <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setSalonModal({})}>+ Agregar salón</button>
+        </div>
+        <div style={{ padding: '12px 16px', fontSize: 13 }} aria-live="polite">
+          <strong>{capacidad.complete ? `${capacidad.simultaneousChildren} niños a la vez` : 'Capacidad por completar'}</strong>
+          <p className="h-sub" style={{ margin: '5px 0 0' }}>
+            {capacidad.recordedRooms} de {capacidad.activeRooms} salones activos con capacidad registrada.
+            {' '}Puestos físicos simultáneos. El total de alumnos atendidos depende de los horarios.
+          </p>
         </div>
         {salones.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Aún no hay salones registrados.</div>
         ) : (
           <OperationsTable label="Salones">
-            <thead><tr>{['Salón', 'Híbrido', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
+            <thead><tr>{['Salón', 'Capacidad', 'Híbrido', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
               {salones.map((s) => (
                 <tr key={s.id} style={{ cursor: 'default', opacity: s.activo ? 1 : 0.55 }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>{s.nombre}</td>
+                  <td>{s.capacidad_ninos == null ? 'Sin registrar' : `${s.capacidad_ninos} niños`}</td>
                   <td style={{ fontSize: 12 }}>{s.es_hibrido ? 'Sí' : 'No'}</td>
                   <td>
                     {s.activo
@@ -3097,15 +3113,17 @@ function CoachModal({ centroId, initial, onClose, onSaved }) {
 function SalonModal({ centroId, initial, onClose, onSaved }) {
   const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
-  const [f, setF] = useState({ nombre: initial.nombre || '', es_hibrido: !!initial.es_hibrido })
+  const [f, setF] = useState({ nombre: initial.nombre || '', es_hibrido: !!initial.es_hibrido, capacidad_ninos: initial.capacidad_ninos ?? '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
+    const capacidad = parseSalonCapacity(f.capacidad_ninos)
+    if (capacidad.error) { setErr(capacidad.error); return }
     setSaving(true); setErr('')
     try {
-      const res = await saveSalon(centroId, { id: initial.id, nombre: f.nombre, es_hibrido: f.es_hibrido })
+      const res = await saveSalon(centroId, { id: initial.id, nombre: f.nombre, es_hibrido: f.es_hibrido, capacidad_ninos: capacidad.value })
       if (res.error) { setErr(res.error); return }
       complete(isEdit ? `Salón ${f.nombre.trim()} actualizado.` : `Salón ${f.nombre.trim()} agregado.`)
     } catch (e) {
@@ -3126,6 +3144,11 @@ function SalonModal({ centroId, initial, onClose, onSaved }) {
       {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
         <Field label="Nombre *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => setF((p) => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Salón 3" /></Field>
+        <Field label="Capacidad de niños">
+          <input name="capacidad_ninos" type="number" min="1" max="2147483647" step="1" inputMode="numeric" className="input" value={f.capacidad_ninos}
+            onChange={(e) => setF((p) => ({ ...p, capacidad_ninos: e.target.value }))} placeholder="Ej: 10" aria-describedby="salon-capacidad-ayuda" />
+        </Field>
+        <p id="salon-capacidad-ayuda" className="h-sub" style={{ margin: 0 }}>Máximo de niños que caben al mismo tiempo en este salón. Déjalo vacío si todavía no lo has verificado.</p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={f.es_hibrido} onChange={(e) => setF((p) => ({ ...p, es_hibrido: e.target.checked }))} />
           <span><b style={{ color: 'var(--text)' }}>Salón híbrido</b><br /><span className="h-sub">Equipado para clases presenciales y online</span></span>
