@@ -9,6 +9,7 @@ import { MODULOS } from '../lib/entrenamiento/modulos.js'
 import { MODULOS_OFICIO, CURSOS } from '../lib/entrenamiento/oficio/catalogo.js'
 import { GUIA, GUIA_GENERAL } from '../lib/entrenamiento/oficio/guia.js'
 import * as audio from '../scripts/entrenamiento-audio.mjs'
+import { clipsActualizados } from '../scripts/entrenamiento-audio-actualizaciones.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const DIGITALES = MODULOS_OFICIO.filter((m) => m.roles.length > 0)
@@ -168,14 +169,32 @@ test('clips de oficio y guía cubren los mismos 64 módulos digitales, sin papel
 test('tours congelados recalculan el hash actual y --solo tour no usa red ni credenciales', async () => {
   const manifest = json(join(ROOT, 'lib/entrenamiento/audio-manifest.json'))
   const clips = new Map(audio.clipsDeTours().map((c) => [c.clave, c]))
+  const sustituidos = new Set(clipsActualizados().map(c => c.clave))
   assert.equal(Object.keys(manifest).length, 66)
   for (const [clave, entrada] of Object.entries(manifest)) {
+    // Las grabaciones sustituidas permanecen archivadas. La siguiente prueba
+    // exige el audio vigente con su hash real; no se regenera el clon antiguo.
+    if (!clips.has(clave)) {
+      assert.ok(sustituidos.has(clave), `${clave}: tour eliminado sin sustitución`)
+      continue
+    }
     assert.equal(audio.hashDe(clips.get(clave)?.texto, audio.RECETAS.tour), entrada.hash, `${clave}: hash de tour cambió`)
   }
   const result = await audio.ejecutarAudio({ args: ['--solo', 'tour'], env: {}, fetchImpl: fetchProhibido() })
   assert.equal(result.exitCode, 0)
   assert.equal(result.generados, 0)
   assert.equal(result.fetches, 0)
+})
+
+test('cada audio actualizado existe y corresponde al guion vigente', () => {
+  const manifest = json(join(ROOT, 'lib/entrenamiento/audio-manifest-actualizaciones.json'))
+  for (const clip of clipsActualizados()) {
+    const entrada = manifest[clip.clave]
+    assert.ok(entrada, `${clip.clave}: falta generar el audio actualizado`)
+    assert.equal(entrada.hash, clip.hash, `${clip.clave}: guion desactualizado`)
+    assert.equal(entrada.file, clip.file)
+    assert.ok(existsSync(join(ROOT, 'public/entrenamiento', entrada.file)), `${clip.clave}: falta el MP3`)
+  }
 })
 
 test('una discrepancia de tour sale no cero antes de pedir credencial o llamar fetch', async () => {
