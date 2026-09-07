@@ -2,6 +2,7 @@
 import { Fragment, Suspense, useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import EncuestasPanel from '../../../../components/encuestas/EncuestasPanel'
+import CartelDescargable from '../../../../components/carteles/CartelDescargable'
 import AyudaCumplimiento, { AyudaDuranteTour, BotonAyudaCumplimiento } from '../../../../components/cumplimiento/AyudaCumplimiento'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
@@ -358,6 +359,7 @@ export default function CumplimientoPage() {
                     <tr><th scope="row">{CUMPLIMIENTO_LABELS[k]}
                       <BotonAyudaCumplimiento clave={k} abierta={ayudaAbierta === k} onClick={() => abrirAyuda(k)} tour={k === 'asistencia_dias' ? 'cumplimiento.abrir-ayuda' : undefined} />
                     </th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>
+                    {(k==='cartel_qr'||k==='wifi_gratis')&&<tr className="compliance-help-row"><td colSpan={3}><CartelDescargable key={`${centroId}-${k}`} tipo={k==='cartel_qr'?'google':'wifi'} centroId={centroId} centro={nombre}/></td></tr>}
                     {ayudaAbierta === k && <tr className="compliance-help-row"><td colSpan={3}><AyudaCumplimiento clave={k} onClose={() => cerrarAyuda(k)} /></td></tr>}
                   </Fragment>)}
                 </tbody></table>

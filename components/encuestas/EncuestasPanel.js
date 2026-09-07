@@ -3,13 +3,13 @@ import {useEffect,useState,useRef} from 'react'
 import Link from 'next/link'
 import {cargarEncuesta,prepararEncuesta,registrarDifusionEncuesta} from '../../app/actions/encuestas'
 import {PREGUNTAS,textoFoda} from '../../lib/encuestas/domain.mjs'
+import {descargarArchivo,prepararCartel} from '../../lib/carteles/descargar.mjs'
 
-export function descargarArchivo(blob,nombre) {
-  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)
-}
+export {descargarArchivo} from '../../lib/carteles/descargar.mjs'
 export default function EncuestasPanel({centroId,anio,mes,compact=false,onResumen}) {
   const [data,setData]=useState(null),[error,setError]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[linkManual,setLinkManual]=useState('')
   const revision=useRef(0)
+  const [formato,setFormato]=useState('carta')
   async function cargar(version=revision.current) {
     const r=await cargarEncuesta(centroId,anio,mes)
     if(version!==revision.current)return
@@ -34,12 +34,9 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
       const c=await preparar(),url=`${base()}/encuesta/${c.token}${p?`?p=${p.token}`:''}`
       if(v!==revision.current)return
       if(tipo==='qr') {
-        const QRCode=(await import('qrcode')).default
-        const canvas=document.createElement('canvas')
-        await QRCode.toCanvas(canvas,url,{width:1200,margin:4,errorCorrectionLevel:'M'})
-        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'))
-        if(!blob)throw new Error('No se pudo generar el QR. Intenta nuevamente.')
-        descargarArchivo(blob,`ALOHA-encuesta-${centroId}-${anio}-${String(mes).padStart(2,'0')}.png`)
+        const archivo=await prepararCartel({tipo:'encuesta',centro:data.centro.nombre,centroId,enlace:url,anio,mes,formato})
+        if(v!==revision.current)return
+        descargarArchivo(archivo.blob,archivo.nombre)
       } else {
         setLinkManual(url)
         try {await navigator.clipboard.writeText(url)} catch {throw new Error('El navegador no permitió copiar. Usa el enlace visible y vuelve a pulsar Copiar enlace cuando esté permitido.')}
@@ -47,7 +44,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
       const r=await registrarDifusionEncuesta(centroId,c.id,tipo)
       if(r.error)throw new Error(`El recurso está listo, pero no se registró la difusión: ${r.error}`)
       if(v!==revision.current)return
-      setStatus(tipo==='qr'?'QR descargado. La descarga quedó registrada.':'Enlace copiado. Compártelo por mensaje directo con cada representante.')
+      setStatus(tipo==='qr'?'Cartel PDF descargado y registrado. Imprime a tamaño real y renueva el cartel cada mes.':'Enlace copiado. Compártelo por mensaje directo con cada representante.')
       await cargar(v)
     } catch(e){if(v===revision.current)setError(e.message)} finally{if(v===revision.current)setBusy(false)}
   }
@@ -67,7 +64,8 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     <div className="survey-box" data-tour="encuestas.compartir">
       <h3>1. Comparte la encuesta del mes</h3>
       <p>La copia del enlace o descarga del QR queda registrada. Para marcar el mes también deben responder más de la mitad de los niños del corte.</p>
-      <div className="survey-actions"><button className="btn btn--primary" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('copiar')}>Copiar enlace</button><button className="btn" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('qr')}>Descargar QR PNG</button><button className="btn" disabled={busy} onClick={()=>cargar()}>Actualizar respuestas</button></div>
+      <div className="survey-actions"><button className="btn btn--primary" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('copiar')}>Copiar enlace</button><label className="survey-field">Tamaño del cartel<select value={formato} disabled={busy} onChange={e=>setFormato(e.target.value)}><option value="carta">Carta</option><option value="a4">A4</option></select></label><button className="btn" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('qr')}>Descargar cartel PDF con QR</button><button className="btn" disabled={busy} onClick={()=>cargar()}>Actualizar respuestas</button></div>
+      <p className="h-sub">Diseño ALOHA con nombre del centro, llamado a responder y QR del mes. Imprime en Carta o A4 a tamaño real.</p>
       {busy&&<p role="status">Preparando el recurso…</p>}
       <p className="h-sub">{r.compartida?'✓ Copia o descarga registrada.':'Aún no hay copia ni descarga registrada.'} {data.campana?`Corte de activos: ${String(data.campana.corte).slice(0,10)}. La lista y la meta quedan fijas este mes.`:'La encuesta y el corte se crean automáticamente al copiar o descargar por primera vez.'}</p>
       {!data.abierta&&<p>El enlace de este mes ya no recibe respuestas. Abre el mes actual para compartir una nueva encuesta.</p>}
