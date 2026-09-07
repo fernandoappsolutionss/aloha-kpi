@@ -39,9 +39,9 @@ Si hay que retirar la función, ocultar sus accesos y detener nuevas respuestas 
 
 ## Verificación
 
-- Suite final del proyecto: 1.044 pruebas aprobadas y compilación de producción correcta, incorporando main `74127eb` (ocupación de coaches y salones).
+- Suite final del proyecto: 1.044 pruebas aprobadas y compilación de producción correcta, incorporando main `379fd75` (contadores de plataforma y oficio). Se ajustó el contador compacto a 12 px para cumplir el mínimo de lectura existente.
 - PostgreSQL 16 local ficticio: 17 pruebas aprobadas, incluyendo apertura concurrente, duplicados, datos futuros/retiros efectivos, umbral exacto, falta de difusión, protección de guardado, histórico de agosto, mes nuevo, repetición de migración y límite de intentos.
 - Chrome con 148 niños ficticios: 74 respuestas permanecieron pendientes; la respuesta 75 marcó Cumplimiento sin pulsar Guardar. Copia y descarga registradas; PNG real de 1.200 × 1.200 decodificado al enlace correcto. Flujo general e individual completado; formulario y panel revisados a 390 px sin desbordamiento horizontal; FODA mostró los resultados.
 - Audio de introducción reproducido completo en Chrome (38,27 s). Los ocho MP3 decodificados y sus duraciones verificadas. Los seis pasos del recorrido y sus tres respuestas completaron el módulo y guardaron progreso en la cuenta ficticia.
 
-Todo lo anterior utilizó datos ficticios, sin respuestas, migraciones ni cambios de cumplimiento en producción.
+Las pruebas funcionales utilizaron datos ficticios. Tras autorización expresa de Fernando para avanzar y fusionar a main, se aplicó la migración productiva el 7 de septiembre: cinco tablas creadas, 110 checklists históricos y todos sus valores conservados, cero campañas creadas. Se respaldaron cumplimiento y trimestres antes y después. No había registros desde septiembre que requirieran cambiar la marca manual.
