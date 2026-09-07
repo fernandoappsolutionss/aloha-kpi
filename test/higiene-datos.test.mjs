@@ -27,6 +27,21 @@ const growth = ({ confidence = {}, window: ventana = {}, issues = [], months = [
 const claves = (resultado) => resultado.puntos.map((punto) => punto.clave)
 const punto = (resultado, clave) => resultado.puntos.find((item) => item.clave === clave)
 
+test('enrollment warning distinguishes individual linkage from the monthly acquisition channel', () => {
+  const resultado = higieneDeDatos({ centroId: 6, growth: growth({ issues: [{
+    code: 'cp_classification_incomplete', severity: 'warning', period: '2026-09',
+  }] }) })
+  const aviso = punto(resultado, 'issue:cp_classification_incomplete')
+  assert.match(aviso.titulo, /inscripciones/i)
+  assert.match(aviso.accion, /septiembre de 2026/)
+  assert.match(aviso.accion, /ficha/)
+  assert.match(aviso.accion, /clase de prueba/)
+  assert.match(aviso.accion, /canal de captación/)
+  assert.deepEqual(aviso.items, ['Septiembre 2026'])
+  assert.equal(aviso.donde.href, '/centro/6/grupos')
+  assert.equal(aviso.bloquea, false)
+})
+
 test('un centro con todo cargado no dibuja nada', () => {
   const resultado = higieneDeDatos({ growth: growth(), centroId: 6 })
   assert.equal(resultado.hay, false)
