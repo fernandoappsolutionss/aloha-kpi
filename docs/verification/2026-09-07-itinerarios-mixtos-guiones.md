@@ -1,6 +1,6 @@
 # Guiones para aprobar · Itinerarios mixtos ALOHA
 
-Siete clips para ElevenLabs con la voz de Fernando ya configurada. Solo se envían estos textos de entrenamiento; no incluyen nombres ni datos de alumnos. Se reutilizan los demás audios. La generación quedó bloqueada por revisión automática hasta recibir autorización explícita para esta acción.
+Siete clips para ElevenLabs con la voz de Fernando ya configurada. Solo se envían estos textos de entrenamiento; no incluyen nombres ni datos de alumnos. Se reutilizan los demás audios. Fernando autorizó expresamente la generación de estos siete guiones con su voz y la publicación tras las pruebas. Audios generados y verificados el 2026-09-07.
 
 ## intro · Introducción
 

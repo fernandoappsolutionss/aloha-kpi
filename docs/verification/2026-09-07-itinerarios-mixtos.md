@@ -19,10 +19,12 @@ No cambia el motor académico, fusiones, base de datos, meses, matrículas ni el
 - Chrome 390/768/1440: sin overflow del documento ni errores JavaScript. Capturas en `.scratch/mixtos/desktop.png`, `mobile.png` y `mobile-form.png`; arnés y comprobación en `.scratch/mixtos/server.mjs` y `check.mjs`.
 - Build Next.js correcto. Se repetirá tras cualquier cambio posterior.
 
-## Bloqueo antes de publicación
+## Validación para publicar
 
-Los textos y preguntas del módulo de Entrenamiento están actualizados. Faltan siete audios (1424 caracteres de texto saneado) con la voz configurada de Fernando. La revisión automática rechazó enviar guiones a ElevenLabs y usar esa voz por falta de autorización explícita en esta tarea. No se intentó eludir la decisión. Guiones exactos en `2026-09-07-itinerarios-mixtos-guiones.md`.
+Fernando autorizó expresamente generar estos siete guiones en ElevenLabs con su voz y publicar tras las pruebas. Generados siete clips (113,3 segundos y 910.412 bytes), decodificados con ffmpeg y medidos con ffprobe. Las grabaciones anteriores se conservan. Comprobación incremental: 54 audios reutilizables, cero pendientes; no se regeneró ningún otro clip.
 
-La suite final tiene 1073/1074 pruebas correctas. La única falla exige los siete MP3 actualizados todavía pendientes de autorización. La comprobación de tours distingue las grabaciones originales activas de las sustituidas y exige que cada audio vigente exista y corresponda al guion nuevo. Al autorizar audio: generar solo estos siete, conservar MP3 originales, repetir suite/build y revisar texto/voz. No publicar con audios viejos asociados a texto nuevo.
+Suite completa: **1074/1074 correctas**. El catálogo comprueba archivos y hashes contra cada guion vigente; las grabaciones sustituidas permanecen archivadas. Build Next.js correcto (exit 0), seis regresiones del itinerario y Chrome 390/768/1440 verificados. Sin cambios de base de datos ni alumnos reales.
 
-No se ha publicado, abierto PR ni modificado producción.
+La revisión automática había bloqueado el primer intento por falta de autorización; el sí de Fernando resolvió ese requisito. No se eludió la revisión.
+
+Publicación autorizada, pendiente de comprobar el despliegue y el dominio productivo al SHA final.
