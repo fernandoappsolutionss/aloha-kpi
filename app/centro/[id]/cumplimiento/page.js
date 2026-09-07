@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { Fragment, Suspense, useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import EncuestasPanel from '../../../../components/encuestas/EncuestasPanel'
+import AyudaCumplimiento, { AyudaDuranteTour, BotonAyudaCumplimiento } from '../../../../components/cumplimiento/AyudaCumplimiento'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
@@ -99,6 +100,17 @@ export default function CumplimientoPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const [ayudaAbierta, setAyudaAbierta] = useState(null)
+  function cerrarAyuda(clave) {
+    setAyudaAbierta(null)
+    document.getElementById(`ayuda-boton-${clave}`)?.focus()
+  }
+  function abrirAyuda(clave) {
+    // El paso práctico siempre abre la ficha, incluso al repetir el recorrido.
+    const paramsTour = new URLSearchParams(window.location.search)
+    const enPasoPractico = paramsTour.get('tour') === 'cumplimiento' && paramsTour.get('paso') === '3'
+    setAyudaAbierta(actual => actual === clave && !enPasoPractico ? null : clave)
+  }
 
   // Marcador 1 · Producto (trimestral, calculado) y marcador 2 · Disciplina del
   // trimestre. Ninguno de los dos se promedia con el otro.
@@ -222,9 +234,11 @@ export default function CumplimientoPage() {
   // otro mes seguiría escondida detrás de una pestaña.
   const comparacion = compararMetas({ producto, filas: metasMarcadas, mesesDelTrimestre: qMonths })
   const discrepancias = discrepanciasPorClave(comparacion)
+  const detallesProducto = producto?.detalle || CLAVES_PRODUCTO.map(clave => ({ clave, meta: 'pendiente', valor: 'Sin datos', cumple: null }))
 
   return (
     <div className="shell">
+      <Suspense fallback={null}><AyudaDuranteTour onOpen={setAyudaAbierta} /></Suspense>
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main reports-page">
         <CentroNavigation centroId={params.id} />
@@ -235,9 +249,9 @@ export default function CumplimientoPage() {
             <p className="h-sub">{nombre} · {label}</p>
           </div>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            <PeriodSelector value={period} onChange={changePeriod} />
+            <div data-tour="cumplimiento.periodo"><PeriodSelector value={period} onChange={changePeriod} /></div>
             {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad-text)' : 'var(--ok-text)', fontWeight: 500 }}>{status}</span>}
-            <button type="button" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">
+            <button type="button" data-tour="cumplimiento.guardar" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
@@ -257,30 +271,36 @@ export default function CumplimientoPage() {
         {loading ? <div role="status" style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando…</div> : error ? <div role="alert">{error}<button type="button" className="btn" onClick={loadData}>Reintentar</button></div> : <div role="tabpanel" id="cumplimiento-panel" aria-labelledby={`mes-tab-${mes}`}>
 
           {/* ── MARCADOR 1 · PRODUCTO ─────────────────────────────────────── */}
-          <div className="card" style={{ padding: '18px 20px', marginBottom: 16 }}>
+          <div className="compliance-help-intro">
+            <p><b>Antes de marcar, revisa cómo se cumple.</b> Abre <b>Cómo cumplir</b> junto a cada criterio: encontrarás pasos, un ejemplo, qué evitar y un audio guía.</p>
+            <Link href={`/centro/${params.id}/entrenamiento/cumplimiento`}>Ver el recorrido guiado <span aria-hidden="true">→</span></Link>
+          </div>
+          <div className="card" data-tour="cumplimiento.producto" style={{ padding: '18px 20px', marginBottom: 16 }}>
             <h2 className="label" style={{ marginBottom: 6 }}>Producto · calculado, no se marca</h2>
             <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.55, color: 'var(--text-dim)' }}>
               Estas tres salen de la base —ventas, deserción real y cobranza del trimestre— y son las que pintan el semáforo.
               Fallar una de ellas no es lo mismo que quedarse sin aromatizante: ninguna casilla de abajo la compensa.
             </p>
             {!producto && <p style={{ margin: 0, fontSize: 14, color: 'var(--text-dim)' }}>No se pudo calcular el producto del trimestre. El checklist de abajo sigue disponible.</p>}
-            {producto && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {producto.detalle.map((d) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {detallesProducto.map((d) => (
                 <div key={d.clave}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '12px 14px' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{CUMPLIMIENTO_LABELS[d.clave]}</div>
                       <div className="label" style={{ fontSize: 13, marginTop: 3 }}>Meta {d.meta} · {detalleDelMes(d.clave) || 'sin datos del mes'}</div>
+                      <BotonAyudaCumplimiento clave={d.clave} abierta={ayudaAbierta === d.clave} onClick={() => abrirAyuda(d.clave)} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span className="num" style={{ fontSize: 18, fontWeight: 600, color: d.cumple === false ? 'var(--bad-text)' : 'var(--text)' }}>{d.valor}</span>
                       <CumplePill cumple={d.cumple} />
                     </div>
                   </div>
+                  {ayudaAbierta === d.clave && <AyudaCumplimiento key={d.clave} clave={d.clave} nivelTitulo="h3" onClose={() => cerrarAyuda(d.clave)} />}
                   <AvisoDiscrepancia d={discrepancias[d.clave]} />
                 </div>
               ))}
-            </div>}
+            </div>
             {producto && !producto.sinDatos && (
               <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                 Trimestre: ventas {producto.ventasQ} de {producto.metaQ} · deserción real {producto.desRealQ} de {producto.bajasQ} bajas ({producto.graduadosQ} graduados, que no penalizan) ·
@@ -334,7 +354,12 @@ export default function CumplimientoPage() {
               </h3>
               <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-dim)' }}>{group.proposito}</p>
                 <table className="table compliance-matrix" aria-label={`${nombreMes} · ${group.titulo}`}><thead><tr><th scope="col">Criterio</th><th scope="col">Sí</th><th scope="col">No</th></tr></thead><tbody>
-                  {group.claves.map(k => <tr key={k}><th scope="row">{CUMPLIMIENTO_LABELS[k]}</th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>)}
+                  {group.claves.map(k => <Fragment key={k}>
+                    <tr><th scope="row">{CUMPLIMIENTO_LABELS[k]}
+                      <BotonAyudaCumplimiento clave={k} abierta={ayudaAbierta === k} onClick={() => abrirAyuda(k)} tour={k === 'asistencia_dias' ? 'cumplimiento.abrir-ayuda' : undefined} />
+                    </th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>
+                    {ayudaAbierta === k && <tr className="compliance-help-row"><td colSpan={3}><AyudaCumplimiento clave={k} onClose={() => cerrarAyuda(k)} /></td></tr>}
+                  </Fragment>)}
                 </tbody></table>
             </div>
           ))}

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { completado, porcentaje, siguienteModulo, corregirQuiz, rutaDePaso } from '../lib/entrenamiento/progreso.js'
 import { MODULOS, ERRORES_GLOBALES, FAQ } from '../lib/entrenamiento/modulos.js'
 import { RESPUESTAS } from '../lib/entrenamiento/respuestas.js'
+import { CUMPLIMIENTO_AYUDA } from '../lib/cumplimiento-ayuda.mjs'
 
 // Raíz del repo, independiente del cwd desde el que se corra `node --test`.
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
@@ -57,11 +58,11 @@ test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
   assert.deepEqual(corregirQuiz(null, [0, 2, 1]), { puntaje: 0, correctas: [false, false, false], aprobado: false })
 })
 
-test('hay 10 módulos con ids únicos y en orden 1..10', () => {
-  assert.equal(MODULOS.length, 10)
+test('hay 11 módulos con ids únicos y en orden 1..11', () => {
+  assert.equal(MODULOS.length, 11)
   const ids = MODULOS.map((m) => m.id)
-  assert.equal(new Set(ids).size, 10)
-  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  assert.equal(new Set(ids).size, 11)
+  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
 })
 
 test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos y 1-3 errores', () => {
@@ -85,7 +86,7 @@ test('cada paso tiene id único global, tipo válido, target, título y texto', 
     // Spec §3: el tour nunca pide confirmar una acción que escriba datos. Un hazlo
     // solo puede navegar, abrir un modal, seleccionar un grupo, cambiar de pestaña
     // o cancelar.
-    if (p.tipo === 'hazlo') assert.match(p.target, /^(nav\.|grupos\.(aperturar|inscribir|tarjeta|tab-fusiones)$|grupo\.tab-|eventos\.nueva$|[a-z]+\.cancelar$)/, `${p.id}: hazlo sobre una acción que escribe (spec §3)`)
+    if (p.tipo === 'hazlo') assert.match(p.target, /^(nav\.|grupos\.(aperturar|inscribir|tarjeta|tab-fusiones)$|grupo\.tab-|eventos\.nueva$|cumplimiento\.abrir-ayuda$|[a-z]+\.cancelar$)/, `${p.id}: hazlo sobre una acción que escribe (spec §3)`)
   }
   // el último paso de cada módulo es mostrar (Terminar vive en la tarjeta)
   for (const m of MODULOS) assert.equal(m.pasos[m.pasos.length - 1].tipo, 'mostrar', `${m.id}: último paso debe ser mostrar`)
@@ -152,6 +153,7 @@ test('manifest de audio: cada clave es un módulo/paso real y su mp3 existe en p
   const manifest = { ...JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest.json'), 'utf8')), ...JSON.parse(readFileSync(join(ROOT, 'lib/entrenamiento/audio-manifest-actualizaciones.json'), 'utf8')) }
   const claves = new Set()
   for (const m of MODULOS) { claves.add(`${m.id}/intro`); for (const p of m.pasos) claves.add(`${m.id}/${p.id}`) }
+  for (const clave of Object.keys(CUMPLIMIENTO_AYUDA)) claves.add(`cumplimiento-ayuda/${clave}`)
   for (const [k, v] of Object.entries(manifest)) {
     assert.ok(claves.has(k), `clave huérfana en el manifest (paso renombrado o borrado): ${k}`)
     assert.ok(v?.file && existsSync(join(ROOT, 'public/entrenamiento', v.file)), `falta el mp3 de ${k}: public/entrenamiento/${v?.file}`)

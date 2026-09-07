@@ -6,13 +6,15 @@ import {dirname,join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {execFileSync} from 'node:child_process'
 import {MODULOS} from '../lib/entrenamiento/modulos.js'
+import {CUMPLIMIENTO_AYUDA} from '../lib/cumplimiento-ayuda.mjs'
 import {hashDe,RECETAS,saneaVoz} from './entrenamiento-audio.mjs'
 const ROOT=fileURLToPath(new URL('../',import.meta.url))
 export function clipsActualizados() {
-  return MODULOS.flatMap(m=>[
+  return [...MODULOS.flatMap(m=>[
     ...(m.audioActualizado?[{clave:`${m.id}/intro`,texto:m.intro.voz||m.intro.texto}]:[]),
     ...m.pasos.filter(p=>m.audioActualizado||p.audioActualizado).map(p=>({clave:`${m.id}/${p.id}`,texto:p.voz||p.texto})),
-  ]).map(c=>({...c,receta:RECETAS.guia,hash:hashDe(c.texto,RECETAS.guia),file:`actualizaciones/${c.clave}-${hashDe(c.texto,RECETAS.guia)}.mp3`}))
+  ]), ...Object.entries(CUMPLIMIENTO_AYUDA).map(([clave,ayuda])=>({clave:`cumplimiento-ayuda/${clave}`,texto:ayuda.voz}))]
+    .map(c=>({...c,receta:RECETAS.guia,hash:hashDe(c.texto,RECETAS.guia),file:`actualizaciones/${c.clave}-${hashDe(c.texto,RECETAS.guia)}.mp3`}))
 }
 async function main() {
   const path=join(ROOT,'lib/entrenamiento/audio-manifest-actualizaciones.json')

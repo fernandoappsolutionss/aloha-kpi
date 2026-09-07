@@ -1578,6 +1578,29 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .disciplina__grupos .compliance-matrix th:first-child { width: auto; max-width: none; text-align: left; padding: 12px 8px; }
 .disciplina__grupos .compliance-matrix thead th:not(:first-child) { width: 64px; }
 .disciplina__grupos .compliance-matrix :is(th,td):not(:first-child) { padding: 12px 4px; text-align: center; }
+/* La ayuda ocupa las tres columnas; las respuestas conservan su espacio. */
+.compliance-help-intro { margin-bottom: 16px; padding: 16px 20px; border-left: 3px solid var(--ts-green); background: var(--surface-2); border-radius: var(--r-sm); }
+.compliance-help-intro p { margin: 0; font-size: 14px; line-height: 1.6; }
+.compliance-help-intro a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 600; }
+.compliance-help-trigger { display: flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 2px; padding: 6px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
+.compliance-help-trigger span { color: var(--ok-text); font-size: 18px; }
+.compliance-help-trigger:hover { text-decoration: underline; text-underline-offset: 3px; }
+.compliance-help-trigger:focus-visible,.compliance-help__close:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; border-radius: 4px; }
+.disciplina__grupos .compliance-matrix .compliance-help-row > td { padding: 0 0 12px; white-space: normal; text-align: left; }
+.compliance-help { padding: 16px; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); font-size: 14px; font-weight: 400; line-height: 1.65; white-space: normal; overflow-wrap: anywhere; }
+.compliance-help__head { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.compliance-help__head :is(h3,h4) { margin: 0; font-size: 16px; line-height: 1.4; padding-top: 10px; }
+.compliance-help__close { min-height: 44px; flex-shrink: 0; padding: 8px 10px; color: var(--text); background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--r-sm); font-size: 13px; cursor: pointer; }
+.compliance-help p { margin: 0 0 10px; }
+.compliance-help .compliance-help__label { margin: 12px 0 4px; font-weight: 700; }
+.compliance-help :is(ol,ul) { padding-left: 20px; margin: 0 0 12px; }
+.compliance-help li + li { margin-top: 8px; }
+.compliance-help__example { margin: 16px 0; padding: 12px 14px; border-left: 3px solid var(--ts-green); border-radius: 0 var(--r-sm) var(--r-sm) 0; background: var(--surface-1); }
+.compliance-help__example .compliance-help__label { margin-top: 0; }
+.compliance-help__example p:last-child { margin-bottom: 0; }
+.compliance-help__audio { padding: 0 0 14px; border-bottom: 1px solid var(--border); }
+.compliance-help__audio audio { display: block; width: 100%; max-width: 430px; min-width: 0; margin-top: 10px; }
+.compliance-help .compliance-help__source { margin: 12px 0 0; color: var(--text-dim); font-size: 13px; }
 .reports-page .table-scroller--sticky th:first-child,.reports-page .table-scroller--sticky td:first-child { max-width: 200px; white-space: normal; }
 .reports-page :is(input,select,textarea) { max-width: 100%; }
 .foda-request-tabs button { min-width: 44px; min-height: 44px; }
