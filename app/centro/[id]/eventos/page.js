@@ -209,6 +209,7 @@ export default function EventosPage() {
     { l: 'Asistieron', v: `${pct(agg.attended, agg.total)}%`, s: `${agg.attended}`, c: 'var(--ok)' },
     { l: 'No asistieron', v: `${pct(agg.not_attended, agg.total)}%`, s: `${agg.not_attended}`, c: 'var(--bad)' },
     { l: 'Pendientes', v: `${pct(agg.pending, agg.total)}%`, s: `${agg.pending}`, c: 'var(--warn)' },
+    { l: 'Matriculados', v: agg.won, s: 'Ganados en CRM', c: 'var(--ok)' },
     { l: 'Pagados', v: `${pct(agg.paid, agg.total)}%`, s: `${agg.paid}`, c: 'var(--ok-text)' },
     { l: 'En compras', v: `$${agg.revenue.toLocaleString()}`, c: 'var(--text)' },
   ]

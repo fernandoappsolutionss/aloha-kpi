@@ -8,7 +8,7 @@ const now = new Date('2026-09-07T14:00:00Z')
 const account = 'c0c81438-bb54-4ae0-a019-b54e0bfcf870'
 const clase = (id, start_date, total, attended, timezone = 'America/Panama') => ({
   id, account_id: account, start_date, timezone, status: 'completed',
-  stats: { total, attended, not_attended: total - attended, pending: 0, paid: 0, total_revenue: 0 },
+  stats: { total, attended, not_attended: total - attended, pending: 0, paid: 0, won: 0, total_revenue: 0 },
 })
 const clases = [
   clase('agosto', '2026-08-31T23:00:00Z', 23, 15),
@@ -20,6 +20,37 @@ test('Anclas: KPI cuenta 28 invitados y 10 asistentes, excluyendo 34 registros f
   const source = fuenteKpiAutomatica({ year: 2026, month: 9, now, clases })
   assert.equal(source.cp_invitados, 28)
   assert.equal(source.cp_asistieron, 10)
+})
+
+test('Anclas: 10 ventas de prueba en septiembre no son matrículas de sus clases de septiembre', () => {
+  const events = structuredClone(clases)
+  events[0].stats.won = 7 // Clase de agosto; sus ventas se anotaron en septiembre.
+  events[2].stats.won = 2 // Tampoco aporta una clase futura.
+  const ventas = Array.from({ length: 10 }, (_, id) => ({ id, origen: 'clase_prueba' }))
+  ventas.push({ id: 11, origen: 'directo' })
+  const source = fuenteKpiAutomatica({ year: 2026, month: 9, now, clases: events, ventas })
+  const data = aplicarAjustes(source, { ...crearAjustes({}, source), cp_matriculados: 99 }, { cp_matriculados: 10, cp_matriculados_override: 10 })
+  assert.equal(source.cp_matriculados, 0)
+  assert.equal(data.cp_matriculados, 0)
+  assert.equal(source.ventasTotal, 11)
+  assert.equal(fuenteKpiAutomatica({ year: 2026, month: 8, now, clases: events, ventas }).cp_matriculados, 7)
+})
+
+test('Calle 50: un ganado de una clase realizada es matrícula aunque no haya venta canónica ni pago', () => {
+  const event = clase('185', '2026-09-05T17:15:00-05:00', 6, 3)
+  event.stats.won = 1
+  const source = fuenteKpiAutomatica({ year: 2026, month: 9, now, clases: [event], ventas: [] })
+  assert.equal(source.cp_matriculados, 1)
+  assert.equal(source.ventasTotal, 0)
+  assert.equal(resumirClases([event]).won, 1)
+})
+
+test('ganados ausentes, negativos o mayores al total no se presentan como cero verificado', () => {
+  for (const won of [undefined, null, -1, 29, '0']) {
+    const event = structuredClone(clases[1])
+    event.stats.won = won
+    assert.throws(() => fuenteKpiAutomatica({ year: 2026, month: 9, now, clases: [event] }))
+  }
 })
 
 test('un ajuste antiguo no infla la fuente viva, ni convierte un cero real en asistencia', () => {

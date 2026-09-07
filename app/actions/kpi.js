@@ -13,7 +13,6 @@ import { calcularKpiAutoMes } from '../../lib/kpi-semanal-service'
 import { superponerSemanasAuto } from '../../lib/kpi-semanal-auto.mjs'
 import { CAMPOS_RESUMEN_AUTO, poblacionKpiAutomatica, usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
 import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
-import { classifyTrialSales } from '../../lib/trial-enrollments.mjs'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -82,8 +81,6 @@ export async function loadKpiMes(centroId, year, month) {
     kpiAuto = await calcularKpiAutoMes(centroId, intOr(year), intOr(month))
     if (kpiAuto?.estado === 'manual_pre_gate') kpiAuto = null
     if (kpiAuto?.estado === 'auto') {
-      const trialFunnel = classifyTrialSales(kpiAuto.ventas)
-      kpiAuto = { ...kpiAuto, cp: trialFunnel.reliable ? trialFunnel.trialEnrollments : null, trialFunnel }
       semanas = superponerSemanasAuto(semanas, {
         centroId, year: intOr(year), month: intOr(month), auto: kpiAuto,
       })
@@ -110,7 +107,7 @@ export async function loadKpiMes(centroId, year, month) {
         mot_otro: automatic.data.mot_otro,
         total: kpiAuto?.estado === 'auto' ? kpiAuto.desTotal : (motivosAuto?.total ?? 0),
       }
-      autoSync = { ok: true, adjusted: automatic.adjusted, trialFunnel: automatic.data._trial_funnel || null }
+      autoSync = { ok: true, adjusted: automatic.adjusted, trialClasses: automatic.data._trial_attendance || null }
     } else {
       autoSync = { ok: false, error: automatic.error || 'No se pudo sincronizar el KPI.' }
     }
@@ -178,16 +175,15 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
   const retirados = esAuto ? kpiAuto.desTotal : auto ? auto.total : totalDes
   const reincorporados = auto ? auto.reincorporados : 0
   const ninosFinal = Math.max(0, balanceMensual({ inicio: ninosInicio, nuevosActivos, reincorporados, retirados }))
-  // Matrícula de prueba: origen técnico explícito, CRM como respaldo. El
-  // override sigue mandando; una clasificación parcial conserva lo declarado.
+  // El embudo completo usa los ganados de las mismas clases realizadas.
+  // Un formulario viejo/alterado o un override legado no puede sustituirlos.
+  const periodoAutomatico = usaKpiAutomatico(year, month, 'abierto')
+  if (periodoAutomatico && !automaticData) {
+    throw new Error('No se pudieron verificar las clases de prueba. Recarga el KPI antes de guardar o cerrar el mes.')
+  }
   const overrideCrudo = config.cp_matriculados_override
-  const cpOverride = overrideCrudo === undefined || overrideCrudo === null || overrideCrudo === ''
-    ? null
-    : intOr(overrideCrudo)
-  const trialSales = esAuto ? classifyTrialSales(kpiAuto.ventas) : null
-  const cpDerivado = trialSales?.reliable
-    ? trialSales.trialEnrollments
-    : automaticData ? automaticData.cp_matriculados : intOr(config.cp_matriculados)
+  const cpOverride = periodoAutomatico || overrideCrudo == null || overrideCrudo === '' ? null : intOr(overrideCrudo)
+  const cpDerivado = automaticData ? automaticData.cp_matriculados : intOr(config.cp_matriculados)
   const now = new Date().toISOString()
 
   await upsertWith(query, 'resumen_mes', {
@@ -244,8 +240,8 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
     // solo en 'fallo' (o pre-gate) se acepta la captura manual.
     const kpiAuto = await calcularKpiAutoMes(centroId, intOr(year), intOr(month), query)
     // La foto de los campos de resumen (clase de prueba, motivos, origen) es
-    // complementaria: si el CRM no responde, el mes se guarda igual con lo que
-    // el usuario tiene delante — un fallo de red no bloquea el KPI.
+    // debe estar completa antes de persistir el embudo automático. Si falla,
+    // guardarKpiBloqueado aborta la transacción sin aceptar cifras del cliente.
     let automatic = null
     if (usaKpiAutomatico(year, month, 'abierto')) {
       const foto = await fotoKpiAutomatica(centroId, intOr(year), intOr(month), { query })
@@ -354,8 +350,8 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
       // (g1-16) El cierre toma la fotografía COMPLETA bajo el mismo lock del
       // mes: el motor semanal recalcula ing/des y se materializan (cob_*
       // intacto), y la foto de resumen (clase de prueba, motivos, origen) se
-      // concilia con lo declarado. En 'fallo' el mes cierra con los valores
-      // manuales y se avisa (fallback explícito, g1-20).
+      // concilia con lo declarado. El embudo requiere una foto CRM completa;
+      // una lectura fallida aborta también los retiros ejecutados en este cierre.
       const kpiAuto = await calcularKpiAutoMes(centroId, y, m, query)
       const warnAuto = kpiAuto?.estado === 'fallo'
         ? `El KPI automático falló (${kpiAuto.mensaje}) y el mes cerró con las ventas y retiros capturados a mano.`

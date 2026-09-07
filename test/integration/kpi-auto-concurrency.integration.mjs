@@ -48,8 +48,8 @@ async function race({ cold = false, close = false } = {}) {
         assert.equal(result.auto.ingTotal,1)
         assert.equal(result.auto.desTotal,1)
         assert.equal(result.data.mot_graduado,1)
-        assert.equal(result.data.cp_matriculados,7)
-        assert.equal(result.data._trial_funnel.valueSource,'manual_override')
+        assert.equal(result.data.cp_matriculados,0)
+        assert.equal(result.data._trial_attendance.basis,'occurred_event_month')
       }
     }
     assert.equal(crmCalls,jobs.length,'El retry no debe recargar CRM/fuente canónica.')
