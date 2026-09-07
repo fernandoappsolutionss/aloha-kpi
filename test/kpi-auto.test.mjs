@@ -188,7 +188,7 @@ test('exige origen comercial solo para ventas desde agosto de 2026', () => {
 test('consume los totales CRM de invitados, incluidos cancelados, sin cambiar las ventas', () => {
   const source = fuenteKpiAutomatica({
     year: 2026, month: 8,
-    clases: [{ id: 'ev-1', start_date: '2026-08-06T23:00:00.000Z',
+    clases: [{ id: 'ev-1', status: 'completed', start_date: '2026-08-06T23:00:00.000Z',
       stats: { total: 2, attended: 1, not_attended: 1, pending: 0, paid: 0, total_revenue: 0 } }],
     ventas: [{ id: 501, estudiante_id: 9, fecha: '2026-08-06', crm_registration_id: 'reg-1', origen_venta: 'referido' }],
   })
@@ -288,7 +288,7 @@ test('la lectura automatica conserva un override CP explicito incluso si es cero
 test('una clase fuera del mes no aporta invitados ni asistentes al KPI', () => {
   const source = fuenteKpiAutomatica({
     year: 2026, month: 8,
-    clases: [{ id: 'ev-1', start_date: '2026-09-06T23:00:00.000Z',
+    clases: [{ id: 'ev-1', status: 'completed', start_date: '2026-09-06T23:00:00.000Z',
       stats: { total: 2, attended: 1, not_attended: 1, pending: 0, paid: 0, total_revenue: 0 } }],
   })
   assert.equal(source.cp_invitados, 0)

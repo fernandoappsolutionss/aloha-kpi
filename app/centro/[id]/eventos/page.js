@@ -16,7 +16,7 @@ import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
-import { mesClase, mesAnterior, filtrarClasesPorMes, resumirClases } from '../../../../lib/clases-prueba.mjs'
+import { mesClase, mesAnterior, filtrarClasesPorMes, filtrarClasesPorMomento, resumirClases } from '../../../../lib/clases-prueba.mjs'
 
 function useMobileCards() {
   const [mobile,setMobile]=useState(false)
@@ -89,6 +89,7 @@ export default function EventosPage() {
   const [q, setQ] = useState('')
   const [filterPeriodo, setFilterPeriodo] = useState('mes_actual')
   const [mesElegido, setMesElegido] = useState(() => mesClase(new Date(), defaultTz))
+  const [filterMomento, setFilterMomento] = useState('todas')
   const [filterEstado, setFilterEstado] = useState('todos')
   const [openId, setOpenId] = useState(null)
   const [menuId, setMenuId] = useState(null)
@@ -112,7 +113,9 @@ export default function EventosPage() {
   }, [id])
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    const mes = new URLSearchParams(window.location.search).get('mes')
+    const params = new URLSearchParams(window.location.search)
+    const mes = params.get('mes')
+    if (['realizadas', 'proximas'].includes(params.get('momento'))) setFilterMomento(params.get('momento'))
     if (/^\d{4}-(0[1-9]|1[0-2])$/.test(mes || '')) {
       setMesElegido(mes); setFilterPeriodo('mes_elegido')
     }
@@ -124,10 +127,13 @@ export default function EventosPage() {
     : filterPeriodo === 'mes_elegido' ? mesElegido : 'todos'
   const periodEvents = filtrarClasesPorMes(events, periodo, defaultTz)
 
-  // Stats agregadas (tarjetas como en el CRM).
-  const agg = resumirClases(periodEvents)
+  const now = new Date()
+  const scopeEvents = filtrarClasesPorMomento(periodEvents, filterMomento, now)
+  const realizadas = resumirClases(filtrarClasesPorMomento(periodEvents, 'realizadas', now))
+  const proximas = resumirClases(filtrarClasesPorMomento(periodEvents, 'proximas', now))
+  const agg = resumirClases(scopeEvents)
 
-  const visible = periodEvents.filter((e) =>
+  const visible = scopeEvents.filter((e) =>
     (filterEstado === 'todos' || e.status === filterEstado) &&
     (!q || (e.name || '').toLowerCase().includes(q.toLowerCase())))
 
@@ -256,6 +262,11 @@ export default function EventosPage() {
             <option value="todos">Todos los meses</option>
           </select>
           {filterPeriodo === 'mes_elegido' && <input type="month" className="input" aria-label="Mes de las clases" style={{ maxWidth: 200 }} value={mesElegido} onChange={e => { if (e.target.value) { setMesElegido(e.target.value); setOpenId(null) } }} />}
+          <select aria-label="Clases realizadas o próximas" className="input" style={{ maxWidth: 200 }} value={filterMomento} onChange={e => { setFilterMomento(e.target.value); setOpenId(null) }}>
+            <option value="todas">Todas las clases</option>
+            <option value="realizadas">Realizadas · KPI</option>
+            <option value="proximas">Próximas</option>
+          </select>
           <select aria-label="Estado de las clases" className="input" style={{ maxWidth: 200 }} value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
             <option value="published">Publicado</option>
@@ -266,7 +277,8 @@ export default function EventosPage() {
         </div>
         <p className="h-sub" style={{ marginBottom: 14 }}>
           {periodo === 'todos' ? 'Todos los meses' : new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${periodo}-01T12:00:00Z`))}
-          {' · Totales por fecha de la clase, igual que Invitados y Asistieron en el KPI. Incluyen los registros cancelados.'}
+          {' · '}Realizadas: <b>{realizadas.total} invitados · {realizadas.attended} asistentes</b> (KPI). Próximas: <b>{proximas.total} registrados</b>.
+          {' Los registros cancelados se incluyen en Invitados; las clases canceladas y los borradores quedan fuera del KPI.'}
         </p>
 
         {!loadError && <div className="panel" data-tour="eventos.lista">

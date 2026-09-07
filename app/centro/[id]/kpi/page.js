@@ -496,7 +496,7 @@ export default function KPIPage() {
         {/* Clase de prueba / Motivos / Origen */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Invitados y asistentes: registros de las clases de este mes, incluidos cancelados. Matrículas: ventas del mes provenientes de prueba; no equivalen a Pagados en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Invitados y asistentes: registros de las clases de este mes que ya comenzaron, incluidos los registros cancelados. Matrículas: ventas del mes provenientes de prueba; no equivalen a Pagados en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
             {title:'Motivo Deserción', accent:'var(--bad)', auto:autoPeriod || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
             {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
           ].map(({title,accent,fields,auto,source}) => (
@@ -510,7 +510,7 @@ export default function KPIPage() {
                     {source || `Se llena con los ${motivosAuto?.total || 0} retiros registrados este mes.`}
                   </div>
                 )}
-                {title === 'Clase de Prueba' && <Link className="btn" style={{ marginBottom: 12 }} href={`/centro/${id}/eventos?mes=${year}-${String(month).padStart(2, '0')}`}>Ver clases de este mes</Link>}
+                {title === 'Clase de Prueba' && <Link className="btn" style={{ marginBottom: 12 }} href={`/centro/${id}/eventos?mes=${year}-${String(month).padStart(2, '0')}&momento=realizadas`}>Ver clases realizadas de este mes</Link>}
                 {fields.map(([lbl,key]) => {
                   // (g1-21) cp_matriculados: efectivo = override ?? derivado.
                   // Editar fija el override; "Usar valor del módulo" lo limpia.
