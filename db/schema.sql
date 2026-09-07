@@ -30,13 +30,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- Acceso Master y bloqueos temporales (expansión compatible).
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='usuarios'::regclass AND conname='usuarios_master_email') THEN
-    ALTER TABLE usuarios ADD CONSTRAINT usuarios_master_email
-      CHECK (rol <> 'admin_master' OR lower(email) = 'fperez@teamsolutionss.com');
-  END IF;
-END $$;
+ALTER TABLE usuarios
+  DROP CONSTRAINT IF EXISTS usuarios_master_email,
+  ADD CONSTRAINT usuarios_master_email
+    CHECK (rol <> 'admin_master' OR lower(email) = 'fperez@teamsolutionss.com');
 CREATE UNIQUE INDEX IF NOT EXISTS usuarios_unico_master ON usuarios (rol) WHERE rol='admin_master';
 
 -- IDs históricos deliberadamente sin cascada/FK: eliminar una cuenta no debe
