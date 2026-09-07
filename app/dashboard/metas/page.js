@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import HistorialNavigation from '../../../components/HistorialNavigation'
 import PeriodSelector from '../../../components/PeriodSelector'
 import { getMetas, saveMetas } from '../../actions/metas'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
@@ -73,6 +74,7 @@ export default function MetasPage() {
     <div className="shell">
       <Sidebar rol="admin_general"/>
       <main id="main-content" data-page-state={loading || saving ? 'loading' : error || saveError ? 'error' : 'ready'} className="main operations-page">
+        <HistorialNavigation />
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Configuración · {label}</div>

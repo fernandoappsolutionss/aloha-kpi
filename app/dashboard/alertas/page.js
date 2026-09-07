@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import HistorialNavigation from '../../../components/HistorialNavigation'
 import PeriodSelector from '../../../components/PeriodSelector'
 import { getCentrosKpi } from '../../actions/dashboard'
 import { getMetasMarcadasPanel } from '../../actions/cumplimiento'
@@ -120,6 +121,7 @@ export default function AlertasPage() {
     <div className="shell">
       <Sidebar rol="admin_general"/>
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
+        <HistorialNavigation />
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Alertas · {label}</div>

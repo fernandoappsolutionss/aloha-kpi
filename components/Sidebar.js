@@ -220,10 +220,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
     { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
-    { label: 'Alertas', icon: 'bell', href: '/dashboard/alertas' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
-    { label: 'Reporte', icon: 'doc', href: '/dashboard/reporte' },
-    ...(context?.capabilities.viewMetas ? [{ label: 'Metas', icon: 'target', href: '/dashboard/metas' }] : []),
     ...(context?.capabilities.viewAdminTraining ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }] : []),
     // La matriz del oficio va aparte: la de tours filtra rol='administradora'
     // y dejaría fuera justo a las asistentes. Misma capacidad de gerencia.
