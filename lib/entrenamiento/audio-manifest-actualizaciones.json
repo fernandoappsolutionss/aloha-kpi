@@ -421,5 +421,68 @@
     "bytes": 190006,
     "segundos": 23.684354,
     "generadoAt": "2026-09-07T13:16:31.857Z"
+  },
+  "itinerario/intro": {
+    "file": "actualizaciones/itinerario/intro-84bdfb78f33c.mp3",
+    "hash": "84bdfb78f33c",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T16:00:12.380Z"
+  },
+  "itinerario/it-1": {
+    "file": "actualizaciones/itinerario/it-1-fa4bdb42b8a7.mp3",
+    "hash": "fa4bdb42b8a7",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 77366,
+    "segundos": 9.613061,
+    "generadoAt": "2026-09-07T16:00:14.631Z"
+  },
+  "itinerario/it-2": {
+    "file": "actualizaciones/itinerario/it-2-654f2b0b59ca.mp3",
+    "hash": "654f2b0b59ca",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 80501,
+    "segundos": 9.98458,
+    "generadoAt": "2026-09-07T16:00:16.177Z"
+  },
+  "itinerario/it-3": {
+    "file": "actualizaciones/itinerario/it-3-044a352a382d.mp3",
+    "hash": "044a352a382d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 142150,
+    "segundos": 17.693605,
+    "generadoAt": "2026-09-07T16:00:19.040Z"
+  },
+  "itinerario/it-4": {
+    "file": "actualizaciones/itinerario/it-4-2bf083df222c.mp3",
+    "hash": "2bf083df222c",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 170780,
+    "segundos": 21.269478,
+    "generadoAt": "2026-09-07T16:00:21.821Z"
+  },
+  "itinerario/it-5": {
+    "file": "actualizaciones/itinerario/it-5-51504ade61f4.mp3",
+    "hash": "51504ade61f4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 111639,
+    "segundos": 13.885533,
+    "generadoAt": "2026-09-07T16:00:23.670Z"
+  },
+  "itinerario/it-6": {
+    "file": "actualizaciones/itinerario/it-6-e5f1427e927b.mp3",
+    "hash": "e5f1427e927b",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 137970,
+    "segundos": 17.182766,
+    "generadoAt": "2026-09-07T16:00:25.880Z"
   }
 }
