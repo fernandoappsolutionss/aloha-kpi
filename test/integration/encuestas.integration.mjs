@@ -89,13 +89,40 @@ test('sistema mensual contra PostgreSQL real',async t=>{
     await assert.rejects(svc.registrarDifusion(centro.id+99999,campana.id,'copiar',user.id),/no disponible/)
     await assert.rejects(svc.responder(campana.token,{...respuesta,general:6,individual:participantes[0].token},'test-ip'),/cuatro preguntas/)
   })
+  await t.test('enlace permanente usa el token inicial de la sede y no expone fichas',async()=>{
+    const c=await svc.preparar(centro.id,2026,9)
+    assert.equal(c.token_permanente,campana.token)
+    assert.equal((await svc.cargar(centro.id,2026,9)).campana.token_permanente,campana.token)
+    const actual=await svc.vigente(c.token_permanente)
+    assert.equal(actual.token,campana.token)
+    assert.deepEqual(Object.keys(actual).sort(),['datos','token'])
+    assert.deepEqual(Object.keys(actual.datos).sort(),['abierta','anio','individual','mes','nombre','version'])
+    assert.equal(await svc.vigente('123'),null)
+    assert.equal(await svc.vigente('f'.repeat(48)),null)
+    assert.equal(await svc.vigente(participantes[0].token),null)
+  })
+  await t.test('el mismo QR respeta medianoche de Panamá y abre un único corte nuevo',async()=>{
+    reloj=new Date('2026-10-01T04:59:59Z')
+    assert.equal((await svc.vigente(campana.token)).token,campana.token)
+    reloj=new Date('2026-10-01T05:00:00Z')
+    const [a,b]=await Promise.all([svc.vigente(campana.token),svc.vigente(campana.token)])
+    assert.notEqual(a.token,campana.token);assert.equal(a.token,b.token)
+    assert.equal(a.datos.mes,10);assert.equal(a.datos.abierta,true)
+    const d=await svc.cargar(centro.id,2026,10)
+    assert.equal(d.campana.token_permanente,campana.token)
+    assert.equal(d.resumen.activos,4) // sale el retirado y entra la venta cuyo inicio ya llegó
+    assert.equal(d.resumen.respuestas,0);assert.equal(d.resumen.compartida,false);assert.equal(d.resumen.cumple,false)
+    assert.equal((await query`SELECT id FROM encuesta_campanas WHERE centro_id=${centro.id} AND anio=2026 AND mes=10`).length,1)
+    assert.equal((await svc.vigente(a.token)).token,a.token) // cualquier alias emitido conserva la sede
+  })
   await t.test('al cambiar el mes, la encuesta anterior cierra y no se arrastra',async()=>{
     reloj=new Date('2026-10-01T05:00:01Z')
     assert.equal((await svc.publica(campana.token)).abierta,false)
     await assert.rejects(svc.responder(campana.token,{...respuesta,individual:participantes[0].token},'test-ip'),/cerrada/)
     await assert.rejects(svc.registrarDifusion(centro.id,campana.id,'copiar',user.id),/cerrada/)
-    const d=await svc.cargar(centro.id,2026,10);assert.equal(d.campana,null);assert.equal(d.resumen.respuestas,0)
+    const d=await svc.cargar(centro.id,2026,10);assert.notEqual(d.campana.token,campana.token);assert.equal(d.resumen.respuestas,0)
     const c=await svc.preparar(centro.id,2026,10);assert.notEqual(c.token,campana.token)
+    assert.equal(c.token_permanente,campana.token)
     // El intento de marcar manualmente un nuevo mes sigue en no.
     const [trim]=await query`SELECT id FROM trimestres WHERE centro_id=${centro.id} AND anio=2026 AND trimestre=4`
     await query`INSERT INTO cumplimiento(trimestre_id,mes,encuestas_satisfaccion) VALUES(${trim.id},1,'si')`
@@ -114,5 +141,22 @@ test('sistema mensual contra PostgreSQL real',async t=>{
     const clave=createHash('sha256').update(`${c.identity_salt}:limited-ip`).digest('hex'),ventana=Math.floor(reloj.getTime()/600000)
     await query`INSERT INTO encuesta_intentos(campana_id,clave,ventana,intentos) VALUES(${c.id},${clave},${ventana},60)`
     await assert.rejects(svc.responder(campana.token,{...respuesta,individual:participantes[0].token},'limited-ip'),/demasiados intentos/)
+  })
+  await t.test('QR de otra sede nunca abre este centro; sin activos no crea campañas vacías',async()=>{
+    const [otro]=await query`INSERT INTO centros(nombre) VALUES('Otra sede ficticia') RETURNING id`
+    const [g]=await query`INSERT INTO grupos(centro_id,numero,fecha_inicio_clases) VALUES(${otro.id},'OTRO','2026-08-01') RETURNING id`
+    await query`INSERT INTO estudiantes(centro_id,grupo_id,nombre,telefono,fecha_inscripcion) VALUES(${otro.id},${g.id},'Otra ficha','60000007','2026-08-01')`
+    const c=await svc.preparar(otro.id,2026,10)
+    assert.notEqual(c.token_permanente,campana.token)
+    assert.equal((await svc.vigente(c.token_permanente)).datos.nombre,'Otra sede ficticia')
+    await assert.rejects(svc.responder(c.token,{...respuesta,individual:participantes[0].token},'test-ip'),/validar/)
+    await query`UPDATE estudiantes SET estado='retirado' WHERE centro_id=${otro.id}`
+    reloj=new Date('2027-01-01T05:00:00Z')
+    await assert.rejects(svc.vigente(c.token_permanente),/No hay niños activos/)
+    assert.equal((await query`SELECT id FROM encuesta_campanas WHERE centro_id=${otro.id} AND anio=2027`).length,0)
+    const enero=await svc.vigente(campana.token)
+    assert.equal(enero.datos.anio,2027);assert.equal(enero.datos.mes,1)
+    assert.equal((await svc.preparar(centro.id,2027,1)).token_permanente,campana.token)
+    assert.equal((await svc.cargar(centro.id,2026,9)).resumen.respuestas,4)
   })
 }).finally(async()=>{await pool.end()})

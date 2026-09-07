@@ -22,7 +22,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
   },[centroId,anio,mes])
   const base=()=>window.location.origin
   async function preparar() {
-    const c=data?.campana || await prepararEncuesta(centroId,anio,mes)
+    const c=data?.campana?.token_permanente ? data.campana : await prepararEncuesta(centroId,anio,mes)
     if(c.error)throw new Error(c.error)
     return c
   }
@@ -31,10 +31,10 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     setBusy(true);setStatus('');setError('')
     const v=revision.current
     try {
-      const c=await preparar(),url=`${base()}/encuesta/${c.token}${p?`?p=${p.token}`:''}`
+      const c=await preparar(),url=p?`${base()}/encuesta/${c.token}?p=${p.token}`:`${base()}/encuesta/centro/${c.token_permanente}`
       if(v!==revision.current)return
       if(tipo==='qr') {
-        const archivo=await prepararCartel({tipo:'encuesta',centro:data.centro.nombre,centroId,enlace:url,anio,mes,formato})
+        const archivo=await prepararCartel({tipo:'encuesta',centro:data.centro.nombre,centroId,enlace:url,formato})
         if(v!==revision.current)return
         descargarArchivo(archivo.blob,archivo.nombre)
       } else {
@@ -44,7 +44,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
       const r=await registrarDifusionEncuesta(centroId,c.id,tipo)
       if(r.error)throw new Error(`El recurso está listo, pero no se registró la difusión: ${r.error}`)
       if(v!==revision.current)return
-      setStatus(tipo==='qr'?'Cartel PDF descargado y registrado. Imprime a tamaño real y renueva el cartel cada mes.':'Enlace copiado. Compártelo por mensaje directo con cada representante.')
+      setStatus(tipo==='qr'?'Cartel PDF descargado y registrado. Imprime a tamaño real: el mismo QR abre la encuesta vigente cada mes.':p?'Enlace individual copiado. Compártelo solo con su representante; es válido este mes.':'Enlace permanente copiado y difusión del mes registrada. Compártelo por mensaje directo con cada representante.')
       await cargar(v)
     } catch(e){if(v===revision.current)setError(e.message)} finally{if(v===revision.current)setBusy(false)}
   }
@@ -65,10 +65,10 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
       <h3>1. Comparte la encuesta del mes</h3>
       <p>La copia del enlace o descarga del QR queda registrada. Para marcar el mes también deben responder más de la mitad de los niños del corte.</p>
       <div className="survey-actions"><button className="btn btn--primary" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('copiar')}>Copiar enlace</button><label className="survey-field">Tamaño del cartel<select value={formato} disabled={busy} onChange={e=>setFormato(e.target.value)}><option value="carta">Carta</option><option value="a4">A4</option></select></label><button className="btn" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('qr')}>Descargar cartel PDF con QR</button><button className="btn" disabled={busy} onClick={()=>cargar()}>Actualizar respuestas</button></div>
-      <p className="h-sub">Diseño ALOHA con nombre del centro, llamado a responder y QR del mes. Imprime en Carta o A4 a tamaño real.</p>
+      <p className="h-sub">Un QR permanente para tu centro: imprime una sola vez en Carta o A4. Abre automáticamente la encuesta del mes vigente. Cada mes, registra la difusión copiando el mismo enlace al invitar a las familias; no necesitas reimprimir.</p>
       {busy&&<p role="status">Preparando el recurso…</p>}
-      <p className="h-sub">{r.compartida?'✓ Copia o descarga registrada.':'Aún no hay copia ni descarga registrada.'} {data.campana?`Corte de activos: ${String(data.campana.corte).slice(0,10)}. La lista y la meta quedan fijas este mes.`:'La encuesta y el corte se crean automáticamente al copiar o descargar por primera vez.'}</p>
-      {!data.abierta&&<p>El enlace de este mes ya no recibe respuestas. Abre el mes actual para compartir una nueva encuesta.</p>}
+      <p className="h-sub">{r.compartida?'✓ Difusión registrada este mes.':'Aún no hay copia ni descarga registrada este mes.'} {data.campana?`Corte de activos: ${String(data.campana.corte).slice(0,10)}. La lista y la meta quedan fijas este mes.`:'El primer acceso al QR permanente, copia o descarga del mes prepara la encuesta y fija el corte de activos.'}</p>
+      {!data.abierta&&<p>Estás viendo resultados de un mes cerrado. El QR permanente abre la encuesta vigente; los enlaces individuales de este mes ya cerraron.</p>}
       {linkManual&&<label className="survey-field">Enlace preparado<input readOnly value={linkManual} onFocus={e=>e.target.select()}/></label>}
       {status&&<p role="status">{status}</p>}{error&&<p role="alert" className="survey-error">{error}</p>}
     </div>
