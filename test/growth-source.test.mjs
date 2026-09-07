@@ -358,5 +358,57 @@ test('partial sales imports never replace the declared historical trial funnel',
   assert.equal(row.trialFunnel.coverage, 0.1)
   assert.equal(row.trialFunnel.reliable, false)
   assert.equal(row.trialFunnel.source, 'declared_summary')
-  assert.ok(row.issues.some((issue) => issue.code === 'cp_classification_incomplete'))
+  assert.equal(row.issues.some((issue) => issue.code === 'cp_classification_incomplete'), false)
+})
+
+test('individual enrollment coverage is required from September 2026, without requesting historical backfills', () => {
+  const periods = [[2025, 9], [2026, 7], [2026, 8], [2026, 9], [2026, 10], [2027, 1]]
+  const summaries = periods.map(([year, month]) => ({
+    year, month, cp_matriculados: 4, orig_marketing: 3, orig_referido: 1,
+  }))
+  const rows = buildGrowthHistory({
+    summaries,
+    states: periods.map(([year, month]) => ({ year, month, estado: 'cerrado' })),
+    weekly: periods.map(([year, month]) => ({ year, month, ventas: 4 })),
+  })
+  assert.deepEqual(rows.flatMap((row) => row.issues
+    .filter((issue) => issue.code === 'cp_classification_incomplete')
+    .map((issue) => issue.period)), ['2026-09', '2026-10', '2027-01'])
+  for (const row of rows) {
+    assert.equal(row.ventas, 4)
+    assert.equal(row.cp_matriculados, 4)
+    assert.equal(row.orig_marketing, 3)
+    assert.equal(row.orig_referido, 1)
+    assert.equal(row.trialFunnel.reliable, false, 'legacy exemption must not claim individual coverage exists')
+    assert.equal(row.trialFunnel.source, 'declared_summary')
+  }
+})
+
+test('September enrollment warning clears when each sale has a linked and classified enrollment', () => {
+  const students = [{ id: 1 }, { id: 2 }]
+  const input = {
+    summaries: [{ year: 2026, month: 9, cp_matriculados: 1 }],
+    states: [{ year: 2026, month: 9, estado: 'cerrado' }],
+    weekly: [{ year: 2026, month: 9, ventas: 2 }],
+    students,
+    events: students.map((student, index) => ({
+      id: index + 1, estudiante_id: student.id, tipo: 'inscripcion',
+      fecha: '2026-09-01', year: 2026, month: 9,
+      origen: index === 0 ? 'clase_prueba' : null,
+    })),
+  }
+  const [pending] = buildGrowthHistory(input)
+  assert.ok(pending.issues.some((issue) => issue.code === 'cp_classification_incomplete'))
+  const [complete] = buildGrowthHistory({ ...input,
+    events: input.events.map((event) => ({ ...event, origen: event.origen || 'directo' })),
+  })
+  assert.equal(complete.issues.some((issue) => issue.code === 'cp_classification_incomplete'), false)
+  assert.equal(complete.trialFunnel.reliable, true)
+  assert.equal(complete.cp_matriculados, 1)
+
+  const [empty] = buildGrowthHistory({
+    summaries: [{ year: 2026, month: 9, cp_matriculados: 0 }],
+    weekly: [{ year: 2026, month: 9, ventas: 0 }],
+  })
+  assert.equal(empty.issues.length, 0, 'a zero-sale month has no enrollments to link')
 })
