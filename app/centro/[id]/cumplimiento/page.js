@@ -8,7 +8,6 @@ import { getCentroResumen } from '../../../actions/centro'
 import { getCentroGrowth } from '../../../actions/growth'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, quarterMonths, periodLabel } from '../../../../lib/period'
 import PeriodSelector from '../../../../components/PeriodSelector'
-import TableScroller from '../../../../components/TableScroller'
 import SemaforoProducto from '../../../../components/SemaforoProducto'
 import {
   CUMPLIMIENTO_KEYS, CUMPLIMIENTO_LABELS, DISCIPLINA_GRUPOS, disciplinaPct,
@@ -329,11 +328,9 @@ export default function CumplimientoPage() {
                 <span className="disciplina__grupo-peso">peso {group.peso} × {group.claves.length}</span>
               </h3>
               <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-dim)' }}>{group.proposito}</p>
-              <TableScroller label={`${nombreMes} · ${group.titulo}`} stickyFirstColumn>
-                <table className="table compliance-matrix"><thead><tr><th scope="col">Criterio</th><th scope="col">Sí</th><th scope="col">No</th></tr></thead><tbody>
+                <table className="table compliance-matrix" aria-label={`${nombreMes} · ${group.titulo}`}><thead><tr><th scope="col">Criterio</th><th scope="col">Sí</th><th scope="col">No</th></tr></thead><tbody>
                   {group.claves.map(k => <tr key={k}><th scope="row">{CUMPLIMIENTO_LABELS[k]}</th>{['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>)}
                 </tbody></table>
-              </TableScroller>
             </div>
           ))}
           </div>
