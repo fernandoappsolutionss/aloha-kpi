@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation'
-import { requireCurrentAdmin } from '../../../lib/auth'
+import { requireSession } from '../../../lib/auth'
+import { esGerencia } from '../../../lib/current-user.mjs'
 
 export default async function MetasLayout({ children }) {
-  try { await requireCurrentAdmin() } catch { redirect('/dashboard') }
+  try {
+    const user = await requireSession()
+    if (!esGerencia(user.rol)) throw new Error('No autorizado')
+  } catch { redirect('/dashboard') }
   return children
 }

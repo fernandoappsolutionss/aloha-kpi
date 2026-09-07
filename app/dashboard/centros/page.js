@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import TableScroller from '../../../components/TableScroller'
 import OperationalCard from '../../../components/OperationalCard'
+import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { listCentrosConUsuarios, createCentro, updateCentro, deleteCentro } from '../../actions/centros'
 
 // El país del centro define las FECHAS PATRIAS que salta su calendario de
@@ -31,6 +32,8 @@ export default function CentrosPage() {
   const [form, setForm] = useState({ nombre: '', region: 'Ciudad de Panamá', pais: 'PA' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(null)
+  const access = useCurrentAccess()
+  const canEdit = access.canManageCenters
 
   useEffect(() => { loadCentros() }, [])
 
@@ -45,6 +48,7 @@ export default function CentrosPage() {
 
   async function saveCentro(e) {
     e.preventDefault()
+    if (!canEdit) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!form.nombre.trim()) { setStatus('❌ El nombre es requerido.'); return }
     setSaving(true); setStatus('')
     try {
@@ -64,6 +68,7 @@ export default function CentrosPage() {
   }
 
   async function deleteCenter(id, nombre, userCount) {
+    if (!canEdit) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     const msg = userCount > 0
       ? `¿Eliminar "${nombre}"? Tiene ${userCount} usuario(s) asignado(s). Serán desvinculados del centro.`
       : `¿Eliminar "${nombre}"?`
@@ -83,6 +88,7 @@ export default function CentrosPage() {
   }
 
   function editCentro(c) {
+    if (!canEdit) return
     setEditing(c.id); setForm({ nombre: c.nombre, region: c.region || 'Ciudad de Panamá', pais: c.pais === 'VE' ? 'VE' : 'PA' }); setShowForm(true)
   }
 
@@ -101,6 +107,7 @@ export default function CentrosPage() {
   }
 
   function acciones(c) {
+    if (!canEdit) return <span className="h-sub" style={{ margin: 0 }}>Solo lectura</span>
     return <div className="page-actions operations-center-actions">
       <button className="btn btn--compact" aria-label={`Editar ${c.nombre}`} onClick={() => editCentro(c)}>Editar</button>
       <button className="btn btn--compact" aria-label={`Eliminar ${c.nombre}`} disabled={deleting === c.id}
@@ -120,11 +127,12 @@ export default function CentrosPage() {
             <h1 className="h-title">Gestión de centros</h1>
             {!loading && !error && <p role="status" className="h-sub">{centros.length} centros registrados</p>}
           </div>
-          <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá',pais:'PA'}); setShowForm(!showForm) }}
+          {canEdit && <button onClick={() => { setEditing(null); setForm({nombre:'',region:'Ciudad de Panamá',pais:'PA'}); setShowForm(!showForm) }}
             disabled={loading || saving || !!error} className={`btn${showForm ? '' : ' btn--primary'}`}>
             {showForm ? '✕ Cancelar' : '+ Nuevo centro'}
-          </button>
+          </button>}
         </div>
+        {access.isReadonlyGlobal && <div className="alert" role="status" style={{ marginBottom: 16 }}>Administrador General · Solo lectura: puedes consultar centros y equipo, sin crear, editar ni eliminar centros.</div>}
 
         {status && (
           <div role={isError ? 'alert' : 'status'} className={`alert${isError ? ' alert--error' : ''}`}
@@ -133,7 +141,7 @@ export default function CentrosPage() {
           </div>
         )}
 
-        {showForm && (
+        {canEdit && showForm && (
           <div className="card" style={{ padding: 24, marginBottom: 20 }}>
             <h2 id="center-form-title" className="panel__title" style={{ marginBottom: 20 }}>{editing ? 'Editar centro' : 'Crear nuevo centro'}</h2>
             <form role="form" aria-labelledby="center-form-title" autoComplete="off" onSubmit={saveCentro}>

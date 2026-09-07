@@ -6,7 +6,7 @@ import {PREGUNTAS,textoFoda} from '../../lib/encuestas/domain.mjs'
 import {descargarArchivo,prepararCartel} from '../../lib/carteles/descargar.mjs'
 
 export {descargarArchivo} from '../../lib/carteles/descargar.mjs'
-export default function EncuestasPanel({centroId,anio,mes,compact=false,onResumen}) {
+export default function EncuestasPanel({centroId,anio,mes,compact=false,onResumen,canWrite=true}) {
   const [data,setData]=useState(null),[error,setError]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[linkManual,setLinkManual]=useState('')
   const revision=useRef(0)
   const [formato,setFormato]=useState('carta')
@@ -27,6 +27,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     return c
   }
   async function ejecutar(tipo,p=null) {
+    if(!canWrite)return
     if(busy)return
     setBusy(true);setStatus('');setError('')
     const v=revision.current
@@ -53,7 +54,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
   const r=data.resumen
   return <section className="survey-panel" data-tour="encuestas.panel" aria-label="Encuesta de satisfacción mensual">
     <div className="survey-box survey-hero">
-      <div><p className="label">{nombreMes} · RETENCIÓN</p><h2>Escucha a tus familias</h2><p>Comparte la encuesta durante el cierre de nivel y pide responder antes de salir. Cada respuesta ayuda a detectar qué debemos mejorar.</p></div>
+      <div><p className="label">{nombreMes} · RETENCIÓN</p><h2>Escucha a tus familias</h2><p>{canWrite?'Comparte la encuesta durante el cierre de nivel y pide responder antes de salir.':'Consulta la participación y los comentarios de las familias.'} Cada respuesta ayuda a detectar qué debemos mejorar.</p></div>
       <span className={`pill ${r.cumple?'pill--ok':''}`} data-tour="encuestas.cumplimiento">{r.cumple?'✓ Hecho en Cumplimiento':data.abierta?'Pendiente de completar':'Mes cerrado'}</span>
     </div>
     <div className="survey-stats" data-tour="encuestas.progreso">
@@ -63,9 +64,9 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     </div>
     <div className="survey-box" data-tour="encuestas.compartir">
       <h3>1. Comparte la encuesta del mes</h3>
-      <p>La copia del enlace o descarga del QR queda registrada. Para marcar el mes también deben responder más de la mitad de los niños del corte.</p>
-      <div className="survey-actions"><button className="btn btn--primary" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('copiar')}>Copiar enlace</button><label className="survey-field">Tamaño del cartel<select value={formato} disabled={busy} onChange={e=>setFormato(e.target.value)}><option value="carta">Carta</option><option value="a4">A4</option></select></label><button className="btn" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('qr')}>Descargar cartel PDF con QR</button><button className="btn" disabled={busy} onClick={()=>cargar()}>Actualizar respuestas</button></div>
-      <p className="h-sub">Un QR permanente para tu centro: imprime una sola vez en Carta o A4. Abre automáticamente la encuesta del mes vigente. Cada mes, registra la difusión copiando el mismo enlace al invitar a las familias; no necesitas reimprimir.</p>
+      <p>{canWrite?'La copia del enlace o descarga del QR queda registrada.':'Modo consulta: no se copian enlaces ni se registra difusión desde esta cuenta.'} Para marcar el mes también deben responder más de la mitad de los niños del corte.</p>
+      <div className="survey-actions">{canWrite&&<><button className="btn btn--primary" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('copiar')}>Copiar enlace</button><label className="survey-field">Tamaño del cartel<select value={formato} disabled={busy} onChange={e=>setFormato(e.target.value)}><option value="carta">Carta</option><option value="a4">A4</option></select></label><button className="btn" disabled={busy||!data.abierta||!r.activos} onClick={()=>ejecutar('qr')}>Descargar cartel PDF con QR</button></>}<button className="btn" disabled={busy} onClick={()=>cargar()}>Actualizar respuestas</button></div>
+      <p className="h-sub">{canWrite?'Un QR permanente para tu centro: imprime una sola vez en Carta o A4. Abre automáticamente la encuesta del mes vigente. Cada mes, registra la difusión copiando el mismo enlace al invitar a las familias; no necesitas reimprimir.':'Consulta el avance del mes; la difusión se registra desde una cuenta operativa autorizada.'}</p>
       {busy&&<p role="status">Preparando el recurso…</p>}
       <p className="h-sub">{r.compartida?'✓ Difusión registrada este mes.':'Aún no hay copia ni descarga registrada este mes.'} {data.campana?`Corte de activos: ${String(data.campana.corte).slice(0,10)}. La lista y la meta quedan fijas este mes.`:'El primer acceso al QR permanente, copia o descarga del mes prepara la encuesta y fija el corte de activos.'}</p>
       {!data.abierta&&<p>Estás viendo resultados de un mes cerrado. El QR permanente abre la encuesta vigente; los enlaces individuales de este mes ya cerraron.</p>}
@@ -79,7 +80,7 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     {!compact&&<>
       <div className="survey-box"><h3>Resultados por pregunta</h3>{PREGUNTAS.map(p=><p key={p.id}>{p.texto} <b>{r.promedios[p.id]===null?'Sin respuestas':`${r.promedios[p.id]} / 5`}</b></p>)}</div>
       <details className="survey-box" data-tour="encuestas.individuales"><summary>Participación por niño y enlaces individuales ({data.participantes.length})</summary><p>Los enlaces individuales validan la ficha sin pedir nombre ni teléfono. Compártelos solo con el representante de ese niño.</p>
-        <div className="survey-roster">{data.participantes.map(p=><div className="survey-roster__row" key={p.id}><div><b>{p.nombre}</b><p className="h-sub">Grupo {p.grupo||'sin asignar'} · {p.respondida_at?'✓ Respondió':'Pendiente'}{!p.tiene_telefono?' · Usar enlace individual':''}</p></div><button className="btn" aria-label={`Copiar enlace de ${p.nombre}`} disabled={busy||!data.abierta||!!p.respondida_at} onClick={()=>ejecutar('individual',p)}>Copiar enlace individual</button></div>)}</div>
+        <div className="survey-roster">{data.participantes.map(p=><div className="survey-roster__row" key={p.id}><div><b>{p.nombre}</b><p className="h-sub">Grupo {p.grupo||'sin asignar'} · {p.respondida_at?'✓ Respondió':'Pendiente'}{canWrite&&!p.tiene_telefono?' · Usar enlace individual':''}</p></div>{canWrite&&<button className="btn" aria-label={`Copiar enlace de ${p.nombre}`} disabled={busy||!data.abierta||!!p.respondida_at} onClick={()=>ejecutar('individual',p)}>Copiar enlace individual</button>}</div>)}</div>
       </details>
       <details className="survey-box"><summary>Comentarios de las familias</summary>{data.respuestas.filter(x=>x.mejorar||x.destacar).length===0?<p>Sin comentarios por ahora.</p>:data.respuestas.filter(x=>x.mejorar||x.destacar).map((x,i)=><div className="survey-comment" key={i}>{x.mejorar&&<p><b>Para mejorar:</b> {x.mejorar}</p>}{x.destacar&&<p><b>Para destacar:</b> {x.destacar}</p>}</div>)}</details>
       <details className="survey-box"><summary>Últimas copias y descargas</summary>{data.difusiones?.length?data.difusiones.map((d,i)=><p key={i}>{d.nombre} · {d.tipo==='qr'?'Descarga del QR':d.tipo==='individual'?'Copia de enlace individual':'Copia del enlace'} · {new Date(d.created_at).toLocaleString('es-PA',{timeZone:'America/Panama'})}</p>):<p>Todavía no hay acciones registradas.</p>}</details>

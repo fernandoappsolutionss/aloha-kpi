@@ -1,5 +1,5 @@
 'use server'
-import { requireCurrentCentroAccess, requireCurrentAdmin } from '../../lib/auth'
+import { requireCurrentCentroAccess, requireCurrentMaster, requireCurrentWriteCentro } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { peticionesRepository } from '../../lib/peticiones-repository'
 import { createPeticionesService } from '../../lib/peticiones-service.mjs'
@@ -31,48 +31,48 @@ export async function listPeticiones(centroId, anio, trimestre) {
 
 export async function createComentario(centroId, anio, trimestre, texto) {
   return runAction('createComentario', async () =>
-    service.createComentario(await requireCurrentCentroAccess(centroId), { centroId, anio, trimestre, texto }))
+    service.createComentario(await requireCurrentWriteCentro(centroId), { centroId, anio, trimestre, texto }))
 }
 
 export async function updateComentario(centroId, id, texto) {
   return runAction('updateComentario', async () =>
-    service.updateComentario(await requireCurrentCentroAccess(centroId), { centroId, id, texto }))
+    service.updateComentario(await requireCurrentWriteCentro(centroId), { centroId, id, texto }))
 }
 
 export async function createPeticionDraft(centroId, anio, trimestre, input) {
   return runAction('createPeticionDraft', async () =>
-    service.createDraft(await requireCurrentCentroAccess(centroId), { ...input, centroId, anio, trimestre }))
+    service.createDraft(await requireCurrentWriteCentro(centroId), { ...input, centroId, anio, trimestre }))
 }
 
 export async function updatePeticionDraft(centroId, id, input) {
   return runAction('updatePeticionDraft', async () =>
-    service.updateDraft(await requireCurrentCentroAccess(centroId), { ...input, centroId, id }))
+    service.updateDraft(await requireCurrentWriteCentro(centroId), { ...input, centroId, id }))
 }
 
 export async function submitPeticion(centroId, id) {
   return runAction('submitPeticion', async () =>
-    service.submitPeticion(await requireCurrentCentroAccess(centroId), { centroId, id }))
+    service.submitPeticion(await requireCurrentWriteCentro(centroId), { centroId, id }))
 }
 
 export async function changePeticionStatus(centroId, id, estado, cotizacionAprobadaId = null) {
   return runAction('changePeticionStatus', async () =>
-    service.changeStatus(await requireCurrentCentroAccess(centroId), { centroId, id, estado, cotizacionAprobadaId }))
+    service.changeStatus(await requireCurrentWriteCentro(centroId), { centroId, id, estado, cotizacionAprobadaId }))
 }
 
 export async function discardPeticionDraft(centroId, id) {
   return runAction('discardPeticionDraft', async () =>
-    service.discardDraft(await requireCurrentCentroAccess(centroId), { centroId, id }))
+    service.discardDraft(await requireCurrentWriteCentro(centroId), { centroId, id }))
 }
 
 export async function eliminarPeticion(centroId, id) {
   return runAction('eliminarPeticion', async () =>
-    service.eliminarPeticion(await requireCurrentAdmin(), { centroId, id }))
+    service.eliminarPeticion(await requireCurrentMaster(), { centroId, id }))
 }
 
 export async function prepareCotizacionUpload(centroId, input) {
   return runAction('prepareCotizacionUpload', async () => {
     requireBlobToken()
-    return await peticionUploadService.prepare(await requireCurrentCentroAccess(centroId), { ...input, centroId })
+    return await peticionUploadService.prepare(await requireCurrentWriteCentro(centroId), { ...input, centroId })
   })
 }
 
@@ -83,5 +83,5 @@ export async function getCotizacionUploadStatus(centroId, peticionId, cotizacion
 
 export async function discardCotizacionAttempt(centroId, peticionId, cotizacionId) {
   return runAction('discardCotizacionAttempt', async () =>
-    peticionUploadService.discardAttempt(await requireCurrentCentroAccess(centroId), { centroId, peticionId, cotizacionId }))
+    peticionUploadService.discardAttempt(await requireCurrentWriteCentro(centroId), { centroId, peticionId, cotizacionId }))
 }

@@ -32,7 +32,7 @@ export default function LoginPage() {
       localStorage.setItem('aloha_nombre', res.nombre || '')
       localStorage.setItem('aloha_email', res.email)
 
-      if (res.rol === 'admin_general' || res.rol === 'supervisor' || res.rol === 'coordinador') {
+      if (res.rol === 'admin_master' || res.rol === 'admin_general' || res.rol === 'supervisor' || res.rol === 'coordinador') {
         router.push('/dashboard')
       } else {
         router.push('/centro/' + res.centro_id)

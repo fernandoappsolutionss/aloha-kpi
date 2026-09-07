@@ -23,9 +23,17 @@ const SAFE_MESSAGES = new Set([
   'El correo ya está registrado en un usuario visible.',
   'Selecciona un rol permitido.',
   'Selecciona un centro permitido.',
+  'No puedes modificar esta cuenta.',
   'No puedes eliminar esta cuenta.',
   'No puedes eliminar un Administrador General.',
   'No puedes eliminar tu propia cuenta.',
+  'No puedes bloquear esta cuenta.',
+  'No puedes bloquear tu propia cuenta.',
+  'No puedes desbloquear esta cuenta.',
+  'No puedes desbloquear tu propia cuenta.',
+  'El motivo es requerido.',
+  'Selecciona una fecha válida.',
+  'Selecciona una fecha futura.',
   'Usuario no encontrado.',
 ])
 
@@ -65,6 +73,14 @@ export async function updateUsuario(id, input) {
 
 export async function reenviarInvitacion(id) {
   return runAction('resendAccess', async () => service.resendAccess(await sessionRef(), id))
+}
+
+export async function bloquearUsuario(id, input) {
+  return runAction('blockUser', async () => service.blockUser(await sessionRef(), id, input))
+}
+
+export async function desbloquearUsuario(id, input) {
+  return runAction('unblockUser', async () => service.unblockUser(await sessionRef(), id, input))
 }
 
 export async function deleteUsuario(id) {

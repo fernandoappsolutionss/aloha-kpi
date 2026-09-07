@@ -2,7 +2,7 @@
 import { randomBytes } from 'crypto'
 import { parseSalonCapacity } from '../../lib/salon-capacidad.mjs'
 import { sql, withTransaction } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { getCurrentPeriod } from '../../lib/period'
 import { ITINERARIOS, NIVEL_MAX, aperturaMinima, hoyISO, fechaIso10 } from '../../lib/operaciones'
 import { analyze, underMeta, promedios, proximasFusiones } from '../../lib/fusiones'
@@ -267,7 +267,7 @@ export async function loadOperaciones(centroId) {
 }
 
 export async function crearGrupo(centroId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const numero = String(data?.numero || '').trim()
   if (!numero) return { error: 'El número de grupo es requerido.' }
   const itinerario = data?.itinerario || 'TINY'
@@ -336,7 +336,7 @@ export async function crearGrupo(centroId, data) {
 }
 
 export async function actualizarGrupo(centroId, grupoId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
 
@@ -586,7 +586,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
 // si la referencia cambió en otra pestaña, se aborta sin efectos. La plantilla
 // de semanas es la base de franquicia y no se toca aquí.
 export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
 
@@ -774,7 +774,7 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
 // Link del coach: token estable por grupo para la lista de asistencia
 // (/coach/<token>, sin sesión). Se genera la primera vez que se pide.
 export async function linkCoach(centroId, grupoId) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT id, coach_token FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
   let token = g.coach_token
@@ -816,7 +816,7 @@ export async function linkCoach(centroId, grupoId) {
 // cron empuja el estado vigente. COALESCE: en filas pre-migración NULL cuenta
 // como abierta (misma convención `!== false` del cliente).
 export async function setInscripcionAbierta(centroId, grupoId, deseado, esperado) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const r = await sql`
     UPDATE grupos SET inscripcion_abierta = ${!!deseado}, updated_at = ${new Date().toISOString()}
     WHERE id = ${grupoId} AND centro_id = ${centroId} AND estado = 'activo'
@@ -837,7 +837,7 @@ export async function setInscripcionAbierta(centroId, grupoId, deseado, esperado
 // estado actual y delega en el CAS de setInscripcionAbierta — el toggle "a
 // ciegas" que podía revertir un cierre concurrente desaparece.
 export async function toggleInscripcionGrupo(centroId, grupoId) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT id, inscripcion_abierta FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
   const actual = g.inscripcion_abierta !== false
@@ -855,7 +855,7 @@ export async function toggleInscripcionGrupo(centroId, grupoId) {
 // aloha_group aunque el vínculo local ya no exista (reemplaza al
 // desvincularGrupoEnEventos best-effort inline).
 export async function cerrarGrupo(centroId, grupoId) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT id FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
   const now = new Date().toISOString()
@@ -889,7 +889,7 @@ export async function cerrarGrupo(centroId, grupoId) {
 // no puede existir (R1, fail closed). El legacy NULL se trata como iniciado en
 // el resto del código, pero aquí se bloquea la reapertura hasta fijarla.
 export async function reabrirGrupo(centroId, grupoId) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const r = await sql`
     UPDATE grupos SET estado = 'activo', fecha_cierre = NULL, fusionado_en = NULL, updated_at = ${new Date().toISOString()}
     WHERE id = ${grupoId} AND centro_id = ${centroId} AND fecha_inicio_clases IS NOT NULL
@@ -971,7 +971,7 @@ export async function contarGruposActivos(centroId) {
 }
 
 export async function saveCoach(centroId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const nombre = data?.nombre?.trim()
   if (!nombre) return { error: 'El nombre es requerido.' }
   const nivelKids = intOr(data?.nivel_kids)
@@ -994,7 +994,7 @@ export async function saveCoach(centroId, data) {
 }
 
 export async function toggleCoach(centroId, id, activo) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const r = await sql`
     UPDATE coaches SET activo = ${!!activo}, updated_at = ${new Date().toISOString()}
     WHERE id = ${id} AND centro_id = ${centroId} RETURNING id
@@ -1004,7 +1004,7 @@ export async function toggleCoach(centroId, id, activo) {
 }
 
 export async function saveSalon(centroId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const nombre = data?.nombre?.trim()
   if (!nombre) return { error: 'El nombre es requerido.' }
   const capacidad = parseSalonCapacity(data?.capacidad_ninos)
@@ -1029,7 +1029,7 @@ export async function saveSalon(centroId, data) {
 }
 
 export async function toggleSalon(centroId, id, activo) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const r = await sql`
     UPDATE salones SET activo = ${!!activo}
     WHERE id = ${id} AND centro_id = ${centroId} RETURNING id
@@ -1051,7 +1051,7 @@ export async function sugerenciasFusion(centroId) {
 // Mueve niños del grupo origen al destino. Re-ejecuta el análisis del manual
 // server-side: si la fusión está bloqueada, no se aplica aunque la UI la pida.
 export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteIds } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!deGrupoId || !aGrupoId || String(deGrupoId) === String(aGrupoId)) return { error: 'Selecciona un grupo origen y un destino distintos.' }
   if (!Array.isArray(estudianteIds) || !estudianteIds.length) return { error: 'Selecciona al menos un niño para fusionar.' }
 
@@ -1231,7 +1231,7 @@ export async function aplicarFusion(centroId, { deGrupoId, aGrupoId, estudianteI
 // `fecha` null retira la extensión. El CRM se entera por el outbox (la fecha
 // límite viaja en el payload de cupos), nunca con push inline.
 export async function extenderVentanaLlenado(centroId, grupoId, fecha) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const limpia = fecha == null || fecha === ''
   const f = limpia ? null : String(fecha).slice(0, 10)
   if (!limpia) {

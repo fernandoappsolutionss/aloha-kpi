@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import * as currentUser from '../lib/current-user.mjs'
 import {
   loadCurrentUser, assertCentroAccess, assertAdmin, assertPuedeCerrarMes, assertPuedeEliminar,
   esAdminDe, centrosDe, vePanelGerencia,
-  puedeGestionarUsuarios, rolesAsignablesUsuarios, centrosDestinoUsuarios,
+  puedeVerUsuarios, puedeGestionarUsuarios, rolesAsignablesUsuarios, centrosDestinoUsuarios,
   puedeGestionarUsuario, puedeAsignarUsuario, accionesGestionUsuario,
   assertGestionUsuarios,
 } from '../lib/current-user.mjs'
@@ -19,17 +20,107 @@ const otroCoord = { id: 11, rol: 'coordinador', centro_id: null, centros: [10] }
 
 const queryWith = (rows) => async () => rows
 
-test('solo gerencia y coordinador abren Gestión de usuarios', () => {
-  assert.equal(puedeGestionarUsuarios(gerencia), true)
+const master = { id: 1, email: 'fperez@teamsolutionss.com', rol: 'admin_master', centros: [] }
+const general = { id: 4, email: 'general@aloha.invalid', rol: 'admin_general', centros: [] }
+const supervisor = { id: 5, email: 'supervisor@aloha.invalid', rol: 'supervisor', centros: [] }
+
+test('Master es unico por correo y General queda como lectura global sin escritura', () => {
+  assert.equal(typeof currentUser.isMaster, 'function')
+  assert.equal(currentUser.isMaster(master), true)
+  assert.equal(currentUser.isMaster({ ...master, email: 'otro@aloha.invalid' }), false)
+  assert.equal(currentUser.isMaster({ ...master, rol: 'admin_general' }), false)
+
+  for (const actor of [general, supervisor]) {
+    assert.equal(currentUser.esSoloLectura(actor), true)
+    assert.equal(currentUser.canAccessCentro(actor, 99), true)
+    assert.equal(currentUser.puedeLeerCentro(actor, 99), true)
+    assert.equal(currentUser.puedeEscribirCentro(actor, 99), false)
+    assert.throws(() => currentUser.assertWriteCentro(actor, 99), /solo lectura|No autorizado/)
+  }
+
+  assert.equal(currentUser.esSoloLectura(master), false)
+  assert.equal(currentUser.puedeEscribirCentro(master, 99), true)
+  assert.equal(currentUser.puedeVerOficio(master), true)
+  assert.equal(currentUser.puedeVerOficio(general), false)
+  assert.equal(currentUser.puedeVerOficio(coordinador), true)
+})
+
+test('Gestion de usuarios es de Master o coordinador local, nunca de General', () => {
+  assert.equal(puedeVerUsuarios(master), true)
+  assert.equal(puedeVerUsuarios(general), true)
+  assert.equal(puedeVerUsuarios(supervisor), true)
+  assert.equal(puedeGestionarUsuarios(master), true)
+  assert.equal(puedeGestionarUsuarios(general), false)
+  assert.equal(puedeGestionarUsuarios(supervisor), false)
+  assert.equal(puedeGestionarUsuarios(coordinador), true)
+  assert.deepEqual(rolesAsignablesUsuarios(master), ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
+  assert.deepEqual(rolesAsignablesUsuarios(general), [])
+  assert.deepEqual(rolesAsignablesUsuarios(supervisor), [])
+  assert.equal(rolesAsignablesUsuarios(master).includes('admin_master'), false)
+})
+
+test('acciones de usuario protegen al Master y no ofrecen bloqueo a no Master', () => {
+  const target = { id: 20, rol: 'administradora', centro_id: 10, password_hash: 'x' }
+  assert.deepEqual(accionesGestionUsuario(master, target), {
+    editar: true,
+    reenviarInvitacion: false,
+    enviarRestablecimiento: true,
+    eliminar: true,
+    bloquear: true,
+    desbloquear: false,
+  })
+  assert.equal(accionesGestionUsuario(master, master).editar, false)
+  assert.equal(accionesGestionUsuario(master, master).eliminar, false)
+  assert.equal(accionesGestionUsuario(master, master).bloquear, false)
+  assert.equal(accionesGestionUsuario(coordinador, target).bloquear, false)
+})
+
+test('loadCurrentUser revoca una cookie antigua si la fila vigente esta bloqueada', async () => {
+  await assert.rejects(() => loadCurrentUser({ uid: 8 }, queryWith([
+    {
+      id: 8,
+      nombre: 'Ana',
+      email: 'ana@aloha.invalid',
+      rol: 'administradora',
+      centro_id: 10,
+      centros: [],
+      password_hash: 'hash',
+      bloqueado: true,
+      blocked_until: '2026-09-10T05:00:00.000Z',
+    },
+  ])), /No autenticado/)
+
+  const vigente = await loadCurrentUser({ uid: 8 }, queryWith([
+    {
+      id: 8,
+      nombre: 'Ana',
+      email: 'ana@aloha.invalid',
+      rol: 'administradora',
+      centro_id: 10,
+      centros: [],
+      password_hash: 'hash',
+      bloqueado: false,
+      blocked_until: '2026-09-07T05:00:00.000Z',
+    },
+  ]))
+  assert.equal(vigente.blocked_until, '2026-09-07T05:00:00.000Z')
+})
+
+test('Master y coordinador gestionan usuarios; General solo consulta', () => {
+  assert.equal(puedeVerUsuarios(gerencia), true)
+  assert.equal(puedeGestionarUsuarios(gerencia), false)
+  assert.equal(puedeGestionarUsuarios(master), true)
   assert.equal(puedeGestionarUsuarios(coordinador), true)
   assert.equal(puedeGestionarUsuarios({ rol: 'administradora', centro_id: 10 }), false)
   assert.throws(() => assertGestionUsuarios({ rol: 'asistente', centro_id: 10 }), /No autorizado/)
 })
 
 test('roles y centros asignables dependen del actor vigente', () => {
-  assert.deepEqual(rolesAsignablesUsuarios(gerencia), ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
+  assert.deepEqual(rolesAsignablesUsuarios(master), ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
+  assert.deepEqual(rolesAsignablesUsuarios(gerencia), [])
   assert.deepEqual(rolesAsignablesUsuarios(coordinador), ['administradora', 'asistente', 'coach'])
-  assert.deepEqual(centrosDestinoUsuarios(gerencia), null)
+  assert.deepEqual(centrosDestinoUsuarios(master), null)
+  assert.deepEqual(centrosDestinoUsuarios(gerencia), [])
   assert.deepEqual(centrosDestinoUsuarios(coordinador), [10, 12])
   assert.deepEqual(centrosDestinoUsuarios(sinCentros), [])
 })
@@ -50,17 +141,20 @@ test('coordinador solo asigna roles operativos a centros propios', () => {
   assert.equal(puedeAsignarUsuario(coordinador, { rol: 'administradora', centroId: null }), false)
 })
 
-test('acciones distinguen invitación, reset y borrado de gerencia', () => {
+test('acciones distinguen invitación, reset y borrado de Master', () => {
   assert.deepEqual(accionesGestionUsuario(coordinador, asistente12), {
-    editar: true, reenviarInvitacion: true, enviarRestablecimiento: false, eliminar: false,
+    editar: true, reenviarInvitacion: true, enviarRestablecimiento: false, eliminar: false, bloquear: false, desbloquear: false,
   })
   assert.deepEqual(accionesGestionUsuario(coordinador, admin10), {
-    editar: true, reenviarInvitacion: false, enviarRestablecimiento: true, eliminar: false,
+    editar: true, reenviarInvitacion: false, enviarRestablecimiento: true, eliminar: false, bloquear: false, desbloquear: false,
   })
   assert.equal(accionesGestionUsuario(coordinador, { ...admin10, password_hash: undefined, activo: true }).enviarRestablecimiento, true)
-  assert.equal(accionesGestionUsuario(gerencia, { ...admin10, id: 1 }).eliminar, false)
-  assert.equal(accionesGestionUsuario(gerencia, { id: 20, rol: 'admin_general', password_hash: 'x' }).eliminar, false)
-  assert.equal(accionesGestionUsuario(gerencia, { id: 21, rol: 'supervisor', password_hash: 'x' }).eliminar, true)
+  assert.equal(accionesGestionUsuario(master, { ...admin10, id: 1 }).eliminar, false)
+  assert.equal(accionesGestionUsuario(master, { id: 20, rol: 'admin_general', password_hash: 'x' }).eliminar, false)
+  assert.equal(accionesGestionUsuario(master, { id: 21, rol: 'supervisor', password_hash: 'x' }).eliminar, true)
+  assert.deepEqual(accionesGestionUsuario(gerencia, { ...admin10, id: 30 }), {
+    editar: false, reenviarInvitacion: false, enviarRestablecimiento: false, eliminar: false, bloquear: false, desbloquear: false,
+  })
 })
 
 test('relee el usuario por el uid del JWT', async () => {
@@ -106,11 +200,12 @@ test('coordinador sin centros asignados no entra a ninguno', () => {
   assert.throws(() => assertCentroAccess(coord, 10), /No autorizado/)
 })
 
-test('gerencia no tiene límite de centros', () => {
+test('General no tiene limite de lectura de centros, pero no manda', () => {
   const gerencia = { id: 1, rol: 'admin_general', centro_id: null, centros: [] }
   assert.equal(centrosDe(gerencia), null)
   assert.equal(assertCentroAccess(gerencia, 99), gerencia)
-  assert.equal(esAdminDe(gerencia, 99), true)
+  assert.equal(esAdminDe(gerencia, 99), false)
+  assert.throws(() => assertPuedeCerrarMes(gerencia), /no puede cerrar/)
 })
 
 test('asistente opera su centro pero no cierra el mes ni elimina', () => {

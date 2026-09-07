@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import TableScroller from '../../../components/TableScroller'
+import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { matrizProgreso, reiniciarProgreso } from '../../actions/entrenamiento'
 import { listCentros } from '../../actions/centros'
 import { completado } from '../../../lib/entrenamiento/progreso'
@@ -15,8 +16,18 @@ export default function EntrenamientoAdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [recarga, setRecarga] = useState(0)
+  const access = useCurrentAccess()
+  const canView = access.canViewAdminTraining
+  const canReset = access.isMaster
 
   useEffect(() => {
+    if (!access.loaded) return
+    if (!canView) {
+      setLoading(false)
+      setError('No autorizado para ver entrenamiento administrativo.')
+      setData(null)
+      return
+    }
     let active = true
     setLoading(true)
     setError(null)
@@ -29,9 +40,10 @@ export default function EntrenamientoAdminPage() {
       .catch(() => { if (active) { setError('No se pudo cargar el progreso. Recarga la página.'); setData(null) } })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [centroId, recarga])
+  }, [centroId, recarga, access.loaded, canView])
 
   async function reiniciar(u) {
+    if (!canReset) return
     const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando entra una administradora nueva que usa el mismo correo del centro.`)
     if (!ok) return
     const r = await reiniciarProgreso(u.id)
@@ -86,7 +98,7 @@ export default function EntrenamientoAdminPage() {
                     })}
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.pct === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.pct}%</td>
                     <td style={{ textAlign: 'right' }}>
-                      {Object.keys(u.progreso).length > 0 && (
+                      {canReset && Object.keys(u.progreso).length > 0 && (
                         <button type="button" className="btn btn--compact" aria-label={`Reiniciar progreso de ${u.nombre}`} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando entra una administradora nueva con el mismo correo.">
                           Reiniciar
                         </button>

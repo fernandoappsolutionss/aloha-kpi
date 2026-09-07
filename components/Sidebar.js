@@ -9,6 +9,7 @@ import useResumenEntrenamiento from './entrenamiento/useResumenEntrenamiento'
 import ResumenEntrenamiento from './entrenamiento/ResumenEntrenamiento'
 import { rolesQueFirma, tienePlanPropio } from '../lib/entrenamiento/oficio/progreso'
 import { hrefActivo } from './nav-activo.mjs'
+import { resolveAccess } from './access-control.mjs'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -174,18 +175,19 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     }
   }, [])
 
-  const actorRole = context?.actor?.role
-  const isPanel = actorRole === 'admin_general' || actorRole === 'supervisor' || actorRole === 'coordinador'
+  const access = resolveAccess(context || {})
+  const actorRole = access.role
+  const isPanel = access.hasPanel
   const isCenterActor = actorRole === 'administradora' || actorRole === 'asistente'
   // EL COACH NO OPERA EL CENTRO. Su única puerta en el KPI es su entrenamiento
   // (el middleware lo encierra ahí), así que darle el menú del centro sería
   // ofrecerle nueve pantallas que lo van a rebotar. Sin esta rama el menú le
   // salía VACÍO: isCenterActor era false y `items` quedaba en [].
   const esCoach = actorRole === 'coach'
-  const centros = context?.centers || []
-  const esCoordinador = actorRole === 'coordinador'
+  const centros = access.centers
+  const esCoordinador = access.isCoordinator
   const centroDelPlan = centroId || centros[0]?.id || null
-  const tienePlan = tienePlanPropio(actorRole)
+  const tienePlan = !access.isReadonlyGlobal && tienePlanPropio(actorRole)
   const planSinCentro = tienePlan && !centroDelPlan
   // El contexto visual procede de la ruta y del alcance fresco del servidor;
   // no concede permisos ni sustituye las guardas de cada página/acción.
@@ -198,7 +200,9 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   // El pendiente se anuncia en Entrenamiento; la cola vive dentro de esa sección.
   const [firmas, setFirmas] = useState(0)
-  const firmaDrills = rolesQueFirma(actorRole).length > 0
+  const firmaDrills = !access.isReadonlyGlobal && rolesQueFirma(actorRole).length > 0
+  const canViewCentersPage = access.canViewCentersPage || (access.isReadonlyGlobal && Boolean(context?.capabilities?.viewCenters))
+  const canViewUsersPage = access.canViewUsersPage || (access.isReadonlyGlobal && Boolean(context?.capabilities?.viewUsers))
   useEffect(() => {
     let active = true
     setFirmas(0)
@@ -214,19 +218,19 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
     { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
-    ...(context?.capabilities.viewAdminTraining
+    ...(access.canViewAdminTraining
       ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }]
       : tienePlan && centroDelPlan
         ? [{ label: 'Entrenamiento', icon: 'book', href: `/centro/${centroDelPlan}/entrenamiento`, entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null }]
         : []),
     // Gerencia conserva la matriz del equipo. El plan propio de cada puesto
     // se encuentra dentro del Entrenamiento de su centro.
-    ...(context?.capabilities.viewAdminTraining ? [{ label: 'Puestos de la gente', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
+    ...(access.canViewOficio ? [{ label: 'Puestos de la gente', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
   ]
   const configItems = [
-    ...(context?.capabilities.viewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
-    ...(context?.capabilities.viewCenters ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
-    ...(context?.capabilities.viewUsers ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
+    ...(access.canViewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
+    ...(canViewCentersPage ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
+    ...(canViewUsersPage ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]
   const centroItems = [
     { label: 'Resumen', icon: 'grid', href: `/centro/${centroId}`, tour: 'nav.resumen' },
@@ -247,7 +251,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     ? (isCenterContext ? centroItems : adminItems)
     : centroId ? (esCoach ? coachItems : isCenterActor ? centroItems : []) : []
   const roleLabel = isPanel
-    ? (esCoordinador ? 'Coordinador Operativo' : 'Administrador')
+    ? access.isMaster ? 'Master' : access.isReadonlyGlobal ? (actorRole === 'supervisor' ? 'Supervisor lectura' : 'General lectura') : access.roleLabel
     : (centroNombre || 'Centro')
 
   async function logout() {

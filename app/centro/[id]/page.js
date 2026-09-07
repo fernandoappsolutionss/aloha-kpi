@@ -5,7 +5,7 @@ import Link from 'next/link'
 import TableScroller from '../../../components/TableScroller'
 import OperationalCard from '../../../components/OperationalCard'
 import Sidebar from '../../../components/Sidebar'
-import { tienePanel } from '../../../components/useRol'
+import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { getCentroResumen } from '../../actions/centro'
 import { getCentroGrowth } from '../../actions/growth'
 import { getDisciplinaTrimestre } from '../../actions/cumplimiento'
@@ -98,7 +98,6 @@ const sectionTitle = {
 export default function CentroPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
   const [periodReady, setPeriodReady] = useState(false)
   const [error, setError] = useState('')
@@ -116,16 +115,12 @@ export default function CentroPage() {
   const [graduacion, setGraduacion] = useState(null)
   const [growth, setGrowth] = useState(null)
   const [growthFallo, setGrowthFallo] = useState(false)
-  const [rol, setRol] = useState(null)
-  const ent = useResumenEntrenamiento(rol, id)
+  const access = useCurrentAccess()
+  const ent = useResumenEntrenamiento(access.loaded ? access.role : null, id)
 
   useEffect(() => {
     setPeriod(readStoredPeriod())
     setPeriodReady(true)
-    const r = localStorage.getItem('aloha_rol')
-    const admin = tienePanel(r)
-    setIsAdmin(admin)
-    setRol(r)
   }, [])
   const label = periodLabel(period.year, period.quarter)
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
@@ -336,7 +331,7 @@ export default function CentroPage() {
             lo primero que se veía era un banner verde hablando de módulos de
             curso. Con el centro en alerta roja, la siguiente acción no es
             terminar un módulo: se oculta. */}
-        {!isAdmin && (ent?.plataforma || ent?.oficio) && estado.color !== 'rojo' && (
+        {!access.hasPanel && access.canOpenOwnOficio && (ent?.plataforma || ent?.oficio) && estado.color !== 'rojo' && (
           <div className="alert center-summary-actions" style={{ marginBottom: 16, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <ResumenEntrenamiento datos={ent} />
             <Link className="btn btn--primary" href={`/centro/${id}/entrenamiento`}>Ver entrenamiento →</Link>

@@ -25,11 +25,13 @@ export async function requestPasswordReset(email) {
 export async function getTokenInfo(token) {
   if (!token) return { valid: false }
   const [row] = await sql`
-    SELECT t.purpose, t.expires_at, t.used_at, u.nombre, u.email
+    SELECT t.purpose, t.expires_at, t.used_at, u.nombre, u.email,
+           (u.blocked_until IS NOT NULL AND u.blocked_until > CURRENT_TIMESTAMP) AS bloqueado
     FROM password_tokens t JOIN usuarios u ON u.id = t.user_id
     WHERE t.token = ${token}
   `
   if (!row) return { valid: false }
+  if (row.bloqueado) return { valid: false, reason: 'bloqueado' }
   if (row.used_at) return { valid: false, reason: 'usado' }
   if (new Date(row.expires_at) < new Date()) return { valid: false, reason: 'vencido' }
   return { valid: true, nombre: row.nombre, email: row.email, purpose: row.purpose }
@@ -45,7 +47,7 @@ export async function setPassword(token, nueva) {
     await createSession(user)
     return { ok: true, rol: user.rol, centro_id: user.centro_id, nombre: user.nombre, email: user.email }
   } catch (error) {
-    const safe = ['Enlace inválido.', 'Este enlace ya fue usado.', 'Este enlace venció. Pide uno nuevo.']
+    const safe = ['Enlace inválido.', 'Este enlace ya fue usado.', 'Este enlace venció. Pide uno nuevo.', 'Cuenta bloqueada temporalmente.']
     return { error: safe.includes(error?.message) ? error.message : 'No pudimos actualizar la contraseña.' }
   }
 }

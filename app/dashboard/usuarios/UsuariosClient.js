@@ -5,12 +5,30 @@ import Sidebar from '../../../components/Sidebar'
 import OperationalCard from '../../../components/OperationalCard'
 import TableScroller from '../../../components/TableScroller'
 import Dialog from '../../../components/Dialog'
-import { createUsuario, updateUsuario, deleteUsuario, reenviarInvitacion } from '../../actions/usuarios'
+import {
+  bloquearUsuario,
+  createUsuario,
+  deleteUsuario,
+  desbloquearUsuario,
+  reenviarInvitacion,
+  updateUsuario,
+} from '../../actions/usuarios'
 import { presentAccessNotice } from '../../../lib/access-presentation.mjs'
+import {
+  actionAllowed,
+  defaultPanamaDatetimeLocal,
+  formatPanamaDateTime,
+  isProtectedMasterUser,
+  isUserBlocked,
+  panamaDatetimeLocalToIso,
+  resolveAccess,
+  userBlockedUntil,
+} from '../../../components/access-control.mjs'
 
 const ROLES = {
-  admin_general: { label: 'Administrador General', help: 'Todos los centros y la configuración del sistema.' },
-  supervisor: { label: 'Supervisor', help: '' },
+  admin_master: { label: 'Administrador Master', help: 'Cuenta única de Fernando. No se asigna desde esta pantalla.' },
+  admin_general: { label: 'Administrador General', help: 'Consulta global de centros, usuarios y metas. No opera ni gestiona cuentas.' },
+  supervisor: { label: 'Supervisor', help: 'Consulta global heredada. No opera ni gestiona cuentas.' },
   coordinador: { label: 'Coordinador Operativo', help: 'Administra cuentas operativas únicamente dentro de los centros que le asignes.' },
   administradora: { label: 'Administradora', help: 'Opera todo su centro, incluido cerrar y reabrir el mes.' },
   asistente: { label: 'Asistente', help: 'Registra la operación del día, pero no cierra ni reabre el mes ni elimina registros.' },
@@ -18,15 +36,60 @@ const ROLES = {
 }
 const roleLabel = role => ROLES[role]?.label || role
 const UN_CENTRO = ['administradora', 'asistente', 'coach']
-const centerNames = user => user.centerNames.join(' · ') || (['admin_general', 'supervisor'].includes(user.role) ? 'Todos los centros' : 'Sin centro asignado')
+const TODOS_CENTROS = new Set(['admin_master', 'admin_general', 'supervisor'])
+const centerNames = user => (user.centerNames || []).join(' · ') || (TODOS_CENTROS.has(user.role) ? 'Todos los centros' : 'Sin centro asignado')
+const blockReason = user => user.blockReason || user.block_reason || user.bloqueo_motivo || user.blockedReason || user.motivo_bloqueo || ''
 
-function UserActions({ user, disabled, pendingAction, onEdit, onAccess, onDelete }) {
+function RoleCell({ user }) {
+  const readonly = user.role === 'admin_general' || user.role === 'supervisor'
+  return <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+    <span>{roleLabel(user.role)}</span>
+    {readonly && <span className="pill" style={{ fontSize: 12 }}>Solo lectura</span>}
+  </div>
+}
+
+function UserStatus({ user }) {
+  const blocked = isUserBlocked(user)
+  const until = userBlockedUntil(user)
+  const reason = blockReason(user)
+  if (blocked) return <div style={{ display: 'grid', gap: 4 }}>
+    <span className="pill pill--bad" style={{ fontSize: 13 }}><span className="dot" />Bloqueado hasta {formatPanamaDateTime(until)} Panamá</span>
+    {reason && <span className="h-sub" style={{ margin: 0 }}>{reason}</span>}
+  </div>
+  if (until) return <div style={{ display: 'grid', gap: 4 }}>
+    <span className="pill" style={{ fontSize: 13 }}><span className="dot" />Bloqueo vencido</span>
+    <span className="h-sub" style={{ margin: 0 }}>Hasta {formatPanamaDateTime(until)} Panamá</span>
+  </div>
+  return user.active ? 'Cuenta activa' : 'Invitación pendiente'
+}
+
+function actionPlanFor(user, access) {
+  const actions = user.actions || {}
+  const protectedMaster = isProtectedMasterUser(user)
+  const manageable = access.canManageUsers && !protectedMaster
+  const blocked = isUserBlocked(user)
+  return {
+    edit: manageable && actionAllowed(actions, 'edit', 'editar'),
+    resendInvitation: manageable && !blocked && actionAllowed(actions, 'resendInvitation', 'reenviarInvitacion'),
+    sendPasswordReset: manageable && !blocked && actionAllowed(actions, 'sendPasswordReset', 'enviarRestablecimiento'),
+    delete: manageable && actionAllowed(actions, 'delete', 'eliminar'),
+    block: access.canBlockUsers && !protectedMaster && !blocked && (actionAllowed(actions, 'block', 'bloquear', 'blockUser') || access.isMaster),
+    unblock: access.canBlockUsers && !protectedMaster && blocked && (actionAllowed(actions, 'unblock', 'desbloquear', 'unblockUser') || access.isMaster),
+  }
+}
+
+function UserActions({ user, disabled, pendingAction, onEdit, onAccess, onDelete, onBlock, onUnblock }) {
+  const acts = user.effectiveActions || {}
+  const hasActions = acts.edit || acts.resendInvitation || acts.sendPasswordReset || acts.delete || acts.block || acts.unblock
+  if (!hasActions) return <span className="h-sub" style={{ margin: 0 }}>Solo lectura</span>
   return <div className="users-actions">
-    {user.actions.edit && <button type="button" className="btn" disabled={disabled} onClick={() => onEdit(user)}>Editar</button>}
-    {(user.actions.resendInvitation || user.actions.sendPasswordReset) && <button type="button" className="btn" disabled={disabled} onClick={() => onAccess(user)}>
-      {pendingAction === `access:${user.id}` ? 'Enviando…' : user.actions.resendInvitation ? 'Reenviar invitación' : 'Enviar restablecimiento'}
+    {acts.edit && <button type="button" className="btn" disabled={disabled} onClick={() => onEdit(user)}>Editar</button>}
+    {(acts.resendInvitation || acts.sendPasswordReset) && <button type="button" className="btn" disabled={disabled} onClick={() => onAccess(user)}>
+      {pendingAction === `access:${user.id}` ? 'Enviando…' : acts.resendInvitation ? 'Reenviar invitación' : 'Enviar restablecimiento'}
     </button>}
-    {user.actions.delete && <button type="button" className="btn btn--danger" disabled={disabled} onClick={() => onDelete(user)}>Eliminar</button>}
+    {acts.block && <button type="button" className="btn" disabled={disabled} onClick={() => onBlock(user)}>Bloquear temporalmente</button>}
+    {acts.unblock && <button type="button" className="btn" disabled={disabled} onClick={() => onUnblock(user)}>{pendingAction === `unblock:${user.id}` ? 'Desbloqueando…' : 'Desbloquear'}</button>}
+    {acts.delete && <button type="button" className="btn btn--danger" disabled={disabled} onClick={() => onDelete(user)}>Eliminar</button>}
   </div>
 }
 
@@ -63,7 +126,9 @@ function InvitationResult({ result, disabled, onClose }) {
 
 export default function UsuariosClient({ initialData }) {
   const router = useRouter()
-  const EMPTY_FORM = { nombre: '', email: '', rol: initialData.assignableRoles[0] || '', centro_id: initialData.centers[0]?.id || '', centros: [] }
+  const access = resolveAccess({ actor: initialData.actor, centers: initialData.centers, capabilities: initialData.capabilities })
+  const assignableRoles = (initialData.assignableRoles || []).filter((role) => role !== 'admin_master')
+  const EMPTY_FORM = { nombre: '', email: '', rol: assignableRoles[0] || '', centro_id: initialData.centers[0]?.id || '', centros: [] }
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [status, setStatus] = useState('')
@@ -72,10 +137,18 @@ export default function UsuariosClient({ initialData }) {
   const [centerFilter, setCenterFilter] = useState('all')
   const [pendingAction, setPendingAction] = useState(null)
   const [deleting, setDeleting] = useState(null)
+  const [blocking, setBlocking] = useState(null)
+  const [blockForm, setBlockForm] = useState({ until: defaultPanamaDatetimeLocal(), reason: '' })
   const pendingRef = useRef(false)
   const cancelDeleteRef = useRef(null)
-  const noCenters = initialData.actor.role === 'coordinador' && initialData.centers.length === 0
-  const visibleUsers = useMemo(() => centerFilter === 'all' ? initialData.users : initialData.users.filter(user => user.centerIds.includes(Number(centerFilter))), [initialData.users, centerFilter])
+  const cancelBlockRef = useRef(null)
+  const noCenters = access.isCoordinator && initialData.centers.length === 0
+  const scopedUsers = useMemo(() => centerFilter === 'all'
+    ? (initialData.users || [])
+    : initialData.users.filter(user => (user.centerIds || []).includes(Number(centerFilter))),
+    [initialData.users, centerFilter])
+  const visibleUsers = useMemo(() => scopedUsers.map((user) => ({ ...user, effectiveActions: actionPlanFor(user, access) })), [scopedUsers, access.role])
+  const canCreate = access.canCreateUser && !noCenters && assignableRoles.length > 0
 
   async function submitOnce(key, work) {
     if (pendingRef.current) return
@@ -89,17 +162,19 @@ export default function UsuariosClient({ initialData }) {
   function resetEditor() { setEditing(null); setForm(EMPTY_FORM) }
   function closeForm() { setShowForm(false); resetEditor(); setStatus('') }
   function openNewUser() {
-    if (!initialData.capabilities.createUser || noCenters) return
+    if (!canCreate) return
     resetEditor(); setStatus(''); setAccessResult(null); setShowForm(true)
   }
   function editUser(user) {
-    if (!user.actions.edit) return
+    if (!user.effectiveActions.edit) return
     setEditing(user.id)
     setForm({ nombre: user.nombre, email: user.email, rol: user.role, centro_id: user.centerId ?? '', centros: user.centerIds })
     setStatus(''); setAccessResult(null); setShowForm(true)
   }
   async function saveUser(event) {
     event.preventDefault()
+    if (!access.canManageUsers) { setStatus('❌ Tu usuario está en modo consulta.'); return }
+    if (form.rol === 'admin_master') { setStatus('❌ El rol Master no se asigna desde Usuarios.'); return }
     return submitOnce('save', async () => {
       setAccessResult(null)
       const snapshot = { nombre: form.nombre, email: form.email }
@@ -114,7 +189,7 @@ export default function UsuariosClient({ initialData }) {
     })
   }
   async function sendAccess(user) {
-    if (!user.actions.resendInvitation && !user.actions.sendPasswordReset) return
+    if (!user.effectiveActions.resendInvitation && !user.effectiveActions.sendPasswordReset) return
     return submitOnce(`access:${user.id}`, async () => {
       setAccessResult(null)
       const result = await reenviarInvitacion(user.id)
@@ -124,7 +199,7 @@ export default function UsuariosClient({ initialData }) {
     })
   }
   async function removeUser() {
-    if (!deleting?.actions.delete) return
+    if (!deleting?.effectiveActions.delete) return
     const user = deleting
     return submitOnce(`delete:${user.id}`, async () => {
       const result = await deleteUsuario(user.id)
@@ -134,18 +209,56 @@ export default function UsuariosClient({ initialData }) {
       router.refresh()
     })
   }
+  function openBlock(user) {
+    if (!user.effectiveActions.block) return
+    setStatus('')
+    setBlocking(user)
+    setBlockForm({ until: defaultPanamaDatetimeLocal(), reason: '' })
+  }
+  async function blockUser() {
+    if (!blocking?.effectiveActions.block) return
+    const iso = panamaDatetimeLocalToIso(blockForm.until)
+    const reason = blockForm.reason.trim()
+    if (!iso) { setStatus('❌ Indica fecha y hora de Panamá para el bloqueo.'); return }
+    if (new Date(iso).getTime() <= Date.now()) { setStatus('❌ El bloqueo debe vencer en una fecha futura.'); return }
+    if (!reason) { setStatus('❌ Indica el motivo del bloqueo temporal.'); return }
+    const hasta = formatPanamaDateTime(iso)
+    return submitOnce(`block:${blocking.id}`, async () => {
+      const result = await bloquearUsuario(blocking.id, { blockedUntil: iso, until: iso, motivo: reason, reason })
+      if (result?.error) { setStatus(`❌ ${result.error}`); return }
+      setBlocking(null)
+      setStatus(`✅ ${blocking.nombre} bloqueado hasta ${hasta} Panamá.`)
+      router.refresh()
+    })
+  }
+  async function unblockUser(user) {
+    if (!user.effectiveActions.unblock) return
+    const motivo = window.prompt(`Motivo del desbloqueo de ${user.nombre}:`, '')
+    if (motivo === null) return
+    const reason = motivo.trim()
+    if (!reason) { setStatus('❌ El motivo del desbloqueo es requerido.'); return }
+    if (!confirm(`¿Desbloquear a ${user.nombre}?`)) return
+    return submitOnce(`unblock:${user.id}`, async () => {
+      const result = await desbloquearUsuario(user.id, { motivo: reason, reason })
+      if (result?.error) { setStatus(`❌ ${result.error}`); return }
+      setStatus(`✅ ${user.nombre} desbloqueado.`)
+      router.refresh()
+    })
+  }
+
   const disabled = Boolean(pendingAction)
   const isError = status.startsWith('❌')
   const notice = status && <div className={`alert${isError ? ' alert--error' : ''}`} role={isError ? 'alert' : 'status'}>{status.replace(/^[❌✅]\s*/, '')}</div>
-  const actions = user => <UserActions user={user} disabled={disabled} pendingAction={pendingAction} onEdit={editUser} onAccess={sendAccess} onDelete={user => { setStatus(''); setDeleting(user) }} />
+  const actions = user => <UserActions user={user} disabled={disabled} pendingAction={pendingAction} onEdit={editUser} onAccess={sendAccess} onBlock={openBlock} onUnblock={unblockUser} onDelete={user => { setStatus(''); setDeleting(user) }} />
 
   return <div className="shell">
     <Sidebar />
     <main id="main-content" className="main users-page" data-page-state="ready">
       <div className="main__head page-actions">
-        <div><div className="label">Configuración · Usuarios</div><h1 className="h-title">{initialData.title}</h1><p className="h-sub">{visibleUsers.length} cuentas</p></div>
-        <button type="button" className="btn btn--primary" disabled={disabled || !initialData.capabilities.createUser || noCenters} onClick={openNewUser}>Crear usuario</button>
+        <div><div className="label">Configuración · Usuarios</div><h1 className="h-title">{initialData.title}</h1><p className="h-sub">{visibleUsers.length} cuentas{access.isReadonlyGlobal ? ' · Solo lectura' : ''}</p></div>
+        {canCreate && <button type="button" className="btn btn--primary" disabled={disabled} onClick={openNewUser}>Crear usuario</button>}
       </div>
+      {access.isReadonlyGlobal && <div className="alert" role="status">Administrador General · Solo lectura: puedes consultar cuentas y centros, sin crear, editar, restablecer, eliminar, bloquear ni desbloquear usuarios.</div>}
       {noCenters && <div className="alert" role="alert">No tienes centros asignados. Contacta a gerencia para poder crear y gestionar usuarios.</div>}
       {initialData.centers.length > 1 && <div className="field users-filter">
         <label className="label" htmlFor="usuarios-center-filter">Centro</label>
@@ -154,13 +267,13 @@ export default function UsuariosClient({ initialData }) {
           {initialData.centers.map(center => <option key={center.id} value={center.id}>{center.nombre}</option>)}
         </select>
       </div>}
-      {!deleting && notice}
+      {!deleting && !blocking && notice}
       {accessResult?.kind === 'invitation' && <InvitationResult result={accessResult} disabled={disabled} onClose={() => setAccessResult(null)} />}
       {accessResult?.kind === 'reset' && <div className="alert users-notice__header">
         <div role="status" aria-live="polite">{accessResult.emailSent ? 'Enviamos el restablecimiento al correo registrado.' : 'No pudimos enviar el correo. Contacta a gerencia.'}</div>
         <button type="button" className="btn users-notice__close" aria-label="Cerrar resultado" disabled={disabled} onClick={() => setAccessResult(null)}>×</button>
       </div>}
-      {showForm && !noCenters && <section className="card users-editor">
+      {showForm && canCreate && !noCenters && <section className="card users-editor">
         <h2 className="panel__title">{editing ? 'Editar usuario' : 'Crear nuevo usuario'}</h2>
         {!editing && <p>Se generará un enlace para que el usuario cree su propia contraseña.</p>}
         <form aria-label="Editor de usuario" onSubmit={saveUser}>
@@ -173,13 +286,13 @@ export default function UsuariosClient({ initialData }) {
             </div>
             <div className="field"><label className="label" htmlFor="users-role">Rol</label>
               <select id="users-role" name="rol" required className="input" value={form.rol} onChange={event => setForm({ ...form, rol: event.target.value, centro_id: initialData.centers.length === 1 ? initialData.centers[0].id : form.centro_id, centros: [] })} disabled={disabled}>
-                {initialData.assignableRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}
+                {assignableRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}
               </select>
               <p className="h-sub">{ROLES[form.rol]?.help}</p>
             </div>
             {UN_CENTRO.includes(form.rol) && <div className="field"><label className="label" htmlFor="users-center">Centro</label>
-              <select id="users-center" name="centro_id" required={initialData.actor.role === 'coordinador'} className="input" value={form.centro_id} onChange={event => setForm({ ...form, centro_id: event.target.value })} disabled={disabled}>
-                {initialData.actor.role !== 'coordinador' && <option value="">Sin asignar</option>}
+              <select id="users-center" name="centro_id" required={access.isCoordinator} className="input" value={form.centro_id} onChange={event => setForm({ ...form, centro_id: event.target.value })} disabled={disabled}>
+                {!access.isCoordinator && <option value="">Sin asignar</option>}
                 {initialData.centers.map(center => <option key={center.id} value={center.id}>{center.nombre}</option>)}
               </select>
             </div>}
@@ -201,22 +314,37 @@ export default function UsuariosClient({ initialData }) {
       </section>}
       <div className="panel desktop-only">
         <TableScroller label="Usuarios y acciones por cuenta"><table className="table users-table">
-          <caption className="sr-only">Usuarios autorizados y acciones disponibles</caption>
+          <caption className="sr-only">Usuarios autorizados y acciones por cuenta</caption>
           <thead><tr>{['Nombre', 'Correo', 'Rol', 'Centro', 'Estado', 'Acciones'].map(heading => <th scope="col" key={heading}>{heading}</th>)}</tr></thead>
           <tbody>{visibleUsers.map(user => <tr key={user.id} data-user-email={user.email}>
-            <td>{user.nombre}</td><td className="users-email">{user.email}</td><td>{roleLabel(user.role)}</td><td>{centerNames(user)}</td><td>{user.active ? 'Cuenta activa' : 'Invitación pendiente'}</td><td>{actions(user)}</td>
+            <td>{user.nombre}</td><td className="users-email">{user.email}</td><td><RoleCell user={user} /></td><td>{centerNames(user)}</td><td><UserStatus user={user} /></td><td>{actions(user)}</td>
           </tr>)}{visibleUsers.length === 0 && <tr><td colSpan={6}>No hay usuarios.</td></tr>}</tbody>
         </table></TableScroller>
       </div>
       <div className="users-cards mobile-only operational-list">
         {visibleUsers.map(user => <div key={user.id} data-user-email={user.email}><OperationalCard headingLevel={2} title={user.nombre}
-          fields={[{ label: 'Correo', value: user.email }, { label: 'Rol', value: roleLabel(user.role) }, { label: 'Centro', value: centerNames(user) }, { label: 'Estado', value: user.active ? 'Cuenta activa' : 'Invitación pendiente' }]}
+          fields={[{ label: 'Correo', value: user.email }, { label: 'Rol', value: <RoleCell user={user} /> }, { label: 'Centro', value: centerNames(user) }, { label: 'Estado', value: <UserStatus user={user} /> }]}
           actions={actions(user)} /></div>)}
         {visibleUsers.length === 0 && <p>No hay usuarios.</p>}
       </div>
       <Dialog open={Boolean(deleting)} title="Eliminar usuario" description={`¿Eliminar a ${deleting?.nombre || 'este usuario'}? Esta acción no se puede deshacer.`} initialFocusRef={cancelDeleteRef} closeDisabled={disabled} onClose={() => setDeleting(null)}
         footer={<><button type="button" className="btn" ref={cancelDeleteRef} disabled={disabled} onClick={() => setDeleting(null)}>Cancelar</button><button type="button" className="btn btn--danger" disabled={disabled} onClick={removeUser}>{disabled ? 'Eliminando…' : 'Confirmar eliminación'}</button></>}>
         {deleting && notice}
+      </Dialog>
+      <Dialog open={Boolean(blocking)} title="Bloqueo temporal" description={`Bloquear temporalmente a ${blocking?.nombre || 'este usuario'}. No hay autobloqueo: debe tener fecha futura y motivo.`} initialFocusRef={cancelBlockRef} closeDisabled={disabled} onClose={() => setBlocking(null)}
+        footer={<><button type="button" className="btn" ref={cancelBlockRef} disabled={disabled} onClick={() => setBlocking(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={disabled} onClick={blockUser}>{pendingAction?.startsWith('block:') ? 'Bloqueando…' : 'Confirmar bloqueo'}</button></>}>
+        {blocking && <div className="dialog-form-grid">
+          {notice}
+          <div className="field" style={{ gridColumn: '1 / -1', margin: 0 }}>
+            <label className="label" htmlFor="users-block-until">Bloquear hasta fecha/hora Panamá</label>
+            <input id="users-block-until" name="blockedUntil" type="datetime-local" className="input" value={blockForm.until} onChange={event => setBlockForm({ ...blockForm, until: event.target.value })} disabled={disabled} />
+            <p className="h-sub" style={{ margin: '6px 0 0' }}>La hora corresponde a Panamá. El acceso se reactivará automáticamente al vencer el bloqueo.</p>
+          </div>
+          <div className="field" style={{ gridColumn: '1 / -1', margin: 0 }}>
+            <label className="label" htmlFor="users-block-reason">Motivo</label>
+            <textarea id="users-block-reason" name="blockReason" className="input" rows={3} required value={blockForm.reason} onChange={event => setBlockForm({ ...blockForm, reason: event.target.value })} disabled={disabled} placeholder="Ej: pausa administrativa hasta verificar acceso." />
+          </div>
+        </div>}
       </Dialog>
     </main>
   </div>

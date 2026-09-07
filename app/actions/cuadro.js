@@ -1,6 +1,6 @@
 'use server'
 import { sql, upsertWith, withTransaction } from '../../lib/db'
-import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar, requireCurrentWriteCentro } from '../../lib/auth'
 import { ITINERARIOS, PRODUCTOS_MATERIAL } from '../../lib/operaciones'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { calcularCuadro, leerSnapshotCuadro } from '../../lib/cuadro-snapshot'
@@ -51,7 +51,7 @@ export async function loadCuadro(centroId, year, month) {
 
 // Crea o actualiza un pedido de material del mes (id opcional = update).
 export async function savePedido(centroId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const y = intOr(data?.year)
   const m = intOr(data?.month)
   if (!mesValido(y, m)) return { error: 'Mes inválido.' }
@@ -110,7 +110,7 @@ export async function deletePedido(centroId, id) {
 // motivos de deserción. No toca kpi_semanas ni los campos de clase de
 // prueba, y respeta el candado del mes cerrado.
 export async function sincronizarConKpi(centroId, year, month) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const y = intOr(year)
   const m = intOr(month)
   if (!mesValido(y, m)) return { error: 'Mes inválido.' }

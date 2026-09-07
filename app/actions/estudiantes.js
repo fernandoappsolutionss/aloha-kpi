@@ -1,6 +1,7 @@
 'use server'
 import { sql, withTransaction } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
+import { isMaster } from '../../lib/current-user.mjs'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, esOrigenVenta, hoyISO, fechaIso10, requiereOrigenVenta } from '../../lib/operaciones'
 import { ventanaNuevos } from '../../lib/llenado.mjs'
 import { colocacionInvalida } from '../../lib/colocacion.mjs'
@@ -122,7 +123,7 @@ function posicionEn(lado, ancla, nivel, hoy, memo) {
 // SIN evento de venta y SIN ancla; ambos nacen en la PRIMERA COLOCACIÓN
 // (actualizarEstudiante, tratada como niño nuevo).
 export async function inscribirEstudiante(centroId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const nombre = data?.nombre?.trim()
   if (!nombre) return { error: 'El nombre es requerido.' }
   const itinerario = data?.itinerario || 'TINY'
@@ -245,7 +246,7 @@ export async function inscribirEstudiante(centroId, data) {
 // ultimaAsistencia SALIÓ del contrato público (g1-23): se deriva server-side
 // de las asistencias y este endpoint la ignora aunque el payload la traiga.
 export async function actualizarEstudiante(centroId, id, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
   if (!est) return { error: 'El estudiante no pertenece a este centro.' }
 
@@ -559,7 +560,7 @@ export async function actualizarEstudiante(centroId, id, data) {
 // en KIDS nivel 5, progresión aprobada sin permiso corporativo). Transaccional:
 // ficha + ancla + evento con el cierre del nivel que termina en detalle.
 export async function graduarTiny(centroId, id) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
   const now = new Date().toISOString()
@@ -734,7 +735,7 @@ async function fijarAnclasDeNivel(centroId, ids, { fecha, origen } = {}) {
 // admin (lib/ancla-sugerencias.mjs); queda en el detalle del evento para saber
 // después POR QUÉ esa fecha. Devuelve el plan derivado recalculado.
 export async function fijarInicioNivel(centroId, estudianteId, { fecha, origen } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const r = await fijarAnclasDeNivel(centroId, [estudianteId], { fecha, origen })
   if (r.error) return r
   const [n] = r.ninos
@@ -746,7 +747,7 @@ export async function fijarInicioNivel(centroId, estudianteId, { fecha, origen }
 // tirón — MISMA validación, UNA sola transacción: o entran todos o no entra
 // ninguno.
 export async function fijarInicioNivelLote(centroId, { estudianteIds, fecha, origen } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   return await fijarAnclasDeNivel(centroId, estudianteIds, { fecha, origen })
 }
 
@@ -834,7 +835,7 @@ export async function sugerenciasAnclaNinos(centroId, estudianteIds) {
 // opcional y queda en el evento para el seguimiento. Alerta MANUAL: no
 // programa nada — el retiro con fecha va por programarRetiro (R5).
 export async function marcarBajaPotencial(centroId, id, { motivo } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [est] = await sql`SELECT id, estado FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
   if (!est) return { error: 'El estudiante no pertenece a este centro.' }
   if (est.estado !== 'activo') return { error: 'El estudiante no está activo.' }
@@ -855,7 +856,7 @@ export async function marcarBajaPotencial(centroId, id, { motivo } = {}) {
 // (que restaura estado Y limpia la fecha — si solo se moviera el estado, el
 // CHECK de coherencia lo rechazaría y el cron lo retiraría igual).
 export async function revertirBajaPotencial(centroId, id) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const [est] = await sql`SELECT id, estado, retiro_programado_para FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
   if (!est) return { error: 'El estudiante no pertenece a este centro.' }
   if (est.estado !== 'baja_potencial') return { error: 'El estudiante no está en baja potencial.' }
@@ -874,7 +875,7 @@ export async function revertirBajaPotencial(centroId, id) {
 // evidencia que quedan en el detalle del evento junto al actor.
 // ultimaAsistencia salió del contrato público: se deriva de las asistencias.
 export async function retirarEstudiante(centroId, id, { motivo, fecha, override } = {}) {
-  const sesion = await requireCentroAccess(centroId)
+  const sesion = await requireCurrentWriteCentro(centroId)
   if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'Motivo de retiro inválido.' }
   const hoy = hoyISO()
   const fechaRetiro = fecha || hoy
@@ -892,8 +893,8 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, override 
   const { year, month } = ym(fechaRetiro)
   let overrideDetalle = null
   if (override) {
-    if (sesion.rol !== 'admin_general') {
-      return { error: 'Solo un admin general puede forzar el retiro de un niño con asistencia en el mes.' }
+    if (!isMaster(sesion)) {
+      return { error: 'Solo el Master puede forzar el retiro de un niño con asistencia en el mes.' }
     }
     const motivoOv = String(override.motivo || '').trim()
     const evidencia = String(override.evidencia || '').trim()
@@ -930,7 +931,7 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, override 
     if (asistio?.ultima && !overrideDetalle) {
       const u = ym(fechaIso10(asistio.ultima))
       return {
-        error: `El niño vio clases en ${String(u.month).padStart(2, '0')}/${u.year} (hay asistencia presente registrada). Norma del cuadro: termina su mes — usa "Retirar el próximo mes" para programar el retiro al día 1. Solo un admin general puede forzarlo ya, con motivo y evidencia.`,
+        error: `El niño vio clases en ${String(u.month).padStart(2, '0')}/${u.year} (hay asistencia presente registrada). Norma del cuadro: termina su mes — usa "Retirar el próximo mes" para programar el retiro al día 1. Solo el Master puede forzarlo ya, con motivo y evidencia.`,
         requiereProgramacion: true,
       }
     }
@@ -972,7 +973,7 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, override 
 // BLOQUEA el mes objetivo (g2-4: cerrarMes reconcilia contra esta fila) y
 // encola CRM. El motivo es OBLIGATORIO: sin motivo no hay deserción medible.
 export async function programarRetiro(centroId, id, { motivo } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'El motivo del retiro es obligatorio para programarlo.' }
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
@@ -1016,7 +1017,7 @@ export async function programarRetiro(centroId, id, { motivo } = {}) {
 // CHECK de coherencia la exige en el MISMO statement); escribe el evento de
 // cancelación (clave de outbox distinta a la de programación) y encola CRM.
 export async function cancelarRetiroProgramado(centroId, id) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
   const now = new Date().toISOString()
@@ -1067,7 +1068,7 @@ export async function cancelarRetiroProgramado(centroId, id) {
 // hecho histórico — el plan derivado en el grupo nuevo sale de esa ancla (y si
 // no da, queda sin_plan explícito; nada se inventa).
 export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!grupoId) return { error: 'Selecciona el grupo donde se reincorpora.' }
 
   const now = new Date().toISOString()

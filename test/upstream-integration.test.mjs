@@ -4,7 +4,14 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { centrosDe, esGerencia, puedeGestionarUsuarios } from '../lib/current-user.mjs'
+import {
+  centrosDe,
+  esGerencia,
+  esSoloLectura,
+  isMaster,
+  puedeGestionarUsuarios,
+  puedeVerUsuarios,
+} from '../lib/current-user.mjs'
 
 // Run the real action/layout, replacing only server I/O boundaries.
 function serverModule(path, dependencies, exports) {
@@ -15,12 +22,12 @@ function serverModule(path, dependencies, exports) {
   return vm.runInNewContext(`${source}\n;({ ${exports.join(',')} })`, { process, ...dependencies })
 }
 
-test('navigation grants Zoho only to current management, never stale role or panel capability', async () => {
-  for (const [rol, expected] of [['admin_general', true], ['supervisor', true], ['coordinador', false], ['administradora', false], ['asistente', false]]) {
+test('navigation grants Zoho only to current Master, never stale role or panel capability', async () => {
+  for (const [rol, expected] of [['admin_master', true], ['admin_general', false], ['supervisor', false], ['coordinador', false], ['administradora', false], ['asistente', false]]) {
     const { getNavigationContext } = serverModule('../app/actions/navigation.js', {
-      requireCurrentUser: async () => ({ id: 7, rol, centros: [10], centro_id: 10 }),
+      requireCurrentUser: async () => ({ id: 7, rol, email: rol === 'admin_master' ? 'fperez@teamsolutionss.com' : `${rol}@example.invalid`, centros: [10], centro_id: 10 }),
       sql: async () => [{ id: 10, nombre: 'Centro local' }],
-      centrosDe, esGerencia, puedeGestionarUsuarios,
+      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios,
     }, ['getNavigationContext'])
     const context = await getNavigationContext()
     assert.equal(context.capabilities.viewZoho, expected, rol)
@@ -31,8 +38,7 @@ test('navigation grants Zoho only to current management, never stale role or pan
 test('Zoho state denies a stale admin cookie before reading connection metadata', async () => {
   let reads = 0
   const { getZohoEstado } = serverModule('../app/actions/zoho.js', {
-    requireAdmin: async () => ({ rol: 'admin_general' }),
-    requireCurrentAdmin: async () => { throw new Error('No autorizado') },
+    requireCurrentMaster: async () => { throw new Error('No autorizado') },
     zohoConexionInfo: async () => { reads++; return { email: 'private@example.invalid' } },
     EMAIL_ZOHO_AUTORIZADO: 'allowed@example.invalid',
   }, ['getZohoEstado'])

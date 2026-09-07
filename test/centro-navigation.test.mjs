@@ -25,10 +25,16 @@ test('cada puesto sigue encontrando su plan dentro de Entrenamiento', () => {
     assert.ok(links.some(({ label, href }) => label === 'Mi plan de puesto' && href === '/centro/2/entrenamiento/oficio'), rol)
     assert.equal(links.some(({ label }) => label === 'Firmas de maniobra'), ['administradora', 'coordinador'].includes(rol), rol)
   }
+  const masterLinks = seccionesCentro(2, 'entrenamiento', 'admin_master')
+  assert.ok(masterLinks.some(({ label }) => label === 'Planes de puestos'))
+  assert.ok(masterLinks.some(({ label }) => label === 'Firmas de maniobra'))
+  assert.equal(masterLinks.some(({ label }) => label === 'Mi plan de puesto'), false)
+
   for (const rol of ['admin_general', 'supervisor']) {
     const links = seccionesCentro(2, 'entrenamiento', rol)
-    assert.ok(links.some(({ label }) => label === 'Planes de puestos'))
-    assert.ok(links.some(({ label }) => label === 'Firmas de maniobra'))
+    assert.deepEqual(links.map(({ label }) => label), ['Entrenamiento'])
+    assert.equal(links.some(({ label }) => label === 'Planes de puestos'), false)
+    assert.equal(links.some(({ label }) => label === 'Firmas de maniobra'), false)
     assert.equal(links.some(({ label }) => label === 'Mi plan de puesto'), false)
   }
   assert.deepEqual(seccionesCentro(2, 'entrenamiento', null), [])
