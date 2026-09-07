@@ -27,6 +27,7 @@ const SAFE_MESSAGES = new Set([
   'Ese coach no está en el centro seleccionado.',
   'Ese coach está desactivado.',
   'Ese coach ya tiene cuenta.',
+  'Ese coach ya está en la lista del centro: escógelo del desplegable.',
   'No puedes eliminar esta cuenta.',
   'No puedes eliminar un Administrador General.',
   'No puedes eliminar tu propia cuenta.',
