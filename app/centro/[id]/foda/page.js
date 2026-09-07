@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
+import CentroNavigation from '../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../actions/centros'
 import { loadFoda, saveFoda } from '../../../actions/foda'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../../lib/period'
@@ -186,6 +187,7 @@ export default function FodaPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id} />
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main reports-page">
+        <CentroNavigation centroId={params.id} />
 
         {/* Header */}
         <div className="main__head">

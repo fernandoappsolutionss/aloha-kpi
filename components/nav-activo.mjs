@@ -22,6 +22,9 @@
 // Cubrir es por SEGMENTO de ruta, no por texto: /centro/21 no lo cubre
 // /centro/2, aunque la cadena empiece igual.
 
+import { esRutaHistorial, HISTORIAL_HREF } from './historial-navigation.mjs'
+import { hrefKpiMensual } from './centro-navigation.mjs'
+
 const cubre = (href, path) => path === href || path.startsWith(`${href}/`)
 
 /**
@@ -32,6 +35,11 @@ const cubre = (href, path) => path === href || path.startsWith(`${href}/`)
  */
 export function hrefActivo(path, hrefs) {
   if (typeof path !== 'string' || !path) return null
+  // Metas, Alertas y Reportes conservan sus enlaces y se agrupan en Historial.
+  // La agrupación solo rige si ese acceso existe en este menú (no en centros).
+  if (hrefs?.includes(HISTORIAL_HREF) && esRutaHistorial(path)) return HISTORIAL_HREF
+  const kpi = hrefKpiMensual(path)
+  if (kpi && hrefs?.includes(kpi)) return kpi
   let activo = null
   for (const href of hrefs || []) {
     if (typeof href !== 'string' || !href.startsWith('/')) continue

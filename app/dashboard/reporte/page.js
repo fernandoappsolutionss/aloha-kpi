@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import HistorialNavigation from '../../../components/HistorialNavigation'
 import PeriodSelector from '../../../components/PeriodSelector'
 import TableScroller from '../../../components/TableScroller'
 import OperationalCard from '../../../components/OperationalCard'
@@ -47,6 +48,7 @@ export default function ReportePage() {
     <div className="shell">
       <Sidebar rol="admin_general"/>
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
+        <HistorialNavigation />
 
         {/* Header */}
         <div className="main__head">

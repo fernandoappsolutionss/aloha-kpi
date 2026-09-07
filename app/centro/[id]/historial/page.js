@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
+import CentroNavigation from '../../../../components/CentroNavigation'
 import Link from 'next/link'
 import TableScroller from '../../../../components/TableScroller'
 import MeasuredChart from '../../../../components/MeasuredChart'
@@ -234,7 +235,10 @@ export default function HistorialPage() {
   if (loading) return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
-      <main id="main-content" data-page-state="loading" className="main reports-page"><div className="empty" role="status">Cargando historial…</div></main>
+      <main id="main-content" data-page-state="loading" className="main reports-page">
+        <CentroNavigation centroId={id} />
+        <div className="empty" role="status">Cargando historial…</div>
+      </main>
     </div>
   )
 
@@ -320,6 +324,7 @@ export default function HistorialPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id}/>
       <main id="main-content" data-page-state={error ? 'error' : 'ready'} className="main reports-page">
+        <CentroNavigation centroId={id} />
         {error && <div role="alert">{error}<button type="button" className="btn" onClick={loadHistorial}>Reintentar</button></div>}
 
         {/* Header */}
@@ -337,7 +342,7 @@ export default function HistorialPage() {
         {meses.length === 0 ? (
           <div className="card" style={{ padding: 48, textAlign: 'center' }}>
             <p style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 8, fontFamily: 'var(--font-serif)' }}>Sin historial aún</p>
-            <p className="h-sub" style={{ marginTop: 0 }}>Ingresa datos en el KPI Semanal y guarda para ver tendencias aquí.</p>
+            <p className="h-sub" style={{ marginTop: 0 }}>Ingresa datos en el KPI Mensual y guarda para ver tendencias aquí.</p>
           </div>
         ) : (
           <>
@@ -614,7 +619,7 @@ export default function HistorialPage() {
               const conCuadro = visibleMeses.filter(m => m.cuadro && !m.cuadro.vivo)
               if (conCuadro.length === 0) return (
                 <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
-                  Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Semanal, su Cuadro de Negocio queda congelado y aparece aquí como historial.
+                  Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Mensual, su Cuadro de Negocio queda congelado y aparece aquí como historial.
                 </div>
               )
               return (
@@ -681,7 +686,7 @@ export default function HistorialPage() {
 
             {chartData.length === 0 && (
               <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
-                Los meses tienen datos de configuración pero aún no hay suficiente información para graficar. Ingresa los datos en el KPI Semanal y guarda.
+                Los meses tienen datos de configuración pero aún no hay suficiente información para graficar. Ingresa los datos en el KPI Mensual y guarda.
               </div>
             )}
 

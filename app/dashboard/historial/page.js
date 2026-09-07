@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Sidebar from '../../../components/Sidebar'
+import HistorialNavigation from '../../../components/HistorialNavigation'
 import { getHistorialAdmin } from '../../actions/dashboard'
 import { listCentros } from '../../actions/centros'
 
@@ -32,6 +33,7 @@ export default function HistorialAdminPage() {
     <div className="shell">
       <Sidebar rol="admin_general"/>
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main comparisons-page history-page">
+        <HistorialNavigation />
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Registro histórico</div>

@@ -6,6 +6,7 @@
 // navegador solo baja lo que se pinta.
 import Link from 'next/link'
 import Sidebar from '../../../../../components/Sidebar'
+import CentroNavigation from '../../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarOficio } from '../../../../actions/entrenamiento-oficio'
 import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../lib/entrenamiento/oficio/catalogo'
@@ -43,7 +44,10 @@ export default async function OficioPage({ params, searchParams }) {
           a #main-content y sin esto caía al vacío justo en las pantallas del
           oficio (WCAG 2.4.1), y sin data-page-state la ruta no puede entrar al
           barrido R10. */}
-      <main className="main ent-page" id="main-content" data-page-state={estado}>{contenido}</main>
+      <main className="main ent-page" id="main-content" data-page-state={estado}>
+        <CentroNavigation centroId={id} section="entrenamiento" />
+        {contenido}
+      </main>
     </div>
   )
 

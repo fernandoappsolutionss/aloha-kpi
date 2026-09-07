@@ -306,7 +306,7 @@ test('el plan de cada rol es el suyo: la asistente no ve el curso del Centro ni 
 // pregunta por tienePlanPropio(), que sale de OFICIAL_DE. Esto amarra esa lista
 // contra los `roles` del catálogo: si entra un quinto puesto, no puede quedarse
 // sin puerta sin que CI lo diga.
-test('todo puesto con plan propio tiene puerta en el menú', () => {
+test('todo puesto con plan propio tiene acceso a Entrenamiento desde el menú', () => {
   assert.deepEqual(
     ROLES_CON_PLAN.slice().sort(), ROLES.slice().sort(),
     'ROLES_CON_PLAN (lo que el menú sabe) y los roles del catálogo se desincronizaron: hay un puesto con plan y sin puerta, o una puerta a un plan que no existe',
@@ -321,7 +321,7 @@ test('todo puesto con plan propio tiene puerta en el menú', () => {
   // Y el menú tiene que seguir preguntándolo, no listar puestos a mano.
   const sidebar = readFileSync(join(ROOT, 'components/Sidebar.js'), 'utf8')
   assert.match(sidebar, /tienePlanPropio\(actorRole\)/, 'el menú decide la puerta con tienePlanPropio, no con una lista de roles escrita ahí')
-  assert.match(sidebar, /entrenamiento\/oficio`/, 'el menú no enlaza a ningún plan de puesto')
+  assert.match(sidebar, /href: `\/centro\/\$\{centroDelPlan\}\/entrenamiento`/, 'el coordinador necesita la entrada a Entrenamiento para llegar a su plan')
 })
 
 // ── 8. el método EN LOS DATOS ───────────────────────────────────────────────────

@@ -7,6 +7,7 @@
 // sobre el dinámico [modulo], así que la página de los tours no se toca.
 import Link from 'next/link'
 import Sidebar from '../../../../../components/Sidebar'
+import CentroNavigation from '../../../../../components/CentroNavigation'
 import PanelDrill from '../../../../../components/entrenamiento/PanelDrill'
 import { getCentroNombre } from '../../../../actions/centros'
 import { colaFirmas } from '../../../../actions/entrenamiento-oficio'
@@ -29,6 +30,7 @@ export default async function FirmasPage({ params }) {
       {/* id + data-page-state: el "Saltar al contenido" del layout apunta a
           #main-content, y sin el estado la ruta no entra al barrido R10. */}
       <main className="main ent-page" id="main-content" data-page-state={estado}>
+        <CentroNavigation centroId={id} section="entrenamiento" />
         <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
         {contenido}
       </main>

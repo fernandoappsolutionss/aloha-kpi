@@ -115,7 +115,7 @@ export async function sincronizarConKpi(centroId, year, month) {
   const m = intOr(month)
   if (!mesValido(y, m)) return { error: 'Mes inválido.' }
   if (!usaIniciosClaseOperativos(y, m)) {
-    return { error: 'Los meses anteriores a agosto de 2026 conservan su captura histórica. Corrígelos desde KPI Semanal.' }
+    return { error: 'Los meses anteriores a agosto de 2026 conservan su captura histórica. Corrígelos desde KPI Mensual.' }
   }
 
   return await withTransaction(async (query) => {

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
+import CentroNavigation from '../../../../components/CentroNavigation'
 import { loadCumplimiento, saveCumplimiento, getDisciplinaTrimestre, getMetasMarcadas } from '../../../actions/cumplimiento'
 import { getCentroNombre } from '../../../actions/centros'
 import { getCentroResumen } from '../../../actions/centro'
@@ -224,6 +225,7 @@ export default function CumplimientoPage() {
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={nombre} centroId={params.id}/>
       <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main reports-page">
+        <CentroNavigation centroId={params.id} />
         <div className="main__head">
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Checklist operativo · {label}</div>

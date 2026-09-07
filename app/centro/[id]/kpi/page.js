@@ -5,6 +5,7 @@ import OperationalCard from '../../../../components/OperationalCard'
 import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
+import CentroNavigation from '../../../../components/CentroNavigation'
 import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
 import { contarGruposActivos } from '../../../actions/grupos'
 import { ajusteHistoricoKpi, finalVisibleKpi, inicioVisibleKpi } from '../../../../lib/inicios-clase.mjs'
@@ -263,13 +264,19 @@ export default function KPIPage() {
   if (loading) return (
     <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
-      <main id="main-content" data-page-state="loading" className="main kpi-page"><div className="empty" role="status" aria-live="polite">Cargando KPI…</div></main>
+      <main id="main-content" data-page-state="loading" className="main kpi-page">
+        <CentroNavigation centroId={id} />
+        <div className="empty" role="status" aria-live="polite">Cargando KPI…</div>
+      </main>
     </div>
   )
 
   if (loadError) return <div className="shell center-core-shell">
     <Sidebar rol="usuario" centroNombre={centroNombre || 'Centro'} centroId={id} />
-    <main id="main-content" data-page-state="error" className="main kpi-page"><div role="alert" className="alert alert--error">{loadError}</div></main>
+    <main id="main-content" data-page-state="error" className="main kpi-page">
+      <CentroNavigation centroId={id} />
+      <div role="alert" className="alert alert--error">{loadError}</div>
+    </main>
   </div>
 
   // Estilo input de "Configuración" / cards de categoría
@@ -284,6 +291,7 @@ export default function KPIPage() {
     <div className="shell center-core-shell">
       <Sidebar rol="usuario" centroNombre={centroNombre} centroId={id}/>
       <main id="main-content" data-page-state="ready" className="main kpi-page">
+        <CentroNavigation centroId={id} />
 
         {/* Header */}
         <div className="main__head">
