@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { getDesercionPorCoach } from '../../app/actions/coach'
 import { es1 } from '../../lib/desercion-coach.mjs'
+import DetalleCoachActual from './DetalleCoachActual'
 
 const tituloSeccion = {
   fontFamily: 'var(--font-mono)',
@@ -38,16 +39,17 @@ function Cifra({ l, v, fuerte }) {
   )
 }
 
-function Fila({ c }) {
+function Fila({ c, centroId }) {
+  const [abierto, setAbierto] = useState(false)
   return (
-    <li style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-      <span style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.nombre}</span>
-      <span className="num" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        {c.expuestos === 0 ? 'sin niños a cargo' : `${c.bajasReales} de ${c.expuestos} · ${c.pctTexto}`}
-      </span>
-      <span className="label" style={{ fontSize: 13 }}>
-        {c.expuestos === 0 ? 'No se evalúa' : (ETIQUETA_ESTADO[c.estado] || '')}
-      </span>
+    <li className="coach-resumen-fila">
+      <button type="button" className="recurso-toggle coach-resumen-fila__boton" aria-expanded={abierto}
+        onClick={() => setAbierto(!abierto)}>
+        <span><span aria-hidden="true">{abierto ? '▾' : '▸'}</span> {c.nombre}</span>
+        <span className="num">{c.expuestos === 0 ? 'sin niños a cargo' : `${c.bajasReales} de ${c.expuestos} · ${c.pctTexto}`}</span>
+        <span className="label">{c.expuestos === 0 ? 'No se evalúa' : (ETIQUETA_ESTADO[c.estado] || '')}</span>
+      </button>
+      {abierto && <DetalleCoachActual centroId={centroId} coachId={c.coachId} />}
     </li>
   )
 }
@@ -55,6 +57,7 @@ function Fila({ c }) {
 export default function AlertaDesercionCoach({ centroId, anio, trimestre }) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
+  const [coachAbierto, setCoachAbierto] = useState(null)
 
   useEffect(() => {
     let vivo = true
@@ -104,7 +107,8 @@ export default function AlertaDesercionCoach({ centroId, anio, trimestre }) {
             key={c.coachId ?? c.nombre}
             style={{ background: 'var(--bad-bg)', border: '1px solid var(--bad-line)', borderRadius: 'var(--r-sm)', padding: '13px 15px' }}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{c.titular}</div>
+            <button type="button" className="recurso-toggle" aria-expanded={coachAbierto === c.coachId}
+              onClick={() => setCoachAbierto(coachAbierto === c.coachId ? null : c.coachId)}><span aria-hidden="true">{coachAbierto === c.coachId ? '▾' : '▸'}</span> {c.titular}<small>Ver promedio, grupos y horario actual</small></button>
             <p style={{ margin: '5px 0 12px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>{c.detalle}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 12 }}>
               <Cifra l="Niños a cargo" v={c.expuestos} />
@@ -113,6 +117,7 @@ export default function AlertaDesercionCoach({ centroId, anio, trimestre }) {
               <Cifra l="Tasa del centro" v={`${es1(datos.pctCentro)}%`} />
               <Cifra l="Niños de más" v={`+${es1(c.exceso)}`} fuerte />
             </div>
+            {coachAbierto === c.coachId && <DetalleCoachActual centroId={centroId} coachId={c.coachId} />}
           </div>
         ))}
       </div>
@@ -123,7 +128,7 @@ export default function AlertaDesercionCoach({ centroId, anio, trimestre }) {
             Ver los otros {resto.length} {resto.length === 1 ? 'coach' : 'coaches'} del centro
           </summary>
           <ul style={{ listStyle: 'none', margin: '10px 0 0', padding: 0 }}>
-            {resto.map((c) => <Fila key={c.coachId ?? c.nombre} c={c} />)}
+            {resto.map((c) => <Fila key={c.coachId ?? c.nombre} c={c} centroId={centroId} />)}
           </ul>
         </details>
       )}
