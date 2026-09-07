@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { usaKpiAutomatico } from '../../../../lib/kpi-auto.mjs'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import TableScroller from '../../../../components/TableScroller'
 import OperationalCard from '../../../../components/OperationalCard'
@@ -235,7 +236,6 @@ export default function KPIPage() {
   // (g1-20) Solo el estado 'auto' bloquea ventas y retiros (el CERO también es
   // auto); en 'fallo' quedan editables con la advertencia visible.
   const autoIngDes = kpiAuto?.estado === 'auto'
-  const cpDerivado = autoIngDes ? kpiAuto.cp : null
   // Sincronización de los campos de RESUMEN (clase de prueba, motivos, origen
   // comercial). Es independiente del motor semanal: su fallo NO bloquea el KPI.
   const automatic = autoSync?.ok === true
@@ -283,7 +283,7 @@ export default function KPIPage() {
   // Estilo input de "Configuración" / cards de categoría
   const cfgInput = (key, full, bloqueado = false) => (
     <input id={`kpi-config-${key}`} name={`config.${key}`} inputMode="numeric" type="number" min="0" value={config[key]} disabled={locked || bloqueado}
-      onChange={e=>setConfig(c=>({...c,[key]:e.target.value}))}
+      onChange={e=>setConfig(c=>({...c,[key]:e.target.value,...(key === 'cp_matriculados' ? {cp_matriculados_override:null} : {})}))}
       className="input num"
       style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: (locked || bloqueado) ? 0.6 : 1, background: (locked || bloqueado) ? 'var(--surface-3)' : 'var(--bg)' }}/>
   )
@@ -496,7 +496,7 @@ export default function KPIPage() {
         {/* Clase de prueba / Motivos / Origen */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Invitados y asistentes: registros de las clases de este mes que ya comenzaron, incluidos los registros cancelados. Matrículas: ventas del mes provenientes de prueba; no equivalen a Pagados en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Los tres indicadores corresponden a las clases de este mes que ya comenzaron. Invitados incluye todos sus registros; Matriculados cuenta los registros con negocio ganado en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
             {title:'Motivo Deserción', accent:'var(--bad)', auto:autoPeriod || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
             {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
           ].map(({title,accent,fields,auto,source}) => (
@@ -512,48 +512,10 @@ export default function KPIPage() {
                 )}
                 {title === 'Clase de Prueba' && <Link className="btn" style={{ marginBottom: 12 }} href={`/centro/${id}/eventos?mes=${year}-${String(month).padStart(2, '0')}&momento=realizadas`}>Ver clases realizadas de este mes</Link>}
                 {fields.map(([lbl,key]) => {
-                  // (g1-21) cp_matriculados: efectivo = override ?? derivado.
-                  // Editar fija el override; "Usar valor del módulo" lo limpia.
-                  // Invitados/Asistieron usan las mismas tarjetas CRM del mes.
-                  if (key === 'cp_matriculados') {
-                    const override = config.cp_matriculados_override
-                    const tieneOverride = override !== null && override !== undefined && override !== ''
-                    const efectivo = override ?? cpDerivado ?? config.cp_matriculados
-                    return (
-                      <div key={key} style={{ marginBottom: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <label htmlFor="kpi-config-cp_matriculados" style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</label>
-                          <input id="kpi-config-cp_matriculados" name="config.cp_matriculados_override" inputMode="numeric" type="number" min="0" value={efectivo} disabled={locked}
-                            onChange={e=>setConfig(c=>({...c, cp_matriculados_override: e.target.value}))}
-                            className="input num"
-                            style={{ width: 65, padding: '6px 8px', textAlign: 'center', opacity: locked ? 0.6 : 1, background: locked ? 'var(--surface-3)' : 'var(--bg)' }}/>
-                        </div>
-                        {cpDerivado != null && (
-                          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {tieneOverride ? (
-                              <>
-                                <span>Ajustado a mano · del módulo: {cpDerivado}</span>
-                                <button onClick={()=>setConfig(c=>({...c, cp_matriculados_override: null}))} disabled={locked}
-                                  className="btn" style={{ padding: '2px 8px', fontSize: 13 }}>Usar valor del módulo</button>
-                              </>
-                            ) : (
-                              <span>🔗 del módulo</span>
-                            )}
-                          </div>
-                        )}
-                        {autoIngDes && cpDerivado == null && (
-                          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
-                            {tieneOverride ? 'Se conserva tu ajuste manual. ' : 'Se conserva el valor guardado. '}
-                            Falta clasificar el origen de algunas ventas para calcular las matrículas de prueba.
-                          </div>
-                        )}
-                      </div>
-                    )
-                  }
                   return (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <label htmlFor={`kpi-config-${key}`} style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lbl}</label>
-                      {cfgInput(key, false, !!auto)}
+                      {cfgInput(key, false, !!auto || (title === 'Clase de Prueba' && usaKpiAutomatico(year, month, mesEstado)))}
                     </div>
                   )
                 })}
