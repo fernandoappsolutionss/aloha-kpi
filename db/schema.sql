@@ -377,6 +377,7 @@ CREATE TABLE IF NOT EXISTS salones (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_salones_centro ON salones(centro_id);
+ALTER TABLE salones ADD COLUMN IF NOT EXISTS capacidad_ninos INTEGER CHECK (capacidad_ninos > 0);
 
 CREATE TABLE IF NOT EXISTS coaches (
   id SERIAL PRIMARY KEY,
