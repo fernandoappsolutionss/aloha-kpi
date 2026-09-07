@@ -6,6 +6,7 @@ import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { matrizProgreso, reiniciarProgreso } from '../../actions/entrenamiento'
 import { listCentros } from '../../actions/centros'
 import { completado } from '../../../lib/entrenamiento/progreso'
+import { nombreDeRol } from '../../../lib/entrenamiento/oficio/progreso'
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: '2-digit', month: '2-digit' }) : ''
 
@@ -44,7 +45,7 @@ export default function EntrenamientoAdminPage() {
 
   async function reiniciar(u) {
     if (!canReset) return
-    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando entra una administradora nueva que usa el mismo correo del centro.`)
+    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando una persona nueva ocupa el puesto y usa el mismo correo.`)
     if (!ok) return
     const r = await reiniciarProgreso(u.id)
     if (r?.error) { setError(r.error); return }
@@ -59,7 +60,7 @@ export default function EntrenamientoAdminPage() {
           <div>
             <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento</div>
             <h1 className="h-title">Quién completó el entrenamiento</h1>
-            <p className="h-sub">Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
+            <p className="h-sub">Plataforma · Administradoras y asistentes administrativos. Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
           </div>
           <label className="training-filter" htmlFor="training-center">Filtrar por centro
           <select id="training-center" name="centro" autoComplete="off" className="input" value={centroId} onChange={(e) => setCentroId(e.target.value)}>
@@ -84,10 +85,10 @@ export default function EntrenamientoAdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.usuarios.length === 0 && <tr><td colSpan={data.modulos.length + 4} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>Sin usuarios administradora.</td></tr>}
+                {data.usuarios.length === 0 && <tr><td colSpan={data.modulos.length + 4} style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>Sin administradoras ni asistentes administrativos.</td></tr>}
                 {data.usuarios.map((u) => (
                   <tr key={u.id}>
-                    <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
+                    <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{nombreDeRol(u.rol)}</div><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
                     <td>{u.centro}</td>
                     {data.modulos.map((m) => {
                       const p = u.progreso[m.id]
@@ -99,7 +100,7 @@ export default function EntrenamientoAdminPage() {
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.pct === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.pct}%</td>
                     <td style={{ textAlign: 'right' }}>
                       {canReset && Object.keys(u.progreso).length > 0 && (
-                        <button type="button" className="btn btn--compact" aria-label={`Reiniciar progreso de ${u.nombre}`} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando entra una administradora nueva con el mismo correo.">
+                        <button type="button" className="btn btn--compact" aria-label={`Reiniciar progreso de ${u.nombre}`} onClick={() => reiniciar(u)} title="Borra el progreso y vuelve a 0. Para cuando una persona nueva ocupa el puesto y usa el mismo correo.">
                           Reiniciar
                         </button>
                       )}
