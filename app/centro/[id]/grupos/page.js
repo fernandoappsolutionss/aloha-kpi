@@ -31,11 +31,11 @@ import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, 
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
 import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_COACH } from '../../../../lib/reservas'
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
-import { generarItinerario, semanaEnCurso } from '../../../../lib/itinerario'
+import { generarItinerario } from '../../../../lib/itinerario'
 // La línea de tiempo del plan vive en components/PlanNino (misma pinta para el
 // aula y para el niño); el modal del plan individual se abre desde el chip.
 import { LineaTiempoPlan, NotasPlan, ProgresoPlan, PlanNinoModal, mesDe } from '../../../../components/PlanNino'
-import { posicionDeIndice } from '../../../../lib/plan-nino-vista.mjs'
+import { posicionPlanNino } from '../../../../lib/plan-nino.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
@@ -985,7 +985,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
   const ll = activo ? llenadoDe(g, metas, hoyISO()) : null
   const aceptaNuevos = !!ll?.ventana?.abierta
   const it = g.itinerario_clases
-  const idxHoy = it ? semanaEnCurso(it, hoyISO()) : -1
+  const posAula = it ? posicionPlanNino(it, hoyISO()) : null
   const TILES = [
     { l: 'Niños', v: n, s: `de ${metas.cupoMax} cupos` },
     { l: 'Meta', v: faltan === 0 ? '✓' : `−${faltan}`, s: faltan === 0 ? `cumple los ${metas.gpnMin}` : `faltan para los ${metas.gpnMin}`, c: faltan === 0 ? 'var(--ok)' : 'var(--warn)' },
@@ -1057,7 +1057,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
 
       <div className="grp-detail__body">
         {vista === 'itinerario' ? (
-          <ItinerarioNivel centroId={centroId} g={g} it={it} idxHoy={idxHoy}
+          <ItinerarioNivel centroId={centroId} g={g} it={it} pos={posAula}
             onAjustar={(fecha) => acciones.ajustarItinerario(g, fecha)}
             onPlanFijado={acciones.planFijado} />
         ) : (
@@ -1080,14 +1080,18 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
         )}
         {it?.semanas?.length > 0 && (
           <button className="grp-hoy" onClick={() => setVista('itinerario')} title="Ver el itinerario completo del nivel">
-            <span className="label" style={{ color: 'var(--text)' }}>Esta semana</span>
+            <span className="label" style={{ color: 'var(--text)' }}>
+              {posAula?.estado === 'por_iniciar' ? 'Arranca por' : 'Esta semana'}
+            </span>
             <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-              {idxHoy < 0 ? 'Nivel terminado' : it.semanas[idxHoy].etiqueta}
+              {posAula?.estado === 'cerrado' ? 'Nivel terminado' : it.semanas[posAula?.indice ?? 0].etiqueta}
             </span>
             <span className="num" style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-              {idxHoy < 0
+              {posAula?.estado === 'cerrado'
                 ? `cerró ${fmtDia(it.fecha_cierre_estimada)}`
-                : `${idxHoy + 1} de ${it.semanas.length} · cierra ${fmtDia(it.fecha_cierre_estimada)}`}
+                : posAula?.estado === 'por_iniciar'
+                  ? `empieza ${fmtDia(it.fecha_inicio)} · ${it.semanas.length} semanas`
+                  : `${(posAula?.indice ?? 0) + 1} de ${it.semanas.length} · cierra ${fmtDia(it.fecha_cierre_estimada)}`}
             </span>
             <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 13 }}>Ver itinerario →</span>
           </button>
@@ -1264,8 +1268,9 @@ function BloqueLlenado({ g, ll, onExtender }) {
 // suspendidas). Cada suspensión corre el plan y mueve el cierre estimado.
 // El dibujo (casillas, leyenda, agenda mes a mes y notas) vive en
 // components/PlanNino: el plan del NIÑO usa exactamente el mismo, y su
-// posición entra por {estado, indice} — aquí se traduce el índice legacy de
-// semanaEnCurso con posicionDeIndice.
+// posición entra por {estado, indice} — la del aula sale de posicionPlanNino,
+// el mismo motor que el niño, para que un grupo que aún no arranca diga
+// 'por_iniciar' y no marque su primera semana como la de hoy.
 // ── Crear el plan que falta (R3): el bloque de creación rápida ──────────────
 // Pide al SERVER las opciones de ancla (las tres fuentes viven en la BD: la
 // referencia del aula, las anclas de los compañeros y el evento de inscripción
@@ -1436,7 +1441,7 @@ function MontonPlan({ m, esReferencia }) {
   )
 }
 
-function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
+function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
   if (!it?.semanas?.length) {
     return (
       <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
@@ -1449,7 +1454,6 @@ function ItinerarioNivel({ centroId, g, it, idxHoy, onAjustar, onPlanFijado }) {
     )
   }
   const total = it.semanas.length
-  const pos = posicionDeIndice(idxHoy, total)
   // (R3) El aula puede ir toda junta o ir mezclada: MEZCLADA = más de un
   // libro (itinerario+nivel) conviviendo en el salón, que es el caso de la
   // fusión. Homogénea (o vacía) se ve como siempre: una sola línea de tiempo,
@@ -1633,11 +1637,11 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
 function posicionPlan(g) {
   const it = g.itinerario_clases
   if (!it?.semanas?.length) return null
-  const idx = semanaEnCurso(it, hoyISO())
-  const sem = idx >= 0 ? it.semanas[idx] : null
+  const pos = posicionPlanNino(it, hoyISO())
+  const sem = pos.estado === 'en_curso' ? it.semanas[pos.indice] : null
   return {
     corto: sem?.corto || '—',
-    etiqueta: sem?.etiqueta || (idx < 0 ? 'aún no inicia' : ''),
+    etiqueta: sem?.etiqueta || (pos.estado === 'por_iniciar' ? 'aún no inicia' : 'nivel terminado'),
     nivel: it.nivel,
     cierre: it.fecha_cierre_estimada,
   }

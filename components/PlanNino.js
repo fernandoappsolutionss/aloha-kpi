@@ -7,9 +7,9 @@
 // app/centro/[id]/grupos/page.js (ItinerarioNivel) a este módulo para que el
 // aula y el niño se vean idénticos y los estilos vivan en un solo sitio
 // (.itin-* de app/globals.css). Lo único que cambia es de dónde sale la
-// posición: el grupo la trae como el índice legacy de `semanaEnCurso`, el niño
-// como el estado explícito de `posicionPlanNino` — las dos entran por
-// {estado, indice} (lib/plan-nino-vista.mjs).
+// posición: el aula por su itinerario y el niño por su ancla, pero ambas por
+// el mismo `posicionPlanNino` — entran por {estado, indice}
+// (lib/plan-nino-vista.mjs).
 //
 // RENDIMIENTO: los planes de los niños llegan ENRIQUECIDOS por lote desde
 // loadOperaciones (memo compartido, g1-13). Aquí NO se deriva por render: el
@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TIPOS_SEMANA } from '../lib/itinerario'
 import { calendarioVersionadoDe, planNino, posicionPlanNino, cierreEfectivo } from '../lib/plan-nino.mjs'
-import { posicionDeIndice, estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
+import { estadoCasilla, progresoPlan } from '../lib/plan-nino-vista.mjs'
 import Dialog, { useDialogCallback } from './Dialog'
 
 // Fechas DATE de Postgres llegan como 'AAAA-MM-DD' o como Date según el driver.
@@ -48,7 +48,7 @@ export const mesDe = (f) => {
 export const diaMes = (f) => String(f).slice(8, 10) + '/' + String(f).slice(5, 7)
 
 // ── Barra de progreso del plan ──────────────────────────────────────────────
-// `estado`/`indice` ya vienen resueltos (posicionDeIndice para el grupo,
+// `estado`/`indice` ya vienen resueltos (posicionPlanNino para el aula,
 // posicionPlanNino para el niño): aquí no se decide nada, se dibuja.
 export function ProgresoPlan({ it, estado, indice }) {
   const total = it?.semanas?.length || 0
