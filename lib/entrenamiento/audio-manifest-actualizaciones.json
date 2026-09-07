@@ -70,5 +70,356 @@
     "bytes": 207560,
     "segundos": 25.867029,
     "generadoAt": "2026-09-07T11:30:55.483Z"
+  },
+  "cumplimiento/intro": {
+    "file": "actualizaciones/cumplimiento/intro-c9acdd221c38.mp3",
+    "hash": "c9acdd221c38",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:14:36.498Z"
+  },
+  "cumplimiento/cu-1": {
+    "file": "actualizaciones/cumplimiento/cu-1-066cfce9eb22.mp3",
+    "hash": "066cfce9eb22",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 156569,
+    "segundos": 19.504762,
+    "generadoAt": "2026-09-07T13:14:39.897Z"
+  },
+  "cumplimiento/cu-2": {
+    "file": "actualizaciones/cumplimiento/cu-2-e583573f37e5.mp3",
+    "hash": "e583573f37e5",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 187498,
+    "segundos": 23.359274,
+    "generadoAt": "2026-09-07T13:14:42.831Z"
+  },
+  "cumplimiento/cu-3": {
+    "file": "actualizaciones/cumplimiento/cu-3-9be5c7ca036d.mp3",
+    "hash": "9be5c7ca036d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 123550,
+    "segundos": 15.37161,
+    "generadoAt": "2026-09-07T13:14:44.861Z"
+  },
+  "cumplimiento/cu-4": {
+    "file": "actualizaciones/cumplimiento/cu-4-fceb5a9303ed.mp3",
+    "hash": "fceb5a9303ed",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:14:47.922Z"
+  },
+  "cumplimiento/cu-5": {
+    "file": "actualizaciones/cumplimiento/cu-5-090531488312.mp3",
+    "hash": "090531488312",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 245386,
+    "segundos": 30.6039,
+    "generadoAt": "2026-09-07T13:14:51.930Z"
+  },
+  "cumplimiento-ayuda/asistencia_dias": {
+    "file": "actualizaciones/cumplimiento-ayuda/asistencia_dias-38b6141083bc.mp3",
+    "hash": "38b6141083bc",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:14:54.929Z"
+  },
+  "cumplimiento-ayuda/seguimiento_evolucion": {
+    "file": "actualizaciones/cumplimiento-ayuda/seguimiento_evolucion-77d8c5510585.mp3",
+    "hash": "77d8c5510585",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 186244,
+    "segundos": 23.219955,
+    "generadoAt": "2026-09-07T13:14:57.814Z"
+  },
+  "cumplimiento-ayuda/ninos_trabajando_study": {
+    "file": "actualizaciones/cumplimiento-ayuda/ninos_trabajando_study-17dc1f9d0414.mp3",
+    "hash": "17dc1f9d0414",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:00.832Z"
+  },
+  "cumplimiento-ayuda/portafolio": {
+    "file": "actualizaciones/cumplimiento-ayuda/portafolio-ee4136340ac4.mp3",
+    "hash": "ee4136340ac4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:03.754Z"
+  },
+  "cumplimiento-ayuda/padres_conectados": {
+    "file": "actualizaciones/cumplimiento-ayuda/padres_conectados-5cfb4274f658.mp3",
+    "hash": "5cfb4274f658",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:06.740Z"
+  },
+  "cumplimiento-ayuda/clase_padres": {
+    "file": "actualizaciones/cumplimiento-ayuda/clase_padres-fa76f7b0c70d.mp3",
+    "hash": "fa76f7b0c70d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:09.633Z"
+  },
+  "cumplimiento-ayuda/coach_activo": {
+    "file": "actualizaciones/cumplimiento-ayuda/coach_activo-7de52f734712.mp3",
+    "hash": "7de52f734712",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:12.741Z"
+  },
+  "cumplimiento-ayuda/niveles_actualizados": {
+    "file": "actualizaciones/cumplimiento-ayuda/niveles_actualizados-c5ab1ff7fe87.mp3",
+    "hash": "c5ab1ff7fe87",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:15.570Z"
+  },
+  "cumplimiento-ayuda/ninos_activos_study": {
+    "file": "actualizaciones/cumplimiento-ayuda/ninos_activos_study-4866526c4b63.mp3",
+    "hash": "4866526c4b63",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 178512,
+    "segundos": 22.244717,
+    "generadoAt": "2026-09-07T13:15:18.338Z"
+  },
+  "cumplimiento-ayuda/encuestas_satisfaccion": {
+    "file": "actualizaciones/cumplimiento-ayuda/encuestas_satisfaccion-de9a712850b7.mp3",
+    "hash": "de9a712850b7",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 273598,
+    "segundos": 34.133333,
+    "generadoAt": "2026-09-07T13:15:22.701Z"
+  },
+  "cumplimiento-ayuda/brochure": {
+    "file": "actualizaciones/cumplimiento-ayuda/brochure-b08337a5a3e9.mp3",
+    "hash": "b08337a5a3e9",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:26.657Z"
+  },
+  "cumplimiento-ayuda/cartel_qr": {
+    "file": "actualizaciones/cumplimiento-ayuda/cartel_qr-c3276953b6c9.mp3",
+    "hash": "c3276953b6c9",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:29.527Z"
+  },
+  "cumplimiento-ayuda/saludo_cordial": {
+    "file": "actualizaciones/cumplimiento-ayuda/saludo_cordial-11f6417ed19f.mp3",
+    "hash": "11f6417ed19f",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:32.576Z"
+  },
+  "cumplimiento-ayuda/fotos_grupo": {
+    "file": "actualizaciones/cumplimiento-ayuda/fotos_grupo-b9ef6c36ab8e.mp3",
+    "hash": "b9ef6c36ab8e",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 188961,
+    "segundos": 23.545034,
+    "generadoAt": "2026-09-07T13:15:36.004Z"
+  },
+  "cumplimiento-ayuda/muro_informacion": {
+    "file": "actualizaciones/cumplimiento-ayuda/muro_informacion-398900cf7f60.mp3",
+    "hash": "398900cf7f60",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:38.802Z"
+  },
+  "cumplimiento-ayuda/bienvenida": {
+    "file": "actualizaciones/cumplimiento-ayuda/bienvenida-f55f0c5017d2.mp3",
+    "hash": "f55f0c5017d2",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:41.932Z"
+  },
+  "cumplimiento-ayuda/classdojo_activo": {
+    "file": "actualizaciones/cumplimiento-ayuda/classdojo_activo-10bf506651af.mp3",
+    "hash": "10bf506651af",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:44.769Z"
+  },
+  "cumplimiento-ayuda/ninos_completos_classdojo": {
+    "file": "actualizaciones/cumplimiento-ayuda/ninos_completos_classdojo-f27098d95cee.mp3",
+    "hash": "f27098d95cee",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:47.660Z"
+  },
+  "cumplimiento-ayuda/calendario": {
+    "file": "actualizaciones/cumplimiento-ayuda/calendario-8da7e13be7f0.mp3",
+    "hash": "8da7e13be7f0",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 186244,
+    "segundos": 23.219955,
+    "generadoAt": "2026-09-07T13:15:50.485Z"
+  },
+  "cumplimiento-ayuda/asistente_classdojo": {
+    "file": "actualizaciones/cumplimiento-ayuda/asistente_classdojo-f78634fbbcef.mp3",
+    "hash": "f78634fbbcef",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 185199,
+    "segundos": 23.080635,
+    "generadoAt": "2026-09-07T13:15:53.431Z"
+  },
+  "cumplimiento-ayuda/grupo_study": {
+    "file": "actualizaciones/cumplimiento-ayuda/grupo_study-a102291dfdb2.mp3",
+    "hash": "a102291dfdb2",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:15:56.290Z"
+  },
+  "cumplimiento-ayuda/centro_buen_estado": {
+    "file": "actualizaciones/cumplimiento-ayuda/centro_buen_estado-2820a490a843.mp3",
+    "hash": "2820a490a843",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 174124,
+    "segundos": 21.687438,
+    "generadoAt": "2026-09-07T13:15:58.963Z"
+  },
+  "cumplimiento-ayuda/aromatizante": {
+    "file": "actualizaciones/cumplimiento-ayuda/aromatizante-37921fa9f0bf.mp3",
+    "hash": "37921fa9f0bf",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 184364,
+    "segundos": 22.987755,
+    "generadoAt": "2026-09-07T13:16:01.934Z"
+  },
+  "cumplimiento-ayuda/mesa_cafe": {
+    "file": "actualizaciones/cumplimiento-ayuda/mesa_cafe-92f4ea780a0d.mp3",
+    "hash": "92f4ea780a0d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 169526,
+    "segundos": 21.130159,
+    "generadoAt": "2026-09-07T13:16:04.619Z"
+  },
+  "cumplimiento-ayuda/wifi_gratis": {
+    "file": "actualizaciones/cumplimiento-ayuda/wifi_gratis-297a279b5a7d.mp3",
+    "hash": "297a279b5a7d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 170989,
+    "segundos": 21.315918,
+    "generadoAt": "2026-09-07T13:16:07.376Z"
+  },
+  "cumplimiento-ayuda/coach_estrella": {
+    "file": "actualizaciones/cumplimiento-ayuda/coach_estrella-16437315fd6b.mp3",
+    "hash": "16437315fd6b",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:16:10.525Z"
+  },
+  "cumplimiento-ayuda/reuniones_mensuales": {
+    "file": "actualizaciones/cumplimiento-ayuda/reuniones_mensuales-96947ccee197.mp3",
+    "hash": "96947ccee197",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:16:13.439Z"
+  },
+  "cumplimiento-ayuda/monitoreo_camaras": {
+    "file": "actualizaciones/cumplimiento-ayuda/monitoreo_camaras-8e2fe03644e7.mp3",
+    "hash": "8e2fe03644e7",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 198156,
+    "segundos": 24.706032,
+    "generadoAt": "2026-09-07T13:16:16.791Z"
+  },
+  "cumplimiento-ayuda/actividades_equipo": {
+    "file": "actualizaciones/cumplimiento-ayuda/actividades_equipo-d02c5067fc42.mp3",
+    "hash": "d02c5067fc42",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 178512,
+    "segundos": 22.244717,
+    "generadoAt": "2026-09-07T13:16:19.630Z"
+  },
+  "cumplimiento-ayuda/encuestas_equipo": {
+    "file": "actualizaciones/cumplimiento-ayuda/encuestas_equipo-717fb7a4cf12.mp3",
+    "hash": "717fb7a4cf12",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 223025,
+    "segundos": 27.817506,
+    "generadoAt": "2026-09-07T13:16:23.234Z"
+  },
+  "cumplimiento-ayuda/meta_cobranza": {
+    "file": "actualizaciones/cumplimiento-ayuda/meta_cobranza-8b7f72aa5a37.mp3",
+    "hash": "8b7f72aa5a37",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:16:26.072Z"
+  },
+  "cumplimiento-ayuda/meta_desercion": {
+    "file": "actualizaciones/cumplimiento-ayuda/meta_desercion-bc04eb915618.mp3",
+    "hash": "bc04eb915618",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:16:29.076Z"
+  },
+  "cumplimiento-ayuda/meta_nuevos_ingresos": {
+    "file": "actualizaciones/cumplimiento-ayuda/meta_nuevos_ingresos-101c59989a24.mp3",
+    "hash": "101c59989a24",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T13:16:31.857Z"
   }
 }

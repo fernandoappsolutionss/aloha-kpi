@@ -17,6 +17,8 @@ Se agrega el módulo 11, **Cumplimiento: del criterio a la acción**, con cinco 
 
 Los guiones nuevos son 33 fichas y 6 clips del módulo (introducción y pasos), con frases cortas y pausas de 0,3–0,5 segundos. El generador incremental usa la receta del clon disponible aprobado y conserva los ocho clips previos del mismo catálogo. El resto de grabaciones publicadas permanece intacto.
 
+Las 39 grabaciones están incorporadas y verificadas: 921 segundos en total, entre 15 y 34 segundos por clip. El reproductor carga al pulsar reproducir y se pausa al cerrar la ficha o cambiar a otra. El inventario incremental final devuelve cero pendientes y 47 archivos reutilizables.
+
 `npm run entrenamiento:audio:actualizaciones` muestra el inventario sin realizar solicitudes. `-- --generar` genera solamente archivos nuevos o desactualizados; requiere autorización para enviar esos guiones a ElevenLabs. Los MP3 se decodifican antes de incorporarlos al manifiesto. La prueba de cobertura debe pasar antes de publicar: no se omite para ocultar audios faltantes.
 
 ## Verificación
@@ -26,3 +28,4 @@ Los guiones nuevos son 33 fichas y 6 clips del módulo (introducción y pasos), 
 - La prueba de audio exige guion, hash, archivo, duración y clon coincidentes.
 - Revisión en Chrome con centro ficticio: apertura de las 33 fichas, una sola visible, respuestas intactas; cierre devuelve el foco; lectura a 390 px; cinco pasos y quiz 3/3.
 - No requiere migraciones de base de datos.
+- Suite completa: 1.056 pruebas correctas; compilación de producción correcta.
