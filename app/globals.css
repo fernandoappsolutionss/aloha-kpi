@@ -2703,3 +2703,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 @media (min-width: 768px) and (max-width: 1440px) {
   .operations-resources { grid-template-columns: minmax(0,1fr); }
 }
+/* Carteles de recepción: formularios breves junto al criterio, PDF de una hoja. */
+.poster-download { margin-top:8px; font-weight:400; text-transform:none; letter-spacing:normal; white-space:normal; }
+.poster-download summary { cursor:pointer; color:var(--text); min-height:44px; display:flex; align-items:center; font-size:13px; text-decoration:underline; text-underline-offset:3px; }
+.poster-download summary::before { content:'↓'; margin-right:8px; }
+.poster-download__body { display:grid; gap:12px; padding:14px; border:1px solid var(--border); background:var(--surface-2); border-radius:10px; min-width:0; }
+.poster-download__body h4,.poster-download__body p { margin:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.poster-download__body h4 { font-size:15px; }
+.poster-download__body label { display:grid; gap:6px; font-size:13px; line-height:1.4; }
+.poster-download__body input:not([type=checkbox]),.poster-download__body select { width:100%; min-width:0; min-height:44px; padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; }
+.poster-download__body .poster-download__check { display:flex; align-items:flex-start; gap:8px; cursor:pointer; }
+.poster-download__check input { flex-shrink:0; width:20px; height:20px; }
+.poster-download__body .btn { white-space:normal; min-height:44px; }
+.poster-download__body a { overflow-wrap:anywhere; font-size:13px; padding:8px 0; }
+.survey-actions .survey-field { margin:0; min-width:100px; }
+.survey-actions .survey-field select { min-height:44px; font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px; }

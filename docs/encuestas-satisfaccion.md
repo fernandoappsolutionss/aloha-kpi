@@ -9,7 +9,7 @@ Implementación del 7 de septiembre de 2026. Fernando aprobó **más del 50% de 
 3. El enlace general y el QR abren un formulario sin cuenta. Nombre completo del niño y teléfono registrado validan pertenencia; el enlace individual permite responder cuando faltan datos. Una respuesta por niño, sin duplicados ni sobrescritura por reintentos. Los enlaces individuales deben entregarse solo a su representante.
 4. La copia realizada con éxito o la descarga del QR registra usuario, fecha y tipo de acción. Eso acredita la acción en la plataforma; no certifica la entrega por WhatsApp.
 5. Cumplimiento se marca automáticamente cuando existe esa difusión y `respuestas >= floor(activos / 2) + 1`. Con 148 activos, 74 respuestas no completan y 75 sí. El servidor y PostgreSQL protegen el criterio frente a formularios abiertos o guardados manuales.
-6. El mes se rige por Panamá. Al cambiar de mes, el enlace anterior deja de aceptar respuestas y el siguiente mes inicia su propio corte, enlace, respuestas y difusión. El histórico conserva resultados. El panel se actualiza cada 30 segundos y al recuperar foco; el criterio se persiste en la transacción de respuesta o difusión.
+6. El mes se rige por Panamá. Al cambiar de mes, los enlaces mensuales e individuales anteriores dejan de aceptar respuestas; el enlace permanente del centro abre el periodo vigente. El siguiente mes inicia su propio corte, token de campaña, respuestas y difusión. El histórico conserva resultados. El panel se actualiza cada 30 segundos y al recuperar foco; el criterio se persiste en la transacción de respuesta o difusión.
 7. Satisfacción es el porcentaje de respuestas generales 4 o 5 entre quienes respondieron; participación es respuestas entre activos del corte. FODA recibe un resumen mensual, sin reemplazar los cuadrantes escritos por el centro.
 
 ## Relación con el manual
@@ -45,3 +45,7 @@ Si hay que retirar la función, ocultar sus accesos y detener nuevas respuestas 
 - Audio de introducción reproducido completo en Chrome (38,27 s). Los ocho MP3 decodificados y sus duraciones verificadas. Los seis pasos del recorrido y sus tres respuestas completaron el módulo y guardaron progreso en la cuenta ficticia.
 
 Las pruebas funcionales utilizaron datos ficticios. Tras autorización expresa de Fernando para avanzar y fusionar a main, se aplicó la migración productiva el 7 de septiembre: cinco tablas creadas, 110 checklists históricos y todos sus valores conservados, cero campañas creadas. Se respaldaron cumplimiento y trimestres antes y después. No había registros desde septiembre que requirieran cambiar la marca manual.
+
+## Cartel permanente
+
+El enlace general nuevo usa `/encuesta/centro/[token]` y abre la campaña vigente según Panamá. El primer acceso público del mes puede fijar el padrón; las siguientes visitas lo reutilizan. El PDF de recepción no lleva fecha y se imprime una vez. Cada mes se conserva el requisito de difusión registrada (copiar el mismo enlace al invitar a las familias) y más del 50% del nuevo corte. Los enlaces individuales y las URLs mensuales antiguas siguen cerrando al terminar su mes. Los periodos y respuestas anteriores se conservan.

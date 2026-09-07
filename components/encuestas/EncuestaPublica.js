@@ -2,7 +2,7 @@
 import {useState} from 'react'
 import {PREGUNTAS,ESCALA} from '../../lib/encuestas/domain.mjs'
 const mesLabel=(anio,mes)=>new Intl.DateTimeFormat('es-PA',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(anio,mes-1,1)))
-export default function EncuestaPublica({token,individual,datos}) {
+export default function EncuestaPublica({token,individual,datos,permanente=false}) {
   const [vals,setVals]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[done,setDone]=useState(false)
   const set=(k,v)=>setVals(x=>({...x,[k]:v}))
   async function enviar(e) {
@@ -17,7 +17,7 @@ export default function EncuestaPublica({token,individual,datos}) {
     <div className="survey-public__brand"><img src="/ALOHA-LOGO.png" alt="ALOHA Mental Arithmetic" onError={e=>{e.currentTarget.style.display='none'}}/><span>ALOHA · PANAMÁ</span></div>
     <p className="label">{datos.nombre} · {mesLabel(datos.anio,datos.mes)}</p>
     <h1>{done?'Gracias por tu opinión':datos.abierta?'Tu opinión nos ayuda a mejorar':'Esta encuesta ya cerró'}</h1>
-    {done?<div role="status" className="survey-box"><p>Tu respuesta quedó registrada. Si ya habías respondido este mes, conservamos tu primera respuesta.</p><p>El equipo del centro revisará lo que compartiste.</p></div>:!datos.abierta?<p>Solicita al centro el enlace del mes actual.</p>:<>
+    {done?<div role="status" className="survey-box"><p>Tu respuesta quedó registrada. Si ya habías respondido este mes, conservamos tu primera respuesta.</p><p>El equipo del centro revisará lo que compartiste.</p></div>:!datos.abierta?permanente?<button className="btn" type="button" onClick={()=>window.location.reload()}>Abrir encuesta vigente</button>:<p>Solicita al centro el enlace del mes actual.</p>:<>
       <p>Cuéntanos cómo ha sido la experiencia de tu hijo. Te toma unos 2 minutos. Una respuesta por niño, cada mes.</p>
       <p className="h-sub">Tus respuestas son confidenciales para el equipo autorizado del centro y su supervisión. Usamos los datos del niño para evitar respuestas duplicadas; esta encuesta no es anónima.</p>
       <form onSubmit={enviar}>
@@ -35,7 +35,7 @@ export default function EncuestaPublica({token,individual,datos}) {
           <label className="survey-field">¿Qué te gustaría destacar? <span className="h-sub">Opcional</span><textarea rows={3} maxLength={1000} value={vals.destacar||''} onChange={e=>set('destacar',e.target.value)}/></label></div>
         <div className="survey-honeypot" aria-hidden="true"><label>Sitio web<input tabIndex={-1} autoComplete="off" value={vals.trampa||''} onChange={e=>set('trampa',e.target.value)}/></label></div>
         <label className="survey-consent"><input type="checkbox" required checked={!!vals.consentimiento} onChange={e=>set('consentimiento',e.target.checked)}/><span>Soy el representante del niño y acepto enviar estas respuestas al equipo autorizado de ALOHA.</span></label>
-        {error&&<p role="alert" className="survey-error">{error}</p>}
+        {error&&<div role="alert" className="survey-error"><p>{error}</p>{permanente&&<button className="btn" type="button" onClick={()=>window.location.reload()}>Abrir encuesta vigente</button>}</div>}
         <button className="btn btn--primary" type="submit" disabled={busy}>{busy?'Guardando tu respuesta…':'Enviar mi opinión'}</button>
       </form></>}
   </main>
