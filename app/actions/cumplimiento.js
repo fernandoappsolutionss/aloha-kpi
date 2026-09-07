@@ -1,6 +1,6 @@
 'use server'
 import { sql, upsert } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { alcancePanel } from '../../lib/alcance'
 import { CUMPLIMIENTO_KEYS, disciplinaPct } from '../../lib/checklist'
 import { CLAVES_PRODUCTO, clavesDisciplina } from '../../lib/discrepancias-metas.mjs'
@@ -25,7 +25,9 @@ async function ensureTrimestre(centroId, anio, trimestre) {
 
 export async function loadCumplimiento(centroId, anio, trimestre, mes) {
   await requireCentroAccess(centroId)
-  const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
+  const [trimestreRow] = await sql`SELECT id FROM trimestres WHERE centro_id = ${centroId} AND anio = ${anio} AND trimestre = ${trimestre}`
+  if (!trimestreRow) return { trimestreId: null, existe: false, vals: null }
+  const trimestreId = trimestreRow.id
   const [row] = await sql`SELECT * FROM cumplimiento WHERE trimestre_id = ${trimestreId} AND mes = ${mes}`
   // `existe` es el que mata el 88% fantasma: un mes SIN fila no es un mes con
   // 29 de 33 criterios cumplidos, es un mes sin registrar. La UI lo dibuja como
@@ -166,7 +168,7 @@ async function metasCalculadas(centroId, anio, trimestre) {
 // reporta hasta que se corrija. Un valor viejo visible es mejor que un valor
 // nuevo inventado.
 export async function saveCumplimiento(centroId, anio, trimestre, mes, incoming) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
   const row = { trimestre_id: trimestreId, mes }
   for (const k of CLAVES_DISCIPLINA) {

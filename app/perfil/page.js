@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { tienePanel, ETIQUETA_ROL } from '../../components/useRol'
 import { changePassword } from '../actions/auth'
 import Sidebar from '../../components/Sidebar'
+import { useCurrentAccess } from '../../components/useCurrentAccess'
 
 export default function PerfilPage() {
   const [rol, setRol] = useState('')
@@ -13,9 +13,10 @@ export default function PerfilPage() {
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  const access = useCurrentAccess()
 
   useEffect(() => {
-    setRol(localStorage.getItem('aloha_rol') || '')
+    setRol('')
     setNombre(localStorage.getItem('aloha_nombre') || '')
     setEmail(localStorage.getItem('aloha_email') || '')
     setCentroId(localStorage.getItem('aloha_centro_id') || '')
@@ -38,14 +39,16 @@ export default function PerfilPage() {
     setLoading(false)
   }
 
-  const isAdmin = tienePanel(rol)
+  const rolVigente = access.role || rol
+  const nombreVisible = access.actor?.nombre || access.actor?.name || nombre
+  const emailVisible = access.actor?.email || email
   const coinciden = form.nueva && form.confirmar && form.nueva === form.confirmar
   const isError = status.includes('❌')
 
   return (
     <div className="shell">
-      <Sidebar rol={rol} centroNombre={nombre} centroId={centroId}/>
-      <main id="main-content" className="main profile-page" data-page-state={hydrated ? 'ready' : 'loading'}>
+      <Sidebar rol={rolVigente} centroNombre={nombreVisible} centroId={centroId}/>
+      <main id="main-content" className="main profile-page" data-page-state={hydrated && access.loaded ? 'ready' : 'loading'}>
 
         {/* Header */}
         <div className="main__head">
@@ -60,14 +63,17 @@ export default function PerfilPage() {
         <div className="card profile-page__card">
           <div className="profile-page__identity">
             <div style={{ width: 56, height: 56, borderRadius: 28, background: 'var(--ts-green-soft)', border: '1px solid var(--ts-green-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: 'var(--ts-green)', fontFamily: 'var(--font-serif)', flexShrink: 0 }}>
-              {nombre.charAt(0).toUpperCase()}
+              {(nombreVisible || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="profile-page__identity-copy">
-              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-serif)' }}>{nombre}</div>
-              <div className="num profile-page__email">{email}</div>
-              <span className={`pill ${isAdmin ? 'pill--ok' : 'pill--ok'}`} style={{ marginTop: 9 }}>
-                <span className="dot" />{ETIQUETA_ROL[rol] || 'Usuario'}
-              </span>
+              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-serif)' }}>{nombreVisible || 'Usuario'}</div>
+              <div className="num profile-page__email">{emailVisible}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 9 }}>
+                <span className="pill pill--ok">
+                  <span className="dot" />{access.roleLabel || rolVigente || 'Usuario'}
+                </span>
+                {access.isReadonlyGlobal && <span className="pill"><span className="dot" />Solo lectura</span>}
+              </div>
             </div>
           </div>
         </div>

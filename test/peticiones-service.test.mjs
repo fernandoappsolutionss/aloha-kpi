@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createPeticionesService } from '../lib/peticiones-service.mjs'
 
-const admin = { id: 1, nombre: 'Gerencia', email: 'g@aloha.com', rol: 'admin_general', centro_id: null }
+const admin = { id: 1, nombre: 'Master', email: 'fperez@teamsolutionss.com', rol: 'admin_master', centro_id: null }
 const centerUser = { id: 8, nombre: 'Centro 10', email: 'c10@aloha.com', rol: 'administradora', centro_id: 10 }
 
 test('comentario se envía sin categoría ni archivos y crea evento inicial', async () => {

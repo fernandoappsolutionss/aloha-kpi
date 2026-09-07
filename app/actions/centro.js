@@ -78,7 +78,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
         motivos: motivosParaKpi(cuadroAbierto?.deserciones || []),
       })
       if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
-        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month, { persist: false })
         if (automatic.complete) {
           rs = mezclarResumenAutomatico(rs, abierto.year, abierto.month, automatic.data)
           automaticosAbiertos.set(`${abierto.year}-${abierto.month}`, automatic.data)
@@ -291,7 +291,7 @@ export async function getHistorialCentro(centroId) {
         motivos: motivosParaKpi(d?.deserciones || []),
       })
       if (usaKpiAutomatico(abierto.year, abierto.month, abierto.estado)) {
-        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month)
+        const automatic = await fotoKpiAutomatica(centroId, abierto.year, abierto.month, { persist: false })
         if (automatic.complete) {
           // Solo los campos de resumen: los totales de ventas y deserción del
           // mes abierto ya vienen superpuestos arriba desde el motor semanal.

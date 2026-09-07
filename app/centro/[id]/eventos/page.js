@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import OperationalCard from '../../../../components/OperationalCard'
 import Sidebar from '../../../../components/Sidebar'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import {
   eventosConfig, opcionesFormulario, listarEventos, crearEvento, actualizarEvento,
   eliminarEvento, duplicarEvento, listarRegistros, agregarInvitado, marcarAsistencia, marcarPago,
@@ -78,9 +79,9 @@ export default function EventosPage() {
   const mobileCards=useMobileCards()
   const [loadError,setLoadError]=useState('')
   const defaultTz = String(id) === '10' ? 'America/Caracas' : 'America/Panama'
-  const [rol, setRol] = useState('usuario')
-  // El asistente registra clases de prueba, pero no las elimina.
-  const esAsistente = rol === 'asistente'
+  const access = useCurrentAccess()
+  const canWrite = access.canWriteOperations
+  const canDelete = access.canDeleteOperations
   const [config, setConfig] = useState({ configured: true, baseUrl: '' })
   const [opts, setOpts] = useState({ sales_teams: [], pipeline_stages: [] })
   const [events, setEvents] = useState([])
@@ -97,8 +98,6 @@ export default function EventosPage() {
   const menuRef = useRef(null)
   const menuTriggerRef = useRef(null)
   const [editing, setEditing] = useState(null) // null=cerrado, {}=nuevo, {...}=editar
-
-  useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
 
   const load = useCallback(async () => {
     setLoading(true);setLoadError('')
@@ -178,6 +177,7 @@ export default function EventosPage() {
   }, [menuId, menuVisible])
 
   async function onDelete(ev) {
+    if (!canDelete) return
     closeActionMenu()
     if (!confirm(`¿Eliminar la clase de prueba "${ev.name}"? Esta acción no se puede deshacer.`)) return
     setStatus('')
@@ -185,6 +185,7 @@ export default function EventosPage() {
     if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba eliminada.'); load() }
   }
   async function onDuplicate(ev) {
+    if (!canWrite) return
     closeActionMenu(); setStatus('')
     const res = await duplicarEvento(id, ev.id)
     if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba duplicada (queda en borrador).'); load() }
@@ -227,8 +228,13 @@ export default function EventosPage() {
             <h1 className="h-title">Clases de Prueba</h1>
             <p className="h-sub">Clases de prueba sincronizadas con el CRM</p>
           </div>
-          <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" data-tour="eventos.nueva" disabled={!config.configured}>+ Nueva clase de prueba</button>
+          {canWrite && <button onClick={() => { setStatus(''); setEditing({ ...EMPTY, timezone: defaultTz }) }} className="btn btn--primary" data-tour="eventos.nueva" disabled={!config.configured}>+ Nueva clase de prueba</button>}
         </div>
+        {access.isReadonlyGlobal && (
+          <div className="alert" role="status" style={{ marginBottom: 16 }}>
+            Modo consulta global: puedes ver clases, métricas y registros; no puedes crear, editar, eliminar, marcar asistencia/pago ni inscribir.
+          </div>
+        )}
 
         {loadError && <div role="alert" className="alert alert--error">{loadError} <Link className="btn" href={`/centro/${id}`}>Volver al centro</Link></div>}
         {loading && <div role="status">Cargando clases…</div>}
@@ -283,7 +289,7 @@ export default function EventosPage() {
         </p>
 
         {!loadError && <div className="panel" data-tour="eventos.lista">
-          {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
+          {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} canWrite={canWrite} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
             <table className="table">
               <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
@@ -320,7 +326,7 @@ export default function EventosPage() {
                         <tr style={{ cursor: 'default' }}>
                           <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
                             <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}>
-                              <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} onChange={load} />
+                              <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} canWrite={canWrite} onChange={load} />
                             </section>
                           </td>
                         </tr>
@@ -345,10 +351,10 @@ export default function EventosPage() {
           style={{ position: 'fixed', left: menuPos?.left ?? 8, top: menuPos?.top ?? 8, visibility: menuPos ? 'visible' : 'hidden', zIndex: 60, background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-sm)', boxShadow: '0 18px 42px rgba(0,0,0,0.28)', width: ACTION_MENU_WIDTH, maxWidth: 'calc(100vw - 16px)', padding: 6, textAlign: 'left' }}
         >
           {[
-            ['✏️ Editar', () => { closeActionMenu(); openEdit(menuEvent, setEditing) }],
-            ['⧉ Duplicar', () => onDuplicate(menuEvent)],
+            canWrite && ['✏️ Editar', () => { closeActionMenu(); openEdit(menuEvent, setEditing) }],
+            canWrite && ['⧉ Duplicar', () => onDuplicate(menuEvent)],
             ['📈 Copiar link de seguimiento', () => copy(segUrl(menuEvent), 'Link de seguimiento copiado.')],
-            !esAsistente && ['🗑 Eliminar', () => onDelete(menuEvent), true],
+            canDelete && ['🗑 Eliminar', () => onDelete(menuEvent), true],
           ].filter(Boolean).map(([txt, fn, danger], k) => (
             <button key={k} type="button" role="menuitem" onClick={fn}
               style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: danger ? 'var(--bad)' : 'var(--text-muted)', borderRadius: 6 }}>
@@ -360,7 +366,7 @@ export default function EventosPage() {
 
       </section>}
 
-      {editing && (
+      {canWrite && editing && (
         <EventModal centroId={id} opts={opts} initial={editing}
           onClose={() => setEditing(null)}
           onSaved={(msg) => { setEditing(null); setStatus('✅ ' + msg); load() }} />
@@ -558,7 +564,7 @@ function Field({ label, full, tour, children }) {
   return <label className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
 }
 
-function Registrations({ centroId, eventId, grupoId, onChange }) {
+function Registrations({ centroId, eventId, grupoId, canWrite = true, onChange }) {
   const mobileCards=useMobileCards()
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
@@ -580,12 +586,14 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   useEffect(() => { load() }, [load])
 
   async function setAsist(reg, attended) {
+    if (!canWrite) return
     setBusy(reg.id + 'a')
     const res = await marcarAsistencia(centroId, eventId, reg.id, attended)
     if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
     setBusy(null)
   }
   async function setPagoR(reg, paid) {
+    if (!canWrite) return
     setBusy(reg.id + 'p')
     const res = await marcarPago(centroId, eventId, reg.id, paid)
     if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
@@ -593,6 +601,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
   }
   async function addInv(e) {
     e.preventDefault()
+    if (!canWrite) return
     if (!inv.first_name.trim()) { setStatus('❌ El nombre es requerido.'); return }
     setSaving(true); setStatus('')
     const res = await agregarInvitado(centroId, eventId, inv)
@@ -605,7 +614,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
     <div className="events-registrations" style={{ padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span className="label">Registrados {regs ? `(${regs.length})` : ''}</span>
-        <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>
+        {canWrite && <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>}
       </div>
       {status && (
         <div role={status.includes('❌') ? 'alert' : 'status'} className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
@@ -613,7 +622,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
           {status.replace(/^[❌✅]\s*/, '')}
         </div>
       )}
-      {showInv && (
+      {canWrite && showInv && (
         <form onSubmit={addInv} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 14, padding: 12, background: 'var(--surface-3)', borderRadius: 'var(--r-sm)' }}>
           {[['first_name', 'Nombre *'], ['last_name', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']].map(([k, l]) => (
             <div className="field" style={{ flex: '1 1 130px', margin: 0 }} key={k}><label className="label" htmlFor={`invite-${k}`}>{l}</label><input id={`invite-${k}`} name={k} autoComplete={{first_name:'given-name',last_name:'family-name',email:'email',phone:'tel'}[k]} type={k==='email'?'email':k==='phone'?'tel':'text'} className="input" value={inv[k]} onChange={(e) => setInv({ ...inv, [k]: e.target.value })} /></div>
@@ -623,10 +632,10 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
       )}
       {regs === null ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
         : status.includes('❌') ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
-          : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={<>
+          : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={canWrite ? <>
             <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
             <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button ref={node => inscribirTriggerRef(node, r.id)} type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
-          </>}/>)}</div> : (
+          </> : null}/>)}</div> : (
             <TableScroller label="Inscritos en la clase"><table className="table" style={{ background: 'var(--surface)' }}>
               <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
@@ -649,10 +658,16 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                       <span style={{ fontSize: 13, marginRight: 4 }}>{origen.icono}</span>{origen.nombre}
                     </td>
                     <td>
+                      {canWrite ? (
                       <button onClick={() => setPagoR(r, r.payment_status !== 'paid')} disabled={busy === r.id + 'p'}
                         className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 13, cursor: 'pointer', border: 'none' }}>
                         {r.payment_status === 'paid' ? 'Pagado' : r.payment_status === 'waived' ? 'Gratis' : 'Pendiente'}
                       </button>
+                      ) : (
+                        <span className={`pill ${r.payment_status === 'paid' ? 'pill--ok' : 'pill--warn'}`} style={{ fontSize: 13 }}>
+                          {r.payment_status === 'paid' ? 'Pagado' : r.payment_status === 'waived' ? 'Gratis' : 'Pendiente'}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -661,14 +676,16 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
                         {r.attendance_status === 'cancelled' && (
                           <span className="pill pill--bad" style={{ fontSize: 13 }}>Cancelado</span>
                         )}
-                        <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
+                        {canWrite && <button onClick={() => setAsist(r, true)} disabled={busy === r.id + 'a'}
                           style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'attended' ? 'var(--ok-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'attended' ? 'var(--ok-bg)' : 'transparent', color: r.attendance_status === 'attended' ? 'var(--ok)' : 'var(--text-dim)' }}>✓ Asistió</button>
-                        <button onClick={() => setAsist(r, false)} disabled={busy === r.id + 'a'}
-                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? 'var(--bad-text)' : 'var(--text-dim)' }}>No vino</button>
+                        }
+                        {canWrite && <button onClick={() => setAsist(r, false)} disabled={busy === r.id + 'a'}
+                          style={{ padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${r.attendance_status === 'no_show' ? 'var(--bad-line)' : 'var(--border-strong)'}`, background: r.attendance_status === 'no_show' ? 'var(--bad-bg)' : 'transparent', color: r.attendance_status === 'no_show' ? 'var(--bad-text)' : 'var(--text-dim)' }}>No vino</button>}
+                        {!canWrite && r.attendance_status !== 'cancelled' && <span className="pill" style={{ fontSize: 13 }}>{r.attendance_status === 'attended' ? 'Asistió' : r.attendance_status === 'no_show' ? 'No vino' : 'Pendiente'}</span>}
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button ref={node => inscribirTriggerRef(node, r.id)} onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>
+                      {canWrite && <button ref={node => inscribirTriggerRef(node, r.id)} onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>}
                     </td>
                   </tr>
                   )
@@ -676,7 +693,7 @@ function Registrations({ centroId, eventId, grupoId, onChange }) {
               </tbody>
             </table></TableScroller>
           )}
-      {inscribir && (
+      {canWrite && inscribir && (
         <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
           returnFocusRef={inscribirReturnFocusRef}
           onClose={() => setInscribir(null)}

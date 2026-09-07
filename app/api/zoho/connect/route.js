@@ -3,13 +3,13 @@
 // aplica en el callback, cuando ya sabemos con qué cuenta se logueó.
 import crypto from 'node:crypto'
 import { cookies } from 'next/headers'
-import { requireAdmin } from '../../../../lib/auth'
+import { requireCurrentMaster } from '../../../../lib/auth'
 import { ZOHO_ACCOUNTS } from '../../../../lib/zoho-cobranza.mjs'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
-  try { await requireAdmin() } catch {
+  try { await requireCurrentMaster() } catch {
     return Response.redirect(new URL('/login', request.url))
   }
   if (!process.env.ZOHO_CLIENT_ID) {

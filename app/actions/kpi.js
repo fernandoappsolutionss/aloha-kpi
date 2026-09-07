@@ -1,6 +1,6 @@
 'use server'
 import { sql, upsertWith, withTransaction } from '../../lib/db'
-import { requireCentroAccess, requireCurrentPuedeCerrarMes } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeCerrarMes, requireCurrentWriteCentro } from '../../lib/auth'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
 import { balanceMensual, cierreKpiDeclarado, cuadroConBalanceDeclarado, ESTADO_MES_CERRANDO, INICIOS_CLASE_DESDE } from '../../lib/inicios-clase.mjs'
@@ -92,7 +92,7 @@ export async function loadKpiMes(centroId, year, month) {
   // los últimos valores guardados quedan visibles con la advertencia.
   let autoSync = null
   if (usaKpiAutomatico(year, month, estado)) {
-    const automatic = await fotoKpiAutomatica(centroId, intOr(year), intOr(month))
+    const automatic = await fotoKpiAutomatica(centroId, intOr(year), intOr(month), { persist: false })
     if (automatic.complete) {
       const automaticSummary = {}
       for (const key of CAMPOS_RESUMEN_AUTO) automaticSummary[key] = automatic.data[key]
@@ -230,7 +230,7 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
 }
 
 async function guardarKpiMes(centroId, year, month, config, semanas) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   return await withTransaction(async (query) => {
     const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
     if (errorMes) return { error: errorMes }

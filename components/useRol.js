@@ -17,10 +17,11 @@ export function useEsAsistente() {
 // Quien tiene panel propio en /dashboard: gerencia y coordinador operativo.
 // Dentro de /centro/* solo decide si se muestra "Volver al panel".
 export function tienePanel(rol) {
-  return rol === 'admin_general' || rol === 'supervisor' || rol === 'coordinador'
+  return rol === 'admin_master' || rol === 'admin_general' || rol === 'supervisor' || rol === 'coordinador'
 }
 
 export const ETIQUETA_ROL = {
+  admin_master: 'Administrador Master',
   admin_general: 'Administrador General',
   supervisor: 'Supervisor',
   coordinador: 'Coordinador Operativo',

@@ -1,6 +1,6 @@
 'use server'
 
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { alcancePanel, soloDeMisCentros } from '../../lib/alcance'
 import { sql } from '../../lib/db'
 import { GROWTH_ENGINE_VERSION } from '../../lib/growth/constants.mjs'
@@ -14,10 +14,13 @@ import {
 } from '../../lib/growth/notifications.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
 import { refreshAfterRecommendationUpdate } from '../../lib/growth/engine.mjs'
+import { puedeEscribirCentro } from '../../lib/current-user.mjs'
 
 export async function getCentroGrowth(centroId, options = {}) {
-  await requireCentroAccess(centroId)
-  return calculateCentroGrowth(centroId, { persist: options?.persist !== false })
+  const session = await requireCentroAccess(centroId)
+  return calculateCentroGrowth(centroId, {
+    persist: puedeEscribirCentro(session, centroId) && options?.persist !== false,
+  })
 }
 
 const receiptShape = (row) => row ? {
@@ -47,7 +50,16 @@ export async function getGrowthBriefing(centroId) {
   const session = await requireCentroAccess(centroId)
   const now = new Date()
   const weekStart = growthWeekStart(now)
-  const growth = await calculateCentroGrowth(centroId)
+  const canWrite = puedeEscribirCentro(session, centroId)
+  const growth = await calculateCentroGrowth(centroId, { persist: canWrite })
+  if (!canWrite) {
+    return {
+      shouldShow: false,
+      reason: 'readonly',
+      weekStart,
+      briefing: briefingShape(growth),
+    }
+  }
   let wasCreated = false
   let [receipt] = await sql`
     SELECT id, shown_at, acknowledged_at, snoozed_until
@@ -93,7 +105,7 @@ export async function getGrowthBriefing(centroId) {
 }
 
 export async function markGrowthBriefingShown(centroId) {
-  const session = await requireCentroAccess(centroId)
+  const session = await requireCurrentWriteCentro(centroId)
   const weekStart = growthWeekStart()
   await sql`
     UPDATE growth_notification_receipts
@@ -106,7 +118,7 @@ export async function markGrowthBriefingShown(centroId) {
 }
 
 export async function acknowledgeGrowthBriefing(centroId) {
-  const session = await requireCentroAccess(centroId)
+  const session = await requireCurrentWriteCentro(centroId)
   const weekStart = growthWeekStart()
   await sql`
     UPDATE growth_notification_receipts
@@ -117,7 +129,7 @@ export async function acknowledgeGrowthBriefing(centroId) {
 }
 
 export async function snoozeGrowthBriefing(centroId) {
-  const session = await requireCentroAccess(centroId)
+  const session = await requireCurrentWriteCentro(centroId)
   const weekStart = growthWeekStart()
   const snoozedUntil = snoozeUntilTomorrow()
   await sql`
@@ -129,7 +141,7 @@ export async function snoozeGrowthBriefing(centroId) {
 }
 
 export async function updateGrowthRecommendation(centroId, recommendationId, command) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   const id = Number(recommendationId)
   if (!Number.isInteger(id) || id <= 0) throw new Error('Recomendacion no valida')
   const status = recommendationStatusFor(command)
@@ -188,12 +200,14 @@ const adminGrowthRow = (growth, backtest) => {
 }
 
 export async function getGrowthAdminOverview() {
-  const { centros: centers, centroIds } = await alcancePanel()
+  const { sesion, centros: centers, centroIds } = await alcancePanel()
   const calculated = []
 
   for (let index = 0; index < centers.length; index += 3) {
     const batch = centers.slice(index, index + 3)
-    const settled = await Promise.allSettled(batch.map((center) => calculateCentroGrowth(center.id)))
+    const settled = await Promise.allSettled(batch.map((center) =>
+      calculateCentroGrowth(center.id, { persist: puedeEscribirCentro(sesion, center.id) })
+    ))
     settled.forEach((result, offset) => {
       calculated.push(result.status === 'fulfilled'
         ? { center: batch[offset], growth: result.value }

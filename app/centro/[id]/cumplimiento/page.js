@@ -7,6 +7,7 @@ import AyudaCumplimiento, { AyudaDuranteTour, BotonAyudaCumplimiento } from '../
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { loadCumplimiento, saveCumplimiento, getDisciplinaTrimestre, getMetasMarcadas } from '../../../actions/cumplimiento'
 import { getCentroNombre } from '../../../actions/centros'
 import { getCentroResumen } from '../../../actions/centro'
@@ -47,7 +48,7 @@ const VACIO = Object.fromEntries(CUMPLIMIENTO_KEYS.map((k) => [k, 'no']))
 // Fernando pidió "debe corregirse, y el sistema lo debe detectar de forma
 // automática": la detección estaba; la corrección era un secreto. Y hay que
 // pulsar Guardar en CADA mes del trimestre, porque cada fila es un mes.
-function AvisoDiscrepancia({ d }) {
+function AvisoDiscrepancia({ d, canWrite = true }) {
   if (!d) return null
   const varios = (d.meses || []).length > 1
   return (
@@ -57,11 +58,19 @@ function AvisoDiscrepancia({ d }) {
       </div>
       <p className="discrepancia__detalle">{d.detalle}</p>
       <p className="discrepancia__accion">
-        Para corregirlo, pulsa <b>Guardar</b> en este mes: el sistema vuelve a derivar la meta desde la base y
-        reemplaza la marca guardada.{' '}
-        {varios
-          ? `Cada fila es un mes, así que repítelo en las otras pestañas del trimestre (${d.nombresMeses}).`
-          : `Afecta a ${d.nombresMeses}: guarda en esa pestaña.`}
+        {canWrite ? (
+          <>
+            Para corregirlo, pulsa <b>Guardar</b> en este mes: el sistema vuelve a derivar la meta desde la base y
+            reemplaza la marca guardada.{' '}
+            {varios
+              ? `Cada fila es un mes, así que repítelo en las otras pestañas del trimestre (${d.nombresMeses}).`
+              : `Afecta a ${d.nombresMeses}: guarda en esa pestaña.`}
+          </>
+        ) : (
+          <>
+            Modo consulta: una cuenta operativa autorizada debe guardar ese mes para que el sistema vuelva a derivar la meta desde la base.
+          </>
+        )}
       </p>
       <p className="discrepancia__nota">{NOTA_NEUTRAL}</p>
     </div>
@@ -81,6 +90,8 @@ function CumplePill({ cumple }) {
 
 export default function CumplimientoPage() {
   const params = useParams()
+  const access = useCurrentAccess()
+  const canWrite = access.canWriteOperations
   // Período seleccionable (trimestre/año) — compartido con el resto del panel.
   // Permite registrar/editar el cumplimiento de meses de trimestres anteriores
   // (p. ej. Junio, que cae en Q2, aunque hoy el trimestre actual sea Q3).
@@ -184,13 +195,17 @@ export default function CumplimientoPage() {
     }))
   }
 
-  function toggle(k, v) { setVals(prev => ({ ...prev, [k]: v })) }
+  function toggle(k, v) {
+    if (!canWrite) return
+    setVals(prev => ({ ...prev, [k]: v }))
+  }
 
   // Las 3 claves de Producto ya NO viajan en el guardado. No es que la
   // pantalla se porte bien: es que el servidor las ignora y las deriva él
   // mismo (app/actions/cumplimiento.js). Mandarlas desde aquí sería sugerir
   // que el cliente puede decidirlas, y es justo lo que se cerró.
   async function save() {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!centroId) { setStatus('Modo demo — conéctate con cuenta real para guardar.'); return }
     setSaving(true); setStatus('')
     try {
@@ -252,11 +267,12 @@ export default function CumplimientoPage() {
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <div data-tour="cumplimiento.periodo"><PeriodSelector value={period} onChange={changePeriod} /></div>
             {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: status.includes('❌') ? 'var(--bad-text)' : 'var(--ok-text)', fontWeight: 500 }}>{status}</span>}
-            <button type="button" data-tour="cumplimiento.guardar" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">
+            {canWrite && <button type="button" data-tour="cumplimiento.guardar" onClick={save} disabled={saving||loading||Boolean(error)} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar'}
-            </button>
+            </button>}
           </div>
         </div>
+        {access.isReadonlyGlobal && <div className="alert" role="status" style={{ marginBottom: 16 }}>Administrador General · Solo lectura: puedes consultar cumplimiento, encuesta y ayudas, sin marcar casillas ni guardar.</div>}
 
         {/* El semáforo del trimestre, en la misma pantalla donde se marcan las
             casillas: para que nadie termine de marcar 30 criterios sin ver que
@@ -298,7 +314,7 @@ export default function CumplimientoPage() {
                     </div>
                   </div>
                   {ayudaAbierta === d.clave && <AyudaCumplimiento key={d.clave} clave={d.clave} nivelTitulo="h3" onClose={() => cerrarAyuda(d.clave)} />}
-                  <AvisoDiscrepancia d={discrepancias[d.clave]} />
+                  <AvisoDiscrepancia d={discrepancias[d.clave]} canWrite={canWrite} />
                 </div>
               ))}
             </div>
@@ -345,7 +361,7 @@ export default function CumplimientoPage() {
             </p>
           </div>
 
-          {year*100+qMonths[mes-1]>=202609 && <div id="encuesta-mensual"><EncuestasPanel key={`${centroId}-${year}-${qMonths[mes-1]}`} centroId={Number(centroId)} anio={year} mes={qMonths[mes-1]} compact onResumen={r=>{setVals(v=>({...v,encuestas_satisfaccion:r.cumple?'si':'no'}));if(r.cumple)setExiste(true);getDisciplinaTrimestre(centroId,year,quarter).then(setDisciplinaQ).catch(()=>{})}} /></div>}
+          {year*100+qMonths[mes-1]>=202609 && <div id="encuesta-mensual"><EncuestasPanel key={`${centroId}-${year}-${qMonths[mes-1]}`} centroId={Number(centroId)} anio={year} mes={qMonths[mes-1]} compact canWrite={canWrite} onResumen={r=>{setVals(v=>({...v,encuestas_satisfaccion:r.cumple?'si':'no'}));if(r.cumple)setExiste(true);getDisciplinaTrimestre(centroId,year,quarter).then(setDisciplinaQ).catch(()=>{})}} /></div>}
           <div className="disciplina__grupos">
           {DISCIPLINA_GRUPOS.map(group => (
             <div key={group.id} className="card" style={{ padding: '16px 20px' }}>
@@ -358,8 +374,8 @@ export default function CumplimientoPage() {
                   {group.claves.map(k => <Fragment key={k}>
                     <tr><th scope="row">{CUMPLIMIENTO_LABELS[k]}
                       <BotonAyudaCumplimiento clave={k} abierta={ayudaAbierta === k} onClick={() => abrirAyuda(k)} tour={k === 'asistencia_dias' ? 'cumplimiento.abrir-ayuda' : undefined} />
-                    </th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>
-                    {(k==='cartel_qr'||k==='wifi_gratis')&&<tr className="compliance-help-row"><td colSpan={3}><CartelDescargable key={`${centroId}-${k}`} tipo={k==='cartel_qr'?'google':'wifi'} centroId={centroId} centro={nombre}/></td></tr>}
+                    </th>{k === 'encuestas_satisfaccion' && year*100+qMonths[mes-1]>=202609 ? <td colSpan={2}><Link className="btn btn--compact" href={`#encuesta-mensual`}>{vals[k]==='si'?'✓ Hecho automáticamente':'Ver avance automático'}</Link></td> : ['si','no'].map(value => <td key={value}><button type="button" className="btn btn--compact" aria-pressed={vals[k]===value} disabled={!canWrite} onClick={()=>toggle(k,value)}>{value==='si' ? 'Sí' : 'No'}</button></td>)}</tr>
+                    {(k==='cartel_qr'||k==='wifi_gratis')&&<tr className="compliance-help-row"><td colSpan={3}><CartelDescargable key={`${centroId}-${k}`} tipo={k==='cartel_qr'?'google':'wifi'} centroId={centroId} centro={nombre} canWrite={canWrite}/></td></tr>}
                     {ayudaAbierta === k && <tr className="compliance-help-row"><td colSpan={3}><AyudaCumplimiento clave={k} onClose={() => cerrarAyuda(k)} /></td></tr>}
                   </Fragment>)}
                 </tbody></table>

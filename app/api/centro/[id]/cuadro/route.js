@@ -4,7 +4,7 @@
 // replicando el formato del cuadro real que se entrega a la Junta.
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
-import { getSession, isAdminRole } from '../../../../../lib/auth'
+import { requireCentroAccess } from '../../../../../lib/auth'
 import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
 import { cargarDatosCuadroExportacion, grupoPedidoCongelado } from '../../../../../lib/cuadro-export.mjs'
 import { calcularCuadro, leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
@@ -45,12 +45,13 @@ const observacion = (e) =>
 const limpio = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
 
 export async function GET(request, { params }) {
-  const s = await getSession()
-  if (!s) return Response.json({ error: 'No autenticado' }, { status: 401 })
   const { id } = await params
-  // Mismo criterio que requireCentroAccess: admin ve cualquier centro; una
-  // administradora solo el suyo.
-  if (!isAdminRole(s.rol) && String(s.centro_id) !== String(id)) {
+  try {
+    await requireCentroAccess(id)
+  } catch (error) {
+    if (/No autenticado/i.test(String(error?.message || error))) {
+      return Response.json({ error: 'No autenticado' }, { status: 401 })
+    }
     return Response.json({ error: 'No autorizado para este centro' }, { status: 403 })
   }
 

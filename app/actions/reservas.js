@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar, requireCurrentWriteCentro } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { aMinutos, aHora, aperturaDe, CIERRE_MIN } from '../../lib/inventario'
 import { ROLES_RESERVA, DURACION_CLASE_PRUEBA_MIN, franjaSugerida } from '../../lib/reservas'
@@ -34,7 +34,7 @@ export async function sugerenciaReserva(centroId, dia) {
 
 export async function guardarReserva(centroId, data) {
   try {
-    await requireCentroAccess(centroId)
+    await requireCurrentWriteCentro(centroId)
     const dia = Number(data?.dia)
     if (!(dia >= 1 && dia <= 7)) return { error: 'Día inválido (1 = lunes … 7 = domingo).' }
     if (!HORA_RE.test(data?.hora_inicio || '') || !HORA_RE.test(data?.hora_fin || '')) {

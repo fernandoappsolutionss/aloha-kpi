@@ -1,6 +1,6 @@
 'use server'
 import { sql, exec, upsert } from '../../lib/db'
-import { requireCentroAccess } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { hoyISO } from '../../lib/operaciones'
 import { getCentroResumen } from './centro'
@@ -140,7 +140,7 @@ export async function loadFoda(centroId, anio, trimestre) {
 
 export async function saveFoda(centroId, anio, trimestre, data) {
   try {
-    await requireCentroAccess(centroId)
+    await requireCurrentWriteCentro(centroId)
     const row = {
       centro_id: Number(centroId), anio: Number(anio), trimestre: Number(trimestre),
       fortalezas: data.fortalezas ?? null,

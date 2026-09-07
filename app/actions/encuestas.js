@@ -1,12 +1,14 @@
 'use server'
-import { requireCurrentCentroAccess } from '../../lib/auth'
+import { requireCurrentCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { encuestas } from '../../lib/encuestas/server'
 import { sql } from '../../lib/db'
 import { resumenEncuesta, textoFoda, validarPeriodo } from '../../lib/encuestas/domain.mjs'
 
-async function acceso(centroId) {
+async function acceso(centroId, { escritura = false } = {}) {
   if (!Number.isInteger(Number(centroId)) || Number(centroId)<1) throw new Error('Centro inválido.')
-  const user=await requireCurrentCentroAccess(Number(centroId))
+  const user = escritura
+    ? await requireCurrentWriteCentro(Number(centroId))
+    : await requireCurrentCentroAccess(Number(centroId))
   if (user.rol==='coach') throw new Error('Tu puesto no tiene acceso a las encuestas del centro.')
   return user
 }
@@ -21,10 +23,10 @@ export async function cargarEncuesta(centroId, anio, mes) {
   return accion(async()=>{await acceso(centroId);return encuestas.cargar(Number(centroId),anio,mes)})
 }
 export async function prepararEncuesta(centroId, anio, mes) {
-  return accion(async()=>{await acceso(centroId);return encuestas.preparar(Number(centroId),anio,mes)})
+  return accion(async()=>{await acceso(centroId,{escritura:true});return encuestas.preparar(Number(centroId),anio,mes)})
 }
 export async function registrarDifusionEncuesta(centroId,id,tipo) {
-  return accion(async()=>{const user=await acceso(centroId);return encuestas.registrarDifusion(Number(centroId),Number(id),tipo,user.id)})
+  return accion(async()=>{const user=await acceso(centroId,{escritura:true});return encuestas.registrarDifusion(Number(centroId),Number(id),tipo,user.id)})
 }
 export async function resumenEncuestasTrimestre(centroId,anio,trimestre) {
   return accion(async()=>{

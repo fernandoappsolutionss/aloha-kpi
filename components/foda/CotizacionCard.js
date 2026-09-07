@@ -33,7 +33,7 @@ function fieldsFromQuote(quote) {
 // Tarjeta de una cotización: junta los datos fiscales del proveedor con la
 // carga del PDF. El servidor sigue siendo la autoridad de validación — esto
 // solo evita subidas condenadas a fallar (país inválido, PDF de más de 10MB).
-export default function CotizacionCard({ centroId, peticionId, quote, index, onValidated, onStatus }) {
+export default function CotizacionCard({ centroId, peticionId, quote, index, onValidated, onStatus, preapprovedSupplierName, onBeforeUpload, onBusyChange }) {
   const [confirmRemove,setConfirmRemove]=useState(false)
   const [cotizacionId, setCotizacionId] = useState(quote?.id || null)
   const [values, setValues] = useState(fieldsFromQuote(quote))
@@ -54,6 +54,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quote?.id])
 
+  const preapproved = preapprovedSupplierName !== undefined
   const isValid = quote?.upload_status === 'valid'
   const isInvalid = quote?.upload_status === 'invalid'
   const isPending = quote?.upload_status === 'pending'
@@ -63,7 +64,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
     setValues((v) => ({ ...v, [name]: value }))
   }
 
-  const supplierComplete = Boolean(
+  const supplierComplete = preapproved ? Boolean(preapprovedSupplierName?.trim()) : Boolean(
     values.proveedorRazonSocial.trim() &&
     values.proveedorPais &&
     values.proveedorIdFiscal.trim() &&
@@ -85,8 +86,10 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
       return
     }
     setBusy(true)
+    onBusyChange?.(true)
     setProgress(0)
     try {
+      if (onBeforeUpload && !await onBeforeUpload()) throw new Error('No se pudo guardar el proveedor. Corrige el borrador antes de adjuntar.')
       const prepared = await prepareCotizacionUpload(centroId, {
         peticionId, cotizacionId, archivoNombre: file.name,
         proveedorRazonSocial: values.proveedorRazonSocial,
@@ -121,9 +124,16 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
       const message = err?.message || 'No se pudo subir el PDF.'
       setError(message)
       onStatus?.(`Error: ${message}`)
+      // Un reemplazo fallido invalida el PDF anterior en el servidor.
+      // Refresca esa situación antes de volver a habilitar el envío.
+      if (preapproved) {
+        try { await onValidated?.() } catch { /* El error de carga ya está visible. */ }
+      }
+    } finally {
+      setBusy(false)
+      onBusyChange?.(false)
+      setProgress(0)
     }
-    setBusy(false)
-    setProgress(0)
   }
 
   async function quitarIntento() {
@@ -139,7 +149,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
     setBusy(false)
   }
 
-  const titulo = Number.isFinite(index) ? `Cotización ${index + 1}` : 'Cotización'
+  const titulo = preapproved ? 'Cotización del servicio' : Number.isFinite(index) ? `Cotización ${index + 1}` : 'Cotización'
 
   return (
     <div className="foda-quote-card">
@@ -154,13 +164,14 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
           <p style={{ fontSize: 13, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span aria-hidden="true">✓</span> {quote.archivo_nombre}
           </p>
-          <p className="h-sub" style={{ marginTop: 2 }}>{values.proveedorRazonSocial} · {values.proveedorPais}</p>
+          <p className="h-sub" style={{ marginTop: 2 }}>{values.proveedorRazonSocial}{!preapproved && ` · ${values.proveedorPais}`}</p>
           <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setReplacing(true)}>
             Reemplazar antes de enviar
           </button>
         </div>
       ) : (
         <div>
+          {preapproved ? <p className="h-sub">Proveedor aprobado: {preapprovedSupplierName}</p> : <>
           <div className="foda-quote-fields">
             <label className="field">
               <span className="label">Razón social</span>
@@ -191,6 +202,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
               onChange={(e) => setField('emiteFacturaFiscal', e.target.checked)} disabled={busy} />
             Emite factura fiscal
           </label>
+          </>}
           <label className="field" style={{ marginTop: 10 }}>
             <span className="label">PDF de la cotización (1 byte – 10 MB)</span>
             <input type="file" name="cotizacionPdf" accept="application/pdf,.pdf" onChange={handleFile}

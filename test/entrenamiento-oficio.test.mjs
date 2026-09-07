@@ -384,7 +384,7 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.equal(puedeFirmar(admiMismo, alumnoAdm), false, 'una administradora no firma a otra administradora')
   assert.equal(puedeFirmar({ id: 5, rol: 'asistente', centroId: 7 }, alumnoAdm), false)
   // Gerencia: cualquier centro. Coordinador: solo los suyos.
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.equal(puedeFirmar({ id: 9, rol, centroId: null }, alumnoAdm), true)
     assert.equal(puedeFirmar({ id: 9, rol, centroId: 99 }, alumnoAsi), true)
   }
@@ -400,7 +400,7 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.deepEqual(rolesQueFirma('coach'), [])
   assert.deepEqual(rolesQueFirma('administradora').sort(), ['asistente', 'coach'])
   assert.deepEqual(rolesQueFirma('coordinador').sort(), ['administradora', 'asistente', 'coach'])
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.deepEqual(rolesQueFirma(rol).sort(), ['administradora', 'asistente', 'coach', 'coordinador'], `${rol} firma a los cuatro puestos`)
   }
   // NADIE SE QUEDA SIN OFICIAL: los cuatro puestos que se entrenan tienen al
@@ -415,9 +415,9 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.equal(puedeFirmar(admiOtro, coach7), false, 'una administradora de OTRO centro no le firma al coach')
   assert.equal(puedeFirmar({ id: 21, rol: 'coach', centroId: 7 }, coach7), false, 'un coach no le firma a otro coach')
   assert.equal(puedeFirmar({ id: 8, rol: 'coordinador', centros: [7] }, coach7), true)
-  // Al coordinador solo lo firma la Junta Directiva: supervisor y admin_general.
+  // Al coordinador solo lo firma la Junta Directiva: Administrador Master.
   const coord = { id: 30, rol: 'coordinador', centroId: null }
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.equal(puedeFirmar({ id: 9, rol, centroId: null }, coord), true)
   }
   assert.equal(puedeFirmar({ id: 31, rol: 'coordinador', centros: [7] }, coord), false, 'un coordinador no le firma a otro coordinador')
@@ -610,7 +610,7 @@ test('schema: la firma del drill existe y borrar al firmante no borra el progres
 
 test('firmarDrill: permiso verificado en el servidor y con auth fresca', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'firmarDrill')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /puedeFirmar\(/)
   assert.match(body, /Number\.isInteger\(usuarioId\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
@@ -618,7 +618,7 @@ test('firmarDrill: permiso verificado en el servidor y con auth fresca', () => {
 
 test('responderQuizOficio: valida el largo contra SU quiz y el gradiente ANTES de corregir', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'responderQuizOficio')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(body, /m\.quiz\.length/)
   assert.doesNotMatch(body, /length !== 3\b/, 'el largo no puede estar clavado en 3')
@@ -632,7 +632,7 @@ test('responderQuizOficio: valida el largo contra SU quiz y el gradiente ANTES d
 
 test('marcarEstudiado: solo ids de oficio y solo módulos del puesto de quien escribe', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'marcarEstudiado')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(body, /m\.roles\.includes\(u\.rol\)/)
   assert.match(body, /INSERT INTO entrenamiento_progreso/)

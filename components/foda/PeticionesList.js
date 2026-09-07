@@ -25,7 +25,7 @@ function quoteLabel(quote) {
 // borrar físicamente desde aquí: comentario/legado se eliminan directo;
 // una petición formal enviada exige anularla primero (dos pasos deliberados
 // para no perder por error el rastro de compras/proveedores).
-export default function PeticionesList({ items, permissions, uploadsAvailable, centroId, onRefresh, onStatus }) {
+export default function PeticionesList({ items, permissions, uploadsAvailable, centroId, onRefresh, onStatus, canWrite = true }) {
   const [confirmAction,setConfirmAction]=useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
@@ -33,10 +33,11 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
   const [addingFor, setAddingFor] = useState(null)
   const [cotizacionAprobadaByRow, setCotizacionAprobadaByRow] = useState({})
 
-  function startEdit(row) { setEditingId(row.id); setEditText(row.texto) }
+  function startEdit(row) { if (!canWrite) return; setEditingId(row.id); setEditText(row.texto) }
   function cancelEdit() { setEditingId(null); setEditText('') }
 
   async function saveEdit(row) {
+    if (!canWrite) return
     const texto = editText.trim()
     if (!texto) return
     setBusyId(row.id)
@@ -53,7 +54,8 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
   }
 
   async function setEstado(row, estado, cotizacionAprobadaId = null) {
-    if (estado === 'Aprobado' && row.tipo === 'peticion' && !cotizacionAprobadaId) {
+    if (!canWrite) return
+    if (estado === 'Aprobado' && row.tipo === 'peticion' && !row.proveedor_preaprobado && !cotizacionAprobadaId) {
       onStatus?.('Selecciona la cotización aprobada.')
       return
     }
@@ -69,6 +71,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
   }
 
   async function eliminar(row) {
+    if (!canWrite) return
     setBusyId(row.id)
     try {
       const res = await eliminarPeticion(centroId, row.id)
@@ -86,7 +89,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-      {confirmAction && <Dialog open title={confirmAction.type==='delete'?'Eliminar registro':'Anular petición'} onClose={()=>setConfirmAction(null)} closeDisabled={busyId!==null} footer={<><button type="button" className="btn" disabled={busyId!==null} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busyId!==null} onClick={async()=>{if(confirmAction.type==='delete')await eliminar(confirmAction.row);else await setEstado(confirmAction.row,'Anulada');setConfirmAction(null)}}>Confirmar</button></>}>
+      {canWrite && confirmAction && <Dialog open title={confirmAction.type==='delete'?'Eliminar registro':'Anular petición'} onClose={()=>setConfirmAction(null)} closeDisabled={busyId!==null} footer={<><button type="button" className="btn" disabled={busyId!==null} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busyId!==null} onClick={async()=>{if(confirmAction.type==='delete')await eliminar(confirmAction.row);else await setEstado(confirmAction.row,'Anulada');setConfirmAction(null)}}>Confirmar</button></>}>
         <p>{confirmAction.type==='delete'?'Esta acción no se puede deshacer y eliminará también los PDFs del registro.':'La petición quedará anulada. Confirma que deseas continuar.'}</p>
       </Dialog>}
       {items.map((row) => {
@@ -99,7 +102,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
         return (
           <div key={row.id} className="foda-request-row">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                 <span className="label" style={{ color: 'var(--text-muted)' }}>{tipoLabel(row)}</span>
                 {editingId === row.id ? (
                   <textarea aria-label="Editar comentario" name="comentarioEditado" autoComplete="off" className="input" value={editText} onChange={(e) => setEditText(e.target.value)}
@@ -108,10 +111,11 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                   <p style={{ marginTop: 6, fontSize: 13 }}>{row.texto}</p>
                 )}
                 <p className="h-sub" style={{ marginTop: 6 }}>
-                  {formatFecha(row.submitted_at)} · {cotizaciones.length} proveedor{cotizaciones.length === 1 ? '' : 'es'}
+                  {formatFecha(row.submitted_at)} · {row.proveedor_preaprobado ? `Proveedor aprobado del centro: ${row.proveedor_preaprobado_nombre}` : `${cotizaciones.length} proveedor${cotizaciones.length === 1 ? '' : 'es'}`}
+                  {row.proveedor_preaprobado && row.estado === 'Próximo trimestre' && ' · Pendiente de aprobación del coordinador operativo'}
                 </p>
               </div>
-              {row.canEditText && (
+              {canWrite && row.canEditText && (
                 <div style={{ display: 'flex', flexShrink: 0, gap: 6 }}>
                   {editingId === row.id ? (
                     <>
@@ -125,17 +129,21 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               )}
             </div>
 
+            {row.tipo === 'peticion' && <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
+              Estado: {row.proveedor_preaprobado && row.estado === 'Próximo trimestre' ? 'Pendiente de aprobación' : row.estado}
+            </p>}
+
             {row.estado === 'Aprobado' && cotizacionAprobada && (
               <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
                 Cotización aprobada: {cotizacionAprobada.proveedor_razon_social} — {cotizacionAprobada.archivo_nombre}
               </p>
             )}
 
-            {permissions?.canChangeStatus && !row.legacy && (
+            {canWrite && permissions?.canChangeStatus && !row.legacy && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 <span className="label" style={{ color: 'var(--text-muted)', marginRight: 2 }}>Estado:</span>
                 {PETICION_ESTADOS.map((estado) => {
-                  if (estado === 'Aprobado' && row.tipo === 'peticion') {
+                  if (estado === 'Aprobado' && row.tipo === 'peticion' && !row.proveedor_preaprobado) {
                     return (
                       <button key={estado} type="button" disabled={busyId === row.id || !selectedCotizacionAprobada}
                         onClick={() => setEstado(row, estado, selectedCotizacionAprobada)}
@@ -151,7 +159,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                     </button>
                   )
                 })}
-                {row.tipo === 'peticion' && (
+                {row.tipo === 'peticion' && !row.proveedor_preaprobado && (
                   <select
                     name="cotizacionAprobada" aria-label="Cotización ganadora"
                     className="input"
@@ -168,7 +176,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               </div>
             )}
 
-            {permissions?.canChangeStatus && (
+            {canWrite && permissions?.canDelete && (
               row.tipo === 'peticion' ? (
                 row.estado === 'Anulada' && (
                   <button type="button" className="btn" disabled={busyId === row.id}
@@ -196,7 +204,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               </div>
             )}
 
-            {retryQuotes.length > 0 && (
+            {canWrite && retryQuotes.length > 0 && (
               <div className="foda-quote-grid" style={{ marginTop: 10 }}>
                 {retryQuotes.map((quote, i) => (
                   <CotizacionCard key={quote.id} centroId={centroId} peticionId={row.id} quote={quote} index={i}
@@ -205,7 +213,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               </div>
             )}
 
-            {row.canAddQuote && (
+            {canWrite && row.canAddQuote && (
               uploadsAvailable ? (
                 showAdding ? (
                   <div className="foda-quote-grid" style={{ marginTop: 10 }}>

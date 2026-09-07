@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireCentroAccess, requireCurrentPuedeEliminar } from '../../lib/auth'
+import { requireCentroAccess, requireCurrentPuedeEliminar, requireCurrentWriteCentro } from '../../lib/auth'
 import { crmCall, crmAccountForCentro, crmConfigured, crmBaseUrl } from '../../lib/crm'
 import { armarAlohaGroup } from '../../lib/cupos-sync'
 import { encolarSyncCrm } from '../../lib/llenado-service'
@@ -135,7 +135,7 @@ async function grupoValido(centroId, grupoId, conservarId = null) {
 }
 
 export async function crearEvento(centroId, data) {
-  const s = await requireCentroAccess(centroId)
+  const s = await requireCurrentWriteCentro(centroId)
   const accountId = crmAccountForCentro(centroId)
   if (!accountId) return { error: 'Este centro no tiene cuenta de CRM asignada.' }
   if (!data?.name?.trim() || !data?.start_date) return { error: 'Nombre y fecha de inicio son requeridos.' }
@@ -160,7 +160,7 @@ async function eventoDelCentro(centroId, eventId) {
 }
 
 export async function actualizarEvento(centroId, eventId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   // El vínculo actual se lee junto con la pertenencia: si el grupo del evento
   // ya no acepta nuevos pero el formulario lo CONSERVA tal cual, se permite
   // (grupoValido con conservarId) — solo el vínculo NUEVO exige ventana abierta.
@@ -197,7 +197,7 @@ export async function eliminarEvento(centroId, eventId) {
 }
 
 export async function duplicarEvento(centroId, eventId) {
-  const s = await requireCentroAccess(centroId)
+  const s = await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
   // El duplicado hereda el grupo por aperturar del original, pero el CRM
@@ -237,7 +237,7 @@ export async function listarRegistros(centroId, eventId) {
 }
 
 export async function agregarInvitado(centroId, eventId, data) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   if (!data?.first_name?.trim()) return { error: 'El nombre es requerido.' }
   const res = await crmCall('add_registration', {
@@ -253,7 +253,7 @@ export async function agregarInvitado(centroId, eventId, data) {
 }
 
 export async function marcarAsistencia(centroId, eventId, registrationId, attended) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,
@@ -264,7 +264,7 @@ export async function marcarAsistencia(centroId, eventId, registrationId, attend
 }
 
 export async function marcarPago(centroId, eventId, registrationId, paid) {
-  await requireCentroAccess(centroId)
+  await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,

@@ -10,8 +10,9 @@
 // autorizado y se verifica con puedeFirmar); las respuestas del quiz viven en
 // respuestas-oficio/ (solo servidor) y jamás llegan al cliente.
 import { sql, withTransaction } from '../../lib/db'
-import { requireSession, requireCurrentUser, requireCurrentAdmin, isAdminRole } from '../../lib/auth'
+import { requireCurrentOficio, requireCurrentMaster } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
+import { isMaster } from '../../lib/current-user.mjs'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
 import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/todas'
@@ -169,7 +170,7 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
 // se revisa no se estorban: son dos listas distintas en la misma respuesta.
 export async function cargarOficio() {
   return runAction('cargarOficio', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentOficio()
     const plan = planDeRol(u.rol, MODULOS_OFICIO)
     // `conPlan` agrega los metadatos módulo a módulo: es lo que la pantalla de
     // revisión pinta como checksheet del plan ajeno.
@@ -180,7 +181,7 @@ export async function cargarOficio() {
       usuarioId: Number(u.id),
       rol: u.rol,
       rolNombre: NOMBRE_ROL[u.rol] || u.rol,
-      veMatriz: isAdminRole(u.rol),
+      veMatriz: isMaster(u),
       puedeFirmarA: rolesQueFirma(u.rol),
       revision,
     }
@@ -227,14 +228,14 @@ export async function cargarOficio() {
 // tres planes ajenos en cada visita.
 export async function resumenOficio() {
   return runAction('resumenOficio', async () => {
-    const s = await requireSession()
+    const s = await requireCurrentOficio()
     const plan = planDeRol(s.rol, MODULOS_OFICIO)
     const revision = planesDeRevision(s.rol)
     // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
     // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
     // enlace se decide con isAdminRole, la misma fuente que ese layout, no
     // comparando nombres de rol en el navegador.
-    const veMatriz = isAdminRole(s.rol)
+    const veMatriz = isMaster(s)
     if (plan.length === 0) {
       if (revision.length === 0) return null
       return { modo: 'revision', rol: s.rol, rolNombre: NOMBRE_ROL[s.rol] || s.rol, veMatriz, revision }
@@ -268,7 +269,7 @@ export async function resumenOficio() {
 
 export async function cargarConceptos(modulo) {
   return runAction('cargarConceptos', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
@@ -287,7 +288,7 @@ export async function cargarConceptos(modulo) {
 
 export async function guardarConcepto(modulo, slug, texto) {
   return runAction('guardarConcepto', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
@@ -333,7 +334,7 @@ export async function guardarConcepto(modulo, slug, texto) {
 // alguien borrado o con el rol cambiado no debe poder escribir.
 export async function marcarEstudiado(modulo) {
   return runAction('marcarEstudiado', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
@@ -373,7 +374,7 @@ export async function marcarEstudiado(modulo) {
 // → { puntaje, minimo, total, correctas:[bool], explicaciones:[string], repasa:[[slug]], aprobado }
 export async function responderQuizOficio(modulo, respuestas) {
   return runAction('responderQuizOficio', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if (!m.roles.includes(u.rol)) return { error: 'Este módulo no es de tu puesto.' }
@@ -445,7 +446,7 @@ function comoFirmante(u) {
 // pantalla lo dice con esas palabras y pide los criterios de todos juntos.
 export async function firmarDrill(usuarioId, modulo) {
   return runAction('firmarDrill', async () => {
-    const firmante = await requireCurrentUser()
+    const firmante = await requireCurrentOficio()
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
@@ -479,7 +480,7 @@ export async function firmarDrill(usuarioId, modulo) {
 // Quitar una firma puesta por error. Mismo permiso que ponerla.
 export async function quitarFirmaDrill(usuarioId, modulo) {
   return runAction('quitarFirmaDrill', async () => {
-    const firmante = await requireCurrentUser()
+    const firmante = await requireCurrentOficio()
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const alumno = await alumnoDe(usuarioId)
@@ -499,7 +500,7 @@ export async function quitarFirmaDrill(usuarioId, modulo) {
 // → { rol, filas:[{ usuarioId, nombre, email, rol, centro, centroId, modulos:[…] }] }
 export async function colaFirmas(centroId = null) {
   return runAction('colaFirmas', async () => {
-    const firmante = await requireCurrentUser()
+    const firmante = await requireCurrentOficio()
     const roles = rolesQueFirma(firmante.rol)
     if (roles.length === 0) return { rol: firmante.rol, filas: [] }
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
@@ -585,7 +586,7 @@ export async function colaFirmas(centroId = null) {
 // → { n } (0 para quien no le firma a nadie)
 export async function contadorFirmas(centroId = null) {
   return runAction('contadorFirmas', async () => {
-    const firmante = await requireCurrentUser()
+    const firmante = await requireCurrentOficio()
     const roles = rolesQueFirma(firmante.rol)
     if (roles.length === 0) return { n: 0 }
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
@@ -627,7 +628,7 @@ export async function contadorFirmas(centroId = null) {
 // haga falta la vista de red, el cambio es el de arriba, no un `||` aquí.
 export async function matrizOficio(centroId = null) {
   return runAction('matrizOficio', async () => {
-    await requireCurrentAdmin()
+    await requireCurrentMaster()
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     // Los centros de usuario_centros VIAJAN, no solo filtran. Para el
     // Coordinador Operativo `usuarios.centro_id` es NULL —manda en varios

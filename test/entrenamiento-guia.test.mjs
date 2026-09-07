@@ -114,7 +114,7 @@ test('actions de conceptos usan usuario fresco, slugs vivos, ReadCommitted y can
   assert.match(src, /function palabrasVivas\(m\)/)
 
   const cargar = src.slice(src.indexOf('export async function cargarConceptos'), src.indexOf('export async function guardarConcepto'))
-  assert.match(cargar, /requireCurrentUser\(\)/)
+  assert.match(cargar, /requireCurrentOficio\(\)/)
   assert.match(cargar, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(cargar, /m\.roles\.includes\(u\.rol\)/)
   assert.match(cargar, /usuario_id = \$\{u\.id\}/)
@@ -122,7 +122,7 @@ test('actions de conceptos usan usuario fresco, slugs vivos, ReadCommitted y can
   assert.match(cargar, /slug = ANY\(\$\{vivos\}\)/)
 
   const guardar = src.slice(src.indexOf('export async function guardarConcepto'), src.indexOf('export async function marcarEstudiado'))
-  assert.match(guardar, /requireCurrentUser\(\)/)
+  assert.match(guardar, /requireCurrentOficio\(\)/)
   assert.match(guardar, /withTransaction\([\s\S]*\{ isolationLevel: 'ReadCommitted' \}\)/)
   assert.match(guardar, /pg_advisory_xact_lock\(hashtext\('conceptos:' \|\| \$\{u\.id\} \|\| ':' \|\| \$\{modulo\}\)\)/)
   assert.match(guardar, /ec\.slug <> \$\{slug\}/)

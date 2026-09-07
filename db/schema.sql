@@ -22,10 +22,33 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre         TEXT NOT NULL,
   email          TEXT NOT NULL UNIQUE,
   password_hash  TEXT,
-  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_general | supervisor | coordinador | administradora | asistente | coach
+  rol            TEXT NOT NULL DEFAULT 'administradora', -- admin_master | admin_general (lectura) | supervisor | coordinador | administradora | asistente | coach
   centro_id      INTEGER REFERENCES centros(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ DEFAULT now()
 );
+
+-- Acceso Master y bloqueos temporales (expansión compatible).
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ;
+
+ALTER TABLE usuarios
+  DROP CONSTRAINT IF EXISTS usuarios_master_email,
+  ADD CONSTRAINT usuarios_master_email
+    CHECK (rol <> 'admin_master' OR lower(email) = 'fperez@teamsolutionss.com');
+CREATE UNIQUE INDEX IF NOT EXISTS usuarios_unico_master ON usuarios (rol) WHERE rol='admin_master';
+
+-- IDs históricos deliberadamente sin cascada/FK: eliminar una cuenta no debe
+-- borrar ni desidentificar la auditoría de sus bloqueos previos.
+CREATE TABLE IF NOT EXISTS usuario_acceso_historial (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  actor_id INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('block','unblock')),
+  previous_blocked_until TIMESTAMPTZ,
+  new_blocked_until TIMESTAMPTZ,
+  motivo TEXT NOT NULL CHECK (length(trim(motivo)) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS usuario_acceso_historial_usuario ON usuario_acceso_historial(user_id,created_at DESC);
 
 -- Centros de un coordinador operativo (N:N). Los demás roles usan
 -- usuarios.centro_id; el coordinador manda como administrador en varios.
