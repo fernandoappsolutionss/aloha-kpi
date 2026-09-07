@@ -52,3 +52,24 @@ test('sin token no se inventa link de asistencia', () => {
   const [g] = presentarMisGrupos({ grupos: [grupo({ token: null })], hoy: '2026-09-04' })
   assert.equal(g.linkAsistencia, null)
 })
+
+// EL MENÚ DEL CENTRO SE ARMA CON EL id DE LA URL. Sidebar decide sus enlaces con
+// `centroId ? (esCoach ? coachItems : ...) : []`: una página de /centro/[id] que
+// monte <Sidebar /> sin ese prop sale con el menú VACÍO — que es exactamente
+// como llegó "Mis grupos" a producción, dejando al coach sin ver su
+// entrenamiento. La regla vale para todas las pantallas del centro, no solo la
+// del coach.
+test('toda pantalla de /centro/[id] le pasa centroId al Sidebar', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const base = new URL('../app/centro/[id]/', import.meta.url)
+  const paginas = readdirSync(base, { recursive: true })
+    .map(String)
+    .filter((p) => p === 'page.js' || p.endsWith('/page.js'))
+  assert.ok(paginas.length >= 10, 'se esperaban las pantallas del centro')
+  for (const pagina of paginas) {
+    const fuente = readFileSync(new URL(pagina, base), 'utf8')
+    for (const etiqueta of fuente.match(/<Sidebar[^/>]*\/?>/g) || []) {
+      assert.match(etiqueta, /centroId=/, `app/centro/[id]/${pagina}: <Sidebar> sin centroId deja el menú vacío`)
+    }
+  }
+})
