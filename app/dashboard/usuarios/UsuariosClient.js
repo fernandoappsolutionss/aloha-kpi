@@ -128,7 +128,7 @@ export default function UsuariosClient({ initialData }) {
   const router = useRouter()
   const access = resolveAccess({ actor: initialData.actor, centers: initialData.centers, capabilities: initialData.capabilities })
   const assignableRoles = (initialData.assignableRoles || []).filter((role) => role !== 'admin_master')
-  const EMPTY_FORM = { nombre: '', email: '', rol: assignableRoles[0] || '', centro_id: initialData.centers[0]?.id || '', centros: [] }
+  const EMPTY_FORM = { nombre: '', coach_id: '', email: '', rol: assignableRoles[0] || '', centro_id: initialData.centers[0]?.id || '', centros: [] }
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [status, setStatus] = useState('')
@@ -143,6 +143,12 @@ export default function UsuariosClient({ initialData }) {
   const cancelDeleteRef = useRef(null)
   const cancelBlockRef = useRef(null)
   const noCenters = access.isCoordinator && initialData.centers.length === 0
+  // LA CUENTA DEL COACH SE ESCOGE DE LA LISTA DEL CENTRO, no se teclea: la ficha
+  // ya existe en Grupos y Fusiones y de ella cuelgan sus grupos. Si el centro
+  // todavía no tiene coaches registrados, se cae al nombre libre (y se dice).
+  const coachesDelCentro = useMemo(() => (initialData.coaches || [])
+    .filter(coach => Number(coach.centroId) === Number(form.centro_id)), [initialData.coaches, form.centro_id])
+  const eligeFicha = form.rol === 'coach' && !editing && coachesDelCentro.length > 0
   const scopedUsers = useMemo(() => centerFilter === 'all'
     ? (initialData.users || [])
     : initialData.users.filter(user => (user.centerIds || []).includes(Number(centerFilter))),
@@ -168,7 +174,7 @@ export default function UsuariosClient({ initialData }) {
   function editUser(user) {
     if (!user.effectiveActions.edit) return
     setEditing(user.id)
-    setForm({ nombre: user.nombre, email: user.email, rol: user.role, centro_id: user.centerId ?? '', centros: user.centerIds })
+    setForm({ nombre: user.nombre, coach_id: '', email: user.email, rol: user.role, centro_id: user.centerId ?? '', centros: user.centerIds })
     setStatus(''); setAccessResult(null); setShowForm(true)
   }
   async function saveUser(event) {
@@ -178,7 +184,7 @@ export default function UsuariosClient({ initialData }) {
     return submitOnce('save', async () => {
       setAccessResult(null)
       const snapshot = { nombre: form.nombre, email: form.email }
-      const input = { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id, centros: form.centros, ...(!editing ? { email: form.email } : {}) }
+      const input = { nombre: form.nombre, rol: form.rol, centro_id: form.centro_id, centros: form.centros, ...(!editing ? { email: form.email, coach_id: form.coach_id } : {}) }
       const result = editing ? await updateUsuario(editing, input) : await createUsuario(input)
       if (result?.error) { setStatus(`❌ ${result.error}`); return }
       const wasEditing = Boolean(editing)
@@ -278,20 +284,33 @@ export default function UsuariosClient({ initialData }) {
         {!editing && <p>Se generará un enlace para que el usuario cree su propia contraseña.</p>}
         <form aria-label="Editor de usuario" onSubmit={saveUser}>
           <div className="form-grid">
-            <div className="field"><label className="label" htmlFor="users-name">Nombre</label>
-              <input id="users-name" name="nombre" type="text" autoComplete="name" required className="input" value={form.nombre} onChange={event => setForm({ ...form, nombre: event.target.value })} disabled={disabled} />
+            <div className="field"><label className="label" htmlFor={eligeFicha ? 'users-coach' : 'users-name'}>{eligeFicha ? 'Coach del centro' : 'Nombre'}</label>
+              {eligeFicha
+                ? <><select id="users-coach" name="coach_id" required className="input" value={form.coach_id}
+                  onChange={event => {
+                    const ficha = coachesDelCentro.find(coach => String(coach.id) === event.target.value)
+                    setForm({ ...form, coach_id: event.target.value, nombre: ficha?.nombre || '' })
+                  }} disabled={disabled}>
+                  <option value="">Escoge un coach…</option>
+                  {coachesDelCentro.map(coach => <option key={coach.id} value={coach.id} disabled={coach.conCuenta}>
+                    {coach.nombre}{coach.conCuenta ? ' · ya tiene cuenta' : ''}
+                  </option>)}
+                </select>
+                <p className="h-sub">Solo falta su correo. La lista sale de los coaches del centro en Grupos y Fusiones.</p></>
+                : <><input id="users-name" name="nombre" type="text" autoComplete="name" required className="input" value={form.nombre} onChange={event => setForm({ ...form, nombre: event.target.value })} disabled={disabled} />
+                  {form.rol === 'coach' && !editing && <p className="h-sub">Este centro todavía no tiene coaches registrados en Grupos y Fusiones. Puedes escribir el nombre, pero la cuenta no quedará ligada a su horario.</p>}</>}
             </div>
             <div className="field"><label className="label" htmlFor="users-email">Correo</label>
               <input id="users-email" name="email" type="email" autoComplete="email" spellCheck={false} required className="input" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} disabled={disabled || Boolean(editing)} />
             </div>
             <div className="field"><label className="label" htmlFor="users-role">Rol</label>
-              <select id="users-role" name="rol" required className="input" value={form.rol} onChange={event => setForm({ ...form, rol: event.target.value, centro_id: initialData.centers.length === 1 ? initialData.centers[0].id : form.centro_id, centros: [] })} disabled={disabled}>
+              <select id="users-role" name="rol" required className="input" value={form.rol} onChange={event => setForm({ ...form, rol: event.target.value, nombre: '', coach_id: '', centro_id: initialData.centers.length === 1 ? initialData.centers[0].id : form.centro_id, centros: [] })} disabled={disabled}>
                 {assignableRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}
               </select>
               <p className="h-sub">{ROLES[form.rol]?.help}</p>
             </div>
             {UN_CENTRO.includes(form.rol) && <div className="field"><label className="label" htmlFor="users-center">Centro</label>
-              <select id="users-center" name="centro_id" required={access.isCoordinator} className="input" value={form.centro_id} onChange={event => setForm({ ...form, centro_id: event.target.value })} disabled={disabled}>
+              <select id="users-center" name="centro_id" required={access.isCoordinator} className="input" value={form.centro_id} onChange={event => setForm({ ...form, centro_id: event.target.value, ...(form.rol === 'coach' && !editing ? { nombre: '', coach_id: '' } : {}) })} disabled={disabled}>
                 {!access.isCoordinator && <option value="">Sin asignar</option>}
                 {initialData.centers.map(center => <option key={center.id} value={center.id}>{center.nombre}</option>)}
               </select>

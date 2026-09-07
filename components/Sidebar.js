@@ -241,9 +241,10 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos`, tour: 'nav.eventos' },
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null },
   ]
-  // El Coach solo alcanza el árbol de entrenamiento (lo encierra el
-  // middleware). Su contador muestra únicamente el plan de oficio.
+  // El Coach solo alcanza sus grupos y el árbol de entrenamiento (lo encierra
+  // el middleware). Su contador muestra únicamente el plan de oficio.
   const coachItems = [
+    { label: 'Mis grupos', icon: 'groups', href: `/centro/${centroId}/mis-grupos` },
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, entrenamiento: true },
   ]
 

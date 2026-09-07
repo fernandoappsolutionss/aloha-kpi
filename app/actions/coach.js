@@ -10,8 +10,10 @@ import { horarioTextoDe } from '../../lib/modelo'
 import { hoyISO } from '../../lib/operaciones'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
 import { errorFechaAsistencia } from '../../lib/retiros.mjs'
-import { requireCurrentCentroAccess } from '../../lib/auth'
+import { requireCurrentCentroAccess, requireCurrentUser } from '../../lib/auth'
 import { consultarDesercionComparada } from '../../lib/desercion-comparada.mjs'
+import { presentarMisGrupos } from '../../lib/coach-mis-grupos.mjs'
+import { randomBytes } from 'crypto'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const ESTADOS = ['presente', 'ausente', 'justificada']
@@ -145,4 +147,76 @@ export async function getDesercionPorCoach(centroId, anio, trimestre) {
     throw new Error('Centro o periodo inválido.')
   }
   return consultarDesercionComparada(sql, { centroId: id, anio: year, trimestre: quarter })
+}
+
+// ── MIS GRUPOS (lectura autenticada por SESIÓN, para el propio coach) ───────
+// El coach entra con su cuenta y ve lo suyo: sus grupos, los niños de cada uno,
+// el itinerario con lo que ya marcó y el botón a su lista de asistencia. El
+// puente entre la cuenta y el horario es coaches.usuario_id — un coach que da
+// clases en dos centros tiene dos fichas y una sola cuenta, así que aquí salen
+// los grupos de TODAS sus fichas, no solo los de su centro base.
+export async function misGruposCoach() {
+  const user = await requireCurrentUser()
+  const grupos = await sql`
+    SELECT g.id, g.numero, g.itinerario, g.itinerario_clases, g.coach_token, c.nombre AS centro_nombre
+    FROM grupos g
+    JOIN coaches co ON co.id = g.coach_id
+    JOIN centros c ON c.id = g.centro_id
+    WHERE co.usuario_id = ${user.id} AND g.estado = 'activo'
+    ORDER BY c.nombre, g.numero
+  `
+  if (!grupos.length) return { grupos: [] }
+
+  // El token del grupo se generaba solo cuando la administradora pedía el link.
+  // Si el coach llega antes que ella, se genera aquí: es el mismo link estable.
+  for (const g of grupos) {
+    if (g.coach_token) continue
+    // COALESCE: si otra pestaña lo generó primero, gana el que ya está guardado.
+    const [fila] = await sql`
+      UPDATE grupos SET coach_token = COALESCE(coach_token, ${randomBytes(18).toString('base64url')}),
+        updated_at = ${new Date().toISOString()}
+      WHERE id = ${g.id} RETURNING coach_token
+    `
+    g.coach_token = fila?.coach_token || null
+  }
+
+  const ids = grupos.map((g) => Number(g.id))
+  const horarios = await sql`
+    SELECT grupo_id, dia, hora_inicio, hora_fin FROM grupo_horarios
+    WHERE grupo_id = ANY(${ids}) ORDER BY grupo_id, dia, hora_inicio
+  `
+  const estudiantes = await sql`
+    SELECT id, grupo_id, nombre, itinerario, nivel, estado, nota_coach FROM estudiantes
+    WHERE grupo_id = ANY(${ids}) AND estado IN ('activo', 'baja_potencial')
+    ORDER BY nombre
+  `
+  const asistencias = await sql`
+    SELECT grupo_id, estudiante_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, estado
+    FROM asistencias WHERE grupo_id = ANY(${ids})
+  `
+  const porGrupo = (filas) => {
+    const mapa = new Map(ids.map((id) => [id, []]))
+    for (const fila of filas) mapa.get(Number(fila.grupo_id))?.push(fila)
+    return mapa
+  }
+  const horariosDe = porGrupo(horarios)
+  const estudiantesDe = porGrupo(estudiantes)
+  const asistenciasDe = porGrupo(asistencias)
+
+  return {
+    grupos: presentarMisGrupos({
+      hoy: hoyISO(),
+      grupos: grupos.map((g) => ({
+        id: Number(g.id),
+        numero: g.numero,
+        itinerario: g.itinerario,
+        centro: g.centro_nombre || '',
+        horarioTexto: horarioTextoDe(horariosDe.get(Number(g.id))),
+        token: g.coach_token,
+        itinerarioClases: itinerarioDe(g),
+        estudiantes: estudiantesDe.get(Number(g.id)) || [],
+        asistencias: asistenciasDe.get(Number(g.id)) || [],
+      })),
+    }),
+  }
 }

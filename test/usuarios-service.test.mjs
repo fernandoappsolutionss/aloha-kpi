@@ -44,6 +44,13 @@ function writeFixture({
   const coordinatorCenters = []
   const blocked = []
   const audit = []
+  const coachLinks = []
+  const coachUnlinks = []
+  const coachRows = new Map([
+    [501, { id: 501, centro_id: 10, nombre: 'CRISTOPHER', activo: true, usuario_id: null }],
+    [502, { id: 502, centro_id: 12, nombre: 'DAYANI', activo: true, usuario_id: 77 }],
+    [503, { id: 503, centro_id: 10, nombre: 'INACTIVA', activo: false, usuario_id: null }],
+  ])
   const events = []
   const transactionOptions = []
   const targets = new Map([
@@ -151,6 +158,22 @@ function writeFixture({
       centerState.set(Number(userId), [...ids])
       if (relationsError) throw relationsError
     },
+    lockCoach: async (query, id) => {
+      events.push(`coach:${query.transaction}:${id}`)
+      return coachRows.get(Number(id)) || null
+    },
+    linkCoachToUser: async (query, coachId, usuarioId) => {
+      events.push(`coach-link:${query.transaction}:${coachId}`)
+      coachLinks.push({ coachId, usuarioId })
+      writeCount++
+      const ficha = coachRows.get(Number(coachId))
+      if (ficha) coachRows.set(Number(coachId), { ...ficha, usuario_id: Number(usuarioId) })
+    },
+    unlinkCoachUser: async (query, usuarioId) => {
+      events.push(`coach-unlink:${query.transaction}:${usuarioId}`)
+      coachUnlinks.push(Number(usuarioId))
+      writeCount++
+    },
     deleteUser: async (query, id) => {
       events.push(`delete:${query.transaction}:${id}`)
       deleted.push(id)
@@ -208,6 +231,9 @@ function writeFixture({
     coordinatorCenters,
     blocked,
     audit,
+    coachLinks,
+    coachUnlinks,
+    coachRow: (id) => coachRows.get(Number(id)),
     events,
     transactionOptions,
     transactionCount: () => transactions,
@@ -220,13 +246,19 @@ function writeFixture({
   }
 }
 
-function readRepo(actor = coord, users = rows) {
+const fichasCoach = [
+  { id: 501, centro_id: 10, nombre: 'CRISTOPHER', usuario_id: null },
+  { id: 502, centro_id: 12, nombre: 'DAYANI', usuario_id: 77 },
+]
+
+function readRepo(actor = coord, users = rows, coaches = fichasCoach) {
   const calls = []
   const repo = {
     calls,
     transaction: async (work) => work(repo),
     loadActor: async (_q, uid, options) => { calls.push(['actor', uid, options]); return actor },
     listUsers: async (_q, scope) => { calls.push(['users', scope]); return users },
+    listCoaches: async (_q, scope) => { calls.push(['coaches', scope]); return coaches },
     listCenters: async (_q, scope) => {
       calls.push(['centers', scope])
       return Array.isArray(scope) && scope.length === 0 ? [] : [{ id: 10, nombre: 'ANCLAS' }, { id: 12, nombre: 'DAVID' }]
@@ -926,4 +958,72 @@ test('repositorio relee duplicado y bloquea objetivo sin interpolar entradas', a
   assert.deepEqual(calls.map((call) => call.values), [['A@ALOHA.INVALID'], [9], [9], [9]])
   assert.match(calls[1].text, /FOR UPDATE/)
   assert.match(calls[2].text, /ORDER BY centro_id FOR SHARE/)
+})
+
+// ── LA CUENTA DEL COACH SALE DE SU FICHA ───────────────────────────────────
+// La administradora ya registró al coach en Grupos y Fusiones (ahí cuelgan sus
+// grupos). Al darle cuenta escoge esa ficha y solo teclea el correo: el nombre
+// lo pone el servidor y la cuenta queda pegada al horario por coaches.usuario_id.
+test('crear coach desde la ficha toma el nombre de la ficha y la enlaza', async () => {
+  const fx = writeFixture()
+  const result = await fx.service.create({ uid: 2 }, {
+    nombre: 'lo que sea que mande el navegador',
+    email: 'coach@aloha.invalid',
+    rol: 'coach',
+    centro_id: 10,
+    coach_id: 501,
+  })
+  assert.equal(result.ok, true)
+  assert.equal(fx.inserted[0].nombre, 'CRISTOPHER')
+  assert.deepEqual(fx.coachLinks, [{ coachId: 501, usuarioId: 30 }])
+  // La ficha se bloquea ANTES de insertar la cuenta.
+  const orden = fx.events.filter((e) => e.startsWith('coach:') || e.startsWith('insert:') || e.startsWith('coach-link:'))
+  assert.deepEqual(orden, ['coach:1:501', 'insert:1', 'coach-link:1:501'])
+})
+
+test('crear coach sin ficha sigue aceptando el nombre tecleado', async () => {
+  const fx = writeFixture()
+  await fx.service.create({ uid: 2 }, { nombre: 'Nueva Coach', email: 'n@aloha.invalid', rol: 'coach', centro_id: 10 })
+  assert.equal(fx.inserted[0].nombre, 'Nueva Coach')
+  assert.deepEqual(fx.coachLinks, [])
+})
+
+test('la ficha del coach se valida: centro, estado y cuenta previa', async () => {
+  const casos = [
+    [502, 'Ese coach no está en el centro seleccionado.'],
+    [503, 'Ese coach está desactivado.'],
+    [999, 'Ese coach no está en el centro seleccionado.'],
+  ]
+  for (const [coachId, mensaje] of casos) {
+    const fx = writeFixture()
+    await assert.rejects(
+      () => fx.service.create({ uid: 2 }, { email: `c${coachId}@aloha.invalid`, rol: 'coach', centro_id: 10, coach_id: coachId }),
+      new RegExp(mensaje.replace(/[.]/g, '\\.')),
+    )
+    assert.deepEqual(fx.inserted, [], `${coachId}: no se crea la cuenta`)
+  }
+  const ocupada = writeFixture()
+  await assert.rejects(
+    () => ocupada.service.create({ uid: 2 }, { email: 'x@aloha.invalid', rol: 'coach', centro_id: 12, coach_id: 502 }),
+    /Ese coach ya tiene cuenta\./,
+  )
+})
+
+test('dejar de ser coach suelta la ficha; seguir siéndolo no', async () => {
+  const fx = writeFixture()
+  await fx.service.update({ uid: 2 }, 9, { nombre: 'B', rol: 'administradora', centro_id: 12 })
+  assert.deepEqual(fx.coachUnlinks, [9])
+  const sigue = writeFixture()
+  await sigue.service.update({ uid: 2 }, 9, { nombre: 'B', rol: 'coach', centro_id: 12 })
+  assert.deepEqual(sigue.coachUnlinks, [])
+})
+
+test('pageData entrega las fichas de coach del alcance', async () => {
+  const repo = readRepo()
+  const result = await createUsuariosService({ repo }).pageData({ uid: 2 })
+  assert.deepEqual(repo.calls.find((c) => c[0] === 'coaches')[1], [10, 12])
+  assert.deepEqual(result.coaches, [
+    { id: 501, centroId: 10, nombre: 'CRISTOPHER', conCuenta: false },
+    { id: 502, centroId: 12, nombre: 'DAYANI', conCuenta: true },
+  ])
 })

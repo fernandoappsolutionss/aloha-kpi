@@ -87,11 +87,14 @@ function centroInicial(user) {
   return user?.centro_id ?? user?.centros?.[0] ?? null
 }
 
-// EL COACH NO OPERA EL CENTRO. Tiene cuenta para una sola cosa: estudiar su
-// puesto y que se lo firmen. Su trabajo del día —marcar la asistencia de su
-// grupo— vive en /coach/<token>, que no pasa por la sesión ni por este matcher.
+// EL COACH NO OPERA EL CENTRO. Tiene cuenta para dos cosas: estudiar su puesto
+// (y que se lo firmen) y ver LO SUYO —sus grupos, sus niños, su itinerario— en
+// /centro/<id>/mis-grupos, que es solo lectura y sale de coaches.usuario_id.
+// Marcar la asistencia sigue viviendo en /coach/<token>, que no pasa por la
+// sesión ni por este matcher; mis-grupos deja el link a un clic.
 function rutaDelCoach(pathname, centroId) {
   const entrenamiento = `/centro/${centroId}/entrenamiento`
+  if (pathname === `/centro/${centroId}/mis-grupos`) return true
   return pathname === entrenamiento || pathname.startsWith(`${entrenamiento}/`)
 }
 
@@ -99,7 +102,7 @@ function destino(user) {
   if (verPanel(user)) return '/dashboard'
   const centro = centroInicial(user)
   if (!centro) return '/perfil'
-  return user?.rol === ROL_COACH ? `/centro/${centro}/entrenamiento` : `/centro/${centro}`
+  return user?.rol === ROL_COACH ? `/centro/${centro}/mis-grupos` : `/centro/${centro}`
 }
 
 function redirectTo(req, pathname) {
@@ -183,7 +186,7 @@ export async function middleware(req) {
     const centroId = pathname.split('/')[2]
     if (centroId && !canAccessCentro(user, centroId)) return deny(req, user)
     if (centroId && user?.rol === ROL_COACH && !rutaDelCoach(pathname, centroId)) {
-      return redirectTo(req, `/centro/${centroId}/entrenamiento`)
+      return redirectTo(req, `/centro/${centroId}/mis-grupos`)
     }
     if (centroId && rutaOficioCentro(pathname, centroId) && !puedeVerOficio(user)) {
       return deny(req, user)
