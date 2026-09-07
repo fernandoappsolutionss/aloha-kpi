@@ -18,10 +18,11 @@ const salons = [
   { id: 3, nombre: 'Salón 3', activo: false, capacidad_ninos: 20 },
 ]
 const operational = (rooms) => buildOperationalGrowth({ today: '2026-09-07', salons: rooms })
-const capacityAlert = (rooms) => {
+const hygieneForRooms = (rooms, issues = []) => {
   const op = operational(rooms)
-  return higieneDeDatos({ centroId: 2, growth: { operational: op, metrics: { confidence: { level: 'medium' }, issues: op.issues } } }).puntos.find(p => p.clave === 'capacidad')
+  return higieneDeDatos({ centroId: 2, growth: { operational: op, metrics: { confidence: { level: 'medium' }, issues: [...op.issues, ...issues] } } })
 }
+const capacityAlert = (rooms) => hygieneForRooms(rooms).puntos.find(p => p.clave === 'capacidad')
 
 test('suma capacidades declaradas de salones activos como puestos simultáneos', () => {
   const op = operational(salons)
@@ -51,9 +52,31 @@ test('el aviso lleva al centro a completar el salón, no lo llama limitación de
   assert.equal(alert.donde.href, '/centro/2/grupos#salones')
 })
 
-test('con todos los salones declarados distingue puestos físicos de matrícula por horarios', () => {
-  const alert = capacityAlert(salons)
-  assert.match(alert.titulo, /22 niños a la vez/)
-  assert.match(alert.accion, /horarios/)
-  assert.doesNotMatch(alert.accion, /no ofrece cómo validarla/)
+test('al completar los salones la capacidad sale de pendientes y queda como información', () => {
+  const result = hygieneForRooms(salons)
+  assert.equal(result.hay, false)
+  assert.equal(result.total, 0)
+  assert.equal(result.soloDireccion, false)
+  assert.deepEqual(result.capacidadRegistrada, {
+    ninos: 22, salones: 2, verificacionHorariosPendiente: true, href: '/centro/2/grupos#salones',
+  })
+  // Completar puestos físicos no certifica programación ni aumenta confianza.
+  assert.equal(result.confianza.techo, 'medium')
+  assert.equal(result.confianza.nivel, 'medium')
+})
+
+test('si se vacía una capacidad vuelve el pendiente y se retira la información completa', () => {
+  const result = hygieneForRooms(salons.map(s => s.id === 1 ? { ...s, capacidad_ninos: null } : s))
+  assert.equal(result.capacidadRegistrada, null)
+  assert.equal(result.delCentro, 1)
+  assert.deepEqual(result.puntos.find(p => p.clave === 'capacidad').items, ['Salón 1'])
+})
+
+test('completar capacidad conserva los demás problemas y sus bloqueos', () => {
+  const result = hygieneForRooms(salons, [{ code: 'population_mismatch', severity: 'error', message: 'Diferencia de 2 niños.' }])
+  assert.equal(result.hay, true)
+  assert.equal(result.total, 1)
+  assert.equal(result.bloqueantes, 1)
+  assert.equal(result.puntos.some(p => p.clave === 'capacidad'), false)
+  assert.equal(result.capacidadRegistrada.ninos, 22)
 })

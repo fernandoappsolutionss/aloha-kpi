@@ -97,72 +97,91 @@ export default function AlertaHigieneDatos({ centroId, growth = null }) {
   if (!pendientes) return null
 
   const higiene = higieneDeDatos({ growth, centroId, ...pendientes })
-  if (!higiene.hay) return null
+  const capacidad = higiene.capacidadRegistrada
+  if (!higiene.hay && !capacidad) return null
 
   // Cuando lo único que queda es trabajo de Dirección, la sección se calma:
-  // mismo contenido, sin borde de aviso y sin píldora de alarma. La lista no
-  // puede llegar a cero (capacity_unverified la empuja siempre), así que un
-  // centro impecable enmarcado en ámbar todos los días es papel tapiz.
+  // mismo contenido, sin borde de aviso y sin píldora de alarma.
   const sereno = higiene.soloDireccion && !higiene.bloqueantes
 
   return (
-    <section
-      className={`higiene${sereno ? ' higiene--sereno' : ''}`}
-      aria-labelledby="higiene-titulo"
-      data-higiene-puntos={higiene.total}
-      data-higiene-bloqueantes={higiene.bloqueantes}
-      data-higiene-sereno={sereno ? '1' : '0'}
-    >
-      <div className="higiene__head">
-        <div className="higiene__head-texto">
-          <h3 id="higiene-titulo" className="higiene__h">
-            {sereno ? 'Datos completos en este centro' : 'Lo que falta por cargar en este centro'}
-          </h3>
-          {/* El resumen, en el documento: cuántos puntos hay y cuántos
-              bloquean, sin tener que leer la lista entera. */}
-          <p className="higiene__resumen">{higiene.resumen}</p>
-          <p className="higiene__porque">{higiene.porQue}</p>
-        </div>
-        <span className={`pill${higiene.bloqueantes ? ' pill--bad' : sereno ? '' : ' pill--warn'}`}>
-          <span className="dot" />
-          <span aria-hidden="true">{higiene.bloqueantes ? '▲' : sereno ? '·' : '◆'}</span>{' '}
-          Confianza {higiene.confianza.texto}
-        </span>
-      </div>
+    <>
+      {higiene.hay && (
+        <section
+          className={`higiene${sereno ? ' higiene--sereno' : ''}`}
+          aria-labelledby="higiene-titulo"
+          data-higiene-puntos={higiene.total}
+          data-higiene-bloqueantes={higiene.bloqueantes}
+          data-higiene-sereno={sereno ? '1' : '0'}
+        >
+          <div className="higiene__head">
+            <div className="higiene__head-texto">
+              <h3 id="higiene-titulo" className="higiene__h">
+                {sereno ? 'Datos completos en este centro' : 'Lo que falta por cargar en este centro'}
+              </h3>
+              {/* El resumen, en el documento: cuántos puntos hay y cuántos
+                  bloquean, sin tener que leer la lista entera. */}
+              <p className="higiene__resumen">{higiene.resumen}</p>
+              <p className="higiene__porque">{higiene.porQue}</p>
+            </div>
+            <span className={`pill${higiene.bloqueantes ? ' pill--bad' : sereno ? '' : ' pill--warn'}`}>
+              <span className="dot" />
+              <span aria-hidden="true">{higiene.bloqueantes ? '▲' : sereno ? '·' : '◆'}</span>{' '}
+              Confianza {higiene.confianza.texto}
+            </span>
+          </div>
 
-      {!growth && (
-        <p className="higiene__aviso" role="status">
-          No se pudo leer el motor de crecimiento: esta lista puede estar incompleta.
-        </p>
+          {!growth && (
+            <p className="higiene__aviso" role="status">
+              No se pudo leer el motor de crecimiento: esta lista puede estar incompleta.
+            </p>
+          )}
+
+          <ol className="higiene__lista">
+            {higiene.puntos.map((punto) => {
+              const tono = tonoDe(punto)
+              return (
+                <li key={punto.clave} className={`higiene__punto higiene__punto--${tono}`}>
+                  <span className="higiene__marca" aria-hidden="true">{TONO[tono].forma}</span>
+                  <div className="higiene__cuerpo">
+                    <div className="higiene__estado">{TONO[tono].palabra}</div>
+                    <h4 className="higiene__titulo">{punto.titulo}</h4>
+                    <p className="higiene__accion">{punto.accion}</p>
+                    <Items punto={punto} />
+                    <div className="higiene__pie">
+                      <span className="higiene__ganancia">{punto.gananciaTexto}</span>
+                      {punto.donde && (
+                        <Link className="higiene__ir" href={punto.donde.href}>{punto.donde.texto} →</Link>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+
+          <p className="higiene__cierre">{higiene.cierre}</p>
+          <p className="higiene__nota">
+            Esta lista no se cierra a mano: cada punto desaparece solo cuando el dato queda cargado.
+          </p>
+        </section>
       )}
-
-      <ol className="higiene__lista">
-        {higiene.puntos.map((punto) => {
-          const tono = tonoDe(punto)
-          return (
-            <li key={punto.clave} className={`higiene__punto higiene__punto--${tono}`}>
-              <span className="higiene__marca" aria-hidden="true">{TONO[tono].forma}</span>
-              <div className="higiene__cuerpo">
-                <div className="higiene__estado">{TONO[tono].palabra}</div>
-                <h4 className="higiene__titulo">{punto.titulo}</h4>
-                <p className="higiene__accion">{punto.accion}</p>
-                <Items punto={punto} />
-                <div className="higiene__pie">
-                  <span className="higiene__ganancia">{punto.gananciaTexto}</span>
-                  {punto.donde && (
-                    <Link className="higiene__ir" href={punto.donde.href}>{punto.donde.texto} →</Link>
-                  )}
-                </div>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-
-      <p className="higiene__cierre">{higiene.cierre}</p>
-      <p className="higiene__nota">
-        Esta lista no se cierra a mano: cada punto desaparece solo cuando el dato queda cargado.
-      </p>
-    </section>
+      {capacidad && (
+        <aside className="capacidad-registrada" aria-labelledby="capacidad-registrada-titulo">
+          <div className="capacidad-registrada__texto">
+            <h3 id="capacidad-registrada-titulo" className="higiene__titulo">Capacidad de salones registrada</h3>
+            <p className="capacidad-registrada__total">
+              {capacidad.ninos} niños a la vez · {capacidad.salones} {capacidad.salones === 1 ? 'salón activo' : 'salones activos'}
+            </p>
+            {capacidad.verificacionHorariosPendiente && (
+              <p className="higiene__accion">
+                Este dato está completo. La capacidad de atención en distintos horarios requiere una revisión adicional de la programación de grupos y coaches.
+              </p>
+            )}
+          </div>
+          <Link className="higiene__ir" href={capacidad.href}>Ver salones →</Link>
+        </aside>
+      )}
+    </>
   )
 }
