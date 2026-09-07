@@ -941,7 +941,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .growth-admin-controls__count { margin-left: auto; white-space: nowrap; }
 .growth-admin-loading { display: grid; place-items: center; gap: 6px; min-height: 240px; color: var(--text-dim); text-align: center; }
 .growth-admin-loading strong { color: var(--text); font-family: var(--font-serif); font-size: 18px; font-weight: 500; }
-.growth-admin-table { width: 1120px; min-width: 1120px; table-layout: fixed; }
+.growth-admin-page .table-scroller__viewport { width: 100%; }
+.growth-admin-table { width: 100%; min-width: 1120px; table-layout: fixed; }
 .growth-admin-table th:nth-child(1) { width: 125px; }
 .growth-admin-table th:nth-child(2) { width: 150px; }
 .growth-admin-table th:nth-child(3) { width: 140px; }
