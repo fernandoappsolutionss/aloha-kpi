@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'next/navigation'
+import EncuestasFoda from '../../../../components/encuestas/EncuestasFoda'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../actions/centros'
@@ -203,6 +204,7 @@ export default function FodaPage() {
           </div>
         </div>
 
+        <EncuestasFoda centroId={params.id} anio={year} trimestre={quarter} />
         {loading ? <p role="status">Cargando FODA…</p> : error ? <div role="alert">{error}<button type="button" className="btn" onClick={() => setRetry(n => n + 1)}>Reintentar</button></div> : <>
         <div className="alert" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <span>

@@ -1,7 +1,7 @@
 import { rolesQueFirma, tienePlanPropio } from '../lib/entrenamiento/oficio/progreso.js'
 
 export function hrefKpiMensual(path) {
-  const match = typeof path === 'string' && path.match(/^\/centro\/([^/]+)\/(?:kpi|cumplimiento|foda|historial)(?:\/|$)/)
+  const match = typeof path === 'string' && path.match(/^\/centro\/([^/]+)\/(?:kpi|cumplimiento|encuestas|foda|historial)(?:\/|$)/)
   return match ? `/centro/${match[1]}/kpi` : null
 }
 
@@ -11,6 +11,7 @@ export function seccionesCentro(centroId, section = 'kpi', rol = null) {
   if (section === 'kpi') return [
     { label: 'KPI Mensual', href: `${base}/kpi` },
     { label: 'Cumplimiento', href: `${base}/cumplimiento` },
+    { label: 'Encuestas', href: `${base}/encuestas` },
     { label: 'FODA', href: `${base}/foda` },
     { label: 'Historial', href: `${base}/historial` },
   ]

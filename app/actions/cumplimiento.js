@@ -169,7 +169,12 @@ export async function saveCumplimiento(centroId, anio, trimestre, mes, incoming)
   await requireCentroAccess(centroId)
   const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
   const row = { trimestre_id: trimestreId, mes }
-  for (const k of CLAVES_DISCIPLINA) row[k] = incoming?.[k] === 'si' ? 'si' : 'no'
+  for (const k of CLAVES_DISCIPLINA) {
+    // Desde septiembre la encuesta se deriva de evidencia. El trigger de BD
+    // también impide que un cliente antiguo o un guardado concurrente la falsee.
+    if (k === 'encuestas_satisfaccion' && Number(anio)*100 + (Number(trimestre)-1)*3 + Number(mes) >= 202609) continue
+    row[k] = incoming?.[k] === 'si' ? 'si' : 'no'
+  }
 
   let producto = null
   try {
