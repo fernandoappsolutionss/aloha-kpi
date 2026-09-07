@@ -1,6 +1,6 @@
 # Guiones de Peticiones
 
-Seis clips del recorrido nuevo, 1638 caracteres enviados a ElevenLabs. Voz aprobada de Fernando, receta de guía existente; se reutilizan los otros 54 clips vigentes. Generación pendiente de autorización específica.
+Seis clips del recorrido nuevo, 1638 caracteres enviados a ElevenLabs. Voz aprobada de Fernando, receta de guía existente; se reutilizan los otros 54 clips vigentes. Generación autorizada por Fernando y completada: seis clips, con decodificación y duración verificadas. Los archivos y hashes están en el catálogo de audio actualizado.
 
 ## peticiones/intro
 

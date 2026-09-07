@@ -19,15 +19,14 @@ El primer comando es de lectura; el segundo requiere autorización para el entor
 
 ## Verificación del requisito corregido
 
-- `npm test`: 1.083 pruebas correctas. `npm run build`: correcto.
+- `npm test`: 1.095 pruebas correctas después de integrar main y completar los audios. `npm run build`: correcto. PR #136.
 - `test/integration/proveedor-preaprobado.integration.ts`: 2 pruebas con PostgreSQL y repositorio reales. Cubren migración repetida; rechazo sin PDF y con firma inválida; reintento; proveedor tomado del servidor; una sola cotización; bloqueo de cambios de proveedor; rechazo si falta el archivo almacenado; envío concurrente; aprobación con archivo asociado; descarga privada y rechazo por rol/centro. El transporte a Blob se sustituye por bytes en memoria, con la inspección y hash reales.
 - La integración solo acepta la base local exclusiva `aloha_proveedor_test`, marcada `E2E_DATABASE_CONFIRM=disposable`, centros ficticios 10/11 y usuarios ficticios 8/2. No ejecutarla contra producción.
 - Chrome: panel y componentes reales en un entorno local; nombre, categoría, descripción, botón Continuar, una tarjeta PDF y Enviar bloqueado sin cotización comprobados. El selector rechazó adjuntar el archivo de prueba (`fileChooser.setFiles: Not allowed`); no se completó la subida por navegador. La carga/reintento/descarga sí se comprobaron en las pruebas de integración. No se usaron servicios Blob ni correo externos.
 
 ## Entrenamiento y audio
 
-Los cinco pasos y tres preguntas reflejan la cotización obligatoria. El dry-run de audio detecta seis clips pendientes, 1.638 caracteres y 47 clips anteriores reutilizables. La generación en ElevenLabs sigue pendiente: la revisión automática rechazó el envío anterior por falta de autorización específica del destino, contenido y voz. No se enviaron los nuevos guiones ni se consumieron créditos.
-
+Los cinco pasos y tres preguntas reflejan la cotización obligatoria. Fernando autorizó expresamente enviar los seis guiones (1.638 caracteres) a ElevenLabs con su clon aprobado. Los seis audios están generados y validados; los 54 clips anteriores vigentes se reutilizan. Guiones revisables en `peticiones-guiones-audio.md`.
 ```sh
 node scripts/entrenamiento-audio-actualizaciones.mjs
 # Únicamente después de autorización para enviar los guiones actuales:

@@ -484,5 +484,59 @@
     "bytes": 137970,
     "segundos": 17.182766,
     "generadoAt": "2026-09-07T16:00:25.880Z"
+  },
+  "peticiones/intro": {
+    "file": "actualizaciones/peticiones/intro-080743c889fc.mp3",
+    "hash": "080743c889fc",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T18:10:21.173Z"
+  },
+  "peticiones/pe-1": {
+    "file": "actualizaciones/peticiones/pe-1-330a7e0d1992.mp3",
+    "hash": "330a7e0d1992",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 119371,
+    "segundos": 14.860771,
+    "generadoAt": "2026-09-07T18:10:24.130Z"
+  },
+  "peticiones/pe-2": {
+    "file": "actualizaciones/peticiones/pe-2-4c3192ddc34d.mp3",
+    "hash": "4c3192ddc34d",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 102026,
+    "segundos": 12.678095,
+    "generadoAt": "2026-09-07T18:10:25.804Z"
+  },
+  "peticiones/pe-3": {
+    "file": "actualizaciones/peticiones/pe-3-33e77bd894e5.mp3",
+    "hash": "33e77bd894e5",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 165973,
+    "segundos": 20.66576,
+    "generadoAt": "2026-09-07T18:10:28.593Z"
+  },
+  "peticiones/pe-4": {
+    "file": "actualizaciones/peticiones/pe-4-050a5456cff4.mp3",
+    "hash": "050a5456cff4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 190006,
+    "segundos": 23.684354,
+    "generadoAt": "2026-09-07T18:10:31.671Z"
+  },
+  "peticiones/pe-5": {
+    "file": "actualizaciones/peticiones/pe-5-5f72c0cf1055.mp3",
+    "hash": "5f72c0cf1055",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 174333,
+    "segundos": 21.733878,
+    "generadoAt": "2026-09-07T18:10:34.445Z"
   }
 }
