@@ -2420,9 +2420,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .higiene[data-higiene-bloqueantes]:not([data-higiene-bloqueantes="0"]) {
   border-left-color: var(--bad);
 }
-/* Y cuando lo único que queda es trabajo de Dirección, la sección se calma:
-   la lista no puede llegar a cero (capacity_unverified la empuja siempre), así
-   que un centro impecable enmarcado en ámbar todos los días es papel tapiz. */
+/* Los pendientes que solo dependen de Dirección usan un tono neutro. */
 .higiene--sereno { border-left-color: var(--border-strong); }
 .higiene__resumen { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--text); }
 .higiene__head {
@@ -2529,6 +2527,19 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .higiene__cierre { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
 .higiene__nota { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-dim); }
+.capacidad-registrada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-1);
+}
+.capacidad-registrada__texto { flex: 1 1 280px; min-width: 0; }
+.capacidad-registrada__total { margin: 5px 0 0; font-size: 14px; color: var(--text); }
 
 @media (max-width: 640px) {
   .higiene { padding: 16px; border-left-width: 6px; }
