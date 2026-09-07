@@ -33,29 +33,31 @@ function centroInicial(payload) {
   return payload?.centro_id ?? payload?.centros?.[0] ?? null
 }
 
-// EL COACH NO OPERA EL CENTRO. Tiene cuenta para una sola cosa: estudiar su
-// puesto y que se lo firmen. Su trabajo del día —marcar la asistencia de su
-// grupo— vive en /coach/<token>, que no pasa por la sesión ni por este
-// matcher. Así que dentro de /centro/<id> solo alcanza el árbol de
-// entrenamiento; el KPI, el cuadro y los grupos le quedan cerrados aquí, en el
-// Edge, antes de que se pinte una sola pantalla.
+// EL COACH NO OPERA EL CENTRO. Tiene cuenta para dos cosas: estudiar su puesto
+// (y que se lo firmen) y ver LO SUYO —sus grupos, sus niños, su itinerario— en
+// /centro/<id>/mis-grupos, que es solo lectura y sale de coaches.usuario_id.
+// Marcar la asistencia sigue viviendo en /coach/<token>, que no pasa por la
+// sesión ni por este matcher; mis-grupos deja el link a un clic. El KPI, el
+// cuadro y los grupos del centro le quedan cerrados aquí, en el Edge, antes de
+// que se pinte una sola pantalla.
 //
 // Esto NO sustituye las guardas del servidor: las acciones destructivas se le
 // niegan además en lib/current-user.mjs (puedeCerrarMes / puedeEliminar).
 function rutaDelCoach(pathname, centroId) {
   const entrenamiento = `/centro/${centroId}/entrenamiento`
+  if (pathname === `/centro/${centroId}/mis-grupos`) return true
   return pathname === entrenamiento || pathname.startsWith(`${entrenamiento}/`)
 }
 
 // A dónde mandar a alguien que no puede estar donde está. Un usuario sin
 // centro asignado va a /perfil: redirigirlo a /centro/null daría un bucle.
-// El Coach aterriza en SU entrenamiento, que es lo único que tiene: mandarlo
-// al resumen del centro lo dejaría rebotando contra la guarda de abajo.
+// El Coach aterriza en SUS GRUPOS, que es su trabajo del día: mandarlo al
+// resumen del centro lo dejaría rebotando contra la guarda de abajo.
 function destino(payload) {
   if (verPanel(payload)) return '/dashboard'
   const centro = centroInicial(payload)
   if (!centro) return '/perfil'
-  return payload?.rol === ROL_COACH ? `/centro/${centro}/entrenamiento` : `/centro/${centro}`
+  return payload?.rol === ROL_COACH ? `/centro/${centro}/mis-grupos` : `/centro/${centro}`
 }
 
 export async function middleware(req) {
@@ -96,10 +98,10 @@ export async function middleware(req) {
       url.pathname = destino(payload)
       return NextResponse.redirect(url)
     }
-    // El Coach entra a su centro solo por el entrenamiento.
+    // El Coach entra a su centro solo por sus grupos y su entrenamiento.
     if (centroId && payload?.rol === ROL_COACH && !rutaDelCoach(pathname, centroId)) {
       const url = req.nextUrl.clone()
-      url.pathname = `/centro/${centroId}/entrenamiento`
+      url.pathname = `/centro/${centroId}/mis-grupos`
       return NextResponse.redirect(url)
     }
   }
