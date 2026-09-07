@@ -6,9 +6,11 @@
 
 ## Gates
 - Bootstrap transaccional: 7/7 GREEN, con RED previo de operación ausente, invalidación de tokens y reloj de BD. Dry-run intacto; solo tres identidades; hashes conservados; idempotencia; rechazo de identidad cambiada/fecha vencida; invalidación de enlaces pendientes de las dos cuentas; reloj PostgreSQL prevalece; fallo intermedio revierte promoción, bloqueo, tokens y auditoría. Comando `node --env-file=.env.local --test test/integration/master-bootstrap.integration.mjs`.
-- HTTP real: script `scripts/verify-master-access-http.mjs`. RED inicial confirmado: General aún recibía `capabilities.createUser=true`. Lectura de7rutas y listado global funcionó en baseline. Gate final pendiente.
+- HTTP real: 53/53 aprobadas en build productivo local mediante `scripts/verify-master-access-http.mjs`. Lectura global, denegación de escrituras sin cambios en diez tablas, catálogo y audios protegidos (incluidas rutas codificadas), bloqueo de sesiones existentes, desbloqueo por vencimiento y facultades exclusivas de Master.
 - Revisión independiente de núcleo auth: P1 de compatibilidad `id` sin `uid` corregido y confirmado por revisor; sesión viva conserva ambos. P2 de reloj local del bootstrap corregido: preflight con `clock_timestamp()` y verificación de bloqueo efectivo antes del commit.
-- Revisión final, build, Chrome y producción: pendientes.
+- Suite final tras integrar PR136 de proveedores: 1.112/1.112 aprobadas; build Next productivo aprobado. Integración de base de datos: 8/8 (bootstrap y expansión).
+- Revisión independiente final: sin hallazgos pendientes. Se conserva el proveedor preaprobado y el cambio de estado de peticiones para Master y coordinador del centro; General permanece en lectura y solo Master elimina.
+- Producción: expansión aplicada sin cambiar roles; promoción y bloqueo pendientes hasta que Vercel publique esta versión. Verificación posterior de solo lectura mediante `scripts/verify-master-access-production.mjs`.
 
 ## Decisiones de alcance
 - General conserva listado de usuarios para lectura; sin crear, editar, borrar, reset ni bloqueo. Responde al pedido de lectura global y evita retirar información no solicitada.

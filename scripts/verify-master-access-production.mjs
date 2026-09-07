@@ -37,6 +37,6 @@ const [reader]=await sql`SELECT id,email FROM usuarios WHERE rol='admin_general'
 if(reader){
   const auth=await cookie(reader)
   for(const path of ['/dashboard/usuarios','/dashboard/metas','/dashboard/centros']) await check(path,auth,s=>s===200,`General activo conserva consulta ${path}`)
-  for(const path of ['/dashboard/entrenamiento/oficio','/centro/2/entrenamiento/oficio','/entrenamiento/oficio/of-cen-2.mp3']) await check(path,auth,s=>[302,303,307,308,401,403].includes(s),`General activo no alcanza ${path}`)
+  for(const path of ['/dashboard/entrenamiento/oficio','/centro/2/entrenamiento/oficio','/entrenamiento/oficio/of-cen-2.mp3','/entrenamiento/%6fficio/of-cen-2.mp3','/entrenamient%6f/oficio/of-cen-2.mp3']) await check(path,auth,s=>[302,303,307,308,401,403].includes(s),`General activo no alcanza ${path}`)
 }
 console.log(JSON.stringify({status:'PASS',master:MASTER_EMAIL,blockedUntil:BLOCKED_UNTIL,accounts:users.map(({id,email,rol,blocked})=>({id,email,rol,blocked}))}))
