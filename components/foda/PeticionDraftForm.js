@@ -9,8 +9,7 @@ function categoriaLabel(value) {
   return PETICION_CATEGORIAS.find((c) => c.value === value)?.label || value || '—'
 }
 
-// Formulario de petición formal: categoría + descripción + mínimo 3 cotizaciones
-// válidas de proveedores fiscales distintos. Vive como borrador (editable,
+// Petición formal: proveedor aprobado del centro o tres cotizaciones fiscales. Vive como borrador (editable,
 // con vencimiento) hasta que se envía; el servidor sigue siendo la autoridad
 // final sobre distinción de proveedores y PDFs.
 export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, uploadsAvailable, onRefresh, onStatus }) {
@@ -18,6 +17,9 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
   const [selectedDraftId, setSelectedDraftId] = useState(null)
   const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
+  const [preapproved, setPreapproved] = useState(false)
+  const [supplierName, setSupplierName] = useState('')
+  const saveQueue = useRef(Promise.resolve())
   const [busy, setBusy] = useState(false)
   // Claves estables de slot "vacío" (sin cotización real todavía). Nunca se
   // reindexan por posición: cada slot conserva su clave desde que se crea
@@ -50,17 +52,30 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
     setSelectedDraftId(draft.id)
     setCategory(draft.categoria || '')
     setDescription(draft.texto || '')
+    setPreapproved(draft.proveedor_preaprobado === true)
+    setSupplierName(draft.proveedor_preaprobado_nombre || '')
   }
 
-  async function persistDraftMeta(id, next) {
-    try {
-      const res = await updatePeticionDraft(centroId, id, next)
-      if (res?.error) throw new Error(res.error)
-      return true
-    } catch (e) {
-      onStatus?.(`Error al guardar el borrador: ${e?.message || ''}`)
-      return false
-    }
+  function draftMeta(next = {}) {
+    return { texto: description, categoria: category, proveedor_preaprobado: preapproved,
+      proveedor_preaprobado_nombre: supplierName, ...next }
+  }
+
+  function persistDraftMeta(id, next) {
+    // Serializa los autoguardados y el envío: una respuesta tardía no puede
+    // restaurar el proveedor anterior después de pulsar Enviar.
+    const save = saveQueue.current.then(async () => {
+      try {
+        const res = await updatePeticionDraft(centroId, id, next)
+        if (res?.error) throw new Error(res.error)
+        return true
+      } catch (e) {
+        onStatus?.(`Error al guardar el borrador: ${e?.message || ''}`)
+        return false
+      }
+    })
+    saveQueue.current = save
+    return save
   }
 
   async function handleUpdateMeta(next) {
@@ -71,27 +86,39 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
   function onCategoryChange(e) {
     const value = e.target.value
     setCategory(value)
-    if (activeDraft) handleUpdateMeta({ texto: description, categoria: value })
+    if (activeDraft) handleUpdateMeta(draftMeta({ categoria: value }))
   }
 
   function onDescriptionBlur() {
-    if (activeDraft) handleUpdateMeta({ texto: description, categoria: category })
+    if (activeDraft) handleUpdateMeta(draftMeta())
   }
 
-  async function handleGuardarBorrador() {
+  async function handleGuardarBorrador(enviar = false) {
     if (busy) return
     const texto = description.trim()
     if (!texto || !category) { onStatus?.('Error: completa la categoría y la descripción antes de guardar.'); return }
+    if (enviar && preapproved && !supplierName.trim()) { onStatus?.('Escribe el nombre del proveedor aprobado del centro.'); return }
     setBusy(true)
     try {
-      const res = await createPeticionDraft(centroId, anio, trimestre, { texto, categoria: category })
+      const res = await createPeticionDraft(centroId, anio, trimestre, draftMeta({ texto }))
       if (res?.error) throw new Error(res.error)
       await onRefresh?.()
       setSelectedDraftId(res.draft.id)
+      if (enviar) {
+        const sent = await submitPeticion(centroId, res.draft.id)
+        if (sent?.error) throw new Error(sent.error)
+        resetForm()
+        await onRefresh?.()
+        onStatus?.('Petición enviada. Pendiente de aprobación del coordinador operativo.')
+      }
     } catch (e) {
       onStatus?.(`Error: ${e?.message || 'No se pudo guardar el borrador.'}`)
     }
     setBusy(false)
+  }
+
+  function resetForm() {
+    setSelectedDraftId(null); setCategory(''); setDescription(''); setPreapproved(false); setSupplierName('')
   }
 
   async function handleDiscard(id) {
@@ -100,7 +127,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
     try {
       const res = await discardPeticionDraft(centroId, id)
       if (res?.error) throw new Error(res.error)
-      if (id === selectedDraftId) { setSelectedDraftId(null); setCategory(''); setDescription('') }
+      if (id === selectedDraftId) resetForm()
       await onRefresh?.()
     } catch (e) {
       onStatus?.(`Error al descartar: ${e?.message || ''}`)
@@ -117,28 +144,29 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
       // servidor enviaría con texto viejo y el guardado tardío luego fallaría
       // con "Borrador no encontrado" porque ya se envió. Se espera aquí la
       // sincronización de categoría/descripción antes de enviar.
-      await persistDraftMeta(activeDraft.id, { texto: description, categoria: category })
+      const saved = await persistDraftMeta(activeDraft.id, draftMeta())
+      if (!saved) return
       const res = await submitPeticion(centroId, activeDraft.id)
       if (res?.error) throw new Error(res.error)
-      setSelectedDraftId(null)
-      setCategory('')
-      setDescription('')
+      resetForm()
       await onRefresh?.()
+      onStatus?.('Petición enviada. Pendiente de aprobación del coordinador operativo.')
     } catch (e) {
       // El servidor sigue siendo la autoridad de distinción de proveedores/PDF —
       // si rechaza el envío, se muestra el motivo pero se conserva el estado
       // (categoría, descripción y borrador seleccionado) para que se corrija.
       onStatus?.(`Error: ${e?.message || 'No se pudo enviar la petición.'}`)
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
   }
 
   const quotes = activeDraft?.cotizaciones || []
   const totalCount = quotes.length + emptySlotKeys.length
 
-  const documentFormDisabled = !uploadsAvailable || busy
+  const documentFormDisabled = (!uploadsAvailable && !preapproved) || busy
   const validCount = quotes.filter((quote) => quote.upload_status === 'valid').length
-  const submitDisabled = !uploadsAvailable || busy || validCount < 3 || !description.trim() || !category
+  const submitDisabled = busy || !description.trim() || !category || (preapproved ? !supplierName.trim() : !uploadsAvailable || validCount < 3)
   const requirementText = validCount < 3
     ? `Faltan ${3 - validCount} cotización${3 - validCount === 1 ? '' : 'es'} válida${3 - validCount === 1 ? '' : 's'}.`
     : 'Documentación mínima completa.'
@@ -146,9 +174,9 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
   return (
     <div>
       {discardId && <Dialog open title="Descartar borrador" onClose={()=>setDiscardId(null)} closeDisabled={busy} footer={<><button type="button" className="btn" disabled={busy} onClick={()=>setDiscardId(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busy} onClick={async()=>{await handleDiscard(discardId);setDiscardId(null)}}>Descartar</button></>}><p>Se descartará este borrador y su documentación. Esta acción no se puede deshacer.</p></Dialog>}
-      {!uploadsAvailable && (
+      {!uploadsAvailable && !preapproved && (
         <p id="peticion-storage-status" className="form-error" role="alert">
-          Carga de cotizaciones no disponible. Configura el almacenamiento privado antes de registrar una petición.
+          Carga de cotizaciones no disponible. Puedes enviar una petición si el centro ya cuenta con proveedor aprobado.
         </p>
       )}
 
@@ -177,7 +205,28 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
         </div>
       )}
 
-      <fieldset disabled={documentFormDisabled} aria-describedby="peticion-storage-status" style={{ border: 'none', padding: 0, margin: 0 }}>
+      <div data-tour="peticiones.proveedor" style={{ marginTop: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
+          <input type="checkbox" name="proveedorPreaprobado" checked={preapproved}
+            disabled={busy || activeDraft?.expired || quotes.length > 0}
+            onChange={(e) => { const checked = e.target.checked; setPreapproved(checked); if (activeDraft) handleUpdateMeta(draftMeta({ proveedor_preaprobado: checked })) }} />
+          <span>El centro ya cuenta con proveedor aprobado</span>
+        </label>
+        {quotes.length > 0 && <p className="h-sub">Este borrador ya tiene cotizaciones. Para cambiar de modalidad, descártalo y crea otro.</p>}
+        {preapproved ? (
+          <>
+            <p className="h-sub">Escribe quién puede hacer el servicio. No necesitas adjuntar cotizaciones ni documentos del proveedor. La petición requiere aprobación del coordinador operativo.</p>
+            <label className="field" style={{ marginTop: 10 }}>
+              <span className="label">Nombre del proveedor aprobado</span>
+              <input name="proveedorPreaprobadoNombre" className="input" value={supplierName} maxLength={200}
+                disabled={busy || activeDraft?.expired} onChange={(e) => setSupplierName(e.target.value)}
+                onBlur={onDescriptionBlur} placeholder="Nombre de la empresa o proveedor" />
+            </label>
+          </>
+        ) : <p className="h-sub">Adjunta al menos tres cotizaciones de proveedores fiscales distintos.</p>}
+      </div>
+
+      <fieldset data-tour="peticiones.formulario" disabled={documentFormDisabled} aria-describedby={!uploadsAvailable && !preapproved ? "peticion-storage-status" : undefined} style={{ border: 'none', padding: 0, margin: 0 }}>
         {!activeDraft && (
           <div style={{ marginTop: 14 }}>
             <div className="foda-quote-fields">
@@ -194,10 +243,14 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
               <textarea name="descripcion" autoComplete="off" className="input" value={description} onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe la petición…" style={{ minHeight: 70, resize: 'vertical' }} />
             </label>
-            <button type="button" className="btn btn--primary" style={{ marginTop: 10 }}
-              disabled={busy || !description.trim() || !category} onClick={handleGuardarBorrador}>
+            <button type="button" className={preapproved ? "btn" : "btn btn--primary"} style={{ marginTop: 10 }}
+              disabled={busy || !description.trim() || !category} onClick={() => handleGuardarBorrador(false)}>
               {busy ? 'Guardando…' : 'Guardar borrador'}
             </button>
+            {preapproved && <button type="button" className="btn btn--primary" style={{ marginTop: 10, marginLeft: 8 }}
+              disabled={submitDisabled} onClick={() => handleGuardarBorrador(true)}>
+              {busy ? 'Enviando…' : 'Enviar a aprobación'}
+            </button>}
           </div>
         )}
 
@@ -231,6 +284,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
 
             {!activeDraft.expired && (
               <>
+                {!preapproved && <>
                 <div className="foda-quote-grid" style={{ marginTop: 12 }}>
                   {quotes.map((quote, i) => (
                     <CotizacionCard key={quote.id} centroId={centroId} peticionId={activeDraft.id}
@@ -257,8 +311,9 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
                   </button>
                 )}
                 <p className="h-sub" style={{ marginTop: 10 }}>{validCount} de 3 cotizaciones válidas · {requirementText}</p>
+                </>}
                 <button type="button" className="btn btn--primary" style={{ marginTop: 10 }} disabled={submitDisabled} onClick={handleSubmit}>
-                  {busy ? 'Enviando…' : 'Enviar petición'}
+                  {busy ? 'Enviando…' : 'Enviar a aprobación'}
                 </button>
               </>
             )}

@@ -25,10 +25,10 @@ export default function PeticionesPanel({ centroId, anio, trimestre, onStatus })
   }, [centroId, anio, trimestre, onStatus])
   useEffect(() => { refresh() }, [refresh])
   return (
-    <section className="card foda-requests" data-peticiones-state={loading ? 'loading' : 'ready'}>
+    <section data-tour="peticiones.panel" className="card foda-requests" data-peticiones-state={loading ? 'loading' : 'ready'}>
       <h3 className="panel__title">Comentarios y peticiones del administrador</h3>
       <div className="foda-request-tabs" role="tablist" aria-label="Tipo de registro">
-        {['comentario','peticion'].map(value => <button key={value} type="button" role="tab" id={`peticiones-tab-${value}`} aria-controls="peticiones-form-panel" aria-selected={mode===value} tabIndex={mode===value ? 0 : -1} onClick={()=>setMode(value)} onKeyDown={event => { const next = event.key==='Home' ? 'comentario' : event.key==='End' ? 'peticion' : ['ArrowRight','ArrowLeft'].includes(event.key) ? mode==='comentario' ? 'peticion' : 'comentario' : null; if(next) { event.preventDefault(); setMode(next); document.getElementById(`peticiones-tab-${next}`)?.focus() } }}>{value==='comentario' ? 'Comentario' : 'Petición'}</button>)}
+        {['comentario','peticion'].map(value => <button data-tour={value === 'peticion' ? 'peticiones.abrir' : undefined} key={value} type="button" role="tab" id={`peticiones-tab-${value}`} aria-controls="peticiones-form-panel" aria-selected={mode===value} tabIndex={mode===value ? 0 : -1} onClick={()=>setMode(value)} onKeyDown={event => { const next = event.key==='Home' ? 'comentario' : event.key==='End' ? 'peticion' : ['ArrowRight','ArrowLeft'].includes(event.key) ? mode==='comentario' ? 'peticion' : 'comentario' : null; if(next) { event.preventDefault(); setMode(next); document.getElementById(`peticiones-tab-${next}`)?.focus() } }}>{value==='comentario' ? 'Comentario' : 'Petición'}</button>)}
       </div>
       <div role="tabpanel" id="peticiones-form-panel" aria-labelledby={`peticiones-tab-${mode}`}>
       {mode === 'comentario'

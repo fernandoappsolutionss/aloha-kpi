@@ -58,11 +58,11 @@ test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
   assert.deepEqual(corregirQuiz(null, [0, 2, 1]), { puntaje: 0, correctas: [false, false, false], aprobado: false })
 })
 
-test('hay 11 módulos con ids únicos y en orden 1..11', () => {
-  assert.equal(MODULOS.length, 11)
+test('hay 12 módulos con ids únicos y en orden 1..12', () => {
+  assert.equal(MODULOS.length, 12)
   const ids = MODULOS.map((m) => m.id)
-  assert.equal(new Set(ids).size, 11)
-  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+  assert.equal(new Set(ids).size, 12)
+  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
 })
 
 test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos y 1-3 errores', () => {
@@ -86,7 +86,7 @@ test('cada paso tiene id único global, tipo válido, target, título y texto', 
     // Spec §3: el tour nunca pide confirmar una acción que escriba datos. Un hazlo
     // solo puede navegar, abrir un modal, seleccionar un grupo, cambiar de pestaña
     // o cancelar.
-    if (p.tipo === 'hazlo') assert.match(p.target, /^(nav\.|grupos\.(aperturar|inscribir|tarjeta|tab-fusiones)$|grupo\.tab-|eventos\.nueva$|cumplimiento\.abrir-ayuda$|[a-z]+\.cancelar$)/, `${p.id}: hazlo sobre una acción que escribe (spec §3)`)
+    if (p.tipo === 'hazlo') assert.match(p.target, /^(nav\.|grupos\.(aperturar|inscribir|tarjeta|tab-fusiones)$|grupo\.tab-|eventos\.nueva$|cumplimiento\.abrir-ayuda$|peticiones\.abrir$|[a-z]+\.cancelar$)/, `${p.id}: hazlo sobre una acción que escribe (spec §3)`)
   }
   // el último paso de cada módulo es mostrar (Terminar vive en la tarjeta)
   for (const m of MODULOS) assert.equal(m.pasos[m.pasos.length - 1].tipo, 'mostrar', `${m.id}: último paso debe ser mostrar`)
