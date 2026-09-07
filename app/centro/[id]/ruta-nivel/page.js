@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { getCentroGrowth, updateGrowthRecommendation } from '../../../actions/growth'
 import {
   confidenceMeta,
@@ -106,6 +107,7 @@ export default function GrowthRoutePage() {
   const [activeScenario, setActiveScenario] = useState('base')
   const [updatingRecommendation, setUpdatingRecommendation] = useState(null)
   const [recommendationError, setRecommendationError] = useState('')
+  const access = useCurrentAccess()
 
   useEffect(() => {
     let alive = true
@@ -150,6 +152,7 @@ export default function GrowthRoutePage() {
 
 
   const changeRecommendation = async (recommendationId, command) => {
+    if (!access.canWriteOperations) return
     setUpdatingRecommendation(recommendationId)
     setRecommendationError('')
     try {
@@ -309,6 +312,11 @@ export default function GrowthRoutePage() {
               <h2 id="actions-title">Acciones y resultados por verificar</h2><p className="growth-explanation">El escenario del plan usa las metas de estas acciones. Posponer o descartar una acción retira su supuesto; realizarla no confirma que ya produjo el resultado.</p>
             </div>
           </div>
+          {access.isReadonlyGlobal && (
+            <div className="alert" role="status" style={{ marginBottom: 16 }}>
+              Modo consulta global: ves la ruta y las prioridades, sin marcar, posponer ni descartar acciones.
+            </div>
+          )}
           {recommendationError && <div role="alert" className="alert alert--error">{recommendationError}<button type="button" className="btn" onClick={async () => {
             try { setData(await getCentroGrowth(id)); setRecommendationError('') }
             catch { setRecommendationError('No se pudo actualizar. La última decisión guardada se conserva.') }
@@ -345,7 +353,7 @@ export default function GrowthRoutePage() {
                 <div className="growth-action__owner"><span>{item.responsible}</span><span>Fecha: {String(item.due_date || '').slice(0, 10) || `en ${item.dueDays} días`}</span></div>
                 {item.status === 'completed' && <p className="growth-explanation">Tarea realizada · resultado todavía por verificar con los próximos datos.</p>}
                 <details className="growth-assumptions"><summary>Supuesto y cálculo del impacto</summary><p>{item.assumption}</p><p>{item.formula}</p><p>{item.priorityExplanation}</p></details>
-                {item.status !== 'completed' && item.status !== 'dismissed' && (
+                {access.canWriteOperations && item.status !== 'completed' && item.status !== 'dismissed' && (
                   <div className="growth-action__commands" aria-label={`Seguimiento de ${item.title}`}>
                     <button
                       type="button"

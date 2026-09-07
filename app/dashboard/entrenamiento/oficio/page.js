@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { matrizOficio } from '../../../actions/entrenamiento-oficio'
 import { listCentros } from '../../../actions/centros'
 // El nombre de cada puesto sale de la misma fuente que el resto del oficio.
@@ -44,16 +45,28 @@ export default function EntrenamientoOficioAdminPage() {
   const [centroId, setCentroId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const access = useCurrentAccess()
+  const canView = access.canViewOficio
 
-  useEffect(() => { listCentros().then((c) => setCentros(c || [])).catch(() => {}) }, [])
   useEffect(() => {
+    if (!access.loaded || !canView) return
+    listCentros().then((c) => setCentros(c || [])).catch(() => {})
+  }, [access.loaded, canView])
+  useEffect(() => {
+    if (!access.loaded) return
+    if (!canView) {
+      setLoading(false)
+      setError('No autorizado para ver Puestos de la gente.')
+      setData(null)
+      return
+    }
     setLoading(true)
     setError(null)
     matrizOficio(centroId ? Number(centroId) : null)
       .then((d) => { if (d?.error) { setError(d.error); setData(null) } else setData(d) })
       .catch(() => { setError('No se pudo cargar el oficio. Recarga la página.'); setData(null) })
       .finally(() => setLoading(false))
-  }, [centroId])
+  }, [centroId, access.loaded, canView])
 
   // El plan se lee dentro de un centro (la ruta es /centro/<id>/…). Con un
   // filtro puesto se usa ese centro; sin filtro, el primero de la lista. Si

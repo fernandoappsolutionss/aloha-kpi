@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
+import { isReadonlyGlobalRole } from '../../../../components/access-control.mjs'
 import { getCentroNombre } from '../../../actions/centros'
 import { getNavigationContext } from '../../../actions/navigation'
 import { cargarProgreso } from '../../../actions/entrenamiento'
@@ -34,6 +35,8 @@ export default function EntrenamientoPage() {
   // sin los 9 recorridos por un error de red sería peor que el parpadeo.
   const [rolActor, setRolActor] = useState(null)
   const esCoach = rolActor === 'coach'
+  const esConsultaGlobal = isReadonlyGlobalRole(rolActor)
+  const veOficio = Boolean(rolActor && rolActor !== 'desconocido' && !esConsultaGlobal)
   const veRecorridos = rolActor !== null && !esCoach
 
   useEffect(() => {
@@ -94,7 +97,8 @@ export default function EntrenamientoPage() {
                   prometerle al Coach "dos cosas distintas" y quitarle una es
                   peor que decir el nombre del centro medio segundo antes. */}
               {nombre}
-              {veRecorridos && <> · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).</>}
+              {veRecorridos && !esConsultaGlobal && <> · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).</>}
+              {veRecorridos && esConsultaGlobal && <> · Consulta de recorridos del sistema. El oficio del puesto no está disponible para Gerencia General.</>}
               {esCoach && <> · Los módulos de tu puesto, cada uno con su maniobra. Los recorridos de cómo operar el sistema no son de tu puesto: tu trabajo del día lo marcas desde tu enlace de Coach.</>}
             </p>
           </div>
@@ -134,9 +138,9 @@ export default function EntrenamientoPage() {
                   <>
                     <p className="ent-start__description">
                       Completaste los recorridos y las preguntas de los {resumen.total} recorridos. Eso es la mitad:
-                      ahora sigue tu oficio, los módulos de tu puesto con su maniobra.
+                      {esConsultaGlobal ? ' puedes repasarlos cuando necesites revisar una pantalla.' : ' ahora sigue tu oficio, los módulos de tu puesto con su maniobra.'}
                     </p>
-                    <Link className="btn btn--primary ent-start__cta" href={`/centro/${id}/entrenamiento/oficio`}>Empezar mi oficio <span aria-hidden="true">→</span></Link>
+                    {veOficio && <Link className="btn btn--primary ent-start__cta" href={`/centro/${id}/entrenamiento/oficio`}>Empezar mi oficio <span aria-hidden="true">→</span></Link>}
                     <p className="ent-start__note"><Link className="tour-card__link" href={moduloHref(MODULOS[0].id)}>Repasar los recorridos del sistema</Link></p>
                   </>
                 )}
@@ -186,7 +190,7 @@ export default function EntrenamientoPage() {
             pista 1 y antes de los acordeones de ayuda: son 389 minutos de
             contenido contra ~60 de recorridos, no puede quedar enterrada bajo
             el pie de página de la otra pista. */}
-        <CarrilOficio centroId={id} />
+        {veOficio && <CarrilOficio centroId={id} />}
 
         {/* Los dos acordeones hablan de los 9 recorridos y enlazan a ellos
             módulo por módulo: al Coach le ofrecerían justo lo que no puede
@@ -194,7 +198,7 @@ export default function EntrenamientoPage() {
         {veRecorridos && (
         <div className="ent-resources">
           <h2>¿Necesitas ayuda con algo puntual?</h2>
-          <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema. Las dudas de tu oficio se aclaran en el glosario, dentro de tu puesto.</p>
+          <p className="h-sub" style={{ marginTop: 0 }}>Sobre cómo usar el sistema.{!esConsultaGlobal && ' Las dudas de tu oficio se aclaran en el glosario, dentro de tu puesto.'}</p>
           <details className="panel ent-help">
             <summary><span>Errores frecuentes y cómo resolverlos</span></summary>
             <div className="ent-help__body">

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../../actions/cuadro'
 import { listarGruposActivos } from '../../../actions/grupos'
 import { retirarEstudiante, reincorporarEstudiante } from '../../../actions/estudiantes'
@@ -32,7 +33,7 @@ export default function CuadroPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [rol, setRol] = useState('usuario')
+  const access = useCurrentAccess()
   const [data, setData] = useState(null)
   const [gruposActivos, setGruposActivos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +47,8 @@ export default function CuadroPage() {
   // { tipo: 'retirar' | 'reincorporar', nino } — acción sobre un niño del cuadro.
   const [accionNino, setAccionNino] = useState(null)
 
-  useEffect(() => { setRol(localStorage.getItem('aloha_rol') || 'usuario') }, [])
+  const canWrite = access.canWriteOperations
+  const canDelete = access.canDeleteOperations
 
   const loadData = useCallback(async () => {
     setStatus(previous => previous.startsWith('❌') ? '' : previous)
@@ -66,6 +68,7 @@ export default function CuadroPage() {
   const congelado = !!data?.congelado
 
   async function handleSincronizar() {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (cerrado) return
     setSyncing(true); setStatus('')
     try {
@@ -78,6 +81,7 @@ export default function CuadroPage() {
 
   async function handleGuardarPedido(e) {
     e.preventDefault()
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setSavingPedido(true); setStatus('')
     try {
     const res = await savePedido(id, { ...pedido, id: pedido.id || undefined, year, month })
@@ -88,6 +92,7 @@ export default function CuadroPage() {
   }
 
   async function handleEliminarPedido(p) {
+    if (!canDelete) { setStatus('❌ Tu usuario no puede eliminar pedidos.'); return }
     setSyncing(true); setStatus('')
     try {
     const res = await deletePedido(id, p.id)
@@ -98,6 +103,7 @@ export default function CuadroPage() {
   }
 
   function editarPedido(p) {
+    if (!canWrite) return
     setPedidoOpen(true)
     setPedido({
       id: p.id, fecha: dateInputVal(p.fecha), numero_oe: p.numero_oe || '', producto: p.producto || 'KIT',
@@ -180,13 +186,18 @@ export default function CuadroPage() {
               </span>
             )}
             <a className="btn btn--primary" href={`/api/centro/${id}/cuadro?year=${year}&month=${month}`} download data-tour="cuadro.excel">⬇ Descargar Excel</a>
-            <button type="button" onClick={()=>setConfirmAction({type:'sync'})} disabled={syncing || cerrado} className="btn"
+            {canWrite && <button type="button" onClick={()=>setConfirmAction({type:'sync'})} disabled={syncing || cerrado} className="btn"
               style={cerrado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               title={cerrado ? 'Este mes está cerrado en KPI Mensual. Reábrelo para poder sincronizar.' : 'Vuelca grupos activos, nuevos activos y motivos de deserción al KPI mensual'}>
               {syncing ? 'Sincronizando…' : 'Sincronizar con KPI'}
-            </button>
+            </button>}
           </div>
         </div>
+        {access.isReadonlyGlobal && (
+          <div className="alert" role="status" style={{ marginBottom: 16 }}>
+            Modo consulta global: puedes revisar el cuadro y descargar Excel, sin retiros, reincorporaciones, pedidos ni sincronización KPI.
+          </div>
+        )}
 
         {status && (
           <div role="status" aria-live="polite" className={`alert${isError ? ' alert--error' : ''}`}
@@ -343,7 +354,7 @@ export default function CuadroPage() {
                                               <div style={{ color: 'var(--text-muted)' }}>{e.correo || ''}</div>
                                             </td>
                                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                              {congelado ? null : e.esRetirado ? (
+                                              {!canWrite || congelado ? null : e.esRetirado ? (
                                                 <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }}
                                                   onClick={() => setAccionNino({ tipo: 'reincorporar', nino: e })}>↩ Reincorporar</button>
                                               ) : (
@@ -474,10 +485,10 @@ export default function CuadroPage() {
                           <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{money(p.monto)}</td>
                           <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{p.observaciones || '—'}</td>
                           <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            {!congelado && (
+                            {canWrite && !congelado && (
                               <>
                                 <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => editarPedido(p)}>✏️ Editar</button>
-                                {rol !== 'asistente' && (
+                                {canDelete && (
                                   <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12, color: 'var(--bad-text)' }} aria-label="Eliminar pedido" onClick={() => setConfirmAction({type:'delete',pedido:p})}>🗑</button>
                                 )}
                               </>
@@ -499,7 +510,7 @@ export default function CuadroPage() {
                 <div style={{ padding: '12px 18px', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
                   🔒 Mes cerrado: los pedidos quedaron congelados con el cuadro. Reabre el mes en KPI Mensual para modificarlos.
                 </div>
-              ) : (
+              ) : canWrite ? (
               <>
               <button type="button" className="btn" onClick={()=>{setPedido(EMPTY_PEDIDO);setPedidoOpen(true)}}>Nuevo pedido</button>
               {data.pedidos.length===0 && <p className="h-sub">No hay pedidos este mes.</p>}
@@ -554,20 +565,20 @@ export default function CuadroPage() {
               </form>
               </Dialog>}
               </>
-              )}
+              ) : null}
             </div>
           </>
         )}
 
-        {confirmAction && <Dialog open title={confirmAction.type==='sync'?'Sincronizar KPI':'Eliminar pedido'} onClose={()=>setConfirmAction(null)} closeDisabled={syncing} footer={<><button type="button" className="btn" disabled={syncing} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={syncing} onClick={async()=>{if(confirmAction.type==='sync')await handleSincronizar();else await handleEliminarPedido(confirmAction.pedido);setConfirmAction(null)}}>Confirmar</button></>}>
+        {canWrite && confirmAction && <Dialog open title={confirmAction.type==='sync'?'Sincronizar KPI':'Eliminar pedido'} onClose={()=>setConfirmAction(null)} closeDisabled={syncing} footer={<><button type="button" className="btn" disabled={syncing} onClick={()=>setConfirmAction(null)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={syncing} onClick={async()=>{if(confirmAction.type==='sync')await handleSincronizar();else await handleEliminarPedido(confirmAction.pedido);setConfirmAction(null)}}>Confirmar</button></>}>
           <p>{confirmAction.type==='sync'?'Se sobrescribirán grupos activos, nuevos activos y motivos de deserción en el resumen mensual.':'Se eliminará este pedido. Esta acción no se puede deshacer.'}</p>
         </Dialog>}
-        {accionNino?.tipo === 'retirar' && (
+        {canWrite && accionNino?.tipo === 'retirar' && (
           <RetirarModal centroId={id} nino={accionNino.nino}
             onClose={() => setAccionNino(null)}
             onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />
         )}
-        {accionNino?.tipo === 'reincorporar' && (
+        {canWrite && accionNino?.tipo === 'reincorporar' && (
           <ReincorporarModal centroId={id} nino={accionNino.nino} grupos={gruposActivos}
             onClose={() => setAccionNino(null)}
             onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />

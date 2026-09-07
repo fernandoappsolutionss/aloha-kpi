@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, useMemo, Children } from 'react'
 import { parseSalonCapacity, roomCapacitySummary } from '../../../../lib/salon-capacidad.mjs'
-import { useEsAsistente } from '../../../../components/useRol'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import OperationalCard from '../../../../components/OperationalCard'
@@ -257,6 +257,9 @@ function ChipLlenado({ v, programa, nivel }) {
 
 export default function GruposPage() {
   const { id } = useParams()
+  const access = useCurrentAccess()
+  const canWrite = access.canWriteOperations
+  const canDelete = access.canDeleteOperations
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -406,6 +409,7 @@ export default function GruposPage() {
   // Puede ser una sesión suelta { dia, hora_inicio, hora_fin, salon_id } o una
   // unidad completa { horarios: [...] } (p. ej. el par Lun+Mié del modelo).
   async function abrirNuevoGrupo(prefill) {
+    if (!canWrite) return
     setStatus('')
     const num = await siguienteNumero(id)
     const horarios = prefill?.horarios?.length
@@ -414,6 +418,7 @@ export default function GruposPage() {
     setGrupoModal({ numero: String(num), itinerario: prefill?.itinerario || 'TINY', es_online: false, coach_id: '', fecha_inicio_clases: '', notas: '', nivel: 1, ninos_iniciales: '', horarios })
   }
   function abrirEditarGrupo(g) {
+    if (!canWrite) return
     setStatus('')
     // La palanca de inscripciones ya NO viaja al modal: vive solo en el botón
     // dedicado del panel (CAS). La fecha de apertura MURIÓ (R1): el modal ya no
@@ -427,6 +432,7 @@ export default function GruposPage() {
     })
   }
   async function onToggleInscripcion(g) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     // CAS: se manda el estado que el usuario VIO (`esperado`); si otra pestaña
     // movió la palanca primero, el server responde con error legible y aquí
     // se recarga para mostrar el estado real — nunca se pisa en silencio.
@@ -441,6 +447,7 @@ export default function GruposPage() {
   // consciente con rastro (llenado_extendido_hasta); vence sola. Devuelve si
   // se aplicó, para que el bloque Llenado cierre su mini-formulario.
   async function onExtenderVentana(g, fecha) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return false }
     const res = await extenderVentanaLlenado(id, g.id, fecha)
     if (res.error) { setStatus('❌ ' + res.error); return false }
     setStatus(fecha
@@ -450,12 +457,14 @@ export default function GruposPage() {
     return true
   }
   async function onCerrarGrupo(g) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Cerrar el grupo ${g.numero}? Deja de contar en la rentabilidad del centro.`)) return
     const res = await cerrarGrupo(id, g.id)
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ Grupo ${g.numero} cerrado.`); setOpenId(null); refresca() }
   }
   async function onReabrirGrupo(g) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Reabrir el grupo ${g.numero}?`)) return
     const res = await reabrirGrupo(id, g.id)
     if (res.error) setStatus('❌ ' + res.error)
@@ -467,12 +476,14 @@ export default function GruposPage() {
     setTab('fusiones')
   }
   async function onGraduar(e) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Graduar a ${e.nombre}? Pasa de TINY 10 a KIDS nivel 5 (regla del manual).`)) return
     const res = await graduarTiny(id, e.id)
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} graduado 🎓 — ahora es KIDS nivel 5.`); refresca() }
   }
   async function onRevertirBaja(e) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     const res = await revertirBajaPotencial(id, e.id)
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} sigue activo.`); refresca() }
@@ -480,12 +491,14 @@ export default function GruposPage() {
   // (R5, g2-3) Cancela un retiro programado: el server restaura el estado
   // previo Y limpia la fecha en la misma transacción — el cron ya no lo toca.
   async function onCancelarRetiro(e) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Cancelar el retiro programado de ${e.nombre} (efectivo el ${fmtDia(e.retiro_programado_para)})? Vuelve a su estado anterior y el sistema ya no lo retira.`)) return
     const res = await cancelarRetiroProgramado(id, e.id)
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ Retiro programado de ${e.nombre} cancelado: queda ${res.estado === 'activo' ? 'activo' : 'en baja potencial (alerta manual)'}.`); refresca() }
   }
   async function retiroGuardado(res, est) {
+    if (!canWrite) return
     setRetiroEst(null)
     let msg = `✅ ${est.nombre} retirado.`
     if (res.warn) msg += ` ⚠️ ${res.warn}`
@@ -497,6 +510,7 @@ export default function GruposPage() {
     refresca()
   }
   async function onAplicarFusion(from, to) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     const n = from.estudiantes.length
     if (!confirm(`¿Fusionar el grupo ${from.numero} (${n} niños) con el grupo ${to.numero}? Los ${n} niños pasan al grupo ${to.numero}.`)) return
     const key = `${from.id}-${to.id}`
@@ -512,6 +526,7 @@ export default function GruposPage() {
   }
 
   async function onLinkCoach(g) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     const res = await linkCoach(id, g.id)
     if (res.error) { setStatus('❌ ' + res.error); return }
     const url = `${window.location.origin}${res.path}`
@@ -539,14 +554,14 @@ export default function GruposPage() {
     toggleInscripcion: onToggleInscripcion,
     extenderVentana: onExtenderVentana,
     buscarFusion: onBuscarFusion,
-    inscribirEn: (g) => { setStatus(''); setInscribir({ grupoId: g.id }) },
-    ajustarItinerario: (g, fecha) => { setStatus(''); setItinEdit({ grupo: g, fecha }) },
+    inscribirEn: (g) => { if (!canWrite) return; setStatus(''); setInscribir({ grupoId: g.id }) },
+    ajustarItinerario: (g, fecha) => { if (!canWrite) return; setStatus(''); setItinEdit({ grupo: g, fecha }) },
     // El chip del niño abre SU plan (no el del aula): mismo dibujo, distinta ancla.
     verPlanNino: (e, g) => { setStatus(''); setVerPlan({ nino: e, grupo: g }) },
     planTriggerRef: (node, id) => { if (node && String(verPlan?.nino.id) === String(id)) planReturnFocusRef.current = node },
-    editarNino: (e) => { setStatus(''); setEditEst(e) },
-    retirar: (e) => { setStatus(''); setRetiroEst(e) },
-    programarRetiro: (e) => { setStatus(''); setProgEst(e) },
+    editarNino: (e) => { if (!canWrite) return; setStatus(''); setEditEst(e) },
+    retirar: (e) => { if (!canWrite) return; setStatus(''); setRetiroEst(e) },
+    programarRetiro: (e) => { if (!canWrite) return; setStatus(''); setProgEst(e) },
     cancelarRetiro: onCancelarRetiro,
     graduar: onGraduar,
     revertirBaja: onRevertirBaja,
@@ -585,11 +600,16 @@ export default function GruposPage() {
             <h1 className="h-title">Grupos y Fusiones</h1>
             <p className="h-sub">{data?.nombre || ''} — grupos, niños, horarios y plan de fusiones según el manual</p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          {canWrite && <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn" data-tour="grupos.inscribir" onClick={() => { setStatus(''); setInscribir({}) }}>Inscribir niño</button>
             <button className="btn btn--primary" data-tour="grupos.aperturar" onClick={() => abrirNuevoGrupo()}>➕ Aperturar grupo</button>
-          </div>
+          </div>}
         </div>
+        {access.isReadonlyGlobal && (
+          <div className="alert" role="status" style={{ marginBottom: 16 }}>
+            Modo consulta global: puedes revisar grupos, fusiones sugeridas, horarios, coaches y alumnos; no puedes aperturar, editar, inscribir, retirar, fusionar ni cambiar recursos.
+          </div>
+        )}
 
         {status && (
           <div role={isError ? "alert" : "status"} className={`alert${isError ? ' alert--error' : ''}`}
@@ -643,7 +663,7 @@ export default function GruposPage() {
                 {visibles.length === 0 ? (
                   <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
                     {grupos.length === 0
-                      ? 'Aún no hay grupos. Apertura el primero con “➕ Aperturar grupo”.'
+                      ? (canWrite ? 'Aún no hay grupos. Apertura el primero con “➕ Aperturar grupo”.' : 'Aún no hay grupos.')
                       : busqueda ? `Ningún grupo coincide con “${busqueda}”.` : 'Sin grupos para este filtro.'}
                   </div>
                 ) : (
@@ -659,6 +679,7 @@ export default function GruposPage() {
                       <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)} tour={g.id === primeraTarjetaId ? 'grupos.tarjeta' : undefined}
                         llenado={llenadoDe(g, metas, hoy)}
                         onAbrir={() => abrirGrupo(g)}
+                        canEdit={canWrite}
                         onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
                     ))}
                     {enLlenado.length > 0 && resto.length > 0 && (
@@ -667,6 +688,7 @@ export default function GruposPage() {
                     {resto.map((g) => (
                       <GrupoCard key={g.id} g={g} metas={metas} activo={String(openId) === String(g.id)} tour={g.id === primeraTarjetaId ? 'grupos.tarjeta' : undefined}
                         onAbrir={() => abrirGrupo(g)}
+                        canEdit={canWrite}
                         onEditar={() => { abrirGrupo(g, { alinear: false }); acciones.editarGrupo(g) }} />
                     ))}
                   </>
@@ -676,6 +698,7 @@ export default function GruposPage() {
               {!narrow && (
                 abierto ? (
                   <GrupoDetalle centroId={id} g={abierto} metas={metas} acciones={acciones} asistenciaMes={data?.asistenciaMes || {}}
+                    canWrite={canWrite}
                     vista={detalleVistas[String(abierto.id)] || 'ninos'}
                     onVistaChange={(vista) => setDetalleVistas((prev) => ({ ...prev, [String(abierto.id)]: vista }))}
                     onCerrarPanel={() => setOpenId(null)} />
@@ -696,18 +719,18 @@ export default function GruposPage() {
 
         {tab === 'fusiones' && (
           <TabFusiones grupos={grupos} metas={metas} fus={fus} fusLoading={fusLoading}
-            origenId={origenId} setOrigenId={setOrigenId} onAplicar={onAplicarFusion} busyFusion={busyFusion} />
+            origenId={origenId} setOrigenId={setOrigenId} onAplicar={onAplicarFusion} busyFusion={busyFusion} canWrite={canWrite} />
         )}
 
         {tab === 'horarios' && (
           <TabHorarios centroId={id} grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
             retirados={data?.retirados || []} reservas={data?.reservas || []}
-            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} onChanged={refresca} setStatus={setStatus} />
+            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} onChanged={refresca} setStatus={setStatus} canWrite={canWrite} canDelete={canDelete} />
         )}
 
         {tab === 'coaches' && (
           <TabCoaches centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} grupos={grupos} reservas={data?.reservas || []}
-            onChanged={refresca} setStatus={setStatus} />
+            onChanged={refresca} setStatus={setStatus} canWrite={canWrite} />
         )}
 
         {tab === 'alumnos' && (
@@ -723,7 +746,7 @@ export default function GruposPage() {
                         <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
                         <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
                         <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_inscripcion)}</td>
-                        <td style={{ textAlign: 'right' }}><button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Asignar grupo</button></td>
+                        <td style={{ textAlign: 'right' }}>{canWrite && <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Asignar grupo</button>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -751,7 +774,7 @@ export default function GruposPage() {
                         <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
                         <td><span className="pill pill--bad"><span className="dot" />{MOTIVOS_RETIRO_LABELS[e.motivo_retiro] || e.motivo_retiro || '—'}</span></td>
                         <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_retiro)}</td>
-                        <td style={{ textAlign: 'right' }}><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button></td>
+                        <td style={{ textAlign: 'right' }}>{canWrite && <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -775,39 +798,40 @@ export default function GruposPage() {
           metas={metas}
           acciones={acciones}
           asistenciaMes={data?.asistenciaMes || {}}
+          canWrite={canWrite}
           vista={detalleVistas[String(abierto.id)] || 'ninos'}
           onVistaChange={(vista) => setDetalleVistas((prev) => ({ ...prev, [String(abierto.id)]: vista }))}
           onClose={() => setOpenId(null)}
         />
       )}
 
-      {grupoModal && (
+      {canWrite && grupoModal && (
         <GrupoModal centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} initial={grupoModal}
           onClose={() => setGrupoModal(null)}
           onSaved={(msg, warn) => { setGrupoModal(null); setStatus(warn ? `✅ ${msg} ⚠️ ${warn}` : `✅ ${msg}`); refresca() }} />
       )}
-      {inscribir && (
+      {canWrite && inscribir && (
         <InscribirModal centroId={id} grupos={grupos} grupoPrefill={inscribir.grupoId}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg); refresca() }} />
       )}
-      {editEst && (
+      {canWrite && editEst && (
         <EstudianteModal centroId={id} est={editEst} grupos={grupos}
           onClose={() => setEditEst(null)}
           onSaved={(msg) => { setEditEst(null); setStatus('✅ ' + msg); refresca() }} />
       )}
-      {retiroEst && (
+      {canWrite && retiroEst && (
         <RetiroModal centroId={id} est={retiroEst}
           onClose={() => setRetiroEst(null)}
           onSaved={(res) => retiroGuardado(res, retiroEst)}
           onProgramado={(res) => { setRetiroEst(null); setStatus(`✅ ${retiroEst.nombre}: retiro programado para el ${fmtDia(res.retiroProgramadoPara)} — sigue este mes.`); refresca() }} />
       )}
-      {progEst && (
+      {canWrite && progEst && (
         <ProgramarRetiroModal centroId={id} est={progEst}
           onClose={() => setProgEst(null)}
           onSaved={(res) => { setProgEst(null); setStatus(`✅ ${progEst.nombre}: retiro programado para el ${fmtDia(res.retiroProgramadoPara)} — sigue este mes.`); refresca() }} />
       )}
-      {itinEdit && (
+      {canWrite && itinEdit && (
         <ItinerarioModal centroId={id} g={itinEdit.grupo} nuevaExcepcion={itinEdit.fecha}
           onClose={() => setItinEdit(null)}
           onSaved={(msg) => { setItinEdit(null); setStatus('✅ ' + msg); refresca() }} />
@@ -821,7 +845,7 @@ export default function GruposPage() {
           onClose={() => setVerPlan(null)}
           renderCreacion={({ nino, onPlanFijado, onBusyChange }) => (
             <div style={{ padding: '16px 18px' }}>
-              <BloqueCrearPlan centroId={id} ninos={[nino]} etiqueta={`${nino.itinerario} ${nino.nivel}`}
+              {canWrite ? <BloqueCrearPlan centroId={id} ninos={[nino]} etiqueta={`${nino.itinerario} ${nino.nivel}`}
                 onCancelar={() => setVerPlan(null)}
                 onBusyChange={onBusyChange}
                 onFijado={(r) => {
@@ -829,12 +853,12 @@ export default function GruposPage() {
                   // El modal repinta con el plan que devolvió el server y avisa
                   // a la pantalla (onCambio) para recargar el roster.
                   onPlanFijado(r.plan)
-                }} />
+                }} /> : null}
             </div>
           )}
           onCambio={() => refresca()} />
       )}
-      {reincEst && (
+      {canWrite && reincEst && (
         <ReincorporarModal centroId={id} est={reincEst} grupos={grupos}
           onClose={() => setReincEst(null)}
           onSaved={(msg) => { setReincEst(null); setStatus('✅ ' + msg); refresca() }} />
@@ -862,7 +886,7 @@ function OcupacionBar({ n, metas }) {
 // ── Tarjeta de grupo en la lista maestra ────────────────────────────────────
 // `llenado` (opcional, solo sección EN LLENADO): countdown de la ventana de
 // nuevos, niños contra la meta y ritmo semanal necesario — de llenadoDe().
-function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
+function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, canEdit = true, tour }) {
   const st = groupStatus(g, metas.gpnMin)
   return (
     <article data-grupo={g.id} data-tour={tour} className={`grp-card${activo ? ' grp-card--on' : ''}`}>
@@ -880,8 +904,9 @@ function GrupoCard({ g, metas, activo, llenado, onAbrir, onEditar, tour }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
           <span className={`pill ${ESTADO_PILL[st.key] || 'pill--warn'}`} title={ESTADO_TITULO[st.key] || ''}><span className="dot" />{st.label}</span>
-          <button className="btn grp-card__edit" style={{ padding: '3px 9px', fontSize: 13 }}
+          {canEdit && <button className="btn grp-card__edit" style={{ padding: '3px 9px', fontSize: 13 }}
             title={`Editar el grupo ${g.numero}`} onClick={(e) => { e.stopPropagation(); onEditar() }}>✎ Editar</button>
+          }
         </div>
       </div>
       <div style={{ marginTop: 11 }}><OcupacionBar n={g.estudiantes.length} metas={metas} /></div>
@@ -926,7 +951,8 @@ function EstadoNinoPill({ e }) {
 // presente este mes el niño termina su mes ("Retirar el próximo mes"); sin
 // presente se retira ya ("Retirar"). Con retiro programado solo queda
 // cancelarlo. La verdad final la re-verifica el server bajo lock (g1-23).
-function AccionesNino({ e, acciones, asis }) {
+function AccionesNino({ e, acciones, asis, canWrite = true }) {
+  if (!canWrite) return null
   const programado = e.estado === 'baja_potencial' && e.retiro_programado_para
   const presentes = asis?.presentes || 0
   return (
@@ -964,7 +990,7 @@ function AccionesNino({ e, acciones, asis }) {
   )
 }
 
-function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, vista, onVistaChange, onClose }) {
+function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, canWrite = true, vista, onVistaChange, onClose }) {
   const closeRef = useRef(null)
   const { layerRef, surfaceRef, onBackdropPointerDown } = useModalLayer({
     open: true,
@@ -982,6 +1008,7 @@ function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, vista, onVist
           metas={metas}
           acciones={acciones}
           asistenciaMes={asistenciaMes}
+          canWrite={canWrite}
           vista={vista}
           onVistaChange={onVistaChange}
           sheet
@@ -998,7 +1025,7 @@ function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, vista, onVist
 // ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
-function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
+function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWrite = true, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
   const useCards = useNarrow(767)
   const [localVista, setLocalVista] = useState('ninos')
   const vista = controlledVista || localVista
@@ -1054,24 +1081,24 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
             onClick={onCerrarPanel} title="Cerrar el detalle (Esc)" aria-label="Cerrar el detalle">✕</button>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>✎ Editar grupo</button>
-          {activo && (
+          {canWrite && <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => acciones.editarGrupo(g)}>✎ Editar grupo</button>}
+          {canWrite && activo && (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} disabled={!aceptaNuevos}
               title={aceptaNuevos ? undefined : motivoNoAceptaNuevos(ll.ventana)}
               data-tour="grupo.inscribir-aqui" onClick={() => acciones.inscribirEn(g)}>+ Inscribir niño aquí</button>
           )}
-          {activo && (
+          {canWrite && activo && (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} data-tour="grupo.cerrar-inscripciones" onClick={() => acciones.toggleInscripcion(g)}>
               {g.inscripcion_abierta === false ? 'Abrir inscripciones' : 'Cerrar inscripciones'}
             </button>
           )}
-          {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} data-tour="grupo.link-coach" onClick={() => acciones.linkCoach(g)}>🔗 Link del coach</button>}
+          {canWrite && activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} data-tour="grupo.link-coach" onClick={() => acciones.linkCoach(g)}>🔗 Link del coach</button>}
           {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} data-tour="grupo.buscar-fusion" onClick={() => acciones.buscarFusion(g)}>Buscar fusión</button>}
-          {activo ? (
+          {canWrite && (activo ? (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12, color: 'var(--bad)', borderColor: 'var(--bad-line)' }} onClick={() => acciones.cerrar(g)}>Cerrar grupo</button>
           ) : (
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.reabrir(g)}>Reabrir</button>
-          )}
+          ))}
         </div>
         {/* Dos vistas del grupo: su gente y el itinerario del nivel que cursa */}
         <div className="grp-seg" role="tablist">
@@ -1087,6 +1114,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
       <div className="grp-detail__body">
         {vista === 'itinerario' ? (
           <ItinerarioNivel centroId={centroId} g={g} it={it} pos={posAula}
+            canWrite={canWrite}
             onAjustar={(fecha) => acciones.ajustarItinerario(g, fecha)}
             onPlanFijado={acciones.planFijado} />
         ) : (
@@ -1102,7 +1130,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
           <div style={{ gridColumn: '1 / -1' }}><OcupacionBar n={n} metas={metas} /></div>
         </div>
         {activo && ll && (
-          <BloqueLlenado g={g} ll={ll} onExtender={(fecha) => acciones.extenderVentana(g, fecha)} />
+          <BloqueLlenado g={g} ll={ll} canWrite={canWrite} onExtender={(fecha) => acciones.extenderVentana(g, fecha)} />
         )}
         {g.notas && (
           <div style={{ padding: '10px 18px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{g.notas}</div>
@@ -1128,7 +1156,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
         {n === 0 ? (
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, display: 'grid', gap: 12, justifyItems: 'center' }}>
             Este grupo no tiene niños activos.
-            {activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>Inscribir el primero</button>}
+            {canWrite && activo && <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.inscribirEn(g)}>Inscribir el primero</button>}
           </div>
         ) : useCards ? (
           // En el panel deslizante la tabla no cabe: cada niño va apilado.
@@ -1152,7 +1180,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
-                  <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} />
+                  <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} canWrite={canWrite} />
                 </div>
               </article>
             ) })}
@@ -1186,7 +1214,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, sheet,
                       y la tabla estrecha la columna del nombre, no los botones. */}
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
-                      <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} />
+                      <AccionesNino e={e} acciones={acciones} asis={asistenciaMes[String(e.id)]} canWrite={canWrite} />
                     </div>
                   </td>
                 </tr>
@@ -1214,7 +1242,7 @@ const ESTADO_RITMO = {
   sin_datos: { t: 'Sin datos aún', pill: 'pill--warn' },
 }
 
-function BloqueLlenado({ g, ll, onExtender }) {
+function BloqueLlenado({ g, ll, canWrite = true, onExtender }) {
   const [extiendo, setExtiendo] = useState(false)
   const [fechaExt, setFechaExt] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -1264,7 +1292,7 @@ function BloqueLlenado({ g, ll, onExtender }) {
           ))}
         </ul>
       )}
-      {extensible && (
+      {canWrite && extensible && (
         extiendo ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Field label="Fecha límite de la extensión"><input name="fecha_extension" type="date" className="input" style={{ width: 160 }} value={fechaExt}
@@ -1370,7 +1398,7 @@ function BloqueCrearPlan({ centroId, ninos, etiqueta, onFijado, onCancelar, onBu
 
 // Los montones de niños SIN plan del grupo, uno por itinerario+nivel: cada
 // tarjeta abre el MISMO bloque de creación rápida y lo aplica en lote.
-function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
+function BloqueSinPlanGrupo({ centroId, subgrupos, total, canWrite = true, onPlanFijado }) {
   const [abierto, setAbierto] = useState(null)
   return (
     <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'grid', gap: 10, background: 'var(--surface-3)' }}>
@@ -1397,7 +1425,7 @@ function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
                     {n.nombre}
                     {inicio && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Inicio: {fmtDia(inicio)}. Falta el horario del aula para calcular su semana.</div>}
                   </div>
-                  {!inicio && !seleccion.length && (
+                  {canWrite && !inicio && !seleccion.length && (
                     <button className="btn" aria-label={`Completar inicio de ${n.nombre}`} onClick={() => setAbierto(`${sub.clave}:${n.id}`)}>
                       Completar inicio
                     </button>
@@ -1405,13 +1433,13 @@ function BloqueSinPlanGrupo({ centroId, subgrupos, total, onPlanFijado }) {
                 </div>
               )
             })}
-            {pendientes.length > 1 && !seleccion.length && (
+            {canWrite && pendientes.length > 1 && !seleccion.length && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
                 <button className="btn" onClick={() => setAbierto(sub.clave)}>Todos empezaron el mismo día</button>
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>Usa una fecha para los {pendientes.length} niños pendientes solo si la coach confirma que comenzaron este nivel juntos.</p>
               </div>
             )}
-            {seleccion.length > 0 && (
+            {canWrite && seleccion.length > 0 && (
               <BloqueCrearPlan key={abierto} centroId={centroId} ninos={seleccion} etiqueta={sub.etiqueta}
                 onCancelar={() => setAbierto(null)}
                 onFijado={(r) => { setAbierto(null); onPlanFijado?.(r) }} />
@@ -1483,7 +1511,7 @@ function MontonPlan({ m, esReferencia }) {
   )
 }
 
-function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
+function ItinerarioNivel({ centroId, g, it, pos, canWrite = true, onAjustar, onPlanFijado }) {
   // Los planes individuales existen con el horario y el inicio de cada niño,
   // aunque el aula todavía no tenga una referencia común.
   const hayReferencia = !!it?.semanas?.length
@@ -1511,8 +1539,8 @@ function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
         {!ninos.length && <p style={{ color: 'var(--text-dim)' }}>Este grupo todavía no tiene niños activos.</p>}
       </div>
 
-      {nSinPlan > 0 && (
-        <BloqueSinPlanGrupo centroId={centroId} subgrupos={sinPlan} total={nSinPlan} onPlanFijado={onPlanFijado} />
+      {canWrite && nSinPlan > 0 && (
+        <BloqueSinPlanGrupo centroId={centroId} subgrupos={sinPlan} total={nSinPlan} canWrite={canWrite} onPlanFijado={onPlanFijado} />
       )}
       {montones.map((m) => (
         <MontonPlan key={m.clave} m={m} esReferencia={hayReferencia && siguePlanDelAula(m, refAula)} />
@@ -1540,9 +1568,9 @@ function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
                 </p>
               )}
             </div>
-            <button className="btn" data-tour="grupo.ajustar-itinerario" onClick={() => onAjustar()}>
+            {canWrite && <button className="btn" data-tour="grupo.ajustar-itinerario" onClick={() => onAjustar()}>
               {hayReferencia ? 'Ajustar referencia del aula' : 'Crear referencia del aula'}
-            </button>
+            </button>}
           </div>
           {hayReferencia && (
             <div style={{ marginTop: 12 }}>
@@ -1552,7 +1580,7 @@ function ItinerarioNivel({ centroId, g, it, pos, onAjustar, onPlanFijado }) {
         </div>
         {hayReferencia && (
           <>
-            <LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={(f) => onAjustar(f)} tour="grupo.itinerario-linea" />
+            <LineaTiempoPlan it={it} estado={pos.estado} indice={pos.indice} onFecha={canWrite ? (f) => onAjustar(f) : undefined} tour="grupo.itinerario-linea" />
             <NotasPlan it={it} />
           </>
         )}
@@ -1588,7 +1616,7 @@ function mensajeAnclaFijada(ninos, etiqueta, fecha) {
 }
 
 // ── Tab Fusiones: bajo meta, destinos por grupo y plan sugerido del mes ──────
-function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, onAplicar, busyFusion }) {
+function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, onAplicar, busyFusion, canWrite = true }) {
   const origen = origenId ? grupos.find((g) => String(g.id) === String(origenId)) : null
   const destinos = origen ? sugerenciasPara(origen, grupos, { MIN: metas.gpnMin, MAX: metas.cupoMax }) : []
   return (
@@ -1607,7 +1635,7 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
             {destinos.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin grupos candidatos para fusionar con este grupo.</div>
             ) : destinos.slice(0, 6).map((s) => (
-              <FusionCard key={s.grupo.id} from={origen} to={s.grupo} analisis={s.analisis} onAplicar={onAplicar} busyFusion={busyFusion} />
+              <FusionCard key={s.grupo.id} from={origen} to={s.grupo} analisis={s.analisis} onAplicar={onAplicar} busyFusion={busyFusion} canWrite={canWrite} />
             ))}
           </div>
         </div>
@@ -1645,7 +1673,7 @@ function TabFusiones({ grupos, metas, fus, fusLoading, origenId, setOrigenId, on
               {fus.sugerencias.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin fusiones sugeridas: no hay pares viables este mes.</div>
               ) : fus.sugerencias.map((p, i) => (
-                <FusionCard key={`${p.from.id}-${p.to.id}`} from={p.from} to={p.to} analisis={p.analisis} onAplicar={onAplicar} busyFusion={busyFusion} tour={i === 0 ? 'fusiones.aplicar' : undefined} />
+                <FusionCard key={`${p.from.id}-${p.to.id}`} from={p.from} to={p.to} analisis={p.analisis} onAplicar={onAplicar} busyFusion={busyFusion} tour={i === 0 ? 'fusiones.aplicar' : undefined} canWrite={canWrite} />
               ))}
             </div>
           </div>
@@ -1690,7 +1718,7 @@ function distribucionSemanas(ninos) {
   return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${k}`).join(' · ')
 }
 
-function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
+function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour, canWrite = true }) {
   const banda = scoreBand(analisis.score, analisis.blocked)
   const key = `${from.id}-${to.id}`
   const K_ICON = { ok: '✓', mb: '△', no: '✕' }
@@ -1736,7 +1764,7 @@ function FusionCard({ from, to, analisis, onAplicar, busyFusion, tour }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span className={`pill ${BANDA_PILL[banda]}`}><span className="dot" />{banda} · {analisis.score} pts</span>
-          {!analisis.blocked && (
+          {canWrite && !analisis.blocked && (
             <button className="btn btn--primary" style={{ padding: '6px 14px', fontSize: 12 }} data-tour={tour} disabled={busyFusion === key} onClick={() => onAplicar(from, to)}>
               {busyFusion === key ? 'Aplicando…' : 'Aplicar fusión'}
             </button>
@@ -1802,9 +1830,7 @@ function liberacionDe(grupo) {
   return { cierre: max, libera: true }
 }
 
-function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, onAbrirGrupo, onChanged, setStatus }) {
-  // El asistente aparta la sala de la clase de prueba, pero no la quita.
-  const esAsistente = useEsAsistente()
+function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, onAbrirGrupo, onChanged, setStatus, canWrite = true, canDelete = true }) {
   const [dia, setDia] = useState(() => {
     const d = new Date().getDay()
     return d >= 1 && d <= 6 ? d : 1
@@ -1875,6 +1901,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
 
   async function quitarReserva() {
     if (!reservaDia) return
+    if (!canDelete) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBorrando(true)
     const res = await eliminarReserva(centroId, reservaDia.id)
     setBorrando(false)
@@ -1883,6 +1910,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
   }
 
   const clickHueco = (salon, h) => {
+    if (!canWrite) return
     // Primero intenta encajar una unidad del modelo (p. ej. el par Lun+Mié
     // completo); si no cabe ninguna, cae al bloque libre en hora vendible.
     const unidad = unidadParaHueco(grupos, salones, dia, salon.id, h)
@@ -1985,10 +2013,12 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                 <div style={{ fontSize: 13, color: r.coachesLibres.length ? 'var(--ok)' : 'var(--warn)', marginTop: 4 }}>
                   {r.coachesLibres.length ? `Coaches libres: ${r.coachesLibres.map((c) => c.nombre.split(' ')[0]).join(', ')}` : 'Sin coach libre en esas franjas'}
                 </div>
-                <button className="btn btn--primary" style={{ marginTop: 8, padding: '5px 12px', fontSize: 12 }}
-                  onClick={() => onAbrirGrupo({ horarios: r.horariosForm })}>
-                  Aperturar aquí
-                </button>
+                {canWrite && (
+                  <button className="btn btn--primary" style={{ marginTop: 8, padding: '5px 12px', fontSize: 12 }}
+                    onClick={() => onAbrirGrupo({ horarios: r.horariosForm })}>
+                    Aperturar aquí
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -2019,18 +2049,18 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
         {reservaDia ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className="pill pill--warn" style={{ whiteSpace: 'nowrap' }}>🎯 Clase de prueba {aHora12(aMinutos(reservaDia.hora_inicio))}–{aHora12(aMinutos(reservaDia.hora_fin))}</span>
-            <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReservaModal(reservaDia) }}>Editar</button>
-            {!esAsistente && (
+            {canWrite && <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReservaModal(reservaDia) }}>Editar</button>}
+            {canDelete && (
               <button className="btn" style={BTN_XS} disabled={borrando} onClick={quitarReserva}>{borrando ? 'Quitando…' : 'Quitar'}</button>
             )}
           </div>
-        ) : (
+        ) : canWrite ? (
           <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => { setStatus(''); setReservaModal({ dia }) }}>
             🎯 Clase de prueba este día
           </button>
-        )}
+        ) : null}
         <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-          Ventana {aHora12(aperturaDia)}–8:30 pm · 15 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días) · toca un bloque verde para aperturar ahí
+          Ventana {aHora12(aperturaDia)}–8:30 pm · 15 min entre clases · el programa son 2 h semanales (2 h un día o 1 h en dos días){canWrite ? ' · toca un bloque verde para aperturar ahí' : ''}
         </span>
       </div>
 
@@ -2046,7 +2076,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
           {sesiones.map(({grupo,horario,titulo,fields})=><OperationalCard key={`${grupo.id}-${horario.id}`} title={titulo} fields={fields} />)}
           {slots.map(sl=><OperationalCard key={sl.inicio} title={`Disponible ${aHora12(sl.inicio)}–${aHora12(sl.fin)}`} subtitle={sl.subTexto}
             fields={[{label:'Programa',value:sl.esKinder?'Zona Kinder':'Tiny/Kids'},{label:'Atractivo',value:sl.at.etiqueta},{label:'Razón',value:sl.at.razon},{label:'Coaches libres',value:sl.coachesTexto}]}
-            actions={<button type="button" className="btn" onClick={()=>onAbrirGrupo({horarios:sl.horarios,itinerario:sl.esKinder?'KINDER':undefined})}>Aperturar en este horario</button>} />)}
+            actions={canWrite ? <button type="button" className="btn" onClick={()=>onAbrirGrupo({horarios:sl.horarios,itinerario:sl.esKinder?'KINDER':undefined})}>Aperturar en este horario</button> : null} />)}
         </section>)}
       </div>
       {/* Calendario del día: vista densa informativa; las acciones viven arriba. */}
@@ -2155,7 +2185,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
                       background: esKinder ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1.5px dashed ${esKinder ? 'var(--warn-line)' : 'var(--ok-line)'}`, borderRadius: 'var(--r-sm)',
-                      color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 3, overflow: 'hidden',
+                      color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 13, fontWeight: 600, cursor: canWrite ? 'pointer' : 'default', padding: 3, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
                     }}>
                     <span className="num" style={{ whiteSpace: 'nowrap' }}>＋ {aHora12(sl.inicio)}–{aHora12(sl.fin)}</span>
@@ -2187,7 +2217,7 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
         </div>
       )}
 
-      {reservaModal && (
+      {canWrite && reservaModal && (
         <ReservaModal centroId={centroId} coaches={coaches} salones={salones} initial={reservaModal}
           onClose={() => setReservaModal(null)}
           onSaved={(msg) => { setReservaModal(null); setStatus('✅ ' + msg); onChanged() }} />
@@ -2311,7 +2341,7 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
 }
 
 // ── Tab Coaches y salones ────────────────────────────────────────────────────
-function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, setStatus }) {
+function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, setStatus, canWrite = true }) {
   const [periodo, setPeriodo] = useState(getCurrentPeriod)
   const [desercion, setDesercion] = useState(null)
   const [errorDesercion, setErrorDesercion] = useState('')
@@ -2334,6 +2364,7 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
   const [busy, setBusy] = useState(null)
 
   async function onToggleCoach(c) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBusy('c' + c.id)
     const res = await toggleCoach(centroId, c.id, !c.activo)
     setBusy(null)
@@ -2341,6 +2372,7 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
     else { setStatus(`✅ Coach ${c.nombre} ${c.activo ? 'desactivado' : 'activado'}.`); onChanged() }
   }
   async function onToggleSalon(s) {
+    if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBusy('s' + s.id)
     const res = await toggleSalon(centroId, s.id, !s.activo)
     setBusy(null)
@@ -2353,7 +2385,7 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
       <div className="panel">
         <div className="panel__head">
           <h2 className="panel__title">Coaches</h2>
-          <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setCoachModal({})}>+ Agregar coach</button>
+          {canWrite && <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setCoachModal({})}>+ Agregar coach</button>}
         </div>
         <div className="desercion-periodo">
           <span>Periodo de deserción</span>
@@ -2384,10 +2416,12 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
                       : <span className="pill pill--bad"><span className="dot" />Inactivo</span>}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn" style={BTN_XS} onClick={() => setCoachModal(c)}>Editar</button>
-                      <button className="btn" style={BTN_XS} disabled={busy === 'c' + c.id} onClick={() => onToggleCoach(c)}>{c.activo ? 'Desactivar' : 'Activar'}</button>
-                    </div>
+                    {canWrite ? (
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button className="btn" style={BTN_XS} onClick={() => setCoachModal(c)}>Editar</button>
+                        <button className="btn" style={BTN_XS} disabled={busy === 'c' + c.id} onClick={() => onToggleCoach(c)}>{c.activo ? 'Desactivar' : 'Activar'}</button>
+                      </div>
+                    ) : <span className="h-sub" style={{ margin: 0 }}>Solo lectura</span>}
                   </td>
                 </tr>,
                 ...(abierto ? [<tr key={`detalle-${c.id}`} data-detail><td colSpan={5}>
@@ -2403,7 +2437,7 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
       <div className="panel">
         <div className="panel__head">
           <h2 id="salones" className="panel__title">Salones</h2>
-          <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setSalonModal({})}>+ Agregar salón</button>
+          {canWrite && <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setSalonModal({})}>+ Agregar salón</button>}
         </div>
         <div style={{ padding: '12px 16px', fontSize: 13 }} aria-live="polite">
           <strong>{capacidad.complete ? `${capacidad.simultaneousChildren} niños a la vez` : 'Capacidad por completar'}</strong>
@@ -2432,10 +2466,12 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
                       : <span className="pill pill--bad"><span className="dot" />Inactivo</span>}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn" style={BTN_XS} onClick={() => setSalonModal(s)}>Editar</button>
-                      <button className="btn" style={BTN_XS} disabled={busy === 's' + s.id} onClick={() => onToggleSalon(s)}>{s.activo ? 'Desactivar' : 'Activar'}</button>
-                    </div>
+                    {canWrite ? (
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button className="btn" style={BTN_XS} onClick={() => setSalonModal(s)}>Editar</button>
+                        <button className="btn" style={BTN_XS} disabled={busy === 's' + s.id} onClick={() => onToggleSalon(s)}>{s.activo ? 'Desactivar' : 'Activar'}</button>
+                      </div>
+                    ) : <span className="h-sub" style={{ margin: 0 }}>Solo lectura</span>}
                   </td>
                 </tr>,
                 ...(abierto ? [<tr key={`detalle-${s.id}`} data-detail><td colSpan={5}><DetalleRecurso recurso={detalle} /></td></tr>] : []),
@@ -2446,12 +2482,12 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
         )}
       </div>
 
-      {coachModal && (
+      {canWrite && coachModal && (
         <CoachModal centroId={centroId} initial={coachModal}
           onClose={() => setCoachModal(null)}
           onSaved={(msg) => { setCoachModal(null); setStatus('✅ ' + msg); onChanged() }} />
       )}
-      {salonModal && (
+      {canWrite && salonModal && (
         <SalonModal centroId={centroId} initial={salonModal}
           onClose={() => setSalonModal(null)}
           onSaved={(msg) => { setSalonModal(null); setStatus('✅ ' + msg); onChanged() }} />

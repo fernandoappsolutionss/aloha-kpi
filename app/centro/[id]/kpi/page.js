@@ -4,7 +4,7 @@ import { usaKpiAutomatico } from '../../../../lib/kpi-auto.mjs'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import TableScroller from '../../../../components/TableScroller'
 import OperationalCard from '../../../../components/OperationalCard'
-import { useEsAsistente } from '../../../../components/useRol'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
@@ -37,8 +37,7 @@ const emptyW = () => ({ cob:['','','','',''], des:['','','','',''], ing:['','','
 export default function KPIPage() {
   const { id } = useParams()
   const now = new Date()
-  // El asistente registra el KPI, pero no cierra ni reabre el mes.
-  const esAsistente = useEsAsistente()
+  const access = useCurrentAccess()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [centroNombre, setCentroNombre] = useState('')
@@ -158,6 +157,7 @@ export default function KPIPage() {
   }
 
   async function handleSave() {
+    if (!access.canWriteOperations) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (mesEstado === 'cerrado') { setStatus('❌ Este mes está cerrado. No se puede editar.'); return }
     setSaving(true); setStatus('')
     try {
@@ -174,6 +174,7 @@ export default function KPIPage() {
   // Sin try/finally, un error del servidor dejaba el botón en "Cerrando…" para
   // siempre y sin mensaje: desde el centro se ve como "no me deja cerrar mes".
   async function handleCerrarMes() {
+    if (!access.canCloseOperations) { setStatus('❌ Tu usuario no puede cerrar ni reabrir meses.'); return }
     if (!confirm('¿Cerrar ' + NOMBRES_MES[month-1] + ' ' + year + '? El mes quedará bloqueado como historial y no podrá editarse.')) return
     setCerrando(true)
     try {
@@ -191,6 +192,7 @@ export default function KPIPage() {
   // Un mes cerrado por error no puede quedar congelado para siempre: la
   // administradora lo reabre, corrige y vuelve a cerrar.
   async function handleReabrirMes() {
+    if (!access.canCloseOperations) { setStatus('❌ Tu usuario no puede cerrar ni reabrir meses.'); return }
     if (!confirm('¿Reabrir ' + NOMBRES_MES[month-1] + ' ' + year + '? Volverá a ser editable y tendrás que cerrarlo de nuevo para que quede como historial.')) return
     setCerrando(true)
     try {
@@ -221,13 +223,15 @@ export default function KPIPage() {
   const gpn = ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
 
   const upd = (semIdx, tipo, di, val) => setSemanas(p => p.map((s,i) => i===semIdx ? {...s,[tipo]:s[tipo].map((d,j) => j===di?val:d)} : s))
+  const readOnly = !access.canWriteOperations
+  const canCloseMonth = access.canCloseOperations
   const weekInput = (semIdx, tipo, day, presentation) => {
     const inputId = `kpi-${presentation}-${semIdx}-${tipo}-${day}`
     const metric = KPI_METRICS.find(item=>item.tipo === tipo)
     return <>
       {presentation === 'desktop' && <label htmlFor={inputId} className="sr-only">{`${metric.label} · semana ${SEMANAS[semIdx]} · día ${day+1}`}</label>}
       <input id={inputId} name={`semanas.${semIdx}.${tipo}.${day}`} type="number" inputMode="numeric" min="0"
-        value={semanas[semIdx][tipo][day]} onChange={e=>upd(semIdx,tipo,day,e.target.value)} disabled={locked || (autoIngDes && tipo !== 'cob')}
+        value={semanas[semIdx][tipo][day]} onChange={e=>upd(semIdx,tipo,day,e.target.value)} disabled={readOnly || locked || (autoIngDes && tipo !== 'cob')}
         className="input num kpi-mobile-input" />
     </>
   }
@@ -282,10 +286,10 @@ export default function KPIPage() {
 
   // Estilo input de "Configuración" / cards de categoría
   const cfgInput = (key, full, bloqueado = false) => (
-    <input id={`kpi-config-${key}`} name={`config.${key}`} inputMode="numeric" type="number" min="0" value={config[key]} disabled={locked || bloqueado}
+    <input id={`kpi-config-${key}`} name={`config.${key}`} inputMode="numeric" type="number" min="0" value={config[key]} disabled={readOnly || locked || bloqueado}
       onChange={e=>setConfig(c=>({...c,[key]:e.target.value,...(key === 'cp_matriculados' ? {cp_matriculados_override:null} : {})}))}
       className="input num"
-      style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: (locked || bloqueado) ? 0.6 : 1, background: (locked || bloqueado) ? 'var(--surface-3)' : 'var(--bg)' }}/>
+      style={{ width: full ? '100%' : 65, padding: full ? '10px 12px' : '6px 8px', textAlign: full ? 'left' : 'center', opacity: (readOnly || locked || bloqueado) ? 0.6 : 1, background: (readOnly || locked || bloqueado) ? 'var(--surface-3)' : 'var(--bg)' }}/>
   )
 
   return (
@@ -303,7 +307,7 @@ export default function KPIPage() {
           </div>
           <div className="kpi-page-actions">
             {locked ? (
-              esAsistente
+              !canCloseMonth
                 ? <span className="label" style={{ color: 'var(--text-faint)' }}>Mes cerrado — lo reabre el administrador del centro</span>
                 : (
                   <button onClick={handleReabrirMes} disabled={cerrando} className="btn" data-tour="kpi.reabrir">
@@ -311,11 +315,13 @@ export default function KPIPage() {
                   </button>
                 )
             ) : (
-              <>
+              readOnly ? (
+                <span className="label" style={{ color: 'var(--text-faint)' }}>Modo consulta — sin edición operativa</span>
+              ) : <>
                 <button onClick={handleSave} disabled={saving} className="btn btn--primary" data-tour="kpi.guardar">
                   {saving ? 'Guardando…' : 'Guardar'}
                 </button>
-                {!esAsistente && (
+                {canCloseMonth && (
                   <button onClick={handleCerrarMes} disabled={cerrando} className="btn" data-tour="kpi.cerrar-mes">
                     {cerrando ? 'Cerrando…' : 'Cerrar mes'}
                   </button>
@@ -329,6 +335,11 @@ export default function KPIPage() {
         {locked && (
           <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)', marginBottom: 16 }}>
             Mes cerrado — Solo lectura. Los datos están guardados como historial. Si quedó mal, usa “Reabrir mes”, corrige y vuelve a cerrarlo.
+          </div>
+        )}
+        {access.isReadonlyGlobal && !locked && (
+          <div className="alert" style={{ marginBottom: 16 }}>
+            Modo consulta global: puedes revisar el KPI y cambiar periodo, sin guardar ni cerrar el mes.
           </div>
         )}
 
@@ -396,7 +407,7 @@ export default function KPIPage() {
                 {key === 'grupos_activos' && gruposModulo !== null && (
                   <span style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     El módulo de grupos cuenta {gruposModulo} activos
-                    <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={locked || autoPeriod}
+                    <button onClick={()=>setConfig(c=>({...c,grupos_activos:gruposModulo}))} disabled={readOnly || locked || autoPeriod}
                       className="btn" style={{ padding: '2px 8px', fontSize: 13 }}>Usar</button>
                   </span>
                 )}

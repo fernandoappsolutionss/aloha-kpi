@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { getNavigationContext } from '../app/actions/navigation'
 import { contadorFirmas } from '../app/actions/entrenamiento-oficio'
 import { rolesQueFirma } from '../lib/entrenamiento/oficio/progreso'
+import { isReadonlyGlobalRole } from './access-control.mjs'
 import { seccionesCentro } from './centro-navigation.mjs'
 
 export default function CentroNavigation({ centroId, section = 'kpi' }) {
@@ -21,7 +22,7 @@ export default function CentroNavigation({ centroId, section = 'kpi' }) {
       if (!active) return
       const role = context?.actor?.role
       setRol(role)
-      if (rolesQueFirma(role).length) {
+      if (!isReadonlyGlobalRole(role) && rolesQueFirma(role).length) {
         const result = await contadorFirmas(Number(centroId)).catch(() => null)
         if (active) setFirmas(result?.n || 0)
       }

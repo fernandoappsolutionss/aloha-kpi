@@ -9,6 +9,7 @@ import { loadFoda, saveFoda } from '../../../actions/foda'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../../lib/period'
 import PeriodSelector from '../../../../components/PeriodSelector'
 import PeticionesPanel from '../../../../components/foda/PeticionesPanel'
+import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { PREFIJO_GENERADO, edicionesGeneradas, faltantesOportunidad, fusionarGenerado, lineaOportunidad, lineasSinDiagnostico, sinPrefijo } from '../../../../lib/foda-datos.mjs'
 
 const CUADRANTES_VACIOS = { fortalezas: [], debilidades: [], oportunidades: [], amenazas: [] }
@@ -70,6 +71,8 @@ function CompositorAccion({ k, etiqueta, onAdd }) {
 
 export default function FodaPage() {
   const params = useParams()
+  const access = useCurrentAccess()
+  const canWrite = access.canWriteOperations
   const [nombre, setNombre] = useState('Centro')
   useEffect(() => { getCentroNombre(params.id).then((n) => { if (n) setNombre(n) }).catch(() => {}) }, [params.id])
   const [saving, setSaving] = useState(false)
@@ -126,11 +129,13 @@ export default function FodaPage() {
       : ''
   }
   function regenerar(k) {
+    if (!canWrite) return
     const aviso = avisoEdiciones([k])
     setFoda((f) => ({ ...f, [k]: fusionarGenerado(f[k], generado[k]) }))
     setStatus(`Regenerado desde los datos — recuerda guardar.${aviso}`)
   }
   function regenerarTodo() {
+    if (!canWrite) return
     const aviso = avisoEdiciones(CLAVES)
     setFoda((f) => {
       const next = { ...f }
@@ -140,6 +145,7 @@ export default function FodaPage() {
     setStatus(`Los 4 cuadrantes se reescribieron desde los datos — recuerda guardar.${aviso}`)
   }
   function agregarLinea(k, linea) {
+    if (!canWrite) return
     setFoda((f) => {
       const actuales = lineasDe(f[k])
       if (actuales.some((l) => sinPrefijo(l) === sinPrefijo(linea))) return f
@@ -160,6 +166,7 @@ export default function FodaPage() {
   }, [foda.fortalezas, foda.debilidades])
 
   async function save() {
+    if (!canWrite) { setStatus('Modo consulta: no puedes guardar el FODA.'); return }
     if (params.id === 'demo') { setStatus('Modo demo — no se guarda.'); return }
     setSaving(true); setStatus('')
     try {
@@ -199,29 +206,32 @@ export default function FodaPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <PeriodSelector value={period} onChange={changePeriod} />
-            {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') ? 'var(--bad-text)' : 'var(--ok-text)' }}>{status}</span>}
-            <button type="button" onClick={save} disabled={saving || loading || Boolean(error)} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>
+            {status && <span role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color: status.startsWith('Error') || status.startsWith('Modo consulta') ? 'var(--bad-text)' : 'var(--ok-text)' }}>{status}</span>}
+            {canWrite && <button type="button" onClick={save} disabled={saving || loading || Boolean(error)} className="btn btn--primary">{saving ? 'Guardando…' : 'Guardar FODA'}</button>}
           </div>
         </div>
 
         <EncuestasFoda centroId={params.id} anio={year} trimestre={quarter} />
         {loading ? <p role="status">Cargando FODA…</p> : error ? <div role="alert">{error}<button type="button" className="btn" onClick={() => setRetry(n => n + 1)}>Reintentar</button></div> : <>
+        {access.isReadonlyGlobal && <div className="alert" role="status" style={{ marginBottom: 16 }}>Administrador General · Solo lectura: puedes consultar FODA y peticiones, sin editar, guardar ni crear registros.</div>}
         <div className="alert" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <span>
             <span style={{ color: 'var(--ts-green)' }}>›</span>{' '}
             Los cuatro cuadrantes se escriben con los <b>números del trimestre</b>: ventas contra meta, deserción real, cobranza, crecimiento y concentración por coach.
-            Lo generado lleva “{PREFIJO_GENERADO.trim()}” adelante; lo que escribas tú se conserva debajo y no se toca.
+            Lo generado lleva “{PREFIJO_GENERADO.trim()}” adelante; lo escrito por el equipo se conserva debajo y no se toca.
           </span>
-          {generado.disponible
-            ? <button type="button" className="btn" onClick={regenerarTodo}>Regenerar los 4 cuadrantes</button>
-            : <span style={{ color: 'var(--warn-text)' }}>Sin datos del trimestre para proponer líneas.</span>}
+          {canWrite
+            ? generado.disponible
+              ? <button type="button" className="btn" onClick={regenerarTodo}>Regenerar los 4 cuadrantes</button>
+              : <span style={{ color: 'var(--warn-text)' }}>Sin datos del trimestre para proponer líneas.</span>
+            : <span style={{ color: 'var(--text-dim)' }}>Solo lectura</span>}
         </div>
 
         {heredado > 0 && (
           <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)', marginBottom: 20 }}>
             Este FODA viene del checklist anterior: {heredado} líneas son nombres de casillas, no diagnósticos
             (por eso una debilidad podía decir “Meta de cobranza lograda”). Regenera para escribir arriba el diagnóstico con números;
-            lo que ya estaba se conserva debajo hasta que tú lo borres.
+            lo que ya estaba se conserva debajo hasta que se borre desde una cuenta con permiso.
           </div>
         )}
 
@@ -237,13 +247,13 @@ export default function FodaPage() {
               <div key={t} className="card" style={{ padding: 18, borderTop: `2px solid ${accent}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                   <h3 className="label" style={{ color: tone, fontSize: 13 }}><label htmlFor={`foda-${k}`}>{t}</label></h3>
-                  <button type="button" onClick={() => regenerar(k)} disabled={!generado.disponible} className="btn" style={{ padding: '4px 10px', fontSize: 13 }}>
+                  {canWrite && <button type="button" onClick={() => regenerar(k)} disabled={!generado.disponible} className="btn" style={{ padding: '4px 10px', fontSize: 13 }}>
                     Regenerar desde los datos
-                  </button>
+                  </button>}
                 </div>
-                <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>Escrito desde los datos del trimestre · editable</p>
+                <p className="h-sub" style={{ marginTop: 0, marginBottom: 8 }}>Escrito desde los datos del trimestre{canWrite ? ' · editable' : ' · solo lectura'}</p>
                 <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 3, paddingLeft: 10, borderLeft: '2px solid var(--border-strong)' }}>{regla}</p>
-                <textarea id={`foda-${k}`} name={k} autoComplete="off" value={foda[k] ?? ''} onChange={e => setFoda({ ...foda, [k]: e.target.value })} style={taStyle} />
+                <textarea id={`foda-${k}`} name={k} autoComplete="off" value={foda[k] ?? ''} onChange={e => setFoda({ ...foda, [k]: e.target.value })} disabled={!canWrite} style={taStyle} />
 
                 {sinDiagnostico.length > 0 && (
                   <p style={{ fontSize: 13, color: 'var(--warn-text)', marginTop: 8, marginBottom: 0 }}>
@@ -256,7 +266,7 @@ export default function FodaPage() {
                   </p>
                 )}
 
-                {propuestas.length > 0 && (
+                {canWrite && propuestas.length > 0 && (
                   <details style={{ marginTop: 10 }}>
                     <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
                       Propuesta desde los datos ({propuestas.length} {propuestas.length === 1 ? 'línea' : 'líneas'} que no están en el texto)
@@ -272,7 +282,7 @@ export default function FodaPage() {
                   </details>
                 )}
 
-                {accionable && <CompositorAccion k={k} etiqueta={accionable} onAdd={(linea) => agregarLinea(k, linea)} />}
+                {canWrite && accionable && <CompositorAccion k={k} etiqueta={accionable} onAdd={(linea) => agregarLinea(k, linea)} />}
               </div>
             )
           })}
@@ -284,6 +294,7 @@ export default function FodaPage() {
             anio={year}
             trimestre={quarter}
             onStatus={setStatus}
+            canWrite={canWrite}
           />
         )}
         </>}

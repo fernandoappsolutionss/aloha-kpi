@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
+import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { getZohoEstado } from '../../actions/zoho'
 
 const ERRORES = {
@@ -20,8 +21,15 @@ export default function ZohoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState(null) // { tipo: 'ok'|'error', texto }
+  const access = useCurrentAccess()
 
   useEffect(() => {
+    if (!access.loaded) return
+    if (!access.canViewZoho) {
+      setLoading(false)
+      setError('No autorizado para administrar Zoho.')
+      return
+    }
     let active = true
     getZohoEstado().then((r) => {
       if (!r || r.error) throw new Error('No se pudo leer Zoho')
@@ -36,7 +44,7 @@ export default function ZohoPage() {
       setAviso({ tipo: 'error', texto: `❌ ${ERRORES[err] || 'Error desconocido.'}${extra}` })
     }
     return () => { active = false }
-  }, [])
+  }, [access.loaded, access.canViewZoho])
 
   const conexion = estado?.conexion
 

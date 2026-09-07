@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from '../../../components/Sidebar'
 import HistorialNavigation from '../../../components/HistorialNavigation'
 import PeriodSelector from '../../../components/PeriodSelector'
+import { useCurrentAccess } from '../../../components/useCurrentAccess'
 import { getMetas, saveMetas } from '../../actions/metas'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
@@ -23,6 +24,8 @@ export default function MetasPage() {
   const [saveError, setSaveError] = useState('')
   const [dirty, setDirty] = useState(false)
   const [period, setPeriod] = useState(getCurrentPeriod())
+  const access = useCurrentAccess()
+  const canEdit = access.canManageMetas
 
   useEffect(() => { setPeriod(readStoredPeriod()) }, [])
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function MetasPage() {
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
 
   async function save() {
+    if (!canEdit) { setSaveError('Tu usuario está en modo consulta.'); return }
     setSaving(true); setSaveError('')
     try {
       const res = await saveMetas(period.year, period.quarter, {
@@ -83,14 +87,15 @@ export default function MetasPage() {
           </div>
           <div className="page-actions operations-actions">
             <PeriodSelector value={period} onChange={changePeriod} />
-            <button onClick={save} disabled={saving || loading || !!error} className="btn btn--primary">
+            {canEdit && <button onClick={save} disabled={saving || loading || !!error} className="btn btn--primary">
               {saving ? 'Guardando…' : 'Guardar metas'}
-            </button>
+            </button>}
           </div>
         </div>
 
         {loading ? <p role="status">Cargando metas…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <>
-        <p role="status">{saving ? 'Guardando metas…' : saved ? 'Metas guardadas' : dirty ? 'Cambios sin guardar' : 'Metas cargadas'}</p>
+        {access.isReadonlyGlobal && <div className="alert" role="status" style={{ marginBottom: 16 }}>Administrador General · Solo lectura: puedes consultar metas por periodo, sin guardarlas.</div>}
+        <p role="status">{canEdit ? (saving ? 'Guardando metas…' : saved ? 'Metas guardadas' : dirty ? 'Cambios sin guardar' : 'Metas cargadas') : 'Metas cargadas en modo consulta'}</p>
         {saveError && <p role="alert" className="alert alert--error">{saveError}</p>}
 
         <div className="card" style={{ padding: '13px 18px', marginBottom: 22, color: 'var(--text-muted)', lineHeight: 1.6, borderLeft: '2px solid var(--ts-green)' }}>
@@ -112,7 +117,7 @@ export default function MetasPage() {
                   value={metas[f.k]}
                   min="0"
                   step={f.k === 'desercion_mes' ? '0.1' : '1'}
-                  disabled={saving}
+                  disabled={saving || !canEdit}
                   onChange={e => { setMetas({ ...metas, [f.k]: parseFloat(e.target.value) || 0 }); setDirty(true); setSaved(false); setSaveError('') }}
                   style={{ width: 96, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--ts-green)' }}
                 />
