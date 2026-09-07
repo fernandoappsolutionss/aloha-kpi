@@ -384,7 +384,7 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.equal(puedeFirmar(admiMismo, alumnoAdm), false, 'una administradora no firma a otra administradora')
   assert.equal(puedeFirmar({ id: 5, rol: 'asistente', centroId: 7 }, alumnoAdm), false)
   // Gerencia: cualquier centro. Coordinador: solo los suyos.
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.equal(puedeFirmar({ id: 9, rol, centroId: null }, alumnoAdm), true)
     assert.equal(puedeFirmar({ id: 9, rol, centroId: 99 }, alumnoAsi), true)
   }
@@ -400,7 +400,7 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.deepEqual(rolesQueFirma('coach'), [])
   assert.deepEqual(rolesQueFirma('administradora').sort(), ['asistente', 'coach'])
   assert.deepEqual(rolesQueFirma('coordinador').sort(), ['administradora', 'asistente', 'coach'])
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.deepEqual(rolesQueFirma(rol).sort(), ['administradora', 'asistente', 'coach', 'coordinador'], `${rol} firma a los cuatro puestos`)
   }
   // NADIE SE QUEDA SIN OFICIAL: los cuatro puestos que se entrenan tienen al
@@ -415,9 +415,9 @@ test('puedeFirmar: nadie se firma solo, ni una administradora de otro centro', (
   assert.equal(puedeFirmar(admiOtro, coach7), false, 'una administradora de OTRO centro no le firma al coach')
   assert.equal(puedeFirmar({ id: 21, rol: 'coach', centroId: 7 }, coach7), false, 'un coach no le firma a otro coach')
   assert.equal(puedeFirmar({ id: 8, rol: 'coordinador', centros: [7] }, coach7), true)
-  // Al coordinador solo lo firma la Junta Directiva: supervisor y admin_general.
+  // Al coordinador solo lo firma la Junta Directiva: Administrador Master.
   const coord = { id: 30, rol: 'coordinador', centroId: null }
-  for (const rol of ['supervisor', 'admin_general']) {
+  for (const rol of ['admin_master']) {
     assert.equal(puedeFirmar({ id: 9, rol, centroId: null }, coord), true)
   }
   assert.equal(puedeFirmar({ id: 31, rol: 'coordinador', centros: [7] }, coord), false, 'un coordinador no le firma a otro coordinador')

@@ -25,7 +25,9 @@ function entry(file, name) {
   const found = Object.entries(manifest.node).find(([,v]) => v.exportedName === name && v.filename === `app/actions/${file}.js`)
   if (!found) throw new Error(`Acción no compilada: ${file}.${name}`)
   const [id,value]=found
-  const route=Object.keys(value.workers)[0].replace(/^app/,'').replace(/\/page$/,'') || '/'
+  const preferred={centros:'app/dashboard/centros/page',metas:'app/dashboard/metas/page',usuarios:'app/dashboard/usuarios/page',kpi:'app/centro/[id]/kpi/page',grupos:'app/centro/[id]/grupos/page',cuadro:'app/centro/[id]/cuadro/page',foda:'app/centro/[id]/foda/page',navigation:'app/dashboard/page',entrenamiento:'app/dashboard/page'}[file]
+  const worker=preferred && value.workers[preferred] ? preferred : Object.keys(value.workers)[0]
+  const route=worker.replace(/^app/,'').replace(/\/page$/,'').replace('[id]','1') || '/'
   return {id,route}
 }
 async function action(file,name,args,auth=cookies.general) {
@@ -41,7 +43,7 @@ let assertions=0
 function check(condition,message){assert.ok(condition,message);assertions++;console.log('PASS',message)}
 async function fingerprint(){
   const result={}
-  for(const table of ['centros','usuarios','password_tokens','metas','mes_kpi','kpi_semanas','foda','salones','pedidos_material']){
+  for(const table of ['centros','usuarios','password_tokens','metas','mes_kpi','kpi_semanas','foda','salones','pedidos_material','entrenamiento_progreso']){
     result[table]=(await db.query(`SELECT md5(coalesce(string_agg(v::text,'|' ORDER BY v::text),'')) hash FROM (SELECT to_jsonb(t) v FROM ${table} t) q`)).rows[0].hash
   }
   return result
@@ -70,6 +72,8 @@ try {
     ['grupos','saveSalon',[1,{nombre:'NO CREAR SALON QA',capacidad_ninos:8}]],
     ['cuadro','savePedido',[1,{year:2026,month:9,producto:'NO GUARDAR QA',cantidad:1,monto:1}]],
     ['foda','saveFoda',[1,2026,3,{fortalezas:'NO GUARDAR QA'}]],
+    ['entrenamiento','marcarTourVisto',['meta']],
+    ['entrenamiento','responderQuiz',['meta',[0,1,2]]],
   ]
   const beforeMutations=await fingerprint()
   for(const [file,name,args] of mutations){
@@ -77,9 +81,13 @@ try {
     check(Boolean(result.result?.error)||result.response.status>=400||/^1:E/m.test(result.text),`General denegado en ${file}.${name}`)
   }
   assert.deepEqual(await fingerprint(),beforeMutations,'General no cambió ninguna fila operativa ni token de acceso')
-  check(true,'Trece acciones HTTP de escritura dejaron intactas nueve tablas')
-  const paths=['/dashboard/entrenamiento/oficio','/centro/1/entrenamiento/oficio','/centro/1/entrenamiento/oficio/of-cen-2','/centro/1/entrenamiento/oficio/of-cen-2/sop','/centro/1/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-2.mp3','/entrenamiento/guia/of-coa-6/vista.mp3']
+  check(true,'Quince acciones HTTP de escritura dejaron intactas diez tablas')
+  const paths=['/dashboard/entrenamiento/oficio','/centro/1/entrenamiento/oficio','/centro/1/entrenamiento/oficio/of-cen-2','/centro/1/entrenamiento/oficio/of-cen-2/sop','/centro/1/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-2.mp3','/entrenamiento/guia/of-coa-6/vista.mp3','/entrenamiento/%6fficio/of-cen-2.mp3','/entrenamiento/guia/%6ff-coa-6/vista.mp3']
   for(const path of paths){const r=await get(path);check(r.status!==200,`General no alcanza ${path}`);await r.arrayBuffer()}
+  for(const path of ['/entrenamient%6f/oficio/of-cen-2.mp3','/entrenamiento/%6fficio/of-cen-2.mp3']){const r=await get(path,null);check(r.status!==200,`Sin sesión tampoco se alcanza ${path}`);await r.arrayBuffer()}
+  const masterAudio=await get('/entrenamiento/oficio/of-cen-2.mp3',cookies.master)
+  check(masterAudio.status===200 && /private/.test(masterAudio.headers.get('cache-control')||'') && /no-store/.test(masterAudio.headers.get('cache-control')||''),'Master conserva audio con caché privada y sin almacenamiento')
+  await masterAudio.arrayBuffer()
   const nav=await action('navigation','getNavigationContext',[],cookies.master)
   check(nav.result?.actor?.role==='admin_master','Cookie vieja de Fernando usa su rol Master vigente')
   const masterPage=await action('usuarios','getUsuariosPageData',[],cookies.master)

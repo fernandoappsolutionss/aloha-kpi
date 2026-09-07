@@ -4,7 +4,7 @@
 // venga del cliente. Las respuestas del quiz viven en respuestas.js (solo
 // servidor): el cliente recibe opciones y explicaciones, nunca el índice.
 import { sql } from '../../lib/db'
-import { requireSession, requireCurrentUser, requireCurrentMaster, isAdminRole } from '../../lib/auth'
+import { requireSession, requireCurrentUser, requireCurrentMaster, requireCurrentTraining, isAdminRole } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas'
@@ -64,7 +64,7 @@ export async function resumenProgreso() {
 // días de un usuario borrado o con acceso revocado no debe poder escribir.
 export async function marcarTourVisto(modulo) {
   return runAction('marcarTourVisto', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentTraining()
     if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
     await sql`
       INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
@@ -80,7 +80,7 @@ export async function marcarTourVisto(modulo) {
 // → { puntaje, correctas:[bool×3], explicaciones:[string×3], aprobado }
 export async function responderQuiz(modulo, respuestas) {
   return runAction('responderQuiz', async () => {
-    const u = await requireCurrentUser()
+    const u = await requireCurrentTraining()
     if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
     // Forma estricta: 3 enteros. Un payload malformado no cuenta como intento.
     const r = Array.isArray(respuestas) ? respuestas : null

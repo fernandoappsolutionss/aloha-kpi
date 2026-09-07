@@ -152,7 +152,9 @@ function rutaDashboardUsuarios(pathname) {
 }
 
 export async function middleware(req) {
-  const { pathname } = req.nextUrl
+  let pathname
+  try { pathname = decodeURIComponent(req.nextUrl.pathname) }
+  catch { return NextResponse.json({ error: 'Ruta inválida' }, { status: 400 }) }
   const user = await getCurrentUser(req)
 
   if (pathname === '/login') {

@@ -29,9 +29,11 @@ test('rolesQueRevisa es exactamente rolesQueFirma, tenga o no plan propio', () =
   // Quien no le firma a nadie no lee nada ajeno. Este es el candado.
   assert.deepEqual(rolesQueRevisa('asistente', MODULOS_OFICIO), [])
   assert.deepEqual(rolesQueRevisa('coach', MODULOS_OFICIO), [])
+  assert.deepEqual(rolesQueRevisa('admin_general', MODULOS_OFICIO), [])
+  assert.deepEqual(rolesQueRevisa('supervisor', MODULOS_OFICIO), [])
   assert.deepEqual(rolesQueRevisa('rol_que_no_existe', MODULOS_OFICIO), [])
   // Gerencia sigue SIN plan propio: firma, no se entrena.
-  for (const rol of ['admin_general', 'supervisor']) {
+  for (const rol of ['admin_master']) {
     assert.deepEqual(planDeRol(rol, MODULOS_OFICIO), [], `${rol} no debe ganar plan propio`)
     assert.ok(rolesQueRevisa(rol, MODULOS_OFICIO).length > 0, `${rol} tiene que poder leer los planes que firma`)
   }
@@ -63,7 +65,7 @@ test('la lectura de gerencia no abre el filtrado real: la asistente no ve el cur
   for (const m of MODULOS_OFICIO.filter((m) => m.curso === 'zoho')) {
     // La administradora SÍ: es la Oficial de Entrenamiento de la asistente.
     assert.equal(puedeLeer('administradora', m), true, `${m.id}: quien firma el drill tiene que poder leerlo`)
-    assert.equal(puedeLeer('admin_general', m), true, `${m.id}: gerencia revisa`)
+    assert.equal(puedeLeer('admin_master', m), true, `${m.id}: gerencia revisa`)
   }
 })
 
