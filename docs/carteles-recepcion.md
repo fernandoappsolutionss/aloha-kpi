@@ -15,6 +15,7 @@ Material facilitado por Fernando: [Manual de marca en Drive](https://drive.googl
 - [Logo original PNG](https://drive.google.com/file/d/1KJ9_p-ovn4jvobGGoW80yAIGirJv4cpb/view): incorporado intacto a `public/carteles/logo-oficial.png`.
 - [Manual de uso del logo](https://drive.google.com/file/d/1Nw4XmYcaThiXsacaYm_5O_Wu8rnikKkx/view) y [colores](https://drive.google.com/file/d/1uHhLlxkwQAK73Ac_XmMDnSamkKfiIknh/view). El manual presenta equivalencias hex inconsistentes en algunos colores; se usan sus RGB explícitos: azul 26/60/106, lima 187/229/41 y verde 0/79/0.
 - [Tipografía institucional](https://drive.google.com/file/d/1MKbzgMnDp-PMggqS6Fxtzp62VjzpflaT/view): Futura Md BT. Las fuentes existentes coinciden byte a byte con los archivos Normal y Bold de Drive; se reutilizan.
+- [Mono oficial en vector](https://drive.google.com/file/d/1VHc5pfpfWo6PnSX966Y4N3BUhrcJT2I2/view): la lámina original se conserva en `public/carteles/mono-oficial.pdf`. Se muestran tres poses completas, sin redibujarlas, reflejarlas ni deformarlas: teléfono para encuesta, saludo para Google y bienvenida con ábaco para WiFi. La mascota queda a la izquierda, fuera del margen del QR; se reserva el espacio de red y clave en WiFi.
 - QR negro vectorial sobre blanco, margen de cuatro módulos, corrección M. Sin logo sobre el código ni dependencia de servicios de QR externos. Los PDF se generan localmente con `pdf-lib` y se descargan como `application/pdf`.
 
 Las instrucciones escritas del recorrido de Encuestas y las ayudas de Google/WiFi están actualizadas. Se conservan las 47 grabaciones vigentes; los tres guiones adicionales están en `carteles-audios-propuestos.md`, pendientes de autorización por el bloqueo de revisión automática.
@@ -26,3 +27,7 @@ Las instrucciones escritas del recorrido de Encuestas y las ayudas de Google/WiF
 3. Chromium local: cuatro descargas (encuesta, Google, WiFi recepción y WiFi con QR), difusión solo en encuesta, dominio inválido bloqueado, separación por centro, mes cerrado, fallo de assets sin registrar difusión y vista 1440/390 sin overflow.
 4. PDFs renderizados e inspeccionados; lector Vision de macOS decodificó seis QR de Carta/A4 al destino exacto. La encuesta de muestra usa el enlace proporcionado por Fernando. Google y la red WiFi de prueba son ejemplos y no deben colocarse como carteles reales.
 5. Sin cambios ni campañas/respuestas ficticias en producción. El arnés de UI usa los componentes reales con datos simulados y está fuera del producto.
+
+## Ajuste de marca · 2026-09-07
+
+Fernando pidió dar protagonismo al mono, personaje principal de ALOHA. Los tres carteles ya lo incluyen en Carta/A4. Se conservaron 1.067 pruebas y build correctos; se inspeccionaron las poses completas y se decodificaron nuevamente los seis QR de los PDF renderizados.

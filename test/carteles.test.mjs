@@ -19,7 +19,7 @@ test('el nombre descargado distingue centro, mes y tamaño', () => {
   assert.equal(nombreArchivo({tipo:'encuesta',centroId:2,anio:2026,mes:9,formato:'a4'}), 'ALOHA-encuesta-2-2026-09-a4.pdf')
   assert.notEqual(nombreArchivo({tipo:'google',centroId:2}),nombreArchivo({tipo:'google',centroId:3}))
 })
-const assets = {logo:readFileSync(new URL('../public/carteles/logo-oficial.png',import.meta.url)),regular:readFileSync(new URL('../public/fonts/FuturaMdBT.ttf',import.meta.url)),bold:readFileSync(new URL('../public/fonts/FuturaMdBT-Bold.ttf',import.meta.url))}
+const assets = {mono:readFileSync(new URL('../public/carteles/mono-oficial.pdf',import.meta.url)),logo:readFileSync(new URL('../public/carteles/logo-oficial.png',import.meta.url)),regular:readFileSync(new URL('../public/fonts/FuturaMdBT.ttf',import.meta.url)),bold:readFileSync(new URL('../public/fonts/FuturaMdBT-Bold.ttf',import.meta.url))}
 for (const formato of Object.keys(FORMATOS)) for (const tipo of ['encuesta','google','wifi']) test(`${tipo} ${formato}: PDF real, una página y papel exacto`,async()=>{
   const bytes=await crearCartelPdf({tipo,centro:'ANCLAS MALL',enlace:tipo==='google'?'https://g.page/r/ejemplo/review':`https://example.com/encuesta/${'a'.repeat(48)}`,anio:2026,mes:9,formato},assets)
   assert.equal(new TextDecoder().decode(bytes.slice(0,5)), '%PDF-')
