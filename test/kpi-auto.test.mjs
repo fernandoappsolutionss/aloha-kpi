@@ -161,7 +161,7 @@ test('los espejos de clases eliminadas del CRM no bloquean los registros vigente
 
   assert.deepEqual(
     filtrarClasesVigentesCrm(clases, [{ id: 'vigente-2' }, { id: 'vigente-1' }]),
-    [clases[0], clases[2]],
+    [{ id: 'vigente-2' }, { id: 'vigente-1' }],
   )
 })
 
@@ -185,43 +185,14 @@ test('exige origen comercial solo para ventas desde agosto de 2026', () => {
   assert.equal(requiereOrigenVenta(new Date('2026-08-01T00:00:00.000Z')), true)
 })
 
-test('sincroniza el embudo y la venta de una clase de prueba sin duplicar registros', () => {
+test('consume los totales CRM de invitados, incluidos cancelados, sin cambiar las ventas', () => {
   const source = fuenteKpiAutomatica({
-    year: 2026,
-    month: 8,
-    clases: [{ id: 'ev-1', start_date: '2026-08-06T23:00:00.000Z' }],
-    registros: [
-      {
-        id: 'reg-1',
-        event_id: 'ev-1',
-        attendance_status: 'attended',
-        registered_at: '2026-08-02T12:00:00.000Z',
-        checked_in_at: '2026-08-06T23:00:00.000Z',
-      },
-      {
-        id: 'reg-1',
-        event_id: 'ev-1',
-        attendance_status: 'attended',
-        registered_at: '2026-08-02T12:00:00.000Z',
-        checked_in_at: '2026-08-06T23:00:00.000Z',
-      },
-      {
-        id: 'cancelled',
-        event_id: 'ev-1',
-        attendance_status: 'cancelled',
-        registered_at: '2026-08-02T12:00:00.000Z',
-      },
-    ],
-    ventas: [{
-      id: 501,
-      estudiante_id: 9,
-      fecha: '2026-08-06',
-      crm_registration_id: 'reg-1',
-      origen_venta: 'referido',
-    }],
+    year: 2026, month: 8,
+    clases: [{ id: 'ev-1', status: 'completed', start_date: '2026-08-06T23:00:00.000Z',
+      stats: { total: 2, attended: 1, not_attended: 1, pending: 0, paid: 0, total_revenue: 0 } }],
+    ventas: [{ id: 501, estudiante_id: 9, fecha: '2026-08-06', crm_registration_id: 'reg-1', origen_venta: 'referido' }],
   })
-
-  assert.equal(source.cp_invitados, 1)
+  assert.equal(source.cp_invitados, 2)
   assert.equal(source.cp_asistieron, 1)
   assert.equal(source.cp_matriculados, 1)
   assert.equal(source.orig_referido, 1)
@@ -314,38 +285,14 @@ test('la lectura automatica conserva un override CP explicito incluso si es cero
   assert.equal(row.cp_matriculados, 0)
 })
 
-test('usa la fecha de la clase como respaldo para una asistencia sin checked_in_at', () => {
+test('una clase fuera del mes no aporta invitados ni asistentes al KPI', () => {
   const source = fuenteKpiAutomatica({
-    year: 2026,
-    month: 8,
-    clases: [{ id: 'ev-1', start_date: '2026-08-13T23:00:00.000Z' }],
-    registros: [{
-      id: 'reg-1',
-      event_id: 'ev-1',
-      attendance_status: 'attended',
-      registered_at: '2026-07-31T23:00:00.000Z',
-      checked_in_at: null,
-    }],
+    year: 2026, month: 8,
+    clases: [{ id: 'ev-1', status: 'completed', start_date: '2026-09-06T23:00:00.000Z',
+      stats: { total: 2, attended: 1, not_attended: 1, pending: 0, paid: 0, total_revenue: 0 } }],
   })
-
   assert.equal(source.cp_invitados, 0)
-  assert.equal(source.cp_asistieron, 1)
-})
-
-test('no suma invitados que no pertenecen a una clase solicitada', () => {
-  const source = fuenteKpiAutomatica({
-    year: 2026,
-    month: 8,
-    clases: [{ id: 'ev-1', start_date: '2026-08-13T23:00:00.000Z' }],
-    registros: [{
-      id: 'reg-ajeno',
-      event_id: 'ev-ajeno',
-      attendance_status: null,
-      registered_at: '2026-08-02T12:00:00.000Z',
-    }],
-  })
-
-  assert.equal(source.cp_invitados, 0)
+  assert.equal(source.cp_asistieron, 0)
 })
 
 test('agrupa los motivos de los retiros que contó el motor semanal', () => {

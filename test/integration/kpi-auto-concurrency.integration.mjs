@@ -52,7 +52,7 @@ async function race({ cold = false, close = false } = {}) {
         assert.equal(result.data._trial_funnel.valueSource,'manual_override')
       }
     }
-    assert.equal(crmCalls,jobs.length*2,'El retry no debe recargar CRM/fuente canónica.')
+    assert.equal(crmCalls,jobs.length,'El retry no debe recargar CRM/fuente canónica.')
     assert.equal((await observer.query('SELECT * FROM mes_kpi WHERE centro_id=3 AND year=2026 AND month=9')).rowCount,1)
     const current = (await observer.query('SELECT ajustes FROM kpi_auto_ajustes WHERE centro_id=3 AND year=2026 AND month=9')).rows
     assert.equal(current.length,1)

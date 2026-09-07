@@ -7,6 +7,8 @@ import { encolarSyncCrm } from '../../lib/llenado-service'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
 import { hoyISO } from '../../lib/operaciones'
 import { ventanaNuevos } from '../../lib/llenado.mjs'
+import { mesClase, resumirClases } from '../../lib/clases-prueba.mjs'
+import { validarEventosCrm } from '../../lib/kpi-auto-server.js'
 
 export async function eventosConfig() {
   return { configured: crmConfigured(), baseUrl: crmBaseUrl() }
@@ -36,8 +38,14 @@ export async function listarEventos(centroId) {
   // CRM sin relajar la autorización del endpoint batch.
   const res = await crmCall('list_events', { account_id: accountId })
   if (res.error) return { error: res.error, events: [] }
-  if (!Array.isArray(res.events)) return { error: 'Respuesta inválida del CRM.', events: [] }
+  const validacion = validarEventosCrm(res.events, accountId)
+  if (!validacion.complete) return { error: validacion.error, events: [] }
   const idsDelCentro = new Set(ids.map(String))
+  const eventosCentro = res.events.filter(ev => idsDelCentro.has(String(ev.id)))
+  try {
+    for (const event of eventosCentro) mesClase(event.start_date, event.timezone || (Number(centroId) === 10 ? 'America/Caracas' : 'America/Panama'))
+    resumirClases(eventosCentro)
+  } catch (error) { return { error: error.message, events: [] } }
   const grupoPorEvento = new Map(rows.filter((r) => r.grupo_id).map((r) => [r.crm_event_id, r.grupo_id]))
   const grupoIds = [...new Set(grupoPorEvento.values())]
   const gruposPorId = new Map()
@@ -65,7 +73,7 @@ export async function listarEventos(centroId) {
       })
     }
   }
-  const events = res.events.filter((ev) => idsDelCentro.has(String(ev.id))).map((ev) => {
+  const events = eventosCentro.map((ev) => {
     const gid = grupoPorEvento.get(ev.id)
     return { ...ev, grupo: (gid && gruposPorId.get(String(gid))) || null }
   })
