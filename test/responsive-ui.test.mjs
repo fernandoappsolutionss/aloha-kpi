@@ -77,7 +77,12 @@ test('R10 las alertas de higiene y de coach no se pueden descartar', () => {
   ]) {
     const source = codigo(path)
     assert.doesNotMatch(source, /localStorage|sessionStorage|document\.cookie/, `${path}: no puede recordar un descarte`)
-    assert.doesNotMatch(source, /<button/, `${path}: una alerta permanente no lleva control de cierre`)
+    if (path.endsWith('/AlertaDesercionCoach.js')) {
+      // Los botones del nombre despliegan datos; la alerta permanece visible.
+      for (const button of source.matchAll(/<button\b([^>]+)>/g)) {
+        assert.match(button[1], /aria-expanded=/, `${path}: solo controles de expansión, sin descarte`)
+      }
+    } else assert.doesNotMatch(source, /<button/, `${path}: una alerta permanente no lleva control de cierre`)
     assert.doesNotMatch(source, /descart|dismiss|ocultar|snooze/i, `${path}: sin afordancia de descarte`)
   }
 

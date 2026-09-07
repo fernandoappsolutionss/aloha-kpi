@@ -1,10 +1,12 @@
 'use client'
-import { useState, useEffect, useCallback, useRef, Children } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Children } from 'react'
 import { parseSalonCapacity, roomCapacitySummary } from '../../../../lib/salon-capacidad.mjs'
 import { useEsAsistente } from '../../../../components/useRol'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import OperationalCard from '../../../../components/OperationalCard'
+import DetalleRecurso, { promedioTexto } from '../../../../components/coach/DetalleRecurso'
+import { ocupacionRecursos } from '../../../../lib/ocupacion-recursos.mjs'
 import Sidebar from '../../../../components/Sidebar'
 import {
   loadOperaciones, crearGrupo, actualizarGrupo, cerrarGrupo, reabrirGrupo, setInscripcionAbierta, extenderVentanaLlenado, linkCoach, siguienteNumero,
@@ -740,7 +742,7 @@ export default function GruposPage() {
         )}
 
         {tab === 'coaches' && (
-          <TabCoaches centroId={id} coaches={data?.coaches || []} salones={data?.salones || []}
+          <TabCoaches centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} grupos={grupos} reservas={data?.reservas || []}
             onChanged={refresca} setStatus={setStatus} />
         )}
       </main>
@@ -2296,7 +2298,10 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
 }
 
 // ── Tab Coaches y salones ────────────────────────────────────────────────────
-function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
+function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, setStatus }) {
+  const ocupacion = useMemo(() => ocupacionRecursos({ coaches, salones, grupos, reservas }), [coaches, salones, grupos, reservas])
+  const [coachAbierto, setCoachAbierto] = useState(null)
+  const [salonAbierto, setSalonAbierto] = useState(null)
   const capacidad = roomCapacitySummary(salones)
   const [coachModal, setCoachModal] = useState(null)
   const [salonModal, setSalonModal] = useState(null)
@@ -2330,9 +2335,12 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
           <OperationsTable label="Coaches">
             <thead><tr>{['Coach', 'Certificación', 'Kinder', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
-              {coaches.map((c) => (
+              {coaches.flatMap((c) => {
+                const detalle = ocupacion.coaches.find(x => String(x.id) === String(c.id))
+                const abierto = coachAbierto === String(c.id)
+                return [
                 <tr key={c.id} style={{ cursor: 'default', opacity: c.activo ? 1 : 0.55 }}>
-                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{c.nombre}</td>
+                  <td><button type="button" className="recurso-toggle" aria-expanded={abierto} onClick={() => setCoachAbierto(abierto ? null : String(c.id))}><span aria-hidden="true">{abierto ? '▾' : '▸'}</span> {c.nombre}<small>{detalle.promedio == null ? 'Sin grupos para promedio' : `${promedioTexto(detalle.promedio)} niños / grupo`}</small></button></td>
                   <td style={{ fontSize: 12 }}>
                     {c.nivel_kids > 0 ? (
                       <>Kids ≤ {c.nivel_kids}<div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Tiny ≤ {TINYMAP[c.nivel_kids] || 0}</div></>
@@ -2350,8 +2358,10 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
                       <button className="btn" style={BTN_XS} disabled={busy === 'c' + c.id} onClick={() => onToggleCoach(c)}>{c.activo ? 'Desactivar' : 'Activar'}</button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                </tr>,
+                ...(abierto ? [<tr key={`detalle-${c.id}`} data-detail><td colSpan={5}><DetalleRecurso recurso={detalle} /></td></tr>] : []),
+                ]
+              })}
             </tbody>
           </OperationsTable>
         )}
@@ -2375,9 +2385,12 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
           <OperationsTable label="Salones">
             <thead><tr>{['Salón', 'Capacidad', 'Híbrido', 'Estado', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
             <tbody>
-              {salones.map((s) => (
+              {salones.flatMap((s) => {
+                const detalle = ocupacion.salones.find(x => String(x.id) === String(s.id))
+                const abierto = salonAbierto === String(s.id)
+                return [
                 <tr key={s.id} style={{ cursor: 'default', opacity: s.activo ? 1 : 0.55 }}>
-                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{s.nombre}</td>
+                  <td><button type="button" className="recurso-toggle" aria-expanded={abierto} onClick={() => setSalonAbierto(abierto ? null : String(s.id))}><span aria-hidden="true">{abierto ? '▾' : '▸'}</span> {s.nombre}<small>Ver ocupación y tiempo libre</small></button></td>
                   <td>{s.capacidad_ninos == null ? 'Sin registrar' : `${s.capacidad_ninos} niños`}</td>
                   <td style={{ fontSize: 12 }}>{s.es_hibrido ? 'Sí' : 'No'}</td>
                   <td>
@@ -2391,8 +2404,10 @@ function TabCoaches({ centroId, coaches, salones, onChanged, setStatus }) {
                       <button className="btn" style={BTN_XS} disabled={busy === 's' + s.id} onClick={() => onToggleSalon(s)}>{s.activo ? 'Desactivar' : 'Activar'}</button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                </tr>,
+                ...(abierto ? [<tr key={`detalle-${s.id}`} data-detail><td colSpan={5}><DetalleRecurso recurso={detalle} /></td></tr>] : []),
+                ]
+              })}
             </tbody>
           </OperationsTable>
         )}
@@ -3182,6 +3197,7 @@ function OperationsTable({ label, children }) {
   const headers = Children.toArray(Children.toArray(head?.props.children)[0]?.props.children).map(cell => cell.props['data-actions'] ? '' : cell.props.children)
   return <div className="operational-list" aria-label={label}>{Children.toArray(body?.props.children).map((row, index) => {
     const cells = Children.toArray(row.props.children)
+    if (row.props['data-detail']) return <div key={row.key || index}>{cells[0]?.props.children}</div>
     const fields = cells.slice(1).flatMap((cell, i) => headers[i+1] ? [{label:headers[i+1],value:cell.props.children}] : [])
     const actions = cells.slice(1).filter((cell,i)=>!headers[i+1]).map(cell=>cell.props.children)
     return <OperationalCard key={row.key||index} title={cells[0]?.props.children} fields={fields} actions={actions.length?actions:null} />
