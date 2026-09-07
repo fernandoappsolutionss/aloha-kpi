@@ -571,7 +571,7 @@ export default function GruposPage() {
     { l: 'Grupos bajo meta', v: bajoMetaN, c: bajoMetaN > 0 ? 'var(--bad)' : 'var(--ok)' },
     { l: 'Niños activos', v: ninosActivos, c: 'var(--text)' },
   ]
-  const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones']]
+  const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones'], ['alumnos', 'Sin grupo y retirados']]
   const FILTROS = [['todos', 'Todos'], ['bajo', 'Bajo meta'], ['estables', 'Estables'], ['kinder', 'Kinder'], ['cerradosNuevos', 'Cerrados a nuevos'], ['cerrados', 'Cerrados']]
 
   return (
@@ -609,7 +609,7 @@ export default function GruposPage() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }} data-tour="grupos.tabs">
           {TABS.map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} className={`btn${tab === k ? ' btn--primary' : ''}`} style={{ padding: '8px 16px', fontSize: 13 }} data-tour={k === 'fusiones' ? 'grupos.tab-fusiones' : undefined}>{l}</button>
+            <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`btn${tab === k ? ' btn--primary' : ''}`} style={{ padding: '8px 16px', fontSize: 13 }} data-tour={k === 'fusiones' ? 'grupos.tab-fusiones' : undefined}>{l}</button>
           ))}
         </div>
 
@@ -690,9 +690,29 @@ export default function GruposPage() {
                 )
               )}
             </div>
+          </>
+        )}
 
-            {data?.sinGrupo?.length > 0 && (
-              <div className="panel" style={{ marginTop: 16 }}>
+        {tab === 'fusiones' && (
+          <TabFusiones grupos={grupos} metas={metas} fus={fus} fusLoading={fusLoading}
+            origenId={origenId} setOrigenId={setOrigenId} onAplicar={onAplicarFusion} busyFusion={busyFusion} />
+        )}
+
+        {tab === 'horarios' && (
+          <TabHorarios centroId={id} grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
+            retirados={data?.retirados || []} reservas={data?.reservas || []}
+            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} onChanged={refresca} setStatus={setStatus} />
+        )}
+
+        {tab === 'coaches' && (
+          <TabCoaches centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} grupos={grupos} reservas={data?.reservas || []}
+            onChanged={refresca} setStatus={setStatus} />
+        )}
+
+        {tab === 'alumnos' && (
+          <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
+            {data?.sinGrupo?.length > 0 ? (
+              <div className="panel">
                 <div className="panel__head"><h2 className="panel__title">Niños sin grupo ({data.sinGrupo.length})</h2></div>
                 <OperationsTable label="Niños sin grupo">
                   <thead><tr>{['Niño', 'Nivel', 'Inscrito', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
@@ -708,10 +728,15 @@ export default function GruposPage() {
                   </tbody>
                 </OperationsTable>
               </div>
+            ) : (
+              <div className="panel">
+                <div className="panel__head"><h2 className="panel__title">Niños sin grupo (0)</h2></div>
+                <div className="empty">Todos los niños tienen grupo asignado.</div>
+              </div>
             )}
 
-            {data?.retirados?.length > 0 && (
-              <div className="panel" style={{ marginTop: 16 }}>
+            {data?.retirados?.length > 0 ? (
+              <div className="panel">
                 <div className="panel__head">
                   <h2 className="panel__title">Retirados recientes</h2>
                   <span className="label">Últimos {data.retirados.length}</span>
@@ -731,24 +756,13 @@ export default function GruposPage() {
                   </tbody>
                 </OperationsTable>
               </div>
+            ) : (
+              <div className="panel">
+                <div className="panel__head"><h2 className="panel__title">Retirados recientes</h2></div>
+                <div className="empty">No hay retiros recientes.</div>
+              </div>
             )}
-          </>
-        )}
-
-        {tab === 'fusiones' && (
-          <TabFusiones grupos={grupos} metas={metas} fus={fus} fusLoading={fusLoading}
-            origenId={origenId} setOrigenId={setOrigenId} onAplicar={onAplicarFusion} busyFusion={busyFusion} />
-        )}
-
-        {tab === 'horarios' && (
-          <TabHorarios centroId={id} grupos={grupos} coaches={data?.coaches || []} salones={data?.salones || []}
-            retirados={data?.retirados || []} reservas={data?.reservas || []}
-            onAbrirGrupo={(prefill) => abrirNuevoGrupo(prefill)} onChanged={refresca} setStatus={setStatus} />
-        )}
-
-        {tab === 'coaches' && (
-          <TabCoaches centroId={id} coaches={data?.coaches || []} salones={data?.salones || []} grupos={grupos} reservas={data?.reservas || []}
-            onChanged={refresca} setStatus={setStatus} />
+          </div>
         )}
       </main>
 
