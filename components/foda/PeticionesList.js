@@ -55,7 +55,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
 
   async function setEstado(row, estado, cotizacionAprobadaId = null) {
     if (!canWrite) return
-    if (estado === 'Aprobado' && row.tipo === 'peticion' && !cotizacionAprobadaId) {
+    if (estado === 'Aprobado' && row.tipo === 'peticion' && !row.proveedor_preaprobado && !cotizacionAprobadaId) {
       onStatus?.('Selecciona la cotización aprobada.')
       return
     }
@@ -102,7 +102,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
         return (
           <div key={row.id} className="foda-request-row">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                 <span className="label" style={{ color: 'var(--text-muted)' }}>{tipoLabel(row)}</span>
                 {editingId === row.id ? (
                   <textarea aria-label="Editar comentario" name="comentarioEditado" autoComplete="off" className="input" value={editText} onChange={(e) => setEditText(e.target.value)}
@@ -111,7 +111,8 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                   <p style={{ marginTop: 6, fontSize: 13 }}>{row.texto}</p>
                 )}
                 <p className="h-sub" style={{ marginTop: 6 }}>
-                  {formatFecha(row.submitted_at)} · {cotizaciones.length} proveedor{cotizaciones.length === 1 ? '' : 'es'}
+                  {formatFecha(row.submitted_at)} · {row.proveedor_preaprobado ? `Proveedor aprobado del centro: ${row.proveedor_preaprobado_nombre}` : `${cotizaciones.length} proveedor${cotizaciones.length === 1 ? '' : 'es'}`}
+                  {row.proveedor_preaprobado && row.estado === 'Próximo trimestre' && ' · Pendiente de aprobación del coordinador operativo'}
                 </p>
               </div>
               {canWrite && row.canEditText && (
@@ -128,6 +129,10 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               )}
             </div>
 
+            {row.tipo === 'peticion' && <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
+              Estado: {row.proveedor_preaprobado && row.estado === 'Próximo trimestre' ? 'Pendiente de aprobación' : row.estado}
+            </p>}
+
             {row.estado === 'Aprobado' && cotizacionAprobada && (
               <p className="pill" style={{ marginTop: 8, display: 'inline-block' }}>
                 Cotización aprobada: {cotizacionAprobada.proveedor_razon_social} — {cotizacionAprobada.archivo_nombre}
@@ -138,7 +143,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 <span className="label" style={{ color: 'var(--text-muted)', marginRight: 2 }}>Estado:</span>
                 {PETICION_ESTADOS.map((estado) => {
-                  if (estado === 'Aprobado' && row.tipo === 'peticion') {
+                  if (estado === 'Aprobado' && row.tipo === 'peticion' && !row.proveedor_preaprobado) {
                     return (
                       <button key={estado} type="button" disabled={busyId === row.id || !selectedCotizacionAprobada}
                         onClick={() => setEstado(row, estado, selectedCotizacionAprobada)}
@@ -154,7 +159,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
                     </button>
                   )
                 })}
-                {row.tipo === 'peticion' && (
+                {row.tipo === 'peticion' && !row.proveedor_preaprobado && (
                   <select
                     name="cotizacionAprobada" aria-label="Cotización ganadora"
                     className="input"
@@ -171,7 +176,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
               </div>
             )}
 
-            {canWrite && permissions?.canChangeStatus && (
+            {canWrite && permissions?.canDelete && (
               row.tipo === 'peticion' ? (
                 row.estado === 'Anulada' && (
                   <button type="button" className="btn" disabled={busyId === row.id}

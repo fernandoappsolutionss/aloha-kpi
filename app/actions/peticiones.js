@@ -56,7 +56,7 @@ export async function submitPeticion(centroId, id) {
 
 export async function changePeticionStatus(centroId, id, estado, cotizacionAprobadaId = null) {
   return runAction('changePeticionStatus', async () =>
-    service.changeStatus(await requireCurrentMaster(), { centroId, id, estado, cotizacionAprobadaId }))
+    service.changeStatus(await requireCurrentWriteCentro(centroId), { centroId, id, estado, cotizacionAprobadaId }))
 }
 
 export async function discardPeticionDraft(centroId, id) {
