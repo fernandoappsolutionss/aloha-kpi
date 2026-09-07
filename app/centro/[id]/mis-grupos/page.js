@@ -4,8 +4,10 @@
 // se abre): muestra sus grupos, los niños de cada uno y el itinerario con lo
 // que ya marcó, para que sepa qué le falta antes de entrar a marcarlo.
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { misGruposCoach } from '../../../actions/coach'
+import { getCentroNombre } from '../../../actions/centros'
 import Sidebar from '../../../../components/Sidebar'
 import TableScroller from '../../../../components/TableScroller'
 
@@ -71,6 +73,11 @@ function Grupo({ grupo }) {
 }
 
 export default function MisGruposPage() {
+  // El menú del centro se arma con el id de la URL: sin `centroId` el Sidebar
+  // no pinta NINGÚN enlace y el coach se queda encerrado sin ver su
+  // entrenamiento (así salió a producción la primera vez).
+  const { id } = useParams()
+  const [nombre, setNombre] = useState('Centro')
   const [grupos, setGrupos] = useState(null)
   const [error, setError] = useState('')
   const [intento, setIntento] = useState(0)
@@ -78,15 +85,16 @@ export default function MisGruposPage() {
   useEffect(() => {
     let activo = true
     setGrupos(null); setError('')
+    getCentroNombre(id).then((n) => { if (activo && n) setNombre(n) }).catch(() => {})
     misGruposCoach()
       .then((res) => { if (activo) setGrupos(res?.grupos || []) })
       .catch(() => { if (activo) setError('No pudimos cargar tus grupos.') })
     return () => { activo = false }
-  }, [intento])
+  }, [id, intento])
 
   return (
     <div className="shell">
-      <Sidebar />
+      <Sidebar rol="usuario" centroNombre={nombre} centroId={id} />
       <main id="main-content" className="main" data-page-state={error ? 'error' : grupos ? 'ready' : 'loading'}>
         <div className="main__head">
           <div className="label">Mi trabajo</div>
