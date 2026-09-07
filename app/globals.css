@@ -994,11 +994,17 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .history-center-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
 .history-center-title .panel__title { overflow-wrap: anywhere; }
 .training-filter { width: min(100%, 300px); flex-shrink: 0; }
-.training-admin-table { width: 1100px; min-width: 1100px; table-layout: fixed; }
-.training-admin-table th:first-child { width: 185px; }
+.training-admin-page .table-scroller__viewport { width: 100%; }
+.training-admin-table { width: 100%; min-width: 1200px; table-layout: fixed; }
+.training-admin-table th:first-child { width: 280px; }
 .training-admin-table th:nth-child(2) { width: 150px; }
-.training-admin-table th:last-child { width: 115px; }
-.training-admin-table .btn--compact { min-width: 44px; min-height: 44px; }
+.training-admin-table th:nth-last-child(2) { width: 68px; }
+.training-admin-table th:last-child { width: 120px; }
+.training-admin-table :is(th, td):nth-child(n+3) { padding-inline: 8px; white-space: nowrap; }
+.training-admin-table .btn--compact { min-width: 44px; min-height: 44px; padding: 8px 12px; white-space: nowrap; }
+@media (max-width: 767px) {
+  .training-admin-table th:first-child { width: 185px; }
+}
 .dashboard-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px; font-size: 13px; color: var(--text-dim); }
 
 @media (max-width: 1280px) {
