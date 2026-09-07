@@ -6,6 +6,11 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import OperationalCard from '../../../../components/OperationalCard'
 import DetalleRecurso, { promedioTexto } from '../../../../components/coach/DetalleRecurso'
+import { CANDADOS } from '../../../../lib/desercion-coach.mjs'
+import ComparacionDesercion from '../../../../components/coach/ComparacionDesercion'
+import PeriodSelector from '../../../../components/PeriodSelector'
+import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod } from '../../../../lib/period'
+import { getDesercionPorCoach } from '../../../actions/coach'
 import { ocupacionRecursos } from '../../../../lib/ocupacion-recursos.mjs'
 import Sidebar from '../../../../components/Sidebar'
 import {
@@ -2299,6 +2304,19 @@ function ReservaModal({ centroId, coaches, salones, initial, onClose, onSaved })
 
 // ── Tab Coaches y salones ────────────────────────────────────────────────────
 function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, setStatus }) {
+  const [periodo, setPeriodo] = useState(getCurrentPeriod)
+  const [desercion, setDesercion] = useState(null)
+  const [errorDesercion, setErrorDesercion] = useState('')
+  useEffect(() => { setPeriodo(readStoredPeriod()) }, [])
+  useEffect(() => {
+    let vivo = true
+    setDesercion(null)
+    setErrorDesercion('')
+    getDesercionPorCoach(centroId, periodo.year, periodo.quarter).then(res => {
+      if (vivo) setDesercion(res)
+    }).catch(() => { if (vivo) setErrorDesercion('No se pudo leer la deserción. Cambia el periodo para volver a intentarlo.') })
+    return () => { vivo = false }
+  }, [centroId, periodo.year, periodo.quarter, coaches])
   const ocupacion = useMemo(() => ocupacionRecursos({ coaches, salones, grupos, reservas }), [coaches, salones, grupos, reservas])
   const [coachAbierto, setCoachAbierto] = useState(null)
   const [salonAbierto, setSalonAbierto] = useState(null)
@@ -2329,6 +2347,10 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
           <h2 className="panel__title">Coaches</h2>
           <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setCoachModal({})}>+ Agregar coach</button>
         </div>
+        <div className="desercion-periodo">
+          <span>Periodo de deserción</span>
+          <PeriodSelector value={periodo} onChange={p => { setPeriodo(p); writeStoredPeriod(p) }} />
+        </div>
         {coaches.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Aún no hay coaches registrados.</div>
         ) : (
@@ -2337,10 +2359,11 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
             <tbody>
               {coaches.flatMap((c) => {
                 const detalle = ocupacion.coaches.find(x => String(x.id) === String(c.id))
+                const tasa = desercion?.coaches.find(x => String(x.coachId) === String(c.id))
                 const abierto = coachAbierto === String(c.id)
                 return [
                 <tr key={c.id} style={{ cursor: 'default', opacity: c.activo ? 1 : 0.55 }}>
-                  <td><button type="button" className="recurso-toggle" aria-expanded={abierto} onClick={() => setCoachAbierto(abierto ? null : String(c.id))}><span aria-hidden="true">{abierto ? '▾' : '▸'}</span> {c.nombre}<small>{detalle.promedio == null ? 'Sin grupos para promedio' : `${promedioTexto(detalle.promedio)} niños / grupo`}</small></button></td>
+                  <td><button type="button" className="recurso-toggle" aria-expanded={abierto} onClick={() => setCoachAbierto(abierto ? null : String(c.id))}><span aria-hidden="true">{abierto ? '▾' : '▸'}</span> {c.nombre}<small>{detalle.promedio == null ? 'Sin grupos para promedio' : `${promedioTexto(detalle.promedio)} niños / grupo`}</small>{tasa && <small>Deserción: {tasa.pctTexto}{tasa.expuestos < CANDADOS.expuestosMin ? ' · muestra insuficiente' : ''}</small>}</button></td>
                   <td style={{ fontSize: 12 }}>
                     {c.nivel_kids > 0 ? (
                       <>Kids ≤ {c.nivel_kids}<div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Tiny ≤ {TINYMAP[c.nivel_kids] || 0}</div></>
@@ -2359,7 +2382,9 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
                     </div>
                   </td>
                 </tr>,
-                ...(abierto ? [<tr key={`detalle-${c.id}`} data-detail><td colSpan={5}><DetalleRecurso recurso={detalle} /></td></tr>] : []),
+                ...(abierto ? [<tr key={`detalle-${c.id}`} data-detail><td colSpan={5}>
+                  {errorDesercion ? <p role="status">{errorDesercion}</p> : !desercion ? <p role="status">Cargando deserción y referencias…</p> : <ComparacionDesercion coach={tasa} centro={desercion.referenciaCentro} global={desercion.referenciaGlobal} periodo={desercion.periodo} />}
+                  <DetalleRecurso recurso={detalle} /></td></tr>] : []),
                 ]
               })}
             </tbody>
