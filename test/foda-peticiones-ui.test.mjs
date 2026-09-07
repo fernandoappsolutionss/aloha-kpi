@@ -32,7 +32,7 @@ test('sin Blob se bloquea solo la creación documental y se explica la causa', (
   assert.match(panel, /uploadsAvailable/)
   assert.match(form, /uploadsAvailable/)
   assert.match(form, /Carga de cotizaciones no disponible/)
-  assert.match(form, /const documentFormDisabled = \(!uploadsAvailable && !preapproved\) \|\| busy/)
+  assert.match(form, /const documentFormDisabled = !uploadsAvailable \|\| busy \|\| quoteBusy/)
   assert.match(form, /<fieldset[^>]*disabled=\{documentFormDisabled\}/)
   assert.match(list, /uploadsAvailable/)
 })

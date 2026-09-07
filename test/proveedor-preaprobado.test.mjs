@@ -7,6 +7,7 @@ import { decisionEmail } from '../lib/peticion-notificaciones.mjs'
 
 const autora = { id: 8, rol: 'administradora', centro_id: 10 }
 const coordinador = { id: 2, rol: 'coordinador', centros: [10] }
+const quote = { id: 9, peticion_id: 4, proveedor_preaprobado: true, proveedor_razon_social: 'Servicios del Istmo', upload_status: 'valid', archivo_sha256: 'a'.repeat(64), archivo_bytes: 100, archivo_nombre: 'servicio.pdf', archivo_mime: 'application/pdf', blob_pathname: 'peticiones/4/servicio.pdf' }
 const datos = { texto: 'Reparar aire acondicionado', categoria: 'reparacion', proveedor_preaprobado: true, proveedor_preaprobado_nombre: '  Servicios del Istmo  ' }
 function fixture(overrides = {}) {
   let row = { id: 4, centro_id: 10, created_by: 8, tipo: 'peticion', estado: 'Próximo trimestre', submitted_at: null, ...datos, ...overrides }
@@ -22,12 +23,16 @@ function fixture(overrides = {}) {
     listSubmitted: async () => [row], listDrafts: async () => [],
     insertHistory: async (_, event) => history.push(event),
   }
-  const service = createPeticionesService({ repo, notifyDecision: async value => notifications.push(value) })
+  const service = createPeticionesService({ repo, verifyQuote: async () => true, notifyDecision: async value => notifications.push(value) })
   return { repo, service, history, notifications, quotes }
 }
 
-test('proveedor preaprobado permite enviar solo con su nombre, categoría y descripción', () => {
-  assert.deepEqual(validateSubmission(datos), [])
+test('proveedor preaprobado exige nombre y una cotización válida del servicio', () => {
+  assert.deepEqual(validateSubmission({ ...datos, cotizaciones: [quote] }), [])
+  assert.ok(validateSubmission(datos).includes('cotizacion_servicio_requerida'))
+  for (const upload_status of ['pending','validating','invalid']) assert.ok(validateSubmission({ ...datos, cotizaciones: [{ ...quote, upload_status }] }).includes('cotizacion_servicio_requerida'))
+  assert.ok(validateSubmission({ ...datos, cotizaciones: [quote, { ...quote, id:10 }] }).includes('una_cotizacion_servicio'))
+  assert.ok(validateSubmission({ ...datos, cotizaciones: [{ ...quote, proveedor_razon_social:'Otro' }] }).includes('cotizacion_servicio_requerida'))
   assert.ok(validateSubmission({ ...datos, proveedor_preaprobado_nombre: '  ' }).includes('nombre_proveedor_requerido'))
   assert.ok(validateSubmission({ ...datos, proveedor_preaprobado_nombre: 'a'.repeat(201) }).includes('nombre_proveedor_invalido'))
   assert.ok(validateSubmission({ ...datos, texto: '' }).includes('texto_requerido'))
@@ -49,8 +54,9 @@ test('guardar y continuar conserva modalidad y nombre normalizado', async () => 
   assert.equal(updated.draft.proveedor_preaprobado_nombre, 'Otro servicio')
 })
 
-test('envío sin PDFs queda pendiente, con historial e idempotencia', async () => {
-  const { service, history, notifications } = fixture()
+test('envío con PDF del servicio queda pendiente, con historial e idempotencia', async () => {
+  const { service, history, notifications, quotes } = fixture()
+  quotes.push(quote)
   const first = await service.submitPeticion(autora, { centroId: 10, id: 4 })
   assert.ok(first.peticion.submitted_at)
   assert.equal(first.peticion.estado, 'Próximo trimestre')
@@ -65,11 +71,12 @@ test('servidor rechaza enviar sin nombre aunque se omita validación del formula
   assert.equal(history.length, 0)
 })
 
-test('coordinador asignado aprueba sin cotización y conserva proveedor e historial', async () => {
-  const { service, history, notifications } = fixture({ submitted_at: '2026-09-07' })
+test('coordinador aprueba la única cotización del servicio y conserva proveedor e historial', async () => {
+  const { service, history, notifications, quotes } = fixture({ submitted_at: '2026-09-07' })
+  quotes.push(quote)
   const result = await service.changeStatus(coordinador, { centroId: 10, id: 4, estado: 'Aprobado' })
   assert.equal(result.peticion.estado, 'Aprobado')
-  assert.equal(result.peticion.cotizacion_aprobada_id, null)
+  assert.equal(result.peticion.cotizacion_aprobada_id, quote.id)
   assert.equal(history[0].changed_by, coordinador.id)
   assert.equal(notifications[0].peticion.proveedor_preaprobado, true)
 })
@@ -109,15 +116,47 @@ test('no cambia a proveedor preaprobado mientras existan cotizaciones o cargas p
   await assert.rejects(service.updateDraft(autora, { ...datos, centroId: 10, id: 4 }), /cotizaciones/i)
 })
 
-test('no se preparan cargas en peticiones con proveedor preaprobado', async () => {
+test('preparar cotización de proveedor aprobado usa el nombre guardado y no inventa datos fiscales', async () => {
   const { repo } = fixture()
+  let prepared
+  repo.countQuotes = async () => 0
+  repo.prepareQuote = async (_, value) => { prepared = value; return { id:9, ...value } }
+  repo.touchDraft = async () => {}
   const upload = createPeticionUploadService({ repo, blob: {} })
-  await assert.rejects(upload.prepare(autora, { centroId: 10, peticionId: 4 }), /proveedor aprobado/i)
+  await upload.prepare(autora, { centroId:10, peticionId:4, archivoNombre:'servicio.pdf', proveedorRazonSocial:'Falsificado', proveedorPais:'PA', empresaConstituida:true })
+  assert.equal(prepared.proveedor_razon_social, 'Servicios del Istmo')
+  assert.equal(prepared.proveedor_preaprobado, true)
+  for (const field of ['proveedor_pais','proveedor_id_fiscal','proveedor_id_fiscal_clave','empresa_constituida','emite_factura_fiscal']) assert.equal(prepared[field], null)
 })
 
-test('correo de aprobación muestra nombre escapado del proveedor existente', () => {
-  const result = decisionEmail({ peticion: { ...datos, centro_id: 10, proveedor_preaprobado_nombre: '<Proveedor>' }, estado: 'Aprobado', actor: coordinador, centroNombre: 'Centro', baseUrl: 'https://example.test' })
-  assert.match(result.html, /Proveedor aprobado del centro/)
+test('una petición aprobada de proveedor existente no recibe archivos nuevos y un borrador admite solo uno', async () => {
+  const { repo } = fixture()
+  repo.countQuotes = async () => 1
+  const upload = createPeticionUploadService({ repo, blob: {} })
+  await assert.rejects(upload.prepare(autora, { centroId:10, peticionId:4, archivoNombre:'servicio.pdf' }), /una cotización/i)
+  const submitted = fixture({submitted_at:'2026-09-07'}).repo
+  await assert.rejects(createPeticionUploadService({repo:submitted,blob:{}}).prepare(autora,{centroId:10,peticionId:4}),/enviada/i)
+})
+
+test('no se envía ni aprueba la petición sin cotización del servicio', async () => {
+  const draft = fixture()
+  await assert.rejects(draft.service.submitPeticion(autora, {centroId:10,id:4}), /cotización.*servicio/i)
+  const submitted = fixture({submitted_at:'2026-09-07'})
+  await assert.rejects(submitted.service.changeStatus(coordinador, {centroId:10,id:4,estado:'Aprobado'}), /cotización.*servicio/i)
+  assert.equal(submitted.history.length, 0)
+})
+
+test('no se cambia el nombre ni la modalidad después de adjuntar la cotización', async () => {
+  const {service,quotes}=fixture()
+  quotes.push(quote)
+  await assert.rejects(service.updateDraft(autora,{...datos,centroId:10,id:4,proveedor_preaprobado:false}),/cotizaci[oó]n/i)
+  await assert.rejects(service.updateDraft(autora,{...datos,centroId:10,id:4,proveedor_preaprobado_nombre:'Otro'}),/cotizaci[oó]n/i)
+})
+
+test('correo de aprobación muestra proveedor y cotización sin país fiscal ficticio', () => {
+  const result = decisionEmail({ peticion: { ...datos, centro_id: 10, proveedor_preaprobado_nombre: '<Proveedor>' }, estado: 'Aprobado', actor: coordinador, cotizacionAprobada: { ...quote, proveedor_razon_social: '<Proveedor>', proveedor_pais: null }, centroNombre: 'Centro', baseUrl: 'https://example.test' })
+  assert.match(result.html, /Cotización aprobada/)
+  assert.match(result.html, /servicio\.pdf/)
   assert.match(result.html, /&lt;Proveedor&gt;/)
-  assert.doesNotMatch(result.html, /<Proveedor>/)
+  assert.doesNotMatch(result.html, /<Proveedor>|\(null\)|\(undefined\)/)
 })
