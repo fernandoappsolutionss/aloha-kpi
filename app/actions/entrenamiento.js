@@ -102,17 +102,17 @@ export async function responderQuiz(modulo, respuestas) {
   })
 }
 
-// Gerencia: usuarios administradora (+centro) × módulos. requireCurrentAdmin
+// Gerencia: administradoras y asistentes (+centro) × módulos. requireCurrentMaster
 // relee el rol desde la BD (como peticiones.js y deleteCentro): un JWT de 7
 // días de alguien degradado o borrado no debe leer nombres/emails/progreso.
-// → { modulos:[{id,titulo}], usuarios:[{ id, nombre, email, centro, centroId, progreso:{[modulo]:{…}}, completados, pct }] }
+// → { modulos:[{id,titulo}], usuarios:[{ id, nombre, email, rol, centro, centroId, progreso:{[modulo]:{…}}, completados, pct }] }
 export async function matrizProgreso(centroId = null) {
   return runAction('matrizProgreso', async () => {
     await requireCurrentMaster()
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     const usuarios = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
-      : await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' ORDER BY c.nombre, u.nombre`
+      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol IN ('administradora', 'asistente') AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
+      : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol IN ('administradora', 'asistente') ORDER BY c.nombre, u.nombre`
     const ids = usuarios.map((x) => x.id)
     const rows = ids.length ? await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id = ANY(${ids})` : []
     const porUsuario = {}
@@ -122,7 +122,7 @@ export async function matrizProgreso(centroId = null) {
       usuarios: usuarios.map((u) => {
         const progreso = porUsuario[u.id] || {}
         const p = porcentaje(progreso, MODULOS)
-        return { id: u.id, nombre: u.nombre, email: u.email, centro: u.centro || '—', centroId: u.centro_id, progreso, completados: p.completados, pct: p.pct }
+        return { id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, centro: u.centro || '—', centroId: u.centro_id, progreso, completados: p.completados, pct: p.pct }
       }),
     }
   })
