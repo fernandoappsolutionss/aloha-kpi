@@ -610,7 +610,7 @@ test('schema: la firma del drill existe y borrar al firmante no borra el progres
 
 test('firmarDrill: permiso verificado en el servidor y con auth fresca', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'firmarDrill')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /puedeFirmar\(/)
   assert.match(body, /Number\.isInteger\(usuarioId\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
@@ -618,7 +618,7 @@ test('firmarDrill: permiso verificado en el servidor y con auth fresca', () => {
 
 test('responderQuizOficio: valida el largo contra SU quiz y el gradiente ANTES de corregir', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'responderQuizOficio')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(body, /m\.quiz\.length/)
   assert.doesNotMatch(body, /length !== 3\b/, 'el largo no puede estar clavado en 3')
@@ -632,7 +632,7 @@ test('responderQuizOficio: valida el largo contra SU quiz y el gradiente ANTES d
 
 test('marcarEstudiado: solo ids de oficio y solo módulos del puesto de quien escribe', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'marcarEstudiado')
-  assert.match(body, /requireCurrentUser\(\)/)
+  assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
   assert.match(body, /m\.roles\.includes\(u\.rol\)/)
   assert.match(body, /INSERT INTO entrenamiento_progreso/)

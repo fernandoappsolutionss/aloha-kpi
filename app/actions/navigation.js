@@ -1,7 +1,7 @@
 'use server'
 import { sql } from '../../lib/db'
 import { requireCurrentUser } from '../../lib/auth'
-import { centrosDe, esGerencia, puedeGestionarUsuarios } from '../../lib/current-user.mjs'
+import { centrosDe, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios } from '../../lib/current-user.mjs'
 
 export async function getNavigationContext() {
   const user = await requireCurrentUser()
@@ -15,11 +15,12 @@ export async function getNavigationContext() {
     actor: { id: user.id, role: user.rol },
     centers: centers.map(({ id, nombre }) => ({ id: Number(id), nombre })),
     capabilities: {
-      viewUsers: puedeGestionarUsuarios(user),
-      viewCenters: esGerencia(user.rol),
-      viewAdminTraining: esGerencia(user.rol),
-      viewMetas: esGerencia(user.rol),
-      viewZoho: esGerencia(user.rol),
+      viewUsers: puedeVerUsuarios(user),
+      manageUsers: puedeGestionarUsuarios(user),
+      viewCenters: isMaster(user) || esSoloLectura(user),
+      viewAdminTraining: isMaster(user),
+      viewMetas: isMaster(user) || esSoloLectura(user),
+      viewZoho: isMaster(user),
     },
   }
 }

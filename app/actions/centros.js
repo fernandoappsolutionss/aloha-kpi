@@ -1,6 +1,6 @@
 'use server'
 import { sql } from '../../lib/db'
-import { requireSession, requireCentroAccess, requireCurrentAdmin, centrosDe } from '../../lib/auth'
+import { requireSession, requireCentroAccess, requireCurrentMaster, centrosDe } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 
 const PAISES = ['PA', 'VE']
@@ -25,25 +25,52 @@ export async function getCentroNombre(id) {
 // Centros con sus miembros: administradora, asistente y los coordinadores
 // operativos que lo tienen asignado. `miembros` alimenta la columna Equipo.
 export async function listCentrosConUsuarios() {
-  await requireCurrentAdmin()
-  const centros = await sql`
-    SELECT c.id, c.nombre, c.region, c.pais, COUNT(u.id)::int AS user_count
-    FROM centros c
-    LEFT JOIN usuarios u ON u.centro_id = c.id
-    GROUP BY c.id, c.nombre, c.region, c.pais
-    ORDER BY c.nombre
-  `
-  const miembros = await sql`
-    SELECT u.id, u.nombre, u.email, u.rol, u.centro_id AS centro_id,
-           (u.password_hash IS NOT NULL) AS activo
-    FROM usuarios u
-    WHERE u.centro_id IS NOT NULL AND u.rol <> 'admin_general' AND u.rol <> 'supervisor'
-    UNION ALL
-    SELECT u.id, u.nombre, u.email, u.rol, uc.centro_id AS centro_id,
-           (u.password_hash IS NOT NULL) AS activo
-    FROM usuario_centros uc
-    JOIN usuarios u ON u.id = uc.usuario_id
-  `
+  const scope = centrosDe(await requireSession())
+  const centros = scope === null
+    ? await sql`
+        SELECT c.id, c.nombre, c.region, c.pais, COUNT(u.id)::int AS user_count
+        FROM centros c
+        LEFT JOIN usuarios u ON u.centro_id = c.id
+        GROUP BY c.id, c.nombre, c.region, c.pais
+        ORDER BY c.nombre
+      `
+    : scope.length === 0
+      ? []
+      : await sql`
+          SELECT c.id, c.nombre, c.region, c.pais, COUNT(u.id)::int AS user_count
+          FROM centros c
+          LEFT JOIN usuarios u ON u.centro_id = c.id
+          WHERE c.id = ANY(${scope}::int[])
+          GROUP BY c.id, c.nombre, c.region, c.pais
+          ORDER BY c.nombre
+        `
+  const miembros = scope === null
+    ? await sql`
+        SELECT u.id, u.nombre, u.email, u.rol, u.centro_id AS centro_id,
+               (u.password_hash IS NOT NULL) AS activo
+        FROM usuarios u
+        WHERE u.centro_id IS NOT NULL AND u.rol <> 'admin_general' AND u.rol <> 'supervisor'
+        UNION ALL
+        SELECT u.id, u.nombre, u.email, u.rol, uc.centro_id AS centro_id,
+               (u.password_hash IS NOT NULL) AS activo
+        FROM usuario_centros uc
+        JOIN usuarios u ON u.id = uc.usuario_id
+      `
+    : scope.length === 0
+      ? []
+      : await sql`
+          SELECT u.id, u.nombre, u.email, u.rol, u.centro_id AS centro_id,
+                 (u.password_hash IS NOT NULL) AS activo
+          FROM usuarios u
+          WHERE u.centro_id IS NOT NULL AND u.rol <> 'admin_general' AND u.rol <> 'supervisor'
+            AND u.centro_id = ANY(${scope}::int[])
+          UNION ALL
+          SELECT u.id, u.nombre, u.email, u.rol, uc.centro_id AS centro_id,
+                 (u.password_hash IS NOT NULL) AS activo
+          FROM usuario_centros uc
+          JOIN usuarios u ON u.id = uc.usuario_id
+          WHERE uc.centro_id = ANY(${scope}::int[])
+        `
   return centros.map((centro) => ({
     ...centro,
     miembros: miembros
@@ -54,7 +81,7 @@ export async function listCentrosConUsuarios() {
 
 // El país define las fechas patrias que salta el calendario de itinerarios.
 export async function createCentro({ nombre, region, pais }) {
-  await requireCurrentAdmin()
+  await requireCurrentMaster()
   if (!nombre || !nombre.trim()) return { error: 'El nombre es requerido.' }
   if (!PAISES.includes(pais)) return { error: 'Indica el país del centro: Panamá o Venezuela.' }
   await sql`INSERT INTO centros (nombre, region, pais) VALUES (${nombre.trim().toUpperCase()}, ${region || null}, ${pais})`
@@ -62,7 +89,7 @@ export async function createCentro({ nombre, region, pais }) {
 }
 
 export async function updateCentro(id, { nombre, region, pais }) {
-  await requireCurrentAdmin()
+  await requireCurrentMaster()
   if (!nombre || !nombre.trim()) return { error: 'El nombre es requerido.' }
   if (!PAISES.includes(pais)) return { error: 'Indica el país del centro: Panamá o Venezuela.' }
   await sql`UPDATE centros SET nombre = ${nombre.trim().toUpperCase()}, region = ${region || null}, pais = ${pais} WHERE id = ${id}`
@@ -71,7 +98,7 @@ export async function updateCentro(id, { nombre, region, pais }) {
 
 export async function deleteCentro(id) {
   try {
-    await requireCurrentAdmin()
+    await requireCurrentMaster()
     // usuarios.centro_id -> ON DELETE SET NULL; resumen/kpi/mes/trimestres -> ON DELETE CASCADE.
     // peticiones.centro_id -> ON DELETE RESTRICT: un centro con historial no se borra en silencio.
     await sql`DELETE FROM centros WHERE id = ${id}`

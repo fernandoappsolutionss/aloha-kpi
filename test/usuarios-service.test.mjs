@@ -8,6 +8,8 @@ import { usuariosDeliveryForRuntime } from '../lib/usuarios-delivery.mjs'
 const { createUsuariosService } = usuariosServiceModule
 
 const coord = { id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'hash' }
+const masterActor = { id: 1, email: 'fperez@teamsolutionss.com', rol: 'admin_master', centros: [], password_hash: 'hash' }
+const generalActor = { id: 3, email: 'general@aloha.invalid', rol: 'admin_general', centros: [], password_hash: 'hash' }
 const rows = [
   { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, centro_nombre: 'ANCLAS', centros: [], centros_nombres: [], activo: true },
   { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, centro_nombre: 'DAVID', centros: [], centros_nombres: [], activo: false },
@@ -40,10 +42,13 @@ function writeFixture({
   const invalidated = []
   const deliveries = []
   const coordinatorCenters = []
+  const blocked = []
+  const audit = []
   const events = []
   const transactionOptions = []
   const targets = new Map([
-    [1, { id: 1, rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
+    [1, { id: 1, nombre: 'Fernando', email: 'fperez@teamsolutionss.com', rol: 'admin_master', centro_id: null, centros: [], password_hash: 'x' }],
+    [3, { id: 3, nombre: 'General', email: 'general@aloha.invalid', rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
     [8, { id: 8, nombre: 'A', email: 'a@aloha.invalid', rol: 'administradora', centro_id: 10, centros: [], password_hash: 'x' }],
     [9, { id: 9, nombre: 'B', email: 'b@aloha.invalid', rol: 'asistente', centro_id: 12, centros: [], password_hash: null }],
     [20, { id: 20, nombre: 'Jefe', email: 'j@aloha.invalid', rol: 'admin_general', centro_id: null, centros: [], password_hash: 'x' }],
@@ -77,6 +82,8 @@ function writeFixture({
         tokens: tokens.length,
         invalidated: invalidated.length,
         coordinatorCenters: coordinatorCenters.length,
+        blocked: blocked.length,
+        audit: audit.length,
         targets: copyUsers(),
         centers: copyLists(centerState),
         tokenState: copyLists(tokenState),
@@ -94,6 +101,8 @@ function writeFixture({
         tokens.length = snapshot.tokens
         invalidated.length = snapshot.invalidated
         coordinatorCenters.length = snapshot.coordinatorCenters
+        blocked.length = snapshot.blocked
+        audit.length = snapshot.audit
         restoreMap(targets, snapshot.targets)
         restoreMap(centerState, snapshot.centers)
         restoreMap(tokenState, snapshot.tokenState)
@@ -150,6 +159,19 @@ function writeFixture({
       centerState.delete(Number(id))
       if (deleteError) throw deleteError
     },
+    updateBlockedUntil: async (query, id, blockedUntil) => {
+      events.push(`block:${query.transaction}:${id}`)
+      blocked.push({ id, blockedUntil })
+      writeCount++
+      const saved = { ...targets.get(Number(id)), blocked_until: blockedUntil, bloqueado: Boolean(blockedUntil) }
+      targets.set(Number(id), saved)
+      return saved
+    },
+    insertAccessHistory: async (query, row) => {
+      events.push(`audit:${query.transaction}:${row.action}:${row.userId}`)
+      audit.push(row)
+      writeCount++
+    },
   }
   const accessTokens = {
     replace: async (query, row) => {
@@ -184,6 +206,8 @@ function writeFixture({
     invalidated,
     deliveries,
     coordinatorCenters,
+    blocked,
+    audit,
     events,
     transactionOptions,
     transactionCount: () => transactions,
@@ -248,7 +272,7 @@ test('pageData usa el actor de DB y el alcance vigente', async () => {
   assert.deepEqual(result.users[0].centerNames, ['ANCLAS'])
   assert.equal(result.users[0].active, true)
   assert.deepEqual(result.users[0].actions, {
-    edit: true, resendInvitation: false, sendPasswordReset: true, delete: false,
+    edit: true, resendInvitation: false, sendPasswordReset: true, delete: false, block: false, unblock: false,
   })
   assert.doesNotMatch(JSON.stringify(result), /password_hash|hash/)
 })
@@ -262,8 +286,8 @@ test('coordinador sin centros no cae en alcance global', async () => {
   assert.deepEqual(repo.calls.find((c) => c[0] === 'users')[1], [])
 })
 
-test('pageData no ofrece editar supervisor pero conserva acceso y eliminación gestionables', async () => {
-  const actor = { id: 1, rol: 'admin_general', centros: [], password_hash: 'actor' }
+test('pageData no ofrece editar supervisor pero conserva acceso y eliminación gestionables para Master', async () => {
+  const actor = masterActor
   const supervisors = [false, true].map((activo, index) => ({
     id: 40 + index, nombre: 'Supervisor', email: `supervisor-${index}@test.invalid`,
     rol: 'supervisor', centro_id: null, centros: [], activo,
@@ -271,8 +295,8 @@ test('pageData no ofrece editar supervisor pero conserva acceso y eliminación g
   const result = await createUsuariosService({ repo: readRepo(actor, supervisors) }).pageData({ uid: 1 })
   assert.deepEqual(result.assignableRoles, ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
   assert.deepEqual(result.users.map(user => user.actions), [
-    { edit: false, resendInvitation: true, sendPasswordReset: false, delete: true },
-    { edit: false, resendInvitation: false, sendPasswordReset: true, delete: true },
+    { edit: false, resendInvitation: true, sendPasswordReset: false, delete: true, block: true, unblock: false },
+    { edit: false, resendInvitation: false, sendPasswordReset: true, delete: true, block: true, unblock: false },
   ])
 })
 
@@ -280,6 +304,102 @@ test('rol sin gestión queda denegado antes de listar', async () => {
   const repo = readRepo({ id: 7, rol: 'administradora', centro_id: 10, password_hash: 'x' })
   await assert.rejects(() => createUsuariosService({ repo }).pageData({ uid: 7 }), /No autorizado/)
   assert.equal(repo.calls.some((c) => c[0] === 'users'), false)
+})
+
+test('General y supervisor consultan usuarios solo lectura', async () => {
+  for (const actor of [generalActor, { ...generalActor, rol: 'supervisor' }]) {
+    const repo = readRepo(actor)
+    const result = await createUsuariosService({ repo }).pageData({ uid: actor.id })
+    assert.equal(result.capabilities.createUser, false)
+    assert.equal(result.capabilities.manageUsers, false)
+    assert.equal(result.capabilities.blockUsers, false)
+    assert.ok(repo.calls.some((c) => c[0] === 'users'))
+    assert.deepEqual(result.users.map((user) => user.actions), rows.map(() => ({
+      edit: false,
+      resendInvitation: false,
+      sendPasswordReset: false,
+      delete: false,
+      block: false,
+      unblock: false,
+    })))
+  }
+})
+
+test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Master', async () => {
+  const masterRow = {
+    id: 1,
+    nombre: 'Fernando',
+    email: 'fperez@teamsolutionss.com',
+    rol: 'admin_master',
+    centro_id: null,
+    centros: [],
+    centros_nombres: [],
+    activo: true,
+    blocked_until: null,
+  }
+  const blockedRow = {
+    id: 14,
+    nombre: 'General bloqueado',
+    email: 'g@aloha.invalid',
+    rol: 'admin_general',
+    centro_id: null,
+    centros: [],
+    centros_nombres: [],
+    activo: true,
+    blocked_until: '2026-09-10T05:00:00.000Z',
+  }
+  const result = await createUsuariosService({ repo: readRepo(masterActor, [masterRow, blockedRow]) }).pageData({ uid: 1 })
+  assert.equal(result.actor.role, 'admin_master')
+  assert.deepEqual(result.assignableRoles, ['admin_general', 'coordinador', 'administradora', 'asistente', 'coach'])
+  assert.equal(result.assignableRoles.includes('admin_master'), false)
+  assert.equal(result.capabilities.blockUsers, true)
+  assert.equal(result.users[0].role, 'admin_master')
+  assert.equal(result.users[0].actions.edit, false)
+  assert.equal(result.users[0].actions.delete, false)
+  assert.equal(result.users[0].actions.block, false)
+  assert.equal(result.users[1].blockedUntil, '2026-09-10T05:00:00.000Z')
+  assert.equal(result.users[1].actions.unblock, true)
+})
+
+test('Master bloquea y desbloquea usuario con auditoria transaccional', async () => {
+  const fx = writeFixture({ actor: masterActor })
+  const result = await fx.service.blockUser(
+    { uid: 1 },
+    8,
+    { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: 'Corte temporal solicitado' },
+  )
+  assert.deepEqual(result, { ok: true, blockedUntil: '2026-09-10T05:00:00.000Z' })
+  assert.deepEqual(fx.blocked, [{ id: 8, blockedUntil: '2026-09-10T05:00:00.000Z' }])
+  assert.deepEqual(fx.audit, [{
+    actorId: 1,
+    userId: 8,
+    action: 'block',
+    previousBlockedUntil: null,
+    newBlockedUntil: '2026-09-10T05:00:00.000Z',
+    motivo: 'Corte temporal solicitado',
+  }])
+
+  const cleared = await fx.service.unblockUser({ uid: 1 }, 8, { motivo: 'Fin del corte' })
+  assert.deepEqual(cleared, { ok: true, blockedUntil: null })
+  assert.deepEqual(fx.blocked.at(-1), { id: 8, blockedUntil: null })
+  assert.equal(fx.audit.at(-1).action, 'unblock')
+  assert.equal(fx.audit.at(-1).motivo, 'Fin del corte')
+})
+
+test('bloqueo niega auto-bloqueo, Master y fechas pasadas sin escribir', async () => {
+  for (const [usuarioId, input, pattern] of [
+    [1, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: 'x' }, /propia cuenta/],
+    [8, { blockedUntil: '2026-09-01T05:00:00.000Z', motivo: 'x' }, /futura/],
+    [8, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: ' ' }, /motivo/],
+  ]) {
+    const fx = writeFixture({ actor: masterActor })
+    if (usuarioId === 1) {
+      await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input), pattern)
+    } else {
+      await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input, { now: new Date('2026-09-07T12:00:00Z') }), pattern)
+    }
+    assert.equal(fx.writes(), 0)
+  }
 })
 
 test('cuenta pendiente devuelve invitación de 48 horas y enlace copiable', async () => {
@@ -587,11 +707,11 @@ test('update mantiene el correo inmutable y elimina relaciones N:N residuales', 
   assert.deepEqual(fx.invalidated, [8])
 })
 
-test('coordinador no elimina; gerencia respeta admin_general y autoborrado', async () => {
+test('coordinador no elimina; Master respeta admin_general y autoborrado', async () => {
   const coordFx = writeFixture()
   await assert.rejects(() => coordFx.service.delete({ uid: 2 }, 8), /No tienes permiso/)
   assert.equal(coordFx.writes(), 0)
-  const adminFx = writeFixture({ actor: { id: 1, rol: 'admin_general', centros: [], password_hash: 'x' } })
+  const adminFx = writeFixture({ actor: masterActor })
   await assert.rejects(() => adminFx.service.delete({ uid: 1 }, 1), /propia cuenta/)
   await assert.rejects(() => adminFx.service.delete({ uid: 1 }, 20), /Administrador General/)
   assert.equal(adminFx.writes(), 0)
@@ -734,7 +854,7 @@ test('fallo al invalidar revierte usuario, relaciones y token anterior', async (
 })
 
 test('fallo al borrar revierte la invalidación y conserva la cuenta', async () => {
-  const actor = { id: 1, rol: 'admin_general', centros: [], password_hash: 'x' }
+  const actor = masterActor
   const fx = writeFixture({ actor, deleteError: new Error('delete failed') })
   const before = { ...fx.user(9) }
   await assert.rejects(() => fx.service.delete({ uid: 1 }, 9), /delete failed/)
@@ -748,7 +868,7 @@ test('fallo al borrar revierte la invalidación y conserva la cuenta', async () 
 })
 
 test('cada rol se persiste con una sola forma canónica de centros', async () => {
-  const adminFx = writeFixture({ actor: { id: 1, rol: 'admin_general', centros: [] } })
+  const adminFx = writeFixture({ actor: masterActor })
   await adminFx.service.create({ uid: 1 }, {
     nombre: 'Coord', email: 'coord@test.invalid', rol: 'coordinador', centro_id: 10, centros: [12],
   })
@@ -762,7 +882,7 @@ test('cada rol se persiste con una sola forma canónica de centros', async () =>
   assert.equal(opFx.inserted[0].centro_id, 10)
   assert.deepEqual(opFx.coordinatorCenters, [])
 
-  const unassignedFx = writeFixture({ actor: { id: 1, rol: 'admin_general', centros: [] } })
+  const unassignedFx = writeFixture({ actor: masterActor })
   await unassignedFx.service.create({ uid: 1 }, {
     nombre: 'Sin centro', email: 'sin-centro@test.invalid', rol: 'administradora', centro_id: null, centros: [12],
   })

@@ -4,7 +4,7 @@
 // guarda el refresh token en zoho_conexion. Todos los errores redirigen a
 // /dashboard/zoho?error=… sin filtrar tokens.
 import { cookies } from 'next/headers'
-import { getSession, isAdminRole } from '../../../../lib/auth'
+import { requireCurrentMaster } from '../../../../lib/auth'
 import { guardarZohoConexion } from '../../../../lib/zoho-conexion'
 import { ZOHO_ACCOUNTS, ORGS_ZOHO, emailAutorizado } from '../../../../lib/zoho-cobranza.mjs'
 
@@ -13,8 +13,10 @@ export const dynamic = 'force-dynamic'
 const volver = (request, q) => Response.redirect(new URL(`/dashboard/zoho?${q}`, request.url))
 
 export async function GET(request) {
-  const sesion = await getSession()
-  if (!sesion || !isAdminRole(sesion.rol)) {
+  let sesion
+  try {
+    sesion = await requireCurrentMaster()
+  } catch {
     return Response.redirect(new URL('/login', request.url))
   }
 

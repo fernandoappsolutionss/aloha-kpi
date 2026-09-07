@@ -4,7 +4,7 @@
 // venga del cliente. Las respuestas del quiz viven en respuestas.js (solo
 // servidor): el cliente recibe opciones y explicaciones, nunca el índice.
 import { sql } from '../../lib/db'
-import { requireSession, requireCurrentUser, requireCurrentAdmin, isAdminRole } from '../../lib/auth'
+import { requireSession, requireCurrentUser, requireCurrentMaster, isAdminRole } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { MODULOS } from '../../lib/entrenamiento/modulos'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas'
@@ -108,7 +108,7 @@ export async function responderQuiz(modulo, respuestas) {
 // → { modulos:[{id,titulo}], usuarios:[{ id, nombre, email, centro, centroId, progreso:{[modulo]:{…}}, completados, pct }] }
 export async function matrizProgreso(centroId = null) {
   return runAction('matrizProgreso', async () => {
-    await requireCurrentAdmin()
+    await requireCurrentMaster()
     const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
     const usuarios = cid
       ? await sql`SELECT u.id, u.nombre, u.email, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = 'administradora' AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
@@ -141,7 +141,7 @@ export async function matrizProgreso(centroId = null) {
 // "vuelve a 0 de 9" borraría también ese trabajo, que no se puede reconstruir.
 export async function reiniciarProgreso(usuarioId) {
   return runAction('reiniciarProgreso', async () => {
-    await requireCurrentAdmin()
+    await requireCurrentMaster()
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
     await sql`DELETE FROM entrenamiento_progreso WHERE usuario_id = ${usuarioId} AND modulo NOT LIKE 'of-%'`
     return { ok: true }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { accessPurpose, createAccessTokenService } from '../lib/access-tokens.mjs'
 
 function fakeRepo(seed = {}) {
-  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.invalid' }]]), tokens: new Map(), calls: [], ...seed }
+  const state = { users: new Map([[8, { id: 8, email: 'u@aloha.invalid', password_hash: 'hash' }]]), tokens: new Map(), calls: [], ...seed }
   const transactionQuery = { transaction: true }
   const record = (method, query) => state.calls.push({ method, query })
   return {
@@ -89,6 +89,24 @@ test('replace reemplaza una invitación reciente aunque reciba cooldown', async 
   assert.equal(repo.state.tokens.get('invite-nuevo').purpose, 'invite')
 })
 
+test('replace no emite invitaciones ni resets para usuarios bloqueados', async () => {
+  const repo = fakeRepo({
+    users: new Map([[8, {
+      id: 8,
+      email: 'u@aloha.invalid',
+      password_hash: 'hash',
+      bloqueado: true,
+      blocked_until: '2026-09-10T05:00:00.000Z',
+    }]]),
+  })
+  const service = createAccessTokenService({ repo, makeToken: () => 'no-debe-crearse', now: () => new Date('2026-09-02T12:00:00Z') })
+  await assert.rejects(
+    () => repo.transaction((query) => service.replace(query, { userId: 8, purpose: 'reset', hours: 2 })),
+    /bloqueada|No autorizado/,
+  )
+  assert.equal(repo.state.tokens.has('no-debe-crearse'), false)
+})
+
 test('consume actualiza contraseña e invalida todos los tokens en una transacción', async () => {
   const repo = fakeRepo()
   repo.state.tokens.set('a', { token: 'a', user_id: 8, purpose: 'invite', expires_at: '2026-09-03T00:00:00Z', used_at: null })
@@ -108,6 +126,22 @@ test('consume actualiza contraseña e invalida todos los tokens en una transacci
   )
 })
 
+test('consume no crea sesion ni password si el usuario fue bloqueado despues de emitir el token', async () => {
+  const repo = fakeRepo({
+    users: new Map([[8, {
+      id: 8,
+      email: 'u@aloha.invalid',
+      bloqueado: true,
+      blocked_until: '2026-09-10T05:00:00.000Z',
+    }]]),
+  })
+  repo.state.tokens.set('a', { token: 'a', user_id: 8, purpose: 'invite', expires_at: '2026-09-03T00:00:00Z', used_at: null })
+  const service = createAccessTokenService({ repo, now: () => new Date('2026-09-02T12:00:00Z') })
+  await assert.rejects(() => service.consume({ token: 'a', passwordHash: 'hash-nuevo' }), /bloqueada|No autorizado/)
+  assert.equal(repo.state.users.get(8).password_hash, undefined)
+  assert.equal(repo.state.tokens.get('a').used_at, null)
+})
+
 test('consume rechaza token usado o vencido sin escribir', async () => {
   const repo = fakeRepo()
   repo.state.tokens.set('usado', { token: 'usado', user_id: 8, purpose: 'reset', expires_at: '2026-09-03T00:00:00Z', used_at: 'x' })
@@ -115,7 +149,7 @@ test('consume rechaza token usado o vencido sin escribir', async () => {
   const service = createAccessTokenService({ repo, now: () => new Date('2026-09-02T12:00:00Z') })
   await assert.rejects(() => service.consume({ token: 'usado', passwordHash: 'x' }), /usado/)
   await assert.rejects(() => service.consume({ token: 'vencido', passwordHash: 'x' }), /venció/)
-  assert.equal(repo.state.users.get(8).password_hash, undefined)
+  assert.equal(repo.state.users.get(8).password_hash, 'hash')
 })
 
 test('consume rechaza un propósito de token desconocido sin escribir', async () => {
@@ -125,7 +159,7 @@ test('consume rechaza un propósito de token desconocido sin escribir', async ()
   })
   const service = createAccessTokenService({ repo, now: () => new Date('2026-09-02T12:00:00Z') })
   await assert.rejects(() => service.consume({ token: 'desconocido', passwordHash: 'x' }), /inválido/)
-  assert.equal(repo.state.users.get(8).password_hash, undefined)
+  assert.equal(repo.state.users.get(8).password_hash, 'hash')
   assert.equal(repo.state.tokens.get('desconocido').used_at, null)
 })
 
