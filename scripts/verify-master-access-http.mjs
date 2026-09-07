@@ -64,6 +64,8 @@ try {
     ['usuarios','updateUsuario',[33,{nombre:'NO EDITAR QA',rol:'asistente',centro_id:1}]],
     ['usuarios','reenviarInvitacion',[33]],
     ['usuarios','deleteUsuario',[33]],
+    ['usuarios','bloquearUsuario',[33,{blockedUntil:new Date(Date.now()+3600000).toISOString(),motivo:'Prueba local no autorizada'}]],
+    ['usuarios','desbloquearUsuario',[33,{motivo:'Prueba local no autorizada'}]],
     ['kpi','saveKpiMes',[1,2026,9,{},[]]],
     ['grupos','saveSalon',[1,{nombre:'NO CREAR SALON QA',capacidad_ninos:8}]],
     ['cuadro','savePedido',[1,{year:2026,month:9,producto:'NO GUARDAR QA',cantidad:1,monto:1}]],
@@ -75,7 +77,7 @@ try {
     check(Boolean(result.result?.error)||result.response.status>=400||/^1:E/m.test(result.text),`General denegado en ${file}.${name}`)
   }
   assert.deepEqual(await fingerprint(),beforeMutations,'General no cambió ninguna fila operativa ni token de acceso')
-  check(true,'Once acciones HTTP de escritura dejaron intactas nueve tablas')
+  check(true,'Trece acciones HTTP de escritura dejaron intactas nueve tablas')
   const paths=['/dashboard/entrenamiento/oficio','/centro/1/entrenamiento/oficio','/centro/1/entrenamiento/oficio/of-cen-2','/centro/1/entrenamiento/oficio/of-cen-2/sop','/centro/1/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-2.mp3','/entrenamiento/guia/of-coa-6/vista.mp3']
   for(const path of paths){const r=await get(path);check(r.status!==200,`General no alcanza ${path}`);await r.arrayBuffer()}
   const nav=await action('navigation','getNavigationContext',[],cookies.master)
@@ -84,13 +86,23 @@ try {
   check(masterPage.result?.capabilities?.createUser===true,'Master conserva gestión de usuarios')
   const self=masterPage.result?.users?.find(u=>Number(u.id)===2)
   check(self&&Object.values(self.actions||{}).every(v=>!v),'Master no puede autoeliminarse, degradarse ni bloquearse')
-  await db.query("UPDATE usuarios SET blocked_until=now()+interval '1 hour' WHERE id=30")
+  const downgrade=await action('usuarios','updateUsuario',[2,{nombre:'Fernando QA',rol:'admin_general',centro_id:null,centros:[]}],cookies.master)
+  check(Boolean(downgrade.result?.error)||downgrade.response.status>=400||/^1:E/m.test(downgrade.text),'Servidor impide degradar al Master mediante acción directa')
+  check((await db.query('SELECT rol FROM usuarios WHERE id=2')).rows[0].rol==='admin_master','Fernando conserva Master tras intento de degradación')
+  const blocked=await action('usuarios','bloquearUsuario',[30,{blockedUntil:new Date(Date.now()+3600000).toISOString(),motivo:'Verificación local del bloqueo temporal'}],cookies.master)
+  check(!blocked.result?.error && (await db.query('SELECT blocked_until>now() blocked FROM usuarios WHERE id=30')).rows[0].blocked===true,'Master bloquea por la acción real de Usuarios')
   try {
     for(const path of ['/dashboard','/dashboard/usuarios','/centro/1/kpi','/entrenamiento/oficio/of-cen-2.mp3','/api/centro/1/cuadro?year=2026&month=9']){
       const r=await get(path);check(r.status!==200,`Cookie ya abierta queda bloqueada en ${path}`);await r.arrayBuffer()
     }
     const r=await get('/login');check(r.status===200,'Bloqueado puede ver login sin bucle');await r.text()
-  }finally{await db.query('UPDATE usuarios SET blocked_until=NULL WHERE id=30')}
+  }finally{
+    const released=await action('usuarios','desbloquearUsuario',[30,{motivo:'Fin de verificación local del bloqueo'}],cookies.master)
+    check(!released.result?.error && (await db.query('SELECT blocked_until FROM usuarios WHERE id=30')).rows[0].blocked_until===null,'Master desbloquea por la acción real de Usuarios')
+  }
   const unblocked=await get('/dashboard');check(unblocked.status===200,'Usuario recupera acceso al quitar bloqueo');await unblocked.text()
+  await db.query("UPDATE usuarios SET blocked_until=now()-interval '1 second' WHERE id=30")
+  try { const expired=await get('/dashboard');check(expired.status===200,'Bloqueo vencido libera acceso automáticamente sin tarea programada');await expired.text() }
+  finally { await db.query('UPDATE usuarios SET blocked_until=NULL WHERE id=30') }
   console.log(JSON.stringify({assertions,status:'PASS'}))
 }finally{await db.end()}
