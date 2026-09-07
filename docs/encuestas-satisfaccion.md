@@ -39,9 +39,9 @@ Si hay que retirar la función, ocultar sus accesos y detener nuevas respuestas 
 
 ## Verificación
 
-- Suite del proyecto: 1.034 pruebas aprobadas.
+- Suite final del proyecto: 1.044 pruebas aprobadas y compilación de producción correcta, incorporando main `74127eb` (ocupación de coaches y salones).
 - PostgreSQL 16 local ficticio: 17 pruebas aprobadas, incluyendo apertura concurrente, duplicados, datos futuros/retiros efectivos, umbral exacto, falta de difusión, protección de guardado, histórico de agosto, mes nuevo, repetición de migración y límite de intentos.
-- Chrome con 148 niños ficticios: 74 respuestas permanecieron pendientes; la respuesta 75 marcó Cumplimiento sin pulsar Guardar. Copia y descarga registradas; PNG real de 1.200 × 1.200 decodificado al enlace correcto. Flujo general e individual completado; formulario revisado a 390 px; FODA mostró los resultados.
-- Audio de introducción reproducido completo en Chrome (38,27 s). Los ocho MP3 decodificados y sus duraciones verificadas.
+- Chrome con 148 niños ficticios: 74 respuestas permanecieron pendientes; la respuesta 75 marcó Cumplimiento sin pulsar Guardar. Copia y descarga registradas; PNG real de 1.200 × 1.200 decodificado al enlace correcto. Flujo general e individual completado; formulario y panel revisados a 390 px sin desbordamiento horizontal; FODA mostró los resultados.
+- Audio de introducción reproducido completo en Chrome (38,27 s). Los ocho MP3 decodificados y sus duraciones verificadas. Los seis pasos del recorrido y sus tres respuestas completaron el módulo y guardaron progreso en la cuenta ficticia.
 
 Todo lo anterior utilizó datos ficticios, sin respuestas, migraciones ni cambios de cumplimiento en producción.
