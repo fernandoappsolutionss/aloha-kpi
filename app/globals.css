@@ -1274,8 +1274,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .ent-module-action .btn { width: 100%; }
 }
 
-/* Badge de progreso del entrenamiento en el menú (n/9) */
+/* Avances de plataforma y oficio, con firmas pendientes aparte. */
 .sb__badge { margin-left: auto; font-family: var(--font-mono); font-size: 13px; padding: 1px 7px; border-radius: 999px; background: var(--ts-green-soft); color: var(--ts-green); border: 1px solid var(--ts-green-line); }
+.sb__training { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.sb__training .sb__training-firmas { margin-left: 0; justify-self: start; color: var(--text); }
+.ent-progress { display: grid; gap: 6px; min-width: 0; }
+.ent-progress__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.ent-progress__row strong { font-family: var(--font-mono); white-space: nowrap; color: var(--text); }
+.ent-progress__unit { color: var(--text-dim); }
+.ent-progress--compact { font-size: 11.5px; line-height: 1.5; font-weight: 400; }
+.ent-progress--compact .ent-progress__row { justify-content: space-between; gap: 2px 4px; }
 
 /* ---------------------------------------------------------------- */
 /*  Fundaciones responsive compartidas                              */
