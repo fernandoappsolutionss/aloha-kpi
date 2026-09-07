@@ -123,12 +123,12 @@ export default async function OficioPage({ params, searchParams }) {
         {encabezado}
         <section className="ofi-checksheet" aria-labelledby="revision-planes">
           <h2 id="revision-planes">Los planes que firmas</h2>
-          <ul className="ofi-carril__cursos">
+          <ul className="ofi-carril__cursos ofi-planes-revision">
             {revision.map((r) => (
               <li key={r.rol}>
                 <span className="label">{r.rolNombre}</span>
                 <strong>{r.total} módulos · {r.minutos >= 60 ? `${Math.round(r.minutos / 60)} h` : `${r.minutos} min`} · {r.conDrill} con maniobra</strong>
-                <span className="ent-pill">{r.cursos.map((c) => c.titulo).join(' · ')}</span>
+                <p className="ofi-planes-revision__descripcion">{r.cursos.map((c) => c.titulo).join(' · ')}</p>
                 <Link className="btn btn--primary" href={`${base}?revisar=${r.rol}`}>Revisar este plan <span aria-hidden="true">→</span></Link>
               </li>
             ))}
