@@ -223,7 +223,6 @@ export default function UsuariosClient({ initialData }) {
     if (new Date(iso).getTime() <= Date.now()) { setStatus('❌ El bloqueo debe vencer en una fecha futura.'); return }
     if (!reason) { setStatus('❌ Indica el motivo del bloqueo temporal.'); return }
     const hasta = formatPanamaDateTime(iso)
-    if (!confirm(`¿Bloquear temporalmente a ${blocking.nombre} hasta ${hasta} Panamá?\n\nMotivo: ${reason}`)) return
     return submitOnce(`block:${blocking.id}`, async () => {
       const result = await bloquearUsuario(blocking.id, { blockedUntil: iso, until: iso, motivo: reason, reason })
       if (result?.error) { setStatus(`❌ ${result.error}`); return }
