@@ -34,7 +34,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url))
 // dos, hoy son cuatro y el día que entre un quinto este archivo no se entera.
 // Sigue pasando en verde con el catálogo vacío (queda en []).
 const ROLES = [...new Set(MODULOS_OFICIO.flatMap((m) => m.roles || []))].sort()
-const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota'])
+const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota', 'recursos'])
 const TONOS = new Set(['regla', 'ojo', 'alerta'])
 
 // Recorre cada string de un módulo (textos, items, celdas, criterios…).
@@ -140,6 +140,14 @@ test('bloques: vocabulario cerrado, tablas cuadradas y NI UN "<" en todo el cont
         assert.ok(TONOS.has(b.tono), `${m.id}: tono de nota "${b.tono}"`)
         assert.ok(b.titulo && b.texto, `${m.id}: nota sin título o texto`)
       }
+      if (b.t === 'recursos') {
+        assert.ok(b.titulo, `${m.id}: recursos sin título`)
+        assert.ok(Array.isArray(b.recursos) && b.recursos.length > 0, `${m.id}: recursos vacío`)
+        for (const r of b.recursos) {
+          assert.ok(r.titulo, `${m.id}: recurso sin título`)
+          assert.match(r.href, /^https:\/\/drive\.google\.com\//, `${m.id}: recurso no apunta a Drive oficial`)
+        }
+      }
     }
     // Invariante duro: nada de HTML crudo en los datos. Sin '<' no hay
     // dangerouslySetInnerHTML posible ni camino a inyección.
@@ -148,6 +156,13 @@ test('bloques: vocabulario cerrado, tablas cuadradas y NI UN "<" en todo el cont
   for (const g of Object.values(GLOSARIO)) {
     for (const s of textos(g)) assert.ok(!s.includes('<'), `glosario: "<" en → ${s.slice(0, 60)}`)
   }
+})
+
+test('BloquesOficio pinta recursos como enlaces externos seguros', () => {
+  const src = readFileSync(join(ROOT, 'components/entrenamiento/BloquesOficio.js'), 'utf8')
+  assert.match(src, /case 'recursos'/)
+  assert.match(src, /target="_blank"/)
+  assert.match(src, /rel="noopener noreferrer"/)
 })
 
 // ── 5. QUIZ ───────────────────────────────────────────────────────────────
@@ -526,7 +541,7 @@ test('marcarTerminos: no pierde ni un carácter, marca solo lo permitido y respe
 
 // ── 12 bis. EL TERCER SENTIDO DE "CICLO" ──────────────────────────────────
 // En ALOHA "ciclo" nombra dos cosas oficiales y el entrenamiento las separa con
-// dos tarjetas: `ciclo` (el del Programa: Ciclo 1 y Ciclo 2) y
+// dos tarjetas: `ciclo` (el del Programa: cada ciclo tiene 2 niveles) y
 // `ciclo-de-matricula` (el paquete que pagó el padre). Pero hay un TERCER uso
 // vivo en el contenido —"cerrar el ciclo" de un reclamo, "el ciclo completo de
 // las operaciones"— que no es ninguno de los dos.
@@ -534,7 +549,7 @@ test('marcarTerminos: no pierde ni un carácter, marca solo lo permitido y respe
 // Hoy no sale ningún tooltip equivocado porque ningún módulo con esos textos
 // declara 'ciclo' en `palabras`. Nada lo sostenía: el día que alguien agregue
 // 'ciclo' a of-nor-3 o a of-cen-8, "cerrar el ciclo" se lleva el popover
-// "Ciclo 1: los niveles 1 al 4" delante de la persona que está estudiando cómo
+// pedagógico delante de la persona que está estudiando cómo
 // atender un reclamo. Esto lo caza en CI.
 const TERCER_SENTIDO = /cerrar el ciclo|cierra el ciclo|ciclo completo de las operaciones/i
 // Lo que BloquesOficio pasa por el auto-enlace: `tabla` y `sub` se pintan planos.

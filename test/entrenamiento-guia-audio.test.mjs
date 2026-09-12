@@ -100,7 +100,7 @@ test('RECETAS fija identidad aprobada y hash legacy por familia', () => {
   assert.equal(audio.hashDe('Texto estable.', audio.RECETAS.guia), legacyHash('Texto estable.', audio.RECETAS.guia))
 })
 
-test('clipsDeGuia produce 64x3 más tres generales y respeta filtros', () => {
+test('clipsDeGuia produce tres clips por módulo digital más tres generales y respeta filtros', () => {
   const todos = audio.clipsDeGuia()
   assert.equal(todos.length, DIGITALES.length * 3 + 3)
   assert.deepEqual(
@@ -145,7 +145,7 @@ test('manifest de guía: toda entrada apunta a un clip real y a un mp3 en disco'
 const manifestGuiaReal = existsSync(join(ROOT, 'lib/entrenamiento/audio-manifest-guia.json'))
   ? json(join(ROOT, 'lib/entrenamiento/audio-manifest-guia.json'))
   : {}
-test('manifest de guía: 195 clips completos cuando empieza la generación', {
+test('manifest de guía: todos los clips completos cuando empieza la generación', {
   skip: Object.keys(manifestGuiaReal).length === 0
     ? 'audio de guía pendiente de generar: npm run entrenamiento:audio -- --solo guia'
     : false,
@@ -157,7 +157,7 @@ test('manifest de guía: 195 clips completos cuando empieza la generación', {
   )
 })
 
-test('clips de oficio y guía cubren los mismos 64 módulos digitales, sin papel', () => {
+test('clips de oficio y guía cubren los mismos módulos digitales, sin papel', () => {
   assert.deepEqual(audio.clipsDeOficio().map((c) => c.clave).sort(), DIGITALES.map((m) => `oficio/${m.id}`).sort())
   assert.deepEqual(Object.keys(GUIA).sort(), DIGITALES.map((m) => m.id).sort())
   assert.deepEqual(Object.keys(GUIA_GENERAL).sort(), SLOTS_GENERALES.sort())
@@ -217,10 +217,10 @@ test('una discrepancia de tour sale no cero antes de pedir credencial o llamar f
 
 test('CLI selecciona familias y rechaza papel, inválidos y mezcla muestra/solo', async () => {
   const casos = [
-    { args: ['--seco', '--solo', 'oficio'], n: 64, primera: 'oficio/' },
+    { args: ['--seco', '--solo', 'oficio'], n: DIGITALES.length, primera: 'oficio/' },
     { args: ['--seco', '--solo', 'of-met-1'], claves: ['oficio/of-met-1'] },
     { args: ['--seco', '--solo', 'metodo'], n: DIGITALES.filter((m) => m.curso === 'metodo').length, primera: 'oficio/' },
-    { args: ['--seco', '--solo', 'guia'], n: 195, primera: 'guia/' },
+    { args: ['--seco', '--solo', 'guia'], n: DIGITALES.length * 3 + 3, primera: 'guia/' },
     { args: ['--seco', '--solo', 'guia:of-met-1'], claves: SLOTS_GUIA.map((slot) => `guia/of-met-1/${slot}`) },
     { args: ['--seco', '--solo', 'general'], claves: SLOTS_GENERALES.map((slot) => `guia/general/${slot}`) },
     { args: ['--seco', '--solo', MODULOS[0].id], n: MODULOS[0].pasos.length + 1, primera: `${MODULOS[0].id}/`, realPaths: true },
@@ -252,7 +252,7 @@ test('--seco no pide key, no llama red y no escribe manifests ni mp3', async () 
   const antes = [paths.manifestTour, paths.manifestOficio, paths.manifestGuia].map((p) => readFileSync(p, 'utf8'))
   const result = await audio.ejecutarAudio({ args: ['--seco', '--solo', 'guia'], env: {}, fetchImpl: fetchProhibido(), paths })
   assert.equal(result.exitCode, 0)
-  assert.equal(result.seleccion.length, 195)
+  assert.equal(result.seleccion.length, DIGITALES.length * 3 + 3)
   assert.equal(result.fetches, 0)
   assert.deepEqual([paths.manifestTour, paths.manifestOficio, paths.manifestGuia].map((p) => readFileSync(p, 'utf8')), antes)
   assert.deepEqual(archivosBajo(paths.publicDir), [])
