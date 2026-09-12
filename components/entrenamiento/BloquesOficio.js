@@ -1,6 +1,6 @@
 'use client'
 // Renderer del vocabulario cerrado de bloques del oficio: sub, p, lista, pasos,
-// tabla y nota. Nada de dangerouslySetInnerHTML: el contenido viene de datos
+// tabla, nota y recursos. Nada de dangerouslySetInnerHTML: el contenido viene de datos
 // con texto plano (ningún campo puede contener '<', lo verifica el test) y el
 // único énfasis permitido es **negrita**.
 //
@@ -108,6 +108,21 @@ export default function BloquesOficio({ bloques, terminos }) {
               <div key={i} className={`ofi-nota ofi-nota--${b.tono}`}>
                 <strong>{b.titulo}</strong>
                 <p>{renderRico({ texto: b.texto, terminos, ya })}</p>
+              </div>
+            )
+          case 'recursos':
+            return (
+              <div key={i} className="ofi-nota ofi-nota--ojo">
+                <strong>{b.titulo || 'Recursos oficiales'}</strong>
+                <ul className="ofi-lista">
+                  {(b.recursos || []).map((r, j) => (
+                    <li key={j}>
+                      <a href={r.href} target="_blank" rel="noopener noreferrer">
+                        {r.titulo}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )
           default:

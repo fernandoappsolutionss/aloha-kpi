@@ -9,15 +9,13 @@
     "generadoAt": "2026-09-07T11:30:31.164Z"
   },
   "encuestas/intro": {
-    "file": "actualizaciones/encuestas/intro-6c9c74618a26.mp3",
-    "hash": "6c9c74618a26",
+    "file": "actualizaciones/encuestas/intro-83044685d617.mp3",
+    "hash": "83044685d617",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 306617,
-    "segundos": 38.266485,
-    "generadoAt": "2026-09-07T11:30:36.816Z",
-    "deshabilitado": true,
-    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
+    "bytes": 319364,
+    "segundos": 39.845442,
+    "generadoAt": "2026-09-12T16:10:36.357Z"
   },
   "encuestas/en-1": {
     "file": "actualizaciones/encuestas/en-1-77fff88773e6.mp3",
@@ -38,15 +36,13 @@
     "generadoAt": "2026-09-07T11:30:43.309Z"
   },
   "encuestas/en-3": {
-    "file": "actualizaciones/encuestas/en-3-443328b70ba3.mp3",
-    "hash": "443328b70ba3",
+    "file": "actualizaciones/encuestas/en-3-65e70d8a1b33.mp3",
+    "hash": "65e70d8a1b33",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 190006,
-    "segundos": 23.684354,
-    "generadoAt": "2026-09-07T11:30:46.211Z",
-    "deshabilitado": true,
-    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
+    "bytes": 204426,
+    "segundos": 25.49551,
+    "generadoAt": "2026-09-12T16:10:41.624Z"
   },
   "encuestas/en-4": {
     "file": "actualizaciones/encuestas/en-4-63b9ee501f8e.mp3",
@@ -58,15 +54,13 @@
     "generadoAt": "2026-09-07T11:30:49.175Z"
   },
   "encuestas/en-5": {
-    "file": "actualizaciones/encuestas/en-5-38f7cff1ecd4.mp3",
-    "hash": "38f7cff1ecd4",
+    "file": "actualizaciones/encuestas/en-5-27ae755e99db.mp3",
+    "hash": "27ae755e99db",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 190006,
-    "segundos": 23.684354,
-    "generadoAt": "2026-09-07T11:30:51.962Z",
-    "deshabilitado": true,
-    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
+    "bytes": 187707,
+    "segundos": 23.405714,
+    "generadoAt": "2026-09-12T16:10:45.886Z"
   },
   "encuestas/en-6": {
     "file": "actualizaciones/encuestas/en-6-5fab0fde1b46.mp3",
@@ -123,15 +117,13 @@
     "generadoAt": "2026-09-07T13:14:47.922Z"
   },
   "cumplimiento/cu-5": {
-    "file": "actualizaciones/cumplimiento/cu-5-090531488312.mp3",
-    "hash": "090531488312",
+    "file": "actualizaciones/cumplimiento/cu-5-fe4965fa8e60.mp3",
+    "hash": "fe4965fa8e60",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 245386,
-    "segundos": 30.6039,
-    "generadoAt": "2026-09-07T13:14:51.930Z",
-    "deshabilitado": true,
-    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
+    "bytes": 267328,
+    "segundos": 33.343855,
+    "generadoAt": "2026-09-12T16:10:52.591Z"
   },
   "cumplimiento-ayuda/asistencia_dias": {
     "file": "actualizaciones/cumplimiento-ayuda/asistencia_dias-38b6141083bc.mp3",
@@ -215,15 +207,13 @@
     "generadoAt": "2026-09-07T13:15:18.338Z"
   },
   "cumplimiento-ayuda/encuestas_satisfaccion": {
-    "file": "actualizaciones/cumplimiento-ayuda/encuestas_satisfaccion-de9a712850b7.mp3",
-    "hash": "de9a712850b7",
+    "file": "actualizaciones/cumplimiento-ayuda/encuestas_satisfaccion-641bbcf9ccf0.mp3",
+    "hash": "641bbcf9ccf0",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 273598,
-    "segundos": 34.133333,
-    "generadoAt": "2026-09-07T13:15:22.701Z",
-    "deshabilitado": true,
-    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
+    "bytes": 292615,
+    "segundos": 36.501769,
+    "generadoAt": "2026-09-12T16:10:59.257Z"
   },
   "cumplimiento-ayuda/brochure": {
     "file": "actualizaciones/cumplimiento-ayuda/brochure-b08337a5a3e9.mp3",

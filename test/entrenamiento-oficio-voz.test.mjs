@@ -115,7 +115,7 @@ test('los guiones de voz cumplen la guía: cortos, con respiración y sin markdo
   }
 })
 
-test('los 64 módulos digitales traen su guion escrito a mano', () => {
+test('los módulos digitales traen su guion escrito a mano', () => {
   const derivados = DIGITALES.filter((m) => !m.voz).map((m) => m.id)
   assert.deepEqual(
     derivados, [],
@@ -146,7 +146,7 @@ test('manifest de oficio: toda entrada apunta a un módulo real y a un mp3 en di
 })
 
 // Se salta mientras el manifest esté vacío (locución pendiente de generar) y
-// pasa a exigir los 64 digitales en cuanto exista el primer clip: una pista locutada a
+// pasa a exigir todos los digitales en cuanto exista el primer clip: una pista locutada a
 // medias es peor que ninguna, porque el alumno no sabe cuáles tienen audio.
 const manifestOficio = existsSync(join(ROOT, RUTA_MANIFEST)) ? json(RUTA_MANIFEST) : {}
 test('manifest de oficio: un clip por módulo, sin dejar ninguno mudo', {
