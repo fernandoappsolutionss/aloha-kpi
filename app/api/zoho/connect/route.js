@@ -1,6 +1,6 @@
-// GET /api/zoho/connect — arranca el login OAuth con Zoho. Solo un admin del
-// KPI puede iniciarlo; el gate del correo (fperez@teamsolutionss.com) se
-// aplica en el callback, cuando ya sabemos con qué cuenta se logueó.
+// GET /api/zoho/connect — arranca el login OAuth con Zoho. Solo el Master
+// del KPI puede iniciarlo. El callback valida por separado la cuenta externa
+// de Zoho Books (latinchinapanama@gmail.com).
 import crypto from 'node:crypto'
 import { cookies } from 'next/headers'
 import { requireCurrentMaster } from '../../../../lib/auth'

@@ -58,11 +58,21 @@ test('clasificarCentro — org de un solo centro recibe todo', () => {
   assert.equal(clasificarCentro(ORG_VA, { reference_number: 'lo que sea' }), 6)
 })
 
-test('emailAutorizado — solo el correo de Fernando conecta Zoho', () => {
-  assert.equal(emailAutorizado('fperez@teamsolutionss.com'), true)
-  assert.equal(emailAutorizado('  FPerez@Teamsolutionss.COM '), true)
+test('emailAutorizado — acepta la cuenta que reúne las organizaciones de Zoho Books', () => {
+  assert.equal(emailAutorizado('latinchinapanama@gmail.com'), true)
+  assert.equal(emailAutorizado('  LatinChinaPanama@GMAIL.COM '), true)
+})
+
+test('emailAutorizado — rechaza el correo Master del KPI como cuenta externa de Zoho', () => {
+  assert.equal(emailAutorizado('fperez@teamsolutionss.com'), false)
+  assert.equal(emailAutorizado('  FPerez@Teamsolutionss.COM '), false)
+})
+
+test('emailAutorizado — rechaza terceros y correos vacíos', () => {
   assert.equal(emailAutorizado('admin@alohapanama.com'), false)
   assert.equal(emailAutorizado(''), false)
+  assert.equal(emailAutorizado('   '), false)
+  assert.equal(emailAutorizado(null), false)
   assert.equal(emailAutorizado(undefined), false)
 })
 
