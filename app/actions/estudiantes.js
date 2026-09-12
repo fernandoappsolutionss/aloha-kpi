@@ -18,6 +18,8 @@ import { planNino, posicionPlanNino, calendarioVersionadoDe, crearMemoPlanes, en
 import { reAnclaEnDestino } from '../../lib/plan-grupo.mjs'
 import { ORIGENES_ANCLA, TIPOS_EVENTO_ANCLA, errorFechaAncla, sugerenciasAncla, topeAncla } from '../../lib/ancla-sugerencias.mjs'
 import { idsDeLote, preparaFijadoAncla } from '../../lib/ancla-lote.mjs'
+import { matriculaAnulada, validarSolicitudAnulacion } from '../../lib/anulacion-matricula.mjs'
+import { anularMatriculaEn } from '../../lib/anulacion-matricula-service.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -249,6 +251,7 @@ export async function actualizarEstudiante(centroId, id, data) {
   await requireCurrentWriteCentro(centroId)
   const [est] = await sql`SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId}`
   if (!est) return { error: 'El estudiante no pertenece a este centro.' }
+  if (matriculaAnulada(est)) return { error: 'La matrícula está anulada. Su ficha se conserva como historial y no admite cambios operativos.' }
 
   const nombre = data?.nombre !== undefined ? String(data.nombre).trim() : est.nombre
   if (!nombre) return { error: 'El nombre es requerido.' }
@@ -571,7 +574,7 @@ export async function graduarTiny(centroId, id) {
       SELECT * FROM estudiantes WHERE id = ${id} AND centro_id = ${centroId} FOR UPDATE
     `
     if (!est) return { error: 'El estudiante no pertenece a este centro.' }
-    if (est.estado === 'retirado') return { error: 'El estudiante está retirado.' }
+    if (!['activo', 'baja_potencial'].includes(est.estado)) return { error: 'El estudiante no tiene una matrícula activa.' }
     if (est.itinerario !== 'TINY' || Number(est.nivel) !== 10) return { error: 'Solo se gradúan niños de TINY nivel 10.' }
     const [centro] = await query`SELECT nombre, pais FROM centros WHERE id = ${centroId}`
     const lado = est.grupo_id
@@ -842,7 +845,11 @@ export async function marcarBajaPotencial(centroId, id, { motivo } = {}) {
   if (motivo && !MOTIVOS_RETIRO.includes(motivo)) return { error: 'Motivo inválido.' }
   const hoy = hoyISO()
   const { year, month } = ym(hoy)
-  await sql`UPDATE estudiantes SET estado = 'baja_potencial', updated_at = ${new Date().toISOString()} WHERE id = ${id}`
+  const [actualizado] = await sql`
+    UPDATE estudiantes SET estado = 'baja_potencial', updated_at = ${new Date().toISOString()}
+    WHERE id = ${id} AND centro_id = ${centroId} AND estado = 'activo' RETURNING id
+  `
+  if (!actualizado) return { error: 'El estado del niño cambió. Recarga antes de marcar la baja potencial.' }
   await sql`
     INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, motivo)
     VALUES (${id}, ${centroId}, 'baja_potencial', ${year}, ${month}, ${hoy}, ${motivo || null})
@@ -863,8 +870,32 @@ export async function revertirBajaPotencial(centroId, id) {
   if (est.retiro_programado_para) {
     return { error: `El niño tiene un retiro programado para el ${fechaIso10(est.retiro_programado_para)}: usa "Cancelar retiro programado" para revertirlo completo.` }
   }
-  await sql`UPDATE estudiantes SET estado = 'activo', updated_at = ${new Date().toISOString()} WHERE id = ${id}`
+  const [actualizado] = await sql`
+    UPDATE estudiantes SET estado = 'activo', updated_at = ${new Date().toISOString()}
+    WHERE id = ${id} AND centro_id = ${centroId} AND estado = 'baja_potencial'
+      AND retiro_programado_para IS NULL RETURNING id
+  `
+  if (!actualizado) return { error: 'El estado del niño cambió. Recarga antes de revertir la baja potencial.' }
   return { ok: true }
+}
+
+// Anulación previa al inicio: revierte matrícula y métricas, conserva evidencia.
+export async function anularMatricula(centroId, estudianteId, { fecha, motivo } = {}) {
+  const sesion = await requireCurrentWriteCentro(centroId)
+  const hoy = hoyISO()
+  const fechaAnulacion = fecha || hoy
+  const error = validarSolicitudAnulacion({ fecha: fechaAnulacion, motivo, hoy })
+  if (error) return { error }
+  const motivoAnulacion = motivo.trim()
+  try {
+    return await withTransaction((query) => anularMatriculaEn(query, {
+      centroId, estudianteId, fecha: fechaAnulacion, motivo: motivoAnulacion, hoy,
+      actor: { uid: sesion.uid, email: sesion.email || null, nombre: sesion.nombre || null },
+    }, { bloquearMesesEditables, encolarSyncCrm }))
+  } catch (error) {
+    if (['40001', '40P01'].includes(error?.code)) return { error: 'La ficha o su periodo cambió mientras anulabas. Recarga y revisa antes de intentar otra vez.' }
+    throw error
+  }
 }
 
 // Retiro INMEDIATO con motivo (g1-22..24). Guiado por asistencia: si el niño
@@ -917,6 +948,7 @@ export async function retirarEstudiante(centroId, id, { motivo, fecha, override 
     `
     if (!est) return { error: 'El estudiante no pertenece a este centro.' }
     if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
+    if (matriculaAnulada(est)) return { error: 'La matrícula está anulada y no corresponde registrarla como retiro.' }
     // (g1-23) La evidencia se evalúa DENTRO de la transacción, sobre el mismo
     // lock que toma marcarAsistencia: nadie marca un presente entre el chequeo
     // y el commit del retiro. Y cubre el mes del retiro Y LOS POSTERIORES:
@@ -991,6 +1023,7 @@ export async function programarRetiro(centroId, id, { motivo } = {}) {
     `
     if (!est) return { error: 'El estudiante no pertenece a este centro.' }
     if (est.estado === 'retirado') return { error: 'El estudiante ya está retirado.' }
+    if (matriculaAnulada(est)) return { error: 'La matrícula está anulada y no admite un retiro programado.' }
     if (est.retiro_programado_para) {
       return { error: `El niño ya tiene un retiro programado para el ${fechaIso10(est.retiro_programado_para)}. Cancélalo antes de programar otro.` }
     }

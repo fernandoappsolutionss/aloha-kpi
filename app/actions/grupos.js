@@ -229,6 +229,24 @@ export async function loadOperaciones(centroId) {
     SELECT * FROM estudiantes WHERE centro_id = ${centroId} AND estado = 'retirado'
     ORDER BY fecha_retiro DESC NULLS LAST, updated_at DESC LIMIT 30
   `
+  const anulados = await sql`
+    SELECT e.*, ev.fecha AS fecha_anulacion, ev.motivo AS motivo_anulacion,
+      reverso.detalle AS reverso_matricula
+    FROM estudiantes e
+    LEFT JOIN LATERAL (
+      SELECT id, fecha, motivo FROM estudiante_eventos
+      WHERE estudiante_id = e.id AND centro_id = ${centroId} AND tipo = 'anulacion_matricula'
+      ORDER BY id DESC LIMIT 1
+    ) ev ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT detalle FROM estudiante_eventos
+      WHERE estudiante_id = e.id AND centro_id = ${centroId} AND tipo = 'reverso_matricula'
+        AND detalle->>'anulacion_evento_id' = ev.id::text
+      ORDER BY id DESC LIMIT 1
+    ) reverso ON TRUE
+    WHERE e.centro_id = ${centroId} AND e.estado = 'matricula_anulada'
+    ORDER BY ev.fecha DESC NULLS LAST, e.id DESC
+  `
   // Niños sin grupo asignado (activos + baja potencial: siguen asistiendo).
   const sinGrupo = await sql`
     SELECT * FROM estudiantes
@@ -263,7 +281,7 @@ export async function loadOperaciones(centroId) {
   `
   const asistenciaMes = {}
   for (const a of asis) asistenciaMes[String(a.estudiante_id)] = { presentes: a.presentes, ultima: fechaIso10(a.ultima) }
-  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, sinGrupo, metas, reservas, asistenciaMes }
+  return { nombre: c?.nombre || '', grupos, coaches, salones, retirados, anulados, sinGrupo, metas, reservas, asistenciaMes }
 }
 
 export async function crearGrupo(centroId, data) {

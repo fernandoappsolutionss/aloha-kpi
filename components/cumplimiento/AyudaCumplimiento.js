@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { CUMPLIMIENTO_AYUDA } from '../../lib/cumplimiento-ayuda.mjs'
 import { CUMPLIMIENTO_LABELS } from '../../lib/checklist'
 import audios from '../../lib/entrenamiento/audio-manifest-actualizaciones.json'
+import { audioDisponible } from '../../lib/entrenamiento/audio-disponible.mjs'
 
 // Repetir, recargar u omitir el paso práctico también deja visible su ejemplo.
 export function AyudaDuranteTour({ onOpen }) {
@@ -23,7 +24,7 @@ export function BotonAyudaCumplimiento({ clave, abierta, onClick, tour }) {
 
 export default function AyudaCumplimiento({ clave, onClose, nivelTitulo: Titulo = 'h4' }) {
   const ayuda = CUMPLIMIENTO_AYUDA[clave]
-  const audio = audios[`cumplimiento-ayuda/${clave}`]
+  const audio = audioDisponible(audios[`cumplimiento-ayuda/${clave}`])
   const [falloAudio, setFalloAudio] = useState(false)
   const [intentoAudio, setIntentoAudio] = useState(0)
   const audioRef = useRef(null)

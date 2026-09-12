@@ -35,7 +35,7 @@ export async function resumenEncuestasTrimestre(centroId,anio,trimestre) {
     validarPeriodo(anio,1)
     const desde=(trimestre-1)*3+1
     const [campanas,respuestas]=await Promise.all([
-      sql`SELECT id,mes,activos,compartida_at FROM encuesta_campanas WHERE centro_id=${centroId} AND anio=${anio} AND mes BETWEEN ${desde} AND ${desde+2}`,
+      sql`SELECT id,mes,activos,compartida_at,regla_participacion FROM encuesta_campanas WHERE centro_id=${centroId} AND anio=${anio} AND mes BETWEEN ${desde} AND ${desde+2}`,
       sql`SELECT r.campana_id,r.general,r.avance,r.coach,r.atencion FROM encuesta_respuestas r JOIN encuesta_campanas c ON c.id=r.campana_id WHERE c.centro_id=${centroId} AND c.anio=${anio} AND c.mes BETWEEN ${desde} AND ${desde+2}`,
     ])
     return {meses:[desde,desde+1,desde+2].map(mes=>{

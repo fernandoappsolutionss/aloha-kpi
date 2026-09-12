@@ -2,16 +2,29 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resumenEncuesta, validarRespuesta, periodoAbierto, periodoPanama, normalizarNombre, telefonoIdentidad, textoFoda } from '../lib/encuestas/domain.mjs'
 const respuesta = { general:4, avance:3, coach:5, atencion:4, consentimiento:true }
-test('más del 50% es estricto: 74 de 148 no; 75 sí, con difusión', () => {
-  const c = { activos:148, compartida_at:'2026-09-07' }
-  assert.equal(resumenEncuesta(c, Array(74).fill(respuesta)).cumple, false)
-  assert.equal(resumenEncuesta(c, Array(75).fill(respuesta)).cumple, true)
-  assert.equal(resumenEncuesta({...c,compartida_at:null}, Array(148).fill(respuesta)).cumple, false)
+test('30% es inclusivo: 29 de 100 no; 30 sí, con difusión', () => {
+  const c = { activos:100, compartida_at:'2026-09-12' }
+  assert.equal(resumenEncuesta(c, Array(29).fill(respuesta)).cumple, false)
+  assert.equal(resumenEncuesta(c, Array(30).fill(respuesta)).cumple, true)
+  assert.equal(resumenEncuesta({...c,compartida_at:null}, Array(100).fill(respuesta)).cumple, false)
   assert.equal(resumenEncuesta(c).cumple, false)
 })
-test('cero activos no cumple ni divide por cero; población impar redondea hacia arriba', () => {
-  assert.equal(resumenEncuesta({activos:0,compartida_at:'x'}).cumple, false)
-  assert.equal(resumenEncuesta({activos:5}).necesarias,3)
+test('148 activos requieren 45 respuestas, redondeando hacia arriba', () => {
+  const c = { activos:148, compartida_at:'2026-09-12' }
+  assert.equal(resumenEncuesta(c).necesarias,45)
+  assert.equal(resumenEncuesta(c, Array(44).fill(respuesta)).cumple,false)
+  assert.equal(resumenEncuesta(c, Array(45).fill(respuesta)).cumple,true)
+})
+test('cero activos no cumple ni divide por cero; padrones pequeños exigen respuestas reales', () => {
+  for (const respuestas of [[],[respuesta]]) assert.equal(resumenEncuesta({activos:0,compartida_at:'x'},respuestas).cumple, false)
+  for (const [activos, necesarias] of [[1,1],[2,1],[3,1],[4,2],[5,2],[10,3]]) assert.equal(resumenEncuesta({activos}).necesarias,necesarias)
+})
+test('la campaña histórica conserva el 50% estricto con el que fue cerrada', () => {
+  const c = { activos:148, compartida_at:'2026-09-07', regla_participacion:'50-estricto' }
+  assert.equal(resumenEncuesta(c).necesarias,75)
+  assert.equal(resumenEncuesta(c, Array(74).fill(respuesta)).cumple,false)
+  assert.equal(resumenEncuesta(c, Array(75).fill(respuesta)).cumple,true)
+  assert.equal(resumenEncuesta(c).metaTexto,'Más del 50%')
 })
 test('satisfacción y participación no son el mismo indicador', () => {
   const r=resumenEncuesta({activos:10,compartida_at:'x'},[{...respuesta,general:1},respuesta])

@@ -373,7 +373,8 @@ test('General y supervisor consultan usuarios solo lectura', async () => {
   }
 })
 
-test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Master', async () => {
+test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Master', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
   const masterRow = {
     id: 1,
     nombre: 'Fernando',
@@ -409,7 +410,8 @@ test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Maste
   assert.equal(result.users[1].actions.unblock, true)
 })
 
-test('Master bloquea y desbloquea usuario con auditoria transaccional', async () => {
+test('Master bloquea y desbloquea usuario con auditoria transaccional', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
   const fx = writeFixture({ actor: masterActor })
   const result = await fx.service.blockUser(
     { uid: 1 },
@@ -434,18 +436,15 @@ test('Master bloquea y desbloquea usuario con auditoria transaccional', async ()
   assert.equal(fx.audit.at(-1).motivo, 'Fin del corte')
 })
 
-test('bloqueo niega auto-bloqueo, Master y fechas pasadas sin escribir', async () => {
+test('bloqueo niega auto-bloqueo, Master y fechas pasadas sin escribir', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
   for (const [usuarioId, input, pattern] of [
     [1, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: 'x' }, /propia cuenta/],
     [8, { blockedUntil: '2026-09-01T05:00:00.000Z', motivo: 'x' }, /futura/],
     [8, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: ' ' }, /motivo/],
   ]) {
     const fx = writeFixture({ actor: masterActor })
-    if (usuarioId === 1) {
-      await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input), pattern)
-    } else {
-      await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input, { now: new Date('2026-09-07T12:00:00Z') }), pattern)
-    }
+    await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input), pattern)
     assert.equal(fx.writes(), 0)
   }
 })

@@ -101,7 +101,8 @@ export async function marcarAsistencia(token, estudianteId, fecha, estado) {
     const errorMes = await bloquearMesesEditables(query, g.centro_id, [{ year: y, month: m }])
     if (errorMes) return { error: errorMes }
     const [e] = await query`
-      SELECT id FROM estudiantes WHERE id = ${estudianteId} AND grupo_id = ${g.id} FOR UPDATE
+      SELECT id FROM estudiantes WHERE id = ${estudianteId} AND grupo_id = ${g.id}
+        AND estado <> 'matricula_anulada' FOR UPDATE
     `
     if (!e) return { error: 'El niño ya no está en este grupo.' }
     if (borrar) {

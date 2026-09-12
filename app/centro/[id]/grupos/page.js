@@ -20,10 +20,11 @@ import {
 import {
   inscribirEstudiante, actualizarEstudiante, graduarTiny,
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
-  programarRetiro, cancelarRetiroProgramado,
+  programarRetiro, cancelarRetiroProgramado, anularMatricula,
   sugerenciasAnclaNinos, fijarInicioNivel, fijarInicioNivelLote,
 } from '../../../actions/estudiantes'
 import SelectorAncla from '../../../../components/SelectorAncla'
+import { registrarReversoMatricula } from '../../../actions/matricula-reversos'
 // Montones del aula (uno por itinerario+nivel: un libro, con sus cohortes de
 // arranque) y opciones que se pueden aplicar a TODO un lote a la vez.
 import { montonesConPlan, subgruposSinPlan, opcionesComunes, siguePlanDelAula } from '../../../../lib/ancla-lote.mjs'
@@ -291,6 +292,8 @@ export default function GruposPage() {
   const [retiroEst, setRetiroEst] = useState(null)
   const [progEst, setProgEst] = useState(null) // "Retirar el próximo mes" (R5)
   const [reincEst, setReincEst] = useState(null)
+  const [anularEst, setAnularEst] = useState(null)
+  const [reversoEst, setReversoEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
   const [verPlan, setVerPlan] = useState(null) // { nino, grupo } — plan individual del niño (R3)
   const planReturnFocusRef = useRef(null)
@@ -561,6 +564,7 @@ export default function GruposPage() {
     planTriggerRef: (node, id) => { if (node && String(verPlan?.nino.id) === String(id)) planReturnFocusRef.current = node },
     editarNino: (e) => { if (!canWrite) return; setStatus(''); setEditEst(e) },
     retirar: (e) => { if (!canWrite) return; setStatus(''); setRetiroEst(e) },
+    anular: (e) => { if (!canWrite) return; setStatus(''); setAnularEst(e) },
     programarRetiro: (e) => { if (!canWrite) return; setStatus(''); setProgEst(e) },
     cancelarRetiro: onCancelarRetiro,
     graduar: onGraduar,
@@ -587,7 +591,7 @@ export default function GruposPage() {
     { l: 'Grupos bajo meta', v: bajoMetaN, c: bajoMetaN > 0 ? 'var(--bad)' : 'var(--ok)' },
     { l: 'Niños activos', v: ninosActivos, c: 'var(--text)' },
   ]
-  const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones'], ['alumnos', 'Sin grupo y retirados']]
+  const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones'], ['alumnos', 'Sin grupo y retirados'], ['anuladas', 'Matrículas anuladas']]
   const FILTROS = [['todos', 'Todos'], ['bajo', 'Bajo meta'], ['estables', 'Estables'], ['kinder', 'Kinder'], ['cerradosNuevos', 'Cerrados a nuevos'], ['cerrados', 'Cerrados']]
 
   return (
@@ -733,6 +737,26 @@ export default function GruposPage() {
             onChanged={refresca} setStatus={setStatus} canWrite={canWrite} />
         )}
 
+        {tab === 'anuladas' && (
+            <div className="panel">
+              <div className="panel__head"><h2 className="panel__title">Matrículas anuladas ({data?.anulados?.length || 0})</h2></div>
+              <p style={{ padding: '0 18px 12px', fontSize: 13, color: 'var(--text-dim)' }}>Devoluciones anteriores al inicio de clases. Conservan la ficha y quedan fuera de nuevos ingresos y deserción.</p>
+              {data?.anulados?.length ? <OperationsTable label="Matrículas anuladas">
+                <thead><tr>{['Niño', 'Inscripción', 'Anulación', 'Motivo', 'Reverso de matrícula'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+                <tbody>{data.anulados.map((e) => <tr key={e.id} style={{ cursor: 'default' }}>
+                  <td style={{ fontWeight: 600 }}>{e.nombre}<div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Matrícula anulada</div></td>
+                  <td>{fmtDia(e.fecha_inscripcion)}</td><td>{fmtDia(e.fecha_anulacion)}</td>
+                  <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{e.motivo_anulacion || '—'}</td>
+                  <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{e.reverso_matricula ? <>
+                    <b>Reverso documentado</b><div>Factura: {e.reverso_matricula.factura}</div><div>Nota de crédito: {e.reverso_matricula.notaCredito}</div>
+                    <div>Devolución: {e.reverso_matricula.importe} {e.reverso_matricula.moneda}</div><div>Comprobante: {e.reverso_matricula.comprobanteDevolucion}</div>
+                    <small>Registrado por el centro; sin verificación automática en Zoho.</small>
+                  </> : <><div>Sin comprobante de reverso</div>{canWrite && <button className="btn" style={BTN_XS} onClick={() => setReversoEst(e)}>Registrar comprobantes</button>}</>}</td>
+                </tr>)}</tbody>
+              </OperationsTable> : <div className="empty">No hay matrículas anuladas.</div>}
+            </div>
+        )}
+
         {tab === 'alumnos' && (
           <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
             {data?.sinGrupo?.length > 0 ? (
@@ -746,7 +770,7 @@ export default function GruposPage() {
                         <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
                         <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
                         <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_inscripcion)}</td>
-                        <td style={{ textAlign: 'right' }}>{canWrite && <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Asignar grupo</button>}</td>
+                        <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Asignar grupo</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Anular matrícula</button></>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -774,7 +798,7 @@ export default function GruposPage() {
                         <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
                         <td><span className="pill pill--bad"><span className="dot" />{MOTIVOS_RETIRO_LABELS[e.motivo_retiro] || e.motivo_retiro || '—'}</span></td>
                         <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_retiro)}</td>
-                        <td style={{ textAlign: 'right' }}>{canWrite && <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button>}</td>
+                        <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Corregir a matrícula anulada</button></>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -862,6 +886,15 @@ export default function GruposPage() {
         <ReincorporarModal centroId={id} est={reincEst} grupos={grupos}
           onClose={() => setReincEst(null)}
           onSaved={(msg) => { setReincEst(null); setStatus('✅ ' + msg); refresca() }} />
+      )}
+      {canWrite && anularEst && (
+        <AnularMatriculaModal centroId={id} est={anularEst}
+          onClose={() => setAnularEst(null)}
+          onSaved={() => { setAnularEst(null); setTab('anuladas'); setStatus('✅ Matrícula anulada. La ficha conserva su historial y queda fuera de ingresos y deserción.'); refresca() }} />
+      )}
+      {canWrite && reversoEst && (
+        <ReversoMatriculaModal centroId={id} est={reversoEst} onClose={() => setReversoEst(null)}
+          onSaved={() => { setReversoEst(null); setStatus('✅ Comprobantes del reverso registrados.'); refresca() }} />
       )}
     </div>
   )
@@ -958,6 +991,8 @@ function AccionesNino({ e, acciones, asis, canWrite = true }) {
   return (
     <>
       <button className="btn" style={BTN_XS} onClick={() => acciones.editarNino(e)}>Editar</button>
+      <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}
+        title="Devolución antes de iniciar clases. El sistema valida las fechas y la asistencia histórica.">Anular matrícula</button>
       {e.itinerario === 'TINY' && Number(e.nivel) === 10 && (
         <button className="btn" style={{ ...BTN_XS, color: 'var(--text)', borderColor: 'var(--ts-green-line)' }} onClick={() => acciones.graduar(e)}>Graduar a Kids 5</button>
       )}
@@ -2992,7 +3027,68 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
 }
 
 // ── Modal: retiro con motivo (cuadro de deserciones) ─────────────────────────
-// Retiro INMEDIATO (R5): para el niño SIN asistencia presente este mes. La
+function AnularMatriculaModal({ centroId, est, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
+  const [fecha, setFecha] = useState(hoyISO())
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  async function save() {
+    setSaving(true); setErr('')
+    try {
+      const res = await anularMatricula(centroId, est.id, { fecha, motivo })
+      if (res.error) { setErr(res.error); return }
+      complete(res)
+    } catch {
+      setErr('No se pudo confirmar la anulación. Revisa el listado antes de volver a intentarlo.')
+    } finally { setSaving(false) }
+  }
+  return <Modal title={`Anular matrícula de ${est.nombre}`} width={540} onClose={onClose} closeDisabled={saving}
+    footer={<><button className="btn" onClick={onClose} disabled={saving}>Volver</button><button className="btn btn--primary" onClick={save} disabled={saving || !motivo.trim() || !fecha}>{saving ? 'Guardando…' : 'Confirmar matrícula anulada'}</button></>}>
+    {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+    <div style={{ display: 'grid', gap: 14, fontSize: 13, lineHeight: 1.6 }}>
+      <p>Usa esta opción cuando la familia pidió la devolución <b>antes de iniciar clases</b>. Se conserva la ficha y se elimina el efecto de esa matrícula en nuevos ingresos y deserción.</p>
+      <Field label="Fecha de la anulación *"><input name="fecha_anulacion" className="input" type="date" min={fechaIso10(est.fecha_inscripcion) || undefined} max={hoyISO()} value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
+      <Field label="Motivo y referencia de la solicitud *"><textarea name="motivo_anulacion" className="input" rows={3} maxLength={1000} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Explica la solicitud de devolución y cómo comprobaste que no inició clases." /></Field>
+      <div style={{ color: 'var(--text-dim)' }}>Si ya empezó clases, corresponde Retirado. Si es una ficha duplicada, corresponde eliminarla o fusionarla. El sistema comprueba la asistencia histórica y las fechas; una corrección que afecte meses cerrados necesita revisión de Administración.</div>
+      <div style={{ color: 'var(--text-dim)' }}>La anulación operativa conserva el historial. El reverso de la factura y la devolución del dinero deben quedar respaldados por sus comprobantes.</div>
+    </div>
+  </Modal>
+}
+
+// Constancia del reverso realizado fuera de ALOHA KPI.
+function ReversoMatriculaModal({ centroId, est, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
+  const [f, setF] = useState({ fecha: hoyISO(), factura: '', notaCredito: '', comprobanteDevolucion: '', importe: '', moneda: 'USD' })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  async function save() {
+    setSaving(true); setErr('')
+    try {
+      const res = await registrarReversoMatricula(centroId, est.id, f)
+      if (res.error) { setErr(res.error); return }
+      complete(res)
+    } catch { setErr('No se pudo confirmar el registro. Revisa el listado antes de reintentar.') }
+    finally { setSaving(false) }
+  }
+  return <Modal title={`Reverso de matrícula · ${est.nombre}`} width={540} onClose={onClose} closeDisabled={saving}
+    footer={<><button className="btn" onClick={onClose} disabled={saving}>Volver</button><button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Registrar reverso realizado'}</button></>}>
+    {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+    <div style={{ display: 'grid', gap: 14, fontSize: 13, lineHeight: 1.6 }}>
+      <p>Registra los documentos del reverso ya realizado en Zoho y de la devolución entregada a la familia. Este registro no modifica Zoho ni mueve dinero.</p>
+      <Field label="Factura de matrícula *"><input name="factura" className="input" maxLength={180} value={f.factura} onChange={(e) => set('factura', e.target.value)} /></Field>
+      <Field label="Nota de crédito / documento de anulación *"><input name="notaCredito" className="input" maxLength={180} value={f.notaCredito} onChange={(e) => set('notaCredito', e.target.value)} /></Field>
+      <Field label="Referencia del comprobante de devolución *"><input name="comprobanteDevolucion" className="input" maxLength={180} value={f.comprobanteDevolucion} onChange={(e) => set('comprobanteDevolucion', e.target.value)} /></Field>
+      <Field label="Fecha de devolución *"><input name="fecha_reverso" type="date" className="input" min={fechaIso10(est.fecha_anulacion) || undefined} max={hoyISO()} value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
+      <Field label="Importe devuelto *"><input name="importe" type="number" min="0.01" step="0.01" max="1000000" className="input" value={f.importe} onChange={(e) => set('importe', e.target.value)} /></Field>
+      <Field label="Moneda"><select name="moneda" className="input" value={f.moneda} onChange={(e) => set('moneda', e.target.value)}><option value="USD">USD</option><option value="VES">VES</option></select></Field>
+      <p style={{ color: 'var(--text-dim)' }}>Quedan registrados tu usuario y la fecha. Comprueba las referencias antes de guardar: el registro se conserva para auditoría.</p>
+    </div>
+  </Modal>
+}
+
+// Retiro INMEDIATO (R5): sin asistencia presente este mes. La
 // última asistencia ya no se escribe a mano: es derivada (g1-23). Si el server
 // detecta presente en el mes (carrera con el coach), la validación dirige al
 // botón correcto y el footer ofrece programar el retiro con el mismo motivo.
