@@ -15,7 +15,9 @@
     "modelId": "eleven_multilingual_v2",
     "bytes": 306617,
     "segundos": 38.266485,
-    "generadoAt": "2026-09-07T11:30:36.816Z"
+    "generadoAt": "2026-09-07T11:30:36.816Z",
+    "deshabilitado": true,
+    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
   },
   "encuestas/en-1": {
     "file": "actualizaciones/encuestas/en-1-77fff88773e6.mp3",
@@ -42,7 +44,9 @@
     "modelId": "eleven_multilingual_v2",
     "bytes": 190006,
     "segundos": 23.684354,
-    "generadoAt": "2026-09-07T11:30:46.211Z"
+    "generadoAt": "2026-09-07T11:30:46.211Z",
+    "deshabilitado": true,
+    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
   },
   "encuestas/en-4": {
     "file": "actualizaciones/encuestas/en-4-63b9ee501f8e.mp3",
@@ -60,7 +64,9 @@
     "modelId": "eleven_multilingual_v2",
     "bytes": 190006,
     "segundos": 23.684354,
-    "generadoAt": "2026-09-07T11:30:51.962Z"
+    "generadoAt": "2026-09-07T11:30:51.962Z",
+    "deshabilitado": true,
+    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
   },
   "encuestas/en-6": {
     "file": "actualizaciones/encuestas/en-6-5fab0fde1b46.mp3",
@@ -123,7 +129,9 @@
     "modelId": "eleven_multilingual_v2",
     "bytes": 245386,
     "segundos": 30.6039,
-    "generadoAt": "2026-09-07T13:14:51.930Z"
+    "generadoAt": "2026-09-07T13:14:51.930Z",
+    "deshabilitado": true,
+    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
   },
   "cumplimiento-ayuda/asistencia_dias": {
     "file": "actualizaciones/cumplimiento-ayuda/asistencia_dias-38b6141083bc.mp3",
@@ -213,7 +221,9 @@
     "modelId": "eleven_multilingual_v2",
     "bytes": 273598,
     "segundos": 34.133333,
-    "generadoAt": "2026-09-07T13:15:22.701Z"
+    "generadoAt": "2026-09-07T13:15:22.701Z",
+    "deshabilitado": true,
+    "motivo": "Guion actualizado a 30% inclusivo el 12 de septiembre de 2026; pendiente regenerar con la voz aprobada. Usa la guía escrita."
   },
   "cumplimiento-ayuda/brochure": {
     "file": "actualizaciones/cumplimiento-ayuda/brochure-b08337a5a3e9.mp3",

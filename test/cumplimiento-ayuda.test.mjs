@@ -23,8 +23,8 @@ test('todos los criterios de Cumplimiento tienen una guía práctica completa y 
 test('la guía distingue encuesta automática de familias de la encuesta del equipo aún manual', () => {
   const familias = CUMPLIMIENTO_AYUDA.encuestas_satisfaccion
   const equipo = CUMPLIMIENTO_AYUDA.encuestas_equipo
-  assert.match(familias.como.join(' '), /más del 50%/)
-  assert.match(familias.ejemplo, /148.*75.*74/)
+  assert.match(familias.como.join(' '), /30% o más/)
+  assert.match(familias.ejemplo, /148.*45.*44.*100.*30/)
   assert.match(familias.evidencia, /difusión registrada.*automáticamente/)
   assert.match(equipo.como.join(' '), /anónima.*supervisor.*100%.*trimestre/)
   assert.match(equipo.evidencia, /manualmente.*aún no está disponible/)
@@ -40,6 +40,11 @@ test('las 39 grabaciones nuevas corresponden a guías cortas en el clon aprobado
     assert.match(clip.texto, /<break time=/)
     for (const frase of clip.texto.split(/<break[^>]*\/>/)) assert.ok(frase.trim().length <= 135, `${clip.clave}: frase sin pausa`)
     assert.doesNotMatch(clip.texto, /\d+\s*%|\*\*|—/)
+    if (manifest[clip.clave]?.deshabilitado) {
+      assert.ok(['cumplimiento/cu-5','cumplimiento-ayuda/encuestas_satisfaccion'].includes(clip.clave))
+      assert.notEqual(manifest[clip.clave].hash, clip.hash)
+      continue
+    }
     assert.equal(manifest[clip.clave]?.hash, clip.hash, `${clip.clave}: grabación desactualizada`)
     assert.ok(existsSync(new URL(`../public/entrenamiento/${clip.file}`, import.meta.url)), `${clip.clave}: falta el MP3`)
     assert.ok(manifest[clip.clave].segundos > 5)
