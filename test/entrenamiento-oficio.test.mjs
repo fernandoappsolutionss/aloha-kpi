@@ -449,6 +449,23 @@ test('los módulos de papel no piden cuenta, no piden quiz y solo los abre quien
   }
 })
 
+// ── 10 ter. LA PUERTA AL PAQUETE DE PAPEL ─────────────────────────────────
+// Las hojas del aseo se pintaban SOLO dentro del plan de quien las reparte. El
+// Control Master no tiene plan propio —solo ve el selector de planes— así que
+// para él ese paquete no existía: no había un enlace, y la única forma de
+// llegar era abrir el plan de la Asistente y bajar hasta el final.
+test('el paquete de papel tiene puerta propia para todo el que puede imprimirlo', () => {
+  const pagina = readFileSync(join(ROOT, 'app/centro/[id]/entrenamiento/oficio/page.js'), 'utf8')
+  assert.match(pagina, /sp\?\.papel/, 'la página tiene que atender ?papel=<curso>')
+  assert.match(pagina, /paquetesDePapel[\s\S]{0,400}hojasQuePuedeImprimir/, 'los paquetes se derivan de las hojas que ese rol ya puede imprimir, no de una lista escrita a mano')
+  assert.match(pagina, /paquetesSinPuerta[\s\S]{0,200}cursosPropios\.has/, 'a quien lleva el curso en su plan no se le ofrece una segunda puerta a lo mismo')
+  // El enlace va en las DOS listas de planes: la del que solo revisa y la del
+  // que además tiene plan propio.
+  assert.ok(pagina.match(/\?papel=\$\{p\.curso\}/g)?.length >= 2, 'el paquete tiene que aparecer en el selector de planes Y en el carril de "los planes que tú firmas"')
+  // Y sigue habiendo un solo sitio donde se decide quién entra.
+  assert.match(pagina, /puedeImprimirPapel\(rol, m, MODULOS_OFICIO\)/, 'la guarda sigue siendo puedeImprimirPapel, la misma que aplica la página de destino')
+})
+
 // ── 11. UMBRAL ────────────────────────────────────────────────────────────
 test('minimoAprobacion: 80% pero siempre con derecho a un error', () => {
   assert.equal(UMBRAL, 0.8)
