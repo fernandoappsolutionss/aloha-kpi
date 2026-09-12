@@ -1,6 +1,6 @@
 // GET /api/zoho/callback — vuelta del login de Zoho. Valida el state (CSRF),
-// cambia el code por tokens, verifica que quien se logueó sea el correo
-// autorizado (fperez@teamsolutionss.com), hace un smoke contra Zoho Books y
+// cambia el code por tokens, verifica la cuenta externa de Zoho Books
+// autorizada (latinchinapanama@gmail.com), hace un smoke contra Zoho Books y
 // guarda el refresh token en zoho_conexion. Todos los errores redirigen a
 // /dashboard/zoho?error=… sin filtrar tokens.
 import { cookies } from 'next/headers'
@@ -46,7 +46,7 @@ export async function GET(request) {
   if (!tokens.access_token) return volver(request, 'error=token')
   if (!tokens.refresh_token) return volver(request, 'error=refresh')
 
-  // ¿Quién se logueó? Solo el correo autorizado puede dejar la conexión.
+  // Cuenta externa de Zoho; el acceso del Master al KPI ya se validó arriba.
   const infoRes = await fetch(`${ZOHO_ACCOUNTS}/oauth/user/info`, {
     headers: { Authorization: `Zoho-oauthtoken ${tokens.access_token}` },
   })

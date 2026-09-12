@@ -97,7 +97,8 @@ export default function ZohoPage() {
             <>
               <p style={{ marginTop: 0, lineHeight: 1.7 }}>
                 Conecta la cuenta de Zoho <b>una sola vez</b> y la Cobranza Vencida deja de digitarse a mano.
-                Solo puede conectar: <b>{estado?.emailAutorizado || 'fperez@teamsolutionss.com'}</b>.
+                Inicia sesión en Zoho con: <b>{estado?.emailAutorizado || 'latinchinapanama@gmail.com'}</b>.
+                La conexión se administra desde tu usuario Master del KPI.
               </p>
               <a className={`btn btn--primary${estado && !estado.clientConfigurado ? ' btn--disabled' : ''}`} href="/api/zoho/connect">
                 Conectar con Zoho
