@@ -26,6 +26,30 @@ const formatoDuracion = (min) => {
   return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
 
+// Las hojas de papel, en fila. El MISMO listado se pinta en tres sitios —el
+// plan de quien las reparte, la revisión de ese plan y el paquete abierto
+// aparte— y estaba copiado dos veces antes de existir el tercero.
+const ListaHojas = ({ hojas, base }) => (
+  <ol className="ofi-checksheet__lista">
+    {hojas.map((m, i) => (
+      <li key={m.id}>
+        <Link className="ofi-fila" href={`${base}/${m.id}`}>
+          <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
+          <span className="ent-route__content">
+            <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
+            <strong>{m.titulo}</strong>
+            <span className="ofi-fila__estados">
+              <span className="ent-pill">Se entrega impresa</span>
+              <span className="ent-pill">Se firma en tinta</span>
+            </span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      </li>
+    ))}
+  </ol>
+)
+
 export default async function OficioPage({ params, searchParams }) {
   const { id } = await params
   // ?revisar=<rol> solo lo usa la REVISIÓN de gerencia. Es una preferencia de
@@ -86,6 +110,48 @@ export default async function OficioPage({ params, searchParams }) {
     return hojasQuePuedeImprimir.filter((m) => cursos.has(m.curso) && CURSOS[m.curso]?.bloque === bloque)
   }
 
+  // EL PAQUETE DE PAPEL, CON PUERTA PROPIA. Pintarlo dentro del plan de quien
+  // lo reparte está bien para esa persona y deja fuera a todos los demás: el
+  // Control Master no tiene plan propio —solo ve el selector de planes— y el
+  // paquete del aseo no es el plan de nadie, así que no salía en esa lista. La
+  // única forma de llegar era abrir el plan de la Asistente y saber que las
+  // hojas estaban al final. Un curso = un paquete, derivado de las hojas que
+  // este rol YA puede imprimir: la guarda sigue siendo puedeImprimirPapel().
+  const paquetesDePapel = [...new Set(hojasQuePuedeImprimir.map((m) => m.curso))].map((curso) => ({
+    curso,
+    titulo: CURSOS[curso]?.titulo || curso,
+    hojas: hojasQuePuedeImprimir.filter((m) => m.curso === curso),
+  }))
+  const paqueteAbierto = paquetesDePapel.find((p) => p.curso === sp?.papel) || null
+  // A quien lleva el curso en SU plan no se le ofrece el atajo: ahí abajo ya
+  // tiene las hojas, y dos puertas a lo mismo en la misma pantalla confunden.
+  const cursosPropios = new Set((plan || []).map((m) => m.curso))
+  const paquetesSinPuerta = paquetesDePapel.filter((p) => !cursosPropios.has(p.curso))
+
+  if (paqueteAbierto) {
+    return shell('ready', <>
+      <Link className="tour-card__link" href={base}>← Volver a Entrenamiento de oficio</Link>
+      <div className="main__head"><div>
+        <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Entrenamiento de oficio · En papel</div>
+        <h1 className="h-title">{paqueteAbierto.titulo}</h1>
+        <p className="h-sub">
+          Este puesto <b>no tiene cuenta en el sistema</b>: no estudia en pantalla, no responde cuestionarios y no
+          acumula progreso. Su entrenamiento son estas {paqueteAbierto.hojas.length} hojas. Se imprimen, se toman con la
+          persona delante —una hoja se toma, no se reparte— y firman las dos al pie, en tinta. La hoja firmada va al
+          file del colaborador: si no está ahí, para efectos de auditoría ese entrenamiento no ocurrió.
+        </p>
+      </div></div>
+      <section className="ofi-checksheet" aria-labelledby="papel-titulo">
+        <h2 id="papel-titulo">Las {paqueteAbierto.hojas.length} hojas, en orden</h2>
+        <ListaHojas hojas={paqueteAbierto.hojas} base={base} />
+      </section>
+      <div className="ofi-nav">
+        <Link className="btn" href={base}>Volver</Link>
+        <Link className="btn" href={`${base}/glosario`}>Glosario de términos</Link>
+      </div>
+    </>)
+  }
+
   // ── REVISIÓN ────────────────────────────────────────────────────────────
   // ponytail: la revisión vive en ESTA misma ruta con ?revisar=<rol>, no en una
   // /oficio/revision/<rol> propia. El techo: no se puede enlazar un estado más
@@ -130,6 +196,18 @@ export default async function OficioPage({ params, searchParams }) {
                 <strong>{r.total} módulos · {r.minutos >= 60 ? `${Math.round(r.minutos / 60)} h` : `${r.minutos} min`} · {r.conDrill} con maniobra</strong>
                 <p className="ofi-planes-revision__descripcion">{r.cursos.map((c) => c.titulo).join(' · ')}</p>
                 <Link className="btn btn--primary" href={`${base}?revisar=${r.rol}`}>Revisar este plan <span aria-hidden="true">→</span></Link>
+              </li>
+            ))}
+            {/* El paquete de papel va en la MISMA lista que los planes: quien
+                entra aquí busca "el entrenamiento de tal puesto", y el del aseo
+                es un puesto aunque no tenga cuenta. Sin este renglón no existía
+                para el Control Master. */}
+            {paquetesSinPuerta.map((p) => (
+              <li key={p.curso}>
+                <span className="label">{p.titulo}</span>
+                <strong>{p.hojas.length} hojas · en papel · sin cuenta en el sistema</strong>
+                <p className="ofi-planes-revision__descripcion">No se estudia en pantalla: se imprime, se toma con la persona delante y se firma en tinta.</p>
+                <Link className="btn btn--primary" href={`${base}?papel=${p.curso}`}>Ver las hojas <span aria-hidden="true">→</span></Link>
               </li>
             ))}
           </ul>
@@ -194,24 +272,7 @@ export default async function OficioPage({ params, searchParams }) {
                     Esta persona no las estudia en pantalla: las imprime y se las toma a quien no tiene cuenta en el
                     sistema. Ábrelas para verlas o para mandarlas a imprimir tú.
                   </p>
-                  <ol className="ofi-checksheet__lista">
-                    {hojas.map((m, i) => (
-                      <li key={m.id}>
-                        <Link className="ofi-fila" href={`${base}/${m.id}`}>
-                          <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
-                          <span className="ent-route__content">
-                            <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
-                            <strong>{m.titulo}</strong>
-                            <span className="ofi-fila__estados">
-                              <span className="ent-pill">Se entrega impresa</span>
-                              <span className="ent-pill">Se firma en tinta</span>
-                            </span>
-                          </span>
-                          <span aria-hidden="true">→</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ol>
+                  <ListaHojas hojas={hojas} base={base} />
                 </>
               )}
             </div>
@@ -385,24 +446,7 @@ export default async function OficioPage({ params, searchParams }) {
                   No se estudian ni cuentan para tu avance. Imprímelas y tómaselas a la persona con ella delante:
                   las dos firman al pie, en tinta, y la hoja va al file del colaborador.
                 </p>
-                <ol className="ofi-checksheet__lista">
-                  {hojas.map((m, i) => (
-                    <li key={m.id}>
-                      <Link className="ofi-fila" href={`${base}/${m.id}`}>
-                        <span className="ent-route__number" aria-hidden="true">{i + 1}</span>
-                        <span className="ent-route__content">
-                          <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
-                          <strong>{m.titulo}</strong>
-                          <span className="ofi-fila__estados">
-                            <span className="ent-pill">Se entrega impresa</span>
-                            <span className="ent-pill">Se firma en tinta</span>
-                          </span>
-                        </span>
-                        <span aria-hidden="true">→</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
+                <ListaHojas hojas={hojas} base={base} />
               </>
             )}
           </div>
@@ -416,7 +460,7 @@ export default async function OficioPage({ params, searchParams }) {
         los tres— necesita las dos cosas en la misma pantalla. Antes el servidor
         elegía una: el que revisaba perdía su plan, o el que estudiaba perdía la
         lectura de los planes que audita. */}
-    {(revision || []).length > 0 && (
+    {((revision || []).length > 0 || paquetesSinPuerta.length > 0) && (
       <section className="ofi-checksheet" aria-labelledby="revisa-titulo">
         <h2 id="revisa-titulo">Los planes que tú firmas</h2>
         <p className="h-sub">
@@ -424,9 +468,17 @@ export default async function OficioPage({ params, searchParams }) {
           a esa persona y para ver qué se le está enseñando.
         </p>
         <div className="ofi-nav">
-          {revision.map((r) => (
+          {(revision || []).map((r) => (
             <Link key={r.rol} className="btn" href={`${base}?revisar=${r.rol}`}>
               Plan de {r.rolNombre} · {r.total} módulos
+            </Link>
+          ))}
+          {/* La Administradora y el Coordinador pueden imprimir el paquete del
+              aseo y no llevan ese curso en su plan: sin esto solo lo alcanzan
+              entrando al plan de la Asistente. */}
+          {paquetesSinPuerta.map((p) => (
+            <Link key={p.curso} className="btn" href={`${base}?papel=${p.curso}`}>
+              {p.titulo} · {p.hojas.length} hojas
             </Link>
           ))}
           <Link className="btn" href={`/centro/${id}/entrenamiento/firmas`}>Firmas pendientes</Link>
