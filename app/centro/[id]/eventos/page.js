@@ -18,6 +18,7 @@ import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, 
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
 import { mesClase, mesAnterior, filtrarClasesPorMes, filtrarClasesPorMomento, resumirClases } from '../../../../lib/clases-prueba.mjs'
+import { normalizeQuestion } from '../../../../lib/registration-questions.mjs'
 
 function useMobileCards() {
   const [mobile,setMobile]=useState(false)
@@ -384,7 +385,7 @@ function openEdit(ev, setEditing) {
     status: ev.status || 'published', grupo_id: ev.grupo?.id ? String(ev.grupo.id) : '',
     sales_team_id: ev.sales_team_id || '', pipeline_stage_id: ev.pipeline_stage_id || '',
     attended_stage_id: ev.attended_stage_id || '', won_stage_id: ev.won_stage_id || '',
-    registration_questions: Array.isArray(ev.registration_questions) ? ev.registration_questions : [],
+    registration_questions: Array.isArray(ev.registration_questions) ? ev.registration_questions.map(normalizeQuestion) : [],
   })
 }
 
@@ -543,15 +544,44 @@ function EventModal({ centroId, opts, initial, onClose, onSaved }) {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                 <span className="h-sub" style={{ margin: 0 }}>Preguntas extra del formulario (además de nombre, email y teléfono).</span>
-                <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('registration_questions', [...f.registration_questions, { label: '', type: 'text', required: false }])}>+ Agregar</button>
+                <button className="btn" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => set('registration_questions', [...f.registration_questions, normalizeQuestion({})])}>+ Agregar</button>
               </div>
               {f.registration_questions.length === 0 ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: 10 }}>Sin preguntas personalizadas.</div>
               ) : f.registration_questions.map((qq, i) => (
                 <fieldset key={i} className="events-question-fields">
                   <legend className="label">Pregunta personalizada {i + 1}</legend>
-                  <Field label={`Pregunta ${i + 1}`}><input name={`pregunta_${i + 1}`} className="input" placeholder="Pregunta" value={qq.label} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], label: e.target.value }; set('registration_questions', a) }} /></Field>
-                  <button className="btn" aria-label={`Quitar pregunta ${i + 1}`} onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <label className="field" style={{ flex: 1, margin: 0 }}>
+                      <span className="label">{`Pregunta ${i + 1}`}</span>
+                      <input name={`pregunta_${i + 1}`} className="input" placeholder="Escribe la pregunta…" value={qq.question} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], question: e.target.value }; set('registration_questions', a) }} />
+                    </label>
+                    <button className="btn" aria-label={`Quitar pregunta ${i + 1}`} onClick={() => set('registration_questions', f.registration_questions.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Field label="Tipo">
+                      <select name={`pregunta_${i + 1}_tipo`} className="input" style={{ minWidth: 160 }} value={qq.type} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], type: e.target.value }; set('registration_questions', a) }}>
+                        <option value="text">Texto</option>
+                        <option value="select">Selección</option>
+                        <option value="checkbox">Sí/No</option>
+                      </select>
+                    </Field>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', paddingBottom: 2 }}>
+                      <input name={`pregunta_${i + 1}_requerida`} type="checkbox" checked={qq.required} onChange={(e) => { const a = [...f.registration_questions]; a[i] = { ...a[i], required: e.target.checked }; set('registration_questions', a) }} />
+                      Requerida
+                    </label>
+                  </div>
+                  {qq.type === 'select' && (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {(qq.options || []).map((opt, oi) => (
+                        <div key={oi} style={{ display: 'flex', gap: 8 }}>
+                          <input className="input" style={{ flex: 1 }} placeholder={`Opción ${oi + 1}`} value={opt} onChange={(e) => { const a = [...f.registration_questions]; const options = [...(a[i].options || [])]; options[oi] = e.target.value; a[i] = { ...a[i], options }; set('registration_questions', a) }} />
+                          <button className="btn" aria-label={`Quitar opción ${oi + 1}`} onClick={() => { const a = [...f.registration_questions]; a[i] = { ...a[i], options: (a[i].options || []).filter((_, j) => j !== oi) }; set('registration_questions', a) }}>✕</button>
+                        </div>
+                      ))}
+                      <button className="btn" style={{ padding: '5px 12px', fontSize: 12, justifySelf: 'start' }} onClick={() => { const a = [...f.registration_questions]; a[i] = { ...a[i], options: [...(a[i].options || []), ''] }; set('registration_questions', a) }}>+ Agregar opción</button>
+                    </div>
+                  )}
                 </fieldset>
               ))}
             </div>
