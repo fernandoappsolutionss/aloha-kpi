@@ -1883,7 +1883,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .operations-role-fields, .operations-exception-fields, .events-question-fields { display: grid; gap: 8px; align-items: end; border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
 .operations-role-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .operations-exception-fields { grid-template-columns: 160px minmax(0,1fr) auto; }
-.events-question-fields { grid-template-columns: minmax(0,1fr) auto; }
+.events-question-fields { grid-template-columns: minmax(0,1fr); }
 :is(.operations-role-fields,.operations-exception-fields,.events-question-fields) legend { margin-bottom: 8px; }
 :is(.operations-role-fields,.operations-exception-fields,.events-question-fields) .field { min-width: 0; }
 @media (min-width: 1360px) { .events-metrics { grid-template-columns: repeat(6,minmax(0,1fr)); } }
