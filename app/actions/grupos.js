@@ -227,7 +227,7 @@ export async function loadOperaciones(centroId) {
   const salones = await sql`SELECT * FROM salones WHERE centro_id = ${centroId} ORDER BY nombre`
   const retirados = await sql`
     SELECT * FROM estudiantes WHERE centro_id = ${centroId} AND estado = 'retirado'
-    ORDER BY fecha_retiro DESC NULLS LAST, updated_at DESC LIMIT 30
+    ORDER BY fecha_retiro DESC NULLS LAST, updated_at DESC LIMIT 5000
   `
   const anulados = await sql`
     SELECT e.*, ev.fecha AS fecha_anulacion, ev.motivo AS motivo_anulacion,

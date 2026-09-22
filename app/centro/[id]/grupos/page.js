@@ -64,7 +64,7 @@ const ESTADO_TITULO = {
   fusionado: 'Grupo fusionado con otro: sus niños fueron movidos.',
 }
 const BANDA_PILL = { Alta: 'pill--ok', Media: 'pill--warn', Baja: 'pill--bad', Bloqueado: 'pill--bad' }
-const ORIGEN_LABELS = { clase_prueba: 'Clase de prueba', directo: 'Inscripción directa', traslado: 'Traslado de centro' }
+const ORIGEN_LABELS = { clase_prueba: 'Clase de prueba', directo: 'Inscripción directa', traslado: 'Traslado de centro', reincorporado: 'Reincorporado' }
 const ORIGEN_VENTA_LABELS = { referido: 'Referido', marketing: 'Marketing', centro: 'Centro', activaciones: 'Activaciones', medios: 'Medios' }
 const BTN_XS = { padding: '4px 10px', fontSize: 13 }
 
@@ -151,6 +151,29 @@ function coincideBusqueda(g, termino) {
     norm(g.coach?.nombre).includes(t) ||
     g.estudiantes.some((e) => norm(e.nombre).includes(t) || norm(e.representante).includes(t))
   )
+}
+
+function filtrarRetirados(retirados, termino) {
+  const t = norm(termino).trim()
+  if (!t) return retirados
+  return retirados.filter((e) => norm(e.nombre).includes(t))
+}
+
+function paginarRetirados(retirados, pagina = 1, porPagina = 20) {
+  const total = retirados.length
+  const totalPaginas = Math.max(1, Math.ceil(total / porPagina))
+  const paginaActual = Math.min(Math.max(1, pagina), totalPaginas)
+  const inicio = (paginaActual - 1) * porPagina
+  const hasta = Math.min(inicio + porPagina, total)
+  return {
+    items: retirados.slice(inicio, hasta),
+    pagina: paginaActual,
+    porPagina,
+    total,
+    desde: total ? inicio + 1 : 0,
+    hasta,
+    totalPaginas,
+  }
 }
 
 // ¿La pantalla es angosta? Debajo del breakpoint el detalle deja de ser una
@@ -274,6 +297,9 @@ export default function GruposPage() {
   }, [])
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
+  const [retiradosQuery, setRetiradosQuery] = useState('')
+  const [retiradosPagina, setRetiradosPagina] = useState(1)
+  const [retiradosPorPagina, setRetiradosPorPagina] = useState(20)
   const [openId, setOpenId] = useState(null)
   const [detalleVistas, setDetalleVistas] = useState({})
   // Workspace maestro/detalle: la lista manda, el detalle vive al lado (sticky)
@@ -325,6 +351,8 @@ export default function GruposPage() {
 
   const metas = data?.metas || { gpnMin: 8, cupoMax: 15 }
   const grupos = data?.grupos || []
+  const retiradosFiltrados = filtrarRetirados(data?.retirados || [], retiradosQuery)
+  const retiradosPaginados = paginarRetirados(retiradosFiltrados, retiradosPagina, retiradosPorPagina)
   const activos = grupos.filter((g) => g.estado === 'activo')
   const bajoMetaN = activos.filter((g) => underMeta(g, metas.gpnMin)).length
   const prom = promedios(grupos, metas.gpnMin)
@@ -787,22 +815,50 @@ export default function GruposPage() {
               <div className="panel">
                 <div className="panel__head">
                   <h2 className="panel__title">Retirados recientes</h2>
-                  <span className="label">Últimos {data.retirados.length}</span>
+                  <span className="label">{retiradosPaginados.total
+                    ? `Mostrando ${retiradosPaginados.desde}–${retiradosPaginados.hasta} de ${retiradosPaginados.total}`
+                    : '0 encontrados'}</span>
                 </div>
-                <OperationsTable label="Retirados recientes">
-                  <thead><tr>{['Niño', 'Nivel', 'Motivo', 'Fecha retiro', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
-                  <tbody>
-                    {data.retirados.map((e) => (
-                      <tr key={e.id} style={{ cursor: 'default' }}>
-                        <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
-                        <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
-                        <td><span className="pill pill--bad"><span className="dot" />{MOTIVOS_RETIRO_LABELS[e.motivo_retiro] || e.motivo_retiro || '—'}</span></td>
-                        <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_retiro)}</td>
-                        <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Corregir a matrícula anulada</button></>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </OperationsTable>
+                <div className="grp-toolbar" style={{ padding: '0 18px' }}>
+                  <div className="grp-search">
+                    <span className="grp-search__icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                    </span>
+                    <input className="input" value={retiradosQuery} onChange={(e) => { setRetiradosQuery(e.target.value); setRetiradosPagina(1) }}
+                      placeholder="Buscar niño retirado…" aria-label="Buscar niño retirado" />
+                    {retiradosQuery && <button className="grp-search__clear" onClick={() => { setRetiradosQuery(''); setRetiradosPagina(1) }} aria-label="Limpiar búsqueda">✕</button>}
+                  </div>
+                  <label className="label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    Por página
+                    <select className="input" value={retiradosPorPagina} onChange={(e) => { setRetiradosPorPagina(Number(e.target.value)); setRetiradosPagina(1) }}
+                      aria-label="Retirados por página" style={{ width: 'auto', padding: '8px 28px 8px 10px' }}>
+                      {[10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {retiradosPaginados.total > 0 ? <>
+                  <OperationsTable label="Retirados recientes">
+                    <thead><tr>{['Niño', 'Nivel', 'Motivo', 'Fecha retiro', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
+                    <tbody>
+                      {retiradosPaginados.items.map((e) => (
+                        <tr key={e.id} style={{ cursor: 'default' }}>
+                          <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
+                          <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
+                          <td><span className="pill pill--bad"><span className="dot" />{MOTIVOS_RETIRO_LABELS[e.motivo_retiro] || e.motivo_retiro || '—'}</span></td>
+                          <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_retiro)}</td>
+                          <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Corregir a matrícula anulada</button></>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </OperationsTable>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 18px 16px', flexWrap: 'wrap' }}>
+                    <span className="label" style={{ marginRight: 4 }}>Página {retiradosPaginados.pagina} de {retiradosPaginados.totalPaginas}</span>
+                    <button className="btn" style={BTN_XS} disabled={retiradosPaginados.pagina === 1}
+                      onClick={() => setRetiradosPagina(retiradosPaginados.pagina - 1)}>Anterior</button>
+                    <button className="btn" style={BTN_XS} disabled={retiradosPaginados.pagina === retiradosPaginados.totalPaginas}
+                      onClick={() => setRetiradosPagina(retiradosPaginados.pagina + 1)}>Siguiente</button>
+                  </div>
+                </> : <div className="empty">Ningún retirado coincide con “{retiradosQuery}”.</div>}
               </div>
             ) : (
               <div className="panel">

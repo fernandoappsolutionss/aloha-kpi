@@ -1126,7 +1126,7 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
     if (errorGrupo) return { error: errorGrupo }
     await query`
       UPDATE estudiantes SET estado = 'activo', grupo_id = ${grupoId}, status_plataforma = 'INCLUIR',
-        motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}
+        origen = COALESCE(origen, 'reincorporado'), motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}
       WHERE id = ${id}
     `
     await query`
