@@ -618,3 +618,49 @@ test('un grupo veterano con fecha PASADA no re-estrena a su gente al cambiar de 
   assert.equal(fechaInicioOperativa(estudiante, grupo, inscripcion), '2025-03-04')
   assert.equal(iniciosClaseMes([estudiante], [grupo], [inscripcion], 2026, 8).length, 0)
 })
+
+// Brisas sep-2026: niña vendida en agosto al grupo 99 (inicia 19-sep), sacada a
+// "Sin grupo" el 21-sep sin un solo presente porque arranca en octubre, y
+// colocada el 23-sep en el grupo 101 (inicia 24-oct). No es nueva de septiembre.
+test('sacada del grupo sin haber asistido en su mes de inicio sigue a la nueva asignacion', () => {
+  const g99 = { id: 99, estado: 'activo', fecha_inicio_clases: '2026-09-19' }
+  const g101 = { id: 101, estado: 'activo', fecha_inicio_clases: '2026-10-24' }
+  const eventos = [
+    { id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-08-31', a_grupo_id: 99 },
+    { id: 2, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-21', de_grupo_id: 99, a_grupo_id: null },
+    { id: 3, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-23', de_grupo_id: null, a_grupo_id: 101 },
+  ]
+  const nina = { id: 1, estado: 'activo', grupo_id: 101, fecha_inscripcion: '2026-08-31', ultima_asistencia: null }
+  assert.equal(iniciosClaseMes([nina], [g99, g101], eventos, 2026, 9).length, 0)
+  assert.equal(iniciosClaseMes([nina], [g99, g101], eventos, 2026, 10).length, 1)
+  // Solo desvinculada (aún sin grupo): no inicia en ningún mes.
+  assert.equal(iniciosClaseMes([{ ...nina, grupo_id: null }], [g99, g101], eventos.slice(0, 2), 2026, 9).length, 0)
+  // Con un presente registrado sí inició en el 99: el cambio posterior no la re-estrena.
+  assert.equal(iniciosClaseMes([{ ...nina, ultima_asistencia: '2026-09-19' }], [g99, g101], eventos, 2026, 9).length, 1)
+  // Sin dato de asistencia (el caller no la consultó) rige la regla vieja.
+  const { ultima_asistencia, ...sinDato } = nina
+  assert.equal(iniciosClaseMes([sinDato], [g99, g101], eventos, 2026, 9).length, 1)
+})
+
+test('un cambio en un mes posterior al inicio no re-estrena a un veterano sin asistencia', () => {
+  const viejo = { id: 7, estado: 'activo', fecha_inicio_clases: '2026-08-14' }
+  const otro = { id: 8, estado: 'activo', fecha_inicio_clases: '2026-06-01' }
+  const eventos = [
+    { id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-08-10', a_grupo_id: 7 },
+    { id: 2, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-02', de_grupo_id: 7, a_grupo_id: 8 },
+  ]
+  const nino = { id: 1, estado: 'activo', grupo_id: 8, fecha_inscripcion: '2026-08-10', ultima_asistencia: null }
+  assert.equal(iniciosClaseMes([nino], [viejo, otro], eventos, 2026, 8).length, 1)
+  assert.equal(iniciosClaseMes([nino], [viejo, otro], eventos, 2026, 9).length, 0)
+})
+
+test('cambiarse antes de arrancar toma el inicio del grupo destino', () => {
+  const tarde = { id: 142, estado: 'activo', fecha_inicio_clases: '2026-10-17' }
+  const antes = { id: 123, estado: 'activo', fecha_inicio_clases: '2026-09-26' }
+  const eventos = [
+    { id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-09-05', a_grupo_id: 142 },
+    { id: 2, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-19', de_grupo_id: 142, a_grupo_id: 123 },
+  ]
+  const nino = { id: 1, estado: 'activo', grupo_id: 123, fecha_inscripcion: '2026-09-05', ultima_asistencia: '2026-09-26' }
+  assert.equal(iniciosClaseMes([nino], [tarde, antes], eventos, 2026, 9)[0]?.fechaInicio, '2026-09-26')
+})

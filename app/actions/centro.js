@@ -154,7 +154,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     SELECT id, estado, fecha_inicio_clases, itinerario_clases FROM grupos WHERE centro_id = ${centroId}
   `
   const estudiantesProyeccion = await sql`
-    SELECT id, grupo_id, estado, fecha_inscripcion FROM estudiantes WHERE centro_id = ${centroId}
+    SELECT id, grupo_id, estado, fecha_inscripcion, ultima_asistencia FROM estudiantes WHERE centro_id = ${centroId}
   `
   const eventosProyeccion = await sql`
     SELECT id, estudiante_id, tipo, fecha, a_grupo_id
