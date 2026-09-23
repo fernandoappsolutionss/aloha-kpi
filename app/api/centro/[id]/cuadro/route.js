@@ -1,13 +1,14 @@
 // GET /api/centro/[id]/cuadro?year=&month= — descarga el Cuadro de Negocio del
 // mes en Excel (ROYALTIES / CANTIDAD DE NIÑOS / NIÑOS RETIRADOS /
-// INICIOS DE CLASE),
+// INICIOS DE CLASE / VENTAS DEL MES),
 // replicando el formato del cuadro real que se entrega a la Junta.
 import ExcelJS from 'exceljs'
 import { sql } from '../../../../../lib/db'
 import { requireCentroAccess } from '../../../../../lib/auth'
-import { MOTIVOS_RETIRO_LABELS } from '../../../../../lib/operaciones'
+import { MOTIVOS_RETIRO_LABELS, fechaIso10 } from '../../../../../lib/operaciones'
 import { cargarDatosCuadroExportacion, grupoPedidoCongelado } from '../../../../../lib/cuadro-export.mjs'
 import { calcularCuadro, leerSnapshotCuadro } from '../../../../../lib/cuadro-snapshot'
+import { calcularKpiAutoMes } from '../../../../../lib/kpi-semanal-service'
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 
@@ -223,6 +224,33 @@ export async function GET(request, { params }) {
     fila(h4, ['TOTAL', '', '', '', iniciosClase.length, '', '', '', '', '', ''], { bold: true, fill: FILL_TOTAL })
   } else {
     fila(h4, ['DECLARACIÓN DISPONIBLE DESDE AGOSTO 2026'], { bold: true, fill: FILL_TOTAL })
+  }
+
+  // ── Hoja 5: VENTAS DEL MES ────────────────────────────────────────────────
+  // Los nombres detrás de "Nuevos ingresos - Ventas" del KPI: el MISMO cálculo
+  // (calcularKpiAutoMes), así la lista y el número nunca descuadran. Sin
+  // traslados ni matrículas anuladas, igual que el KPI.
+  const auto = await calcularKpiAutoMes(id, year, month)
+  const h5 = wb.addWorksheet('VENTAS DEL MES')
+  h5.columns = [{ width: 32 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 28 }, { width: 14 }]
+  fila(h5, [`VENTAS DEL MES (KPI) — ${mesNombre} ${year}`], { bold: true })
+  fila(h5, [])
+  if (auto.estado === 'auto') {
+    const fichas = new Map((await sql`
+      SELECT e.id, e.nombre, e.representante, e.telefono, g.numero
+      FROM estudiantes e LEFT JOIN grupos g ON g.id = e.grupo_id
+      WHERE e.centro_id = ${id}
+    `).map((e) => [String(e.id), e]))
+    fila(h5, ['NIÑO', 'FECHA DE VENTA', 'ORIGEN', 'GRUPO HOY', 'REPRESENTANTE', 'TELÉFONO'], { bold: true, fill: FILL_HEADER })
+    const ventas = [...auto.ventas].sort((a, b) => String(fechaIso10(a.fecha)).localeCompare(String(fechaIso10(b.fecha))))
+    for (const v of ventas) {
+      const e = fichas.get(String(v.estudiante_id)) || {}
+      fila(h5, [e.nombre || `#${v.estudiante_id}`, fechaIso10(v.fecha), v.origen || '', e.numero ? `GRUPO ${e.numero}` : 'SIN GRUPO', e.representante || '', e.telefono || ''])
+    }
+    fila(h5, ['TOTAL', ventas.length], { bold: true, fill: FILL_TOTAL })
+    if (auto.traslados) fila(h5, [`Traslados (no cuentan como venta): ${auto.traslados}`])
+  } else {
+    fila(h5, [auto.estado === 'manual_pre_gate' ? 'VENTAS DIGITADAS A MANO ANTES DE AGOSTO 2026' : `NO SE PUDO CALCULAR: ${auto.mensaje || ''}`], { bold: true, fill: FILL_TOTAL })
   }
 
   const buffer = await wb.xlsx.writeBuffer()

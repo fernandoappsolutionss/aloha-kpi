@@ -41,7 +41,7 @@ export async function getHigienePendientes(centroId) {
       FROM grupos WHERE centro_id = ${id}
     `,
     sql`
-      SELECT id, nombre, grupo_id, estado, fecha_inscripcion, created_at
+      SELECT id, nombre, grupo_id, estado, fecha_inscripcion, created_at, ultima_asistencia
       FROM estudiantes
       WHERE centro_id = ${id} AND estado IN ('activo', 'baja_potencial')
     `,
