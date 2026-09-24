@@ -2996,10 +2996,15 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
 // ── Modal: editar niño (datos, nivel y grupo) ────────────────────────────────
 function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   const complete = useDialogCallback(onSaved, centroId)
+  // La fecha que cuenta el KPI es la de la venta (evento canónico), no la de la
+  // ficha: un niño colocado después de inscrito estrena venta al colocarlo.
+  // Solo viaja si el usuario la cambia.
+  const fechaVentaInicial = isoDia(est.fecha_venta || est.fecha_inscripcion)
   const [f, setF] = useState({
     nombre: est.nombre || '', itinerario: est.itinerario, nivel: Number(est.nivel) || 1, grupo_id: est.grupo_id || '',
     fecha_cierre_nivel: isoDia(est.fecha_cierre_nivel), representante: est.representante || '', correo: est.correo || '',
     telefono: est.telefono || '', notas: est.notas || '', origen_venta: est.origen_venta || '',
+    fecha_inscripcion: fechaVentaInicial,
   })
   // (g1-11) fecha_cierre_nivel = override manual: SOLO viaja si se tocó en
   // esta sesión del modal (campo ausente = no tocar). Vaciarla tocada limpia
@@ -3023,6 +3028,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
         telefono: f.telefono, notas: f.notas, origen_venta: f.origen_venta,
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
+      if (f.fecha_inscripcion && f.fecha_inscripcion !== fechaVentaInicial) data.fecha_inscripcion = f.fecha_inscripcion
       const res = await actualizarEstudiante(centroId, est.id, data)
       if (res.error) { setErr(res.error); return }
       complete(`${f.nombre.trim()} actualizado.`)
@@ -3066,6 +3072,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
             {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
           </select>
         </Field>
+        <Field label="Fecha de inscripción (venta)"><input name="fecha_inscripcion" type="date" className="input" max={hoyISO()} value={f.fecha_inscripcion} onChange={(e) => set('fecha_inscripcion', e.target.value)} /></Field>
         <Field label="Cierre de nivel (override)">
           <input name="fecha_cierre_nivel" type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />

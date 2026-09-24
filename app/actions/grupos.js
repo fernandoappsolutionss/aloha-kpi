@@ -90,10 +90,17 @@ async function cargarGrupos(centroId) {
     SELECT h.* FROM grupo_horarios h JOIN grupos g ON g.id = h.grupo_id
     WHERE g.centro_id = ${centroId} ORDER BY h.dia, h.hora_inicio
   `
+  // fecha_venta = la inscripción canónica que cuenta el KPI; puede diferir de
+  // la ficha (pendiente colocado después) y el modal de edición la corrige.
   const kids = await sql`
-    SELECT * FROM estudiantes
-    WHERE centro_id = ${centroId} AND estado IN ('activo', 'baja_potencial')
-    ORDER BY nombre
+    SELECT e.*, (
+      SELECT ev.fecha FROM estudiante_eventos ev
+      WHERE ev.estudiante_id = e.id AND ev.tipo = 'inscripcion'
+      ORDER BY ev.fecha, ev.id LIMIT 1
+    ) AS fecha_venta
+    FROM estudiantes e
+    WHERE e.centro_id = ${centroId} AND e.estado IN ('activo', 'baja_potencial')
+    ORDER BY e.nombre
   `
   const coachPorId = new Map(coaches.map((co) => [String(co.id), co]))
   const armados = grupos
