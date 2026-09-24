@@ -9,10 +9,13 @@ function AvisoDescuadre({ descuadre }) {
   if (!descuadre) return null
   return (
     <p role="alert" className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
-      ⚠️ Al estado de cuenta le falta un movimiento de {usdExacto(descuadre.monto)} al {fechaCorta(descuadre.fecha)}: el saldo se toma del resumen del banco. Baja el estado oficial para identificarlo.
+      ⚠️ Al estado de cuenta le falta {Number(descuadre.monto) < 0 ? 'un débito' : 'un crédito'} de {usdExacto(Math.abs(Number(descuadre.monto)))}{descuadre.fecha ? ` al ${fechaCorta(descuadre.fecha)}` : ''}: el saldo se toma del resumen del banco. Baja el estado oficial para identificarlo.
     </p>
   )
 }
+
+// Un saldo sin fecha no sirve de ancla (la tabla exige los dos): sin ambos no hay "solo saldo".
+const saldoUtil = (saldo) => Boolean(saldo?.fecha) && saldo.monto !== null && saldo.monto !== undefined
 
 export function ImportarExtracto({ onCambio }) {
   const input = useRef(null)
@@ -23,17 +26,20 @@ export function ImportarExtracto({ onCambio }) {
   const [descuadreGuardado, setDescuadreGuardado] = useState(null)
   const [ocupado, setOcupado] = useState(false)
 
+  const limpiarInput = () => { if (input.current) input.current.value = '' }
+
   async function revisar(file) {
     setArchivo(file); setVista(null); setError(''); setDescuadreGuardado(null); setEstado('Leyendo el archivo…'); setOcupado(true)
     try {
       const fd = new FormData(); fd.set('archivo', file)
       const r = await previsualizarExtracto(fd)
       setEstado('')
-      if (r?.error) setError(r.error)
+      if (r?.error) { setError(r.error); setArchivo(null); limpiarInput() }
       else setVista(r)
     } catch {
       setEstado('')
       setError('No se pudo leer el archivo. Intenta de nuevo.')
+      setArchivo(null); limpiarInput()
     } finally {
       setOcupado(false)
     }
@@ -47,10 +53,12 @@ export function ImportarExtracto({ onCambio }) {
       const r = await confirmarExtracto(fd)
       setEstado('')
       if (r?.error) { setError(r.error); return }
-      setVista(null); setArchivo(null)
-      if (input.current) input.current.value = ''
+      const cuenta = vista?.cuenta || 'la cuenta'
+      setEstado(r.nuevos === 0 && saldoUtil(vista?.saldo)
+        ? `✅ Saldo del banco actualizado al ${fechaCorta(vista.saldo.fecha)} (${cuenta}).`
+        : `✅ ${cuenta}: ${r.nuevos} movimientos nuevos (${r.duplicados} ya estaban).`)
+      setVista(null); setArchivo(null); limpiarInput()
       setDescuadreGuardado(r.descuadre || null)
-      setEstado(`✅ ${r.nuevos} movimientos nuevos (${r.duplicados} ya estaban).`)
       onCambio()
     } catch {
       setEstado('')
@@ -60,7 +68,7 @@ export function ImportarExtracto({ onCambio }) {
     }
   }
 
-  const soloSaldo = vista && vista.nuevos === 0 && vista.saldo
+  const soloSaldo = Boolean(vista) && vista.nuevos === 0 && saldoUtil(vista.saldo)
 
   return (
     <section className="card" style={{ padding: 20, marginBottom: 16 }} aria-labelledby="caja-subir">
@@ -81,7 +89,7 @@ export function ImportarExtracto({ onCambio }) {
           </p>
           <p>{vista.nuevos} nuevos · {vista.duplicados} ya cargados · {vista.porClasificar} quedarán por clasificar.</p>
           <AvisoDescuadre descuadre={vista.descuadre} />
-          <button className="btn btn--primary" type="button" onClick={guardar} disabled={ocupado || (vista.nuevos === 0 && !vista.saldo)}>
+          <button className="btn btn--primary" type="button" onClick={guardar} disabled={ocupado || (vista.nuevos === 0 && !soloSaldo)}>
             {soloSaldo ? 'Guardar solo el saldo del banco' : `Guardar ${vista.nuevos} movimientos`}
           </button>
         </div>

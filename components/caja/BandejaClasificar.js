@@ -13,17 +13,19 @@ function Fila({ m, clases, onCambio }) {
   const [guardando, setGuardando] = useState(false)
   async function guardar(e) {
     e.preventDefault()
+    if (guardando) return
     setError(''); setGuardando(true)
     try {
       const r = await clasificarMovimiento({ id: m.id, clase, categoria: categoria || clases[clase], patron: regla ? patron : null })
-      if (r?.error) setError(r.error)
-      else onCambio()
+      if (r?.error) { setError(r.error); setGuardando(false); return }
+      // Éxito: el botón queda apagado hasta que la recarga saque la fila (sin doble envío).
+      onCambio()
     } catch {
       setError('No se pudo guardar. Intenta de nuevo.')
-    } finally {
       setGuardando(false)
     }
   }
+  const quien = `movimiento del ${fechaCorta(m.fecha)} por ${usdExacto(m.monto)}`
   return (
     <tr>
       <td style={{ whiteSpace: 'nowrap' }}>{fechaCorta(m.fecha)}</td>
@@ -32,16 +34,16 @@ function Fila({ m, clases, onCambio }) {
       <td style={{ minWidth: 200, maxWidth: 320, overflowWrap: 'anywhere' }}>{m.memo}</td>
       <td>
         <form onSubmit={guardar} style={{ display: 'grid', gap: 6, minWidth: 220 }}>
-          <select className="select" aria-label="Clase" value={clase} onChange={(e) => setClase(e.target.value)} required style={{ fontSize: 16 }}>
+          <select className="select" aria-label={`Clase del ${quien}`} value={clase} onChange={(e) => setClase(e.target.value)} required style={{ fontSize: 16 }}>
             <option value="">Elegir…</option>
             {Object.entries(clases).filter(([k]) => k !== 'por_clasificar').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input className="input" aria-label="Categoría" placeholder="Categoría (opcional)" value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ fontSize: 16 }} />
+          <input className="input" aria-label={`Categoría del ${quien} (opcional)`} placeholder="Categoría (opcional)" value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ fontSize: 16 }} />
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
-            <input type="checkbox" checked={regla} onChange={(e) => setRegla(e.target.checked)} /> Crear regla con este texto
+            <input type="checkbox" aria-label={`Crear regla con el texto del ${quien}`} checked={regla} onChange={(e) => setRegla(e.target.checked)} /> Crear regla con este texto
           </label>
-          {regla && <input className="input" aria-label="Texto de la regla" value={patron} onChange={(e) => setPatron(e.target.value)} style={{ fontSize: 16 }} />}
-          <button className="btn" type="submit" disabled={guardando}>Guardar</button>
+          {regla && <input className="input" aria-label={`Texto de la regla para el ${quien}`} value={patron} onChange={(e) => setPatron(e.target.value)} style={{ fontSize: 16 }} />}
+          <button className="btn" type="submit" disabled={guardando} aria-label={`Guardar clasificación del ${quien}`}>{guardando && !error ? 'Guardando…' : 'Guardar'}</button>
           {error && <span role="alert" className="alert alert--error">{error}</span>}
         </form>
       </td>
