@@ -82,3 +82,12 @@ DETALLE DE TRANSACCIONES
   assert.equal(new Set(ids).size, 3)
   assert.equal(r.descuadre, null)
 })
+
+test('descarta filas en 0.00 (caso real mayo 2026: "ITBMS" sin monto) sin romper el saldo corrido', () => {
+  // La tabla exige monto <> 0; el OFX ya las descarta igual.
+  const conCero = TEXTO.replace('02-FEB-26 REMISIÓN', '02-FEB-26 ITBMS CLAVE 016030673 0.00 6,713.73\n02-FEB-26 REMISIÓN')
+  const r = parseStGeorgesTexto(conCero)
+  assert.equal(r.movimientos.length, 3)
+  assert.ok(r.movimientos.every((m) => m.monto !== 0))
+  assert.equal(r.descuadre, null)
+})
