@@ -68,7 +68,7 @@ export default function CajaPage() {
               {res && <div><div className="label">Reserva de impuesto</div><b>{usd(res.baldesEstado.reservaImpuesto)}</b></div>}
               {res && <div><div className="label">Cobro promedio / mes</div><b>{usd(res.perfil.promedioMensual)}</b>{res.perfil.estimado && <div className="h-sub" style={{ margin: 0 }}>(estimado desde Zoho — sube extractos)</div>}</div>}
               {res?.balde && <div><div className="label">Baldes vigentes</div><b>Dueño {res.balde.dueno_pct}% · Impuesto {res.balde.impuesto_pct}%</b></div>}
-              <div><div className="label">Línea de tormenta disponible</div><b>{usd(datos.lineaDisponible)}</b></div>
+              <div><div className="label">Línea de tormenta disponible</div><b>{usd(datos.lineaDisponible)}</b>{datos.lineaUsada > 0 && <div className="h-sub" style={{ margin: 0 }}>usada: {usd(datos.lineaUsada)}</div>}</div>
             </div>
             {viejas.length > 0 && (
               <p role="alert" className="alert" style={{ marginTop: 12, background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>

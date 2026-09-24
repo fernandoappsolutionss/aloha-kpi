@@ -8,7 +8,7 @@ import {
 import { leerExtracto } from '../../lib/caja/extracto.mjs'
 import { clasificar, CLASES, CLASES_FUERA_DE_CURVA } from '../../lib/caja/reglas.mjs'
 import { hoyPanama, sumarDias, lunesDe } from '../../lib/caja/semanas.mjs'
-import { perfilIngresos, perfilConRespaldo, estadoBaldes, calcularCurva, consolidar } from '../../lib/caja/curva.mjs'
+import { perfilIngresos, perfilConRespaldo, estadoBaldes, calcularCurva, consolidar, lineaUsada } from '../../lib/caja/curva.mjs'
 import { INGRESO_REFERENCIA } from '../../lib/caja/semilla-datos.mjs'
 
 const EMPRESAS = ['altavia', 'ff']
@@ -28,20 +28,23 @@ export async function getCaja() {
   try {
     await requireCurrentCaja()
     const hoy = hoyPanama()
-    // La historia cubre el perfil de ingresos (3 meses cerrados) y, si los baldes son
-    // más viejos, arranca en el primer balde: si no, el pendiente del dueño y la
-    // reserva de impuesto se calcularían sobre una historia recortada.
-    const cargarBaldesYMovs = listarBaldes().then(async (baldes) => {
-      const primerBalde = baldes.map((b) => b.vigente_desde).sort()[0]
-      const base = sumarDias(hoy, -150)
-      const desde = primerBalde && primerBalde < base ? primerBalde : base
-      return [baldes, await movimientosDesde(desde)]
+    // La historia cubre el perfil de ingresos (3 meses cerrados) y arranca antes si
+    // hace falta: en el primer balde (si no, el pendiente del dueño y la reserva de
+    // impuesto saldrían de una historia recortada) y en el saldo base de la línea
+    // (si no, los giros viejos dejarían de contar como uso).
+    const cargarBase = Promise.all([listarCuentas(), listarBaldes()]).then(async ([cuentas, baldes]) => {
+      const lineaBase = cuentas.find((c) => c.tipo === 'linea_credito')?.base_fecha
+      const desde = [sumarDias(hoy, -150), baldes.map((b) => b.vigente_desde).sort()[0], lineaBase].filter(Boolean).sort()[0]
+      return [cuentas, baldes, await movimientosDesde(desde)]
     })
-    const [cuentas, [baldes, movs], compromisos, ajustes, pendientes] = await Promise.all([
-      listarCuentas(), cargarBaldesYMovs, listarCompromisos(), listarAjustes(lunesDe(hoy)), porClasificar(),
+    const [[cuentas, baldes, movs], compromisos, ajustes, pendientes] = await Promise.all([
+      cargarBase, listarCompromisos(), listarAjustes(lunesDe(hoy)), porClasificar(),
     ])
     const linea = cuentas.find((c) => c.tipo === 'linea_credito')
-    const lineaDisponible = linea ? r2((linea.limite || 0) - ((linea.base || 0) + linea.posterior)) : 0
+    // El uso sale de los giros/abonos (clase 'linea') en las cuentas operativas: la
+    // cuenta de la línea casi nunca tiene extracto propio cargado.
+    const usada = linea ? lineaUsada({ base: linea.base, baseFecha: linea.base_fecha }, movs) : 0
+    const lineaDisponible = linea ? r2(Math.max(0, (Number(linea.limite) || 0) - usada)) : 0
     const curvas = {}
     const resumen = {}
     for (const empresa of EMPRESAS) {
@@ -62,7 +65,7 @@ export async function getCaja() {
       resumen[empresa] = { saldoHoy, perfil, baldesEstado, balde: baldesEmpresa.at(-1) || null }
     }
     curvas.consolidado = consolidar(curvas.altavia, curvas.ff)
-    return { hoy, cuentas, curvas, resumen, lineaDisponible, compromisos, pendientes, clases: CLASES }
+    return { hoy, cuentas, curvas, resumen, lineaDisponible, lineaUsada: usada, compromisos, pendientes, clases: CLASES }
   } catch (e) { return fallo(e) }
 }
 

@@ -57,3 +57,29 @@ test('getCaja sin historia de cobro proyecta con la referencia de Zoho y lo marc
   assert.equal(r.resumen.ff.perfil.estimado, false)
   assert.equal(r.resumen.ff.perfil.promedioMensual, 500)
 })
+
+test('getCaja descuenta de la línea los giros de clase linea hechos en las cuentas operativas', async () => {
+  let desdePedido = null
+  const { getCaja } = acciones({
+    requireCurrentCaja: async () => ({ id: 1 }),
+    hoyPanama: () => '2027-06-01',
+    listarCuentas: async () => [
+      { id: 1, empresa: 'altavia', tipo: 'operativa', base: 1000, posterior: 0, base_fecha: '2027-05-30' },
+      { id: 9, empresa: 'ff', tipo: 'linea_credito', limite: 50000, base: 0, posterior: 0, base_fecha: '2026-09-24' },
+    ],
+    listarBaldes: async () => [],
+    movimientosDesde: async (desde) => {
+      desdePedido = desde
+      return [{ cuenta_id: 1, empresa: 'altavia', cuenta_tipo: 'operativa', fecha: '2026-10-05', monto: 10000, clase: 'linea' }]
+    },
+    listarCompromisos: async () => [],
+    listarAjustes: async () => [],
+    porClasificar: async () => [],
+  })
+  const r = await getCaja()
+  assert.equal(r.error, undefined)
+  assert.ok(desdePedido <= '2026-09-24', `la historia arranca en el saldo base de la línea (pidió ${desdePedido})`)
+  assert.equal(r.lineaUsada, 10000)
+  assert.equal(r.lineaDisponible, 40000)
+  assert.equal(r.curvas.altavia.lineaDisponible, 40000)
+})

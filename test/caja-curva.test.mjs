@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { perfilIngresos, estadoBaldes, calcularCurva, consolidar, perfilConRespaldo } from '../lib/caja/curva.mjs'
+import { perfilIngresos, estadoBaldes, calcularCurva, consolidar, perfilConRespaldo, lineaUsada } from '../lib/caja/curva.mjs'
 import { INGRESO_REFERENCIA } from '../lib/caja/semilla-datos.mjs'
 
 const cerca = (a, b) => assert.ok(Math.abs(a - b) < 0.011, `${a} ≠ ${b}`)
@@ -146,4 +146,18 @@ test('sin meses cerrados la curva usa el perfil de referencia de Zoho y lo marca
 test('INGRESO_REFERENCIA: pesos de cada empresa suman 1', () => {
   for (const e of ['altavia', 'ff']) cerca(INGRESO_REFERENCIA[e].pesos.reduce((a, b) => a + b, 0), 1)
   assert.equal(INGRESO_REFERENCIA.ff.promedioMensual, 36578)
+})
+
+test('uso de la línea: giros (+) y abonos (−) de clase linea en cuentas operativas después del saldo base', () => {
+  const base = { base: 0, baseFecha: '2026-09-24' }
+  const giro = { fecha: '2026-09-25', monto: 10000, clase: 'linea', empresa: 'altavia', cuenta_tipo: 'operativa' }
+  assert.equal(lineaUsada(base, [giro]), 10000)
+  const abono = { fecha: '2026-10-02', monto: -4000, clase: 'linea', empresa: 'ff', cuenta_tipo: 'operativa' }
+  assert.equal(lineaUsada(base, [giro, abono]), 6000, 'suma las dos empresas')
+  assert.equal(lineaUsada(base, [{ ...giro, fecha: '2026-09-24' }, { ...giro, fecha: '2026-09-01' }]), 0, 'lo del día base o antes ya está en el saldo')
+  assert.equal(lineaUsada(base, [{ ...giro, clase: 'ingreso' }, { ...giro, clase: 'planilla', monto: -500 }]), 0, 'solo clase linea')
+  assert.equal(lineaUsada(base, [{ ...abono, monto: -9000 }]), 0, 'nunca negativa')
+  assert.equal(lineaUsada({ base: '2500', baseFecha: '2026-09-24' }, [giro]), 12500, 'base en texto se coerciona')
+  assert.equal(lineaUsada({ base: 0, baseFecha: '2026-09-24' }, [{ ...giro, cuenta_tipo: 'linea_credito' }]), 0, 'el extracto de la propia línea ya mueve su saldo base: no se cuenta doble')
+  assert.equal(lineaUsada(null, [giro]), 0, 'sin cuenta de línea no hay uso')
 })
