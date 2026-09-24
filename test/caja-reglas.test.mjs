@@ -35,3 +35,19 @@ test('una regla de empresa no aplica a la otra y el signo se respeta', () => {
 test('toda regla semilla usa una clase conocida', () => {
   for (const r of REGLAS_SEMILLA) assert.ok(CLASES[r.clase], r.patron)
 })
+
+// Ajustes tras correr la semilla contra los extractos reales de Altavia (feb–sep 2026).
+test('ACH XPRESS de St. Georges a una persona NO es traspaso propio', () => {
+  // 5-abr-2026: 15.000 salieron a personas, no a Banco General de Altavia (no hay entrada pareja).
+  assert.equal(c('ACH XPRESS A FAVOR DE FERNANDO PEREZ', -5000), 'por_clasificar')
+  assert.equal(c('ACH XPRESS A FAVOR DE JUAN DIEGO CEDENO', -3750), 'por_clasificar')
+  assert.equal(c('ACH XPRESS A FAVOR DE ALTAVIA GROUP S A', -5000), 'traspaso_propio')
+})
+
+test('C Y C escrito sin & es el mismo proveedor C&C', () => {
+  assert.equal(c('ACH A FAVOR DE C Y C SOLUCIONES INTEGRAL', -10000), 'kits')
+})
+
+test('el pago de la Visa gana aunque el titular sea Movemedia', () => {
+  assert.equal(c('BANCA EN LINEA PAGO VISA 4941-62XX-XXXX-0865 MOVEMEDIA, S.A.', -116.46), 'operativo_otro')
+})
