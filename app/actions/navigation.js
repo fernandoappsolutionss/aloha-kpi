@@ -2,6 +2,7 @@
 import { sql } from '../../lib/db'
 import { requireCurrentUser } from '../../lib/auth'
 import { centrosDe, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios } from '../../lib/current-user.mjs'
+import { puedeVerCaja } from '../../lib/caja/acceso.mjs'
 
 export async function getNavigationContext() {
   const user = await requireCurrentUser()
@@ -21,6 +22,7 @@ export async function getNavigationContext() {
       viewAdminTraining: isMaster(user),
       viewMetas: isMaster(user) || esSoloLectura(user),
       viewZoho: isMaster(user),
+      viewCaja: puedeVerCaja(user),
     },
   }
 }
