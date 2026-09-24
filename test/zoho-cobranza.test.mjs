@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, emailAutorizado } from '../lib/zoho-cobranza.mjs'
+import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, emailAutorizado, esMensualidad } from '../lib/zoho-cobranza.mjs'
 
 const ORG_FF = ORGS_ZOHO.find((o) => o.orgId === '667522360')
 const ORG_ALTAVIA = ORGS_ZOHO.find((o) => o.orgId === '903355420')
@@ -85,4 +85,15 @@ test('vencidaElDia — reglas de vencimiento', () => {
   assert.equal(vencidaElDia({ ...base, status: 'paid', last_payment_date: '' }, '2026-08-14'), false)
   assert.equal(vencidaElDia({ ...base, status: 'void' }, '2026-08-14'), false)
   assert.equal(vencidaElDia({ status: 'sent', due_date: '2026-08-30' }, '2026-08-14'), false)
+})
+
+// Brisas 24-sep-2026: el KPI contaba 31 vencidas y la administradora 20 en
+// Zoho. 10 eran matrículas del ciclo siguiente. Cobranza = solo mensualidades.
+test('esMensualidad — fuera matrículas, campeonatos y clases de reposición', () => {
+  for (const ref of ['Brisas-1-Kids', 'Mensualidad Brisas Tiny', 'David-Tiny', 'Ciclo 1 TinyTots', 'Cuota G07 KIDS', '', undefined]) {
+    assert.equal(esMensualidad({ reference_number: ref }), true, String(ref))
+  }
+  for (const ref of ['Matrícula 4to. Ciclo Tiny', 'Matricula', 'MATRÍCULA 2do. Ciclo Kids', 'Campeonato', 'Clase de Reposición', 'CLASE DE REPOSICION']) {
+    assert.equal(esMensualidad({ reference_number: ref }), false, ref)
+  }
 })
