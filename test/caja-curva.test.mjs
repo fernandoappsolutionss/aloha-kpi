@@ -107,3 +107,25 @@ test('cambio de baldes a mitad de semana: cada día usa el % vigente ese día', 
   cerca(s2.reservaImpuesto, 50 + 37.5 + 4 * 2250 / 7 * 0.1)
   cerca(s3.dueno, 2250 * 0.2) // 5-7 oct + 8-11 oct = 2250, todo al 20%
 })
+
+test('curva coerciona saldo, baldes y línea que llegan como texto (sin concatenar)', () => {
+  const r = calcularCurva({
+    hoy: '2026-09-23',
+    saldoHoy: '1000',
+    perfil: { promedioMensual: 0, pesos: [0.25, 0.25, 0.25, 0.25] },
+    baldesEstado: { duenoPendiente: '100', reservaImpuesto: '50' },
+    lineaDisponible: '2000',
+  })
+  const s1 = r.semanas[0]
+  assert.equal(typeof s1.saldoFinal, 'number')
+  assert.equal(s1.saldoInicial, 1000)
+  assert.equal(s1.dueno, 100)
+  assert.equal(s1.saldoFinal, 900)
+  assert.equal(s1.reservaImpuesto, 50)
+  assert.equal(s1.disponible, 850)
+  assert.equal(r.semanas[12].saldoFinal, 900)
+  assert.equal(r.lineaDisponible, 2000)
+  const sinBaldes = calcularCurva({ hoy: '2026-09-23', saldoHoy: null, perfil: { promedioMensual: 0, pesos: [0.25, 0.25, 0.25, 0.25] }, baldesEstado: null })
+  assert.equal(sinBaldes.semanas[0].saldoFinal, 0)
+  assert.equal(sinBaldes.lineaDisponible, 0)
+})

@@ -120,6 +120,8 @@ export async function guardarCompromiso(input) {
     const id = input?.id ? Number(input.id) : null
     if (id !== null && !(Number.isInteger(id) && id > 0)) throw new Error('Compromiso inválido.')
     const clase = input?.clase
+    // Los baldes separan al dueño solos: un pago programado de dueño contaría dos veces.
+    if (clase === 'dueno') throw new Error('La separación del dueño es automática: no se programa como pago.')
     if (!esClase(clase) || CLASES_NO_COMPROMISO.includes(clase)) throw new Error('Clase de egreso inválida.')
     const c = {
       id,
