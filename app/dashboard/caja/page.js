@@ -100,10 +100,10 @@ export default function CajaPage() {
             </TableScroller>
           </section>
 
-          <CurvaCaja key={empresa} empresa={empresa} curva={datos.curvas[empresa]} clases={datos.clases} onCambio={cargar} />
+          <CurvaCaja key={`curva-${empresa}`} empresa={empresa} curva={datos.curvas[empresa]} clases={datos.clases} onCambio={cargar} />
           <ImportarExtracto onCambio={cargar} />
           <BandejaClasificar pendientes={datos.pendientes.filter((p) => empresa === 'consolidado' || p.empresa === empresa)} clases={datos.clases} onCambio={cargar} />
-          {empresa !== 'consolidado' && <Compromisos key={empresa} empresa={empresa} compromisos={datos.compromisos} clases={datos.clases} onCambio={cargar} />}
+          {empresa !== 'consolidado' && <Compromisos key={`compromisos-${empresa}`} empresa={empresa} compromisos={datos.compromisos} clases={datos.clases} onCambio={cargar} />}
         </>}
       </main>
     </div>
