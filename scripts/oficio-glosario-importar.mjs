@@ -2,9 +2,10 @@
 // la palabra sin aclarar. Herramienta de desarrollo: NO corre en Vercel, no la
 // importa la app.
 //
-// Lee las dos fuentes congeladas en docs/entrenamiento/fuente/
+// Lee las tres fuentes congeladas en docs/entrenamiento/fuente/
 //   glosario-aloha.md  (186 términos, del Manual de Operaciones)
 //   glosario-zoho.md   (73 términos, del Curso 2 de Zoho para Asistentes)
+//   glosario-fiscal.md (materia fiscal de Los Naranjos; solo términos nuevos)
 // y escribe lib/entrenamiento/oficio/glosario.js con 238 entradas: los 259
 // términos de las dos fuentes reconciliando a UNA definición los 21 que
 // aparecen en las dos.
@@ -250,6 +251,9 @@ export function variantesDe(termino, slug) {
 export function construirGlosario() {
   const aloha = parseGlosario(join(FUENTE, 'glosario-aloha.md'))
   const zoho = parseGlosario(join(FUENTE, 'glosario-zoho.md'))
+  // Tercera fuente, solo de términos NUEVOS: la materia fiscal de Los Naranjos.
+  // Un slug que ya exista en las otras dos no se pisa (gana el Manual).
+  const fiscal = parseGlosario(join(FUENTE, 'glosario-fiscal.md'))
   const porSlugZoho = new Map(zoho.map((e) => [e.slug, e]))
   const fuera = new Map()
 
@@ -266,6 +270,7 @@ export function construirGlosario() {
 
   for (const e of aloha) fuera.set(e.slug, mezclar(e, porSlugZoho.get(e.slug), e.slug))
   for (const e of zoho) if (!fuera.has(e.slug)) fuera.set(e.slug, mezclar(e, null, e.slug))
+  for (const e of fiscal) if (!fuera.has(e.slug)) fuera.set(e.slug, mezclar(e, null, e.slug))
 
   const orden = [...fuera.keys()].sort((a, b) => fuera.get(a).termino.localeCompare(fuera.get(b).termino, 'es'))
   const salida = {}
@@ -305,7 +310,8 @@ export function renderArchivo({ salida, compartidos }) {
 //
 // GENERADO por scripts/oficio-glosario-importar.mjs desde las fuentes
 // congeladas en docs/entrenamiento/fuente/: glosario-aloha.md (186 términos del
-// Manual de Operaciones) y glosario-zoho.md (73 del Curso 2). Son ${slugs.length} entradas:
+// Manual de Operaciones), glosario-zoho.md (73 del Curso 2) y glosario-fiscal.md
+// (materia fiscal de Los Naranjos). Son ${slugs.length} entradas:
 // los ${compartidos.length} términos que aparecen en las dos fuentes están reconciliados a UNA
 // definición, con la del Manual como canónica (la del curso rellena los huecos).
 // No se edita a mano: se corrige la fuente y se vuelve a generar.

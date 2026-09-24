@@ -98,6 +98,6 @@ test('en revisión no se estudia ni se firma: las actions de escritura siguen pi
   for (const nombre of ['marcarEstudiado', 'responderQuizOficio']) {
     const start = src.indexOf(`export async function ${nombre}`)
     const cuerpo = src.slice(start, src.indexOf('export ', start + 1))
-    assert.match(cuerpo, /m\.roles\.includes\(u\.rol\)/, `${nombre}: gerencia no puede escribir progreso de un módulo ajeno`)
+    assert.match(cuerpo, /esDelPlan\(m, u\.rol, u\.centro_id\)/, `${nombre}: gerencia no puede escribir progreso de un módulo ajeno`)
   }
 })

@@ -13,7 +13,7 @@ import { derivarSop } from '../../../../../../../components/entrenamiento/sop-de
 import { getCentroNombre } from '../../../../../../actions/centros'
 import { cargarOficio } from '../../../../../../actions/entrenamiento-oficio'
 import { CURSOS, MODULOS_OFICIO, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
-import { rolesQueFirma, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+import { rolesQueFirma, esDelPlan, alcanzaCentro, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../../../lib/entrenamiento/oficio/progreso'
 import { puertaCerrada } from '../../../../../../../lib/entrenamiento/oficio/guia-pasos'
 
 // Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
@@ -74,10 +74,11 @@ export default async function SopPage({ params, searchParams }) {
   // Quién se la toma a la persona de aseo: el primer rol de rolesDelPapel() es
   // el dueño del paquete (la Asistente), no uno de sus jefes.
   const tomador = papel ? (rolesDelPapel(m, MODULOS_OFICIO)[0] || '') : ''
-  const esMio = !papel && m.roles.includes(rol)
+  const esMio = !papel && esDelPlan(m, rol, oficio.centroId)
   const puedeVerla = papel
     ? puedeImprimirPapel(rol, m, MODULOS_OFICIO)
-    : esMio || puedeLeerComoOficial(rol, m)
+    // alcanzaCentro: un módulo con `centros` (materia fiscal) no se lee desde otro centro.
+    : esMio || (puedeLeerComoOficial(rol, m) && alcanzaCentro(m, oficio.centroId))
   // El ?revisar= es del carril de revisión y no aplica a una hoja de papel: no
   // hay plan ajeno que arrastrar, porque no está en el plan de nadie.
   const rolPlan = esMio || papel ? rol : (m.roles.includes(sp?.revisar) ? sp.revisar : m.roles[0])
