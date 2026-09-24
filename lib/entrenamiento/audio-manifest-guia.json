@@ -1018,5 +1018,35 @@
     "hash": "edf8e25f6561",
     "file": "guia/of-coa-14/cierre.mp3",
     "seg": 29
+  },
+  "guia/of-fis-1/vista": {
+    "hash": "b14d4e4b8a74",
+    "file": "guia/of-fis-1/vista.mp3",
+    "seg": 26
+  },
+  "guia/of-fis-1/palabras": {
+    "hash": "94b20eca90f3",
+    "file": "guia/of-fis-1/palabras.mp3",
+    "seg": 40
+  },
+  "guia/of-fis-1/cierre": {
+    "hash": "878886945407",
+    "file": "guia/of-fis-1/cierre.mp3",
+    "seg": 24
+  },
+  "guia/of-fis-2/vista": {
+    "hash": "6115e800f274",
+    "file": "guia/of-fis-2/vista.mp3",
+    "seg": 29
+  },
+  "guia/of-fis-2/palabras": {
+    "hash": "e9b781244e79",
+    "file": "guia/of-fis-2/palabras.mp3",
+    "seg": 36
+  },
+  "guia/of-fis-2/cierre": {
+    "hash": "56cd096cf617",
+    "file": "guia/of-fis-2/cierre.mp3",
+    "seg": 24
   }
 }
