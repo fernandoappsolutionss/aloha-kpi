@@ -53,3 +53,12 @@ test('rechaza un archivo que no es OFX de cuenta', () => {
 test('rechaza un movimiento sin FITID', () => {
   assert.throws(() => parseOfx(OFX.replace('<FITID>694\n', '')), /FITID/)
 })
+
+test('rechaza un OFX cuyos movimientos no se pueden leer (bloques sin cerrar) en vez de importar vacío', () => {
+  assert.throws(() => parseOfx(OFX.replaceAll('</STMTTRN>', '')), /No se pudieron leer los movimientos del OFX/)
+})
+
+test('rechaza fechas imposibles nombrando el valor', () => {
+  assert.throws(() => parseOfx(OFX.replace('<DTPOSTED>20260301154528.000', '<DTPOSTED>20269945154528.000')), /Fecha inválida.*20269945/)
+  assert.throws(() => parseOfx(OFX.replace('<DTPOSTED>20260301154528.000', '<DTPOSTED>20260230154528.000')), /Fecha inválida.*20260230/)
+})

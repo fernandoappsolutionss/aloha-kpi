@@ -60,3 +60,25 @@ test('aborta si el saldo corrido no cuadra (fila mal leída)', () => {
 test('rechaza un texto que no es estado de St. Georges', () => {
   assert.throws(() => parseStGeorgesTexto('otra cosa'), /St. Georges/)
 })
+
+test('rechaza fechas imposibles nombrando el valor', () => {
+  assert.throws(() => parseStGeorgesTexto(TEXTO.replace('02-FEB-26 COMISION CLAVE', '31-FEB-26 COMISION CLAVE')), /Fecha inválida.*31-FEB-26/)
+})
+
+test('fitid único cuando el saldo vuelve a un valor previo el mismo día; la primera ocurrencia no cambia', () => {
+  const texto = `ESTADO DE CUENTA
+Número:
+20000001096460
+Fecha : Feb. 28, 2026
+Saldo Anterior Total Créditos Total Débitos Saldo Actual
+100.00 100.00 50.00 150.00
+DETALLE DE TRANSACCIONES
+03-FEB-26 REMISION CLAVE 016030671 50.00 150.00
+03-FEB-26 REVERSO CLAVE 016030671 -50.00 100.00
+03-FEB-26 REMISION CLAVE 016030671 50.00 150.00`
+  const r = parseStGeorgesTexto(texto)
+  const ids = r.movimientos.map((m) => m.fitid)
+  assert.deepEqual(ids, ['2026-02-03|150.00|50.00', '2026-02-03|100.00|-50.00', '2026-02-03|150.00|50.00|2'])
+  assert.equal(new Set(ids).size, 3)
+  assert.equal(r.descuadre, null)
+})
