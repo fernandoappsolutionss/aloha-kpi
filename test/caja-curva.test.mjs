@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { perfilIngresos, estadoBaldes, calcularCurva, consolidar } from '../lib/caja/curva.mjs'
+import { perfilIngresos, estadoBaldes, calcularCurva, consolidar, perfilConRespaldo } from '../lib/caja/curva.mjs'
+import { INGRESO_REFERENCIA } from '../lib/caja/semilla-datos.mjs'
 
 const cerca = (a, b) => assert.ok(Math.abs(a - b) < 0.011, `${a} ≠ ${b}`)
 const PLANO = { promedioMensual: 9000, pesos: [0.25, 0.25, 0.25, 0.25] }
@@ -128,4 +129,21 @@ test('curva coerciona saldo, baldes y línea que llegan como texto (sin concaten
   const sinBaldes = calcularCurva({ hoy: '2026-09-23', saldoHoy: null, perfil: { promedioMensual: 0, pesos: [0.25, 0.25, 0.25, 0.25] }, baldesEstado: null })
   assert.equal(sinBaldes.semanas[0].saldoFinal, 0)
   assert.equal(sinBaldes.lineaDisponible, 0)
+})
+
+test('sin meses cerrados la curva usa el perfil de referencia de Zoho y lo marca estimado', () => {
+  const vacio = perfilIngresos([], '2026-09-24')
+  const r = perfilConRespaldo(vacio, INGRESO_REFERENCIA.altavia)
+  assert.equal(r.estimado, true)
+  assert.deepEqual(r.meses, [])
+  assert.equal(r.promedioMensual, 40646)
+  assert.deepEqual(r.pesos, [0.181, 0.186, 0.212, 0.421])
+  const propio = { promedioMensual: 700, pesos: [1, 0, 0, 0], meses: ['2026-08'] }
+  assert.deepEqual(perfilConRespaldo(propio, INGRESO_REFERENCIA.ff), { ...propio, estimado: false })
+  assert.equal(perfilConRespaldo(vacio, null).estimado, false, 'sin referencia se queda con el perfil propio')
+})
+
+test('INGRESO_REFERENCIA: pesos de cada empresa suman 1', () => {
+  for (const e of ['altavia', 'ff']) cerca(INGRESO_REFERENCIA[e].pesos.reduce((a, b) => a + b, 0), 1)
+  assert.equal(INGRESO_REFERENCIA.ff.promedioMensual, 36578)
 })

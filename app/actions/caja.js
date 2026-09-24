@@ -8,7 +8,8 @@ import {
 import { leerExtracto } from '../../lib/caja/extracto.mjs'
 import { clasificar, CLASES, CLASES_FUERA_DE_CURVA } from '../../lib/caja/reglas.mjs'
 import { hoyPanama, sumarDias, lunesDe } from '../../lib/caja/semanas.mjs'
-import { perfilIngresos, estadoBaldes, calcularCurva, consolidar } from '../../lib/caja/curva.mjs'
+import { perfilIngresos, perfilConRespaldo, estadoBaldes, calcularCurva, consolidar } from '../../lib/caja/curva.mjs'
+import { INGRESO_REFERENCIA } from '../../lib/caja/semilla-datos.mjs'
 
 const EMPRESAS = ['altavia', 'ff']
 const ISO = /^\d{4}-\d{2}-\d{2}$/
@@ -49,7 +50,8 @@ export async function getCaja() {
       const ids = new Set(operativas.map((c) => c.id))
       const propios = movs.filter((m) => ids.has(m.cuenta_id) && !CLASES_FUERA_DE_CURVA.has(m.clase))
       const baldesEmpresa = baldes.filter((b) => b.empresa === empresa)
-      const perfil = perfilIngresos(propios, hoy)
+      // Sin un mes cerrado de extractos, respaldo de Zoho marcado `estimado`.
+      const perfil = perfilConRespaldo(perfilIngresos(propios, hoy), INGRESO_REFERENCIA[empresa])
       const baldesEstado = estadoBaldes(propios, baldesEmpresa, hoy)
       curvas[empresa] = calcularCurva({
         hoy, saldoHoy, perfil, baldesEstado, lineaDisponible,
