@@ -113,3 +113,10 @@ test('C Y C escrito sin & es el mismo proveedor C&C', () => {
 test('el pago de la Visa gana aunque el titular sea Movemedia', () => {
   assert.equal(c('BANCA EN LINEA PAGO VISA 4941-62XX-XXXX-0865 MOVEMEDIA, S.A.', -116.46), 'operativo_otro')
 })
+
+test('F&F: la afiliación POS de Banco General es comisión y el "PAGO FEE" a C&C es regalía', () => {
+  assert.equal(ff('COBRO AFILIAC001 908351310', -25).categoria, 'Comisiones bancarias')
+  // 30-may-2026: la regalía de mayo salió como "PAGO FEE CALL…" y caía en kits.
+  assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0318011050715 C&C SOLUCIONES INTEGRALES, S.A. PAGO FEE CALL', -4230.9).clase, 'regalia')
+  assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0318011050715 C&C SOLUCIONES INTEGRALES, S.A. PAGO OC 1028', -3542).clase, 'kits')
+})
