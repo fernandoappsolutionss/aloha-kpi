@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS caja_importaciones (
   id SERIAL PRIMARY KEY,
   cuenta_id INT NOT NULL REFERENCES caja_cuentas(id),
   archivo TEXT NOT NULL,
-  formato TEXT NOT NULL CHECK (formato IN ('ofx','pdf_stgeorges','zoho_json')),
+  formato TEXT NOT NULL CHECK (formato IN ('ofx','pdf_stgeorges','xls_stgeorges','zoho_json')),
   desde DATE,
   hasta DATE,
   saldo_banco NUMERIC(12,2),

@@ -1,6 +1,6 @@
 // Uso:
 //   node scripts/caja-semilla.mjs                      → solo muestra qué haría
-//   node scripts/caja-semilla.mjs --apply [archivos…]  → siembra y carga extractos (.ofx / .pdf)
+//   node scripts/caja-semilla.mjs --apply [archivos…]  → siembra y carga extractos (.ofx / .xls / .pdf)
 // Cuentas: ON CONFLICT DO NOTHING. Reglas, pagos programados y baldes: solo si su tabla está vacía.
 // Los extractos se deduplican por (cuenta, fitid): correrlo dos veces no duplica movimientos.
 import { readFileSync } from 'node:fs'

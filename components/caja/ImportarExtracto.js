@@ -73,10 +73,10 @@ export function ImportarExtracto({ onCambio }) {
   return (
     <section className="card" style={{ padding: 20, marginBottom: 16 }} aria-labelledby="caja-subir">
       <h2 id="caja-subir" style={{ marginTop: 0 }}>Subir extracto</h2>
-      <p className="h-sub">OFX de Banco General o PDF del estado de cuenta de St. Georges. Subir el mismo archivo dos veces no duplica nada.</p>
+      <p className="h-sub">OFX de Banco General, o Excel de St. Georges (la descarga de movimientos) o el PDF de su estado de cuenta. Subir el mismo archivo dos veces no duplica nada.</p>
       <label style={{ display: 'grid', gap: 6, maxWidth: '100%' }}>
         <span className="label">Archivo del banco</span>
-        <input ref={input} type="file" accept=".ofx,.pdf" disabled={ocupado} style={{ fontSize: 16, maxWidth: '100%' }}
+        <input ref={input} type="file" accept=".ofx,.xls,.pdf" disabled={ocupado} style={{ fontSize: 16, maxWidth: '100%' }}
           onChange={(e) => e.target.files?.[0] && revisar(e.target.files[0])} />
       </label>
       {estado && <p role="status">{estado}</p>}
