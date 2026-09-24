@@ -22,10 +22,10 @@ CREATE TABLE IF NOT EXISTS caja_reglas (
   patron TEXT NOT NULL CHECK (length(patron) BETWEEN 3 AND 80),
   empresa TEXT CHECK (empresa IN ('altavia','ff')),
   signo SMALLINT CHECK (signo IN (-1, 1)),
-  clase TEXT NOT NULL,
+  clase TEXT NOT NULL CHECK (clase IN ('ingreso','planilla','regalia','kits','alquiler','servicios','impuesto','operativo_otro','dueno','intercompania','traspaso_propio','resguardo_cc','linea','por_clasificar')),
   categoria TEXT NOT NULL CHECK (length(categoria) BETWEEN 1 AND 80),
   prioridad INT NOT NULL DEFAULT 100,
-  creado_por INT REFERENCES usuarios(id),
+  creado_por INT REFERENCES usuarios(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS caja_importaciones (
   saldo_banco_fecha DATE,
   nuevos INT NOT NULL DEFAULT 0,
   duplicados INT NOT NULL DEFAULT 0,
-  usuario_id INT REFERENCES usuarios(id),
+  usuario_id INT REFERENCES usuarios(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK ((saldo_banco IS NULL) = (saldo_banco_fecha IS NULL))
 );
@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS caja_movimientos (
   monto NUMERIC(12,2) NOT NULL CHECK (monto <> 0),
   memo TEXT NOT NULL,
   fitid TEXT NOT NULL,
-  clase TEXT NOT NULL,
+  clase TEXT NOT NULL CHECK (clase IN ('ingreso','planilla','regalia','kits','alquiler','servicios','impuesto','operativo_otro','dueno','intercompania','traspaso_propio','resguardo_cc','linea','por_clasificar')),
   categoria TEXT NOT NULL,
   regla_id INT REFERENCES caja_reglas(id) ON DELETE SET NULL,
   importacion_id INT REFERENCES caja_importaciones(id),
-  clasificado_por INT REFERENCES usuarios(id),
+  clasificado_por INT REFERENCES usuarios(id) ON DELETE SET NULL,
   UNIQUE (cuenta_id, fitid)
 );
 CREATE INDEX IF NOT EXISTS caja_movimientos_cuenta_fecha ON caja_movimientos (cuenta_id, fecha);
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS caja_compromisos (
   id SERIAL PRIMARY KEY,
   empresa TEXT NOT NULL CHECK (empresa IN ('altavia','ff')),
   concepto TEXT NOT NULL CHECK (length(concepto) BETWEEN 1 AND 120),
-  clase TEXT NOT NULL,
+  clase TEXT NOT NULL CHECK (clase IN ('ingreso','planilla','regalia','kits','alquiler','servicios','impuesto','operativo_otro','dueno','intercompania','traspaso_propio','resguardo_cc','linea','por_clasificar')),
   categoria TEXT NOT NULL,
   monto NUMERIC(12,2) NOT NULL CHECK (monto > 0),
   frecuencia TEXT NOT NULL CHECK (frecuencia IN ('unico','mensual','quincenal','anual')),
