@@ -48,8 +48,8 @@ test('Altavia: los ACH XPRESS del 5-abr a los socios son reparto al dueño (Fern
   for (const socio of ['FERNANDO PEREZ', 'FREDERICK ROBERTS', 'JUAN DIEGO CEDENO']) {
     assert.deepEqual([r(`ACH XPRESS A FAVOR DE ${socio}`).clase, r(`ACH XPRESS A FAVOR DE ${socio}`).categoria], ['dueno', 'Reparto a socios'], socio)
   }
-  // Solo Altavia y solo salidas: en F&F no se decidió todavía.
-  assert.equal(c('ACH XPRESS A FAVOR DE FERNANDO PEREZ', -5000, 'ff'), 'por_clasificar')
+  // Solo salidas: un ACH que entra de un socio no es reparto.
+  assert.notEqual(c('ACH XPRESS A FAVOR DE FERNANDO PEREZ', 5000), 'dueno')
   // Los honorarios de Frederick por Banco General siguen siendo planilla.
   assert.equal(c('BANCA EN LINEA TRANSFERENCIA A 0438990470387 FREDERICK MOISES ROBERTS VENCE CEO', -244.91), 'planilla')
   assert.equal(c('BANCA EN LINEA TRANSFERENCIA A 0438990470387 FREDERICK MOISES ROBERTS VENCE CEO', -244.91, 'ff'), 'planilla')
@@ -119,4 +119,39 @@ test('F&F: la afiliación POS de Banco General es comisión y el "PAGO FEE" a C&
   // 30-may-2026: la regalía de mayo salió como "PAGO FEE CALL…" y caía en kits.
   assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0318011050715 C&C SOLUCIONES INTEGRALES, S.A. PAGO FEE CALL', -4230.9).clase, 'regalia')
   assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0318011050715 C&C SOLUCIONES INTEGRALES, S.A. PAGO OC 1028', -3542).clase, 'kits')
+})
+
+test('servicios, CSS, municipio, seguros, préstamos BG y tarjeta son globales: Altavia clasifica igual', () => {
+  const alt = (memo, monto) => { const r = clasificar({ memo, monto }, reglas, 'altavia'); return `${r.clase}/${r.categoria}` }
+  assert.equal(alt('BANCA EN LINEA BANCO NACIONAL 10000042761 TESORO MUNICIPAL DE PANAMA', -500), 'impuesto/Municipio')
+  assert.equal(alt('BANCA EN LÍNEA NATURGY (EDEMET-EDECHI) (1234567)', -200), 'servicios/Luz')
+  assert.equal(alt('PAGO CSS (CAJA DE SEGURO SOCIAL) - (1)', -400), 'planilla/CSS')
+  assert.equal(alt('BANCA EN LINEA ASEGURADORA ANCON (1)', -100), 'servicios/Seguros')
+  assert.equal(alt('PAGOS PR. 0792090593109', -100), 'operativo_otro/Préstamos BG')
+  assert.equal(alt('BANCA EN LINEA TRANSFERENCIA A 0303010025244 MASTER, S.A. (MASTER SERVICES) FACEBOOK', -100), 'operativo_otro/Tarjeta Visa')
+})
+
+test('BG Trust es el arrendador de F&F: en Altavia no se toma como alquiler', () => {
+  const memo = 'BANCA EN LINEA TRANSFERENCIA A 0472994536330 BG TRUST INC. FID (0115-GTIA-15) (DESAROLLOS'
+  assert.equal(ff(memo, -1331.29).categoria, 'Alquiler (fideicomiso BG Trust)')
+  assert.equal(c(memo, -1331.29), 'por_clasificar')
+})
+
+test('F&F 7–8 abr: los ACH XPRESS de St. Georges a los socios también son reparto al dueño (Fernando)', () => {
+  for (const socio of ['FERNANDO PEREZ', 'FREDERICK ROBERTS', 'JUAN DIEGO CEDENO', 'VANESSA CAMPOS']) {
+    const r = ff(`ACH XPRESS A FAVOR DE ${socio}`, -1250)
+    assert.deepEqual([r.clase, r.categoria], ['dueno', 'Reparto a socios'], socio)
+  }
+  // Los honorarios de Vanessa por Banco General siguen siendo planilla.
+  assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0319010327120 VANESSA DEL CARMEN CAMPOS LADRON DE GUEVARA C', -465.09).clase, 'planilla')
+  // Pagos a "Adrián Cedeño (o) Vanessa…" (~350): no son reparto y quedan por clasificar.
+  assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0323010818321 ADRIAN CEDEÑO CEDEÑO (O) VANESSA DEL CARMEN C', -350.5).clase, 'por_clasificar')
+})
+
+test('el préstamo de corto plazo de Movemedia es intercompañía en los dos sentidos, no cobro ni planilla', () => {
+  const entra = ff('BANCA EN LINEA TRANSFERENCIA DE MOVEMEDIA, S.A. (MOVEMEDIA) Prestamo a corto plazo', 2500)
+  const sale = ff('BANCA EN LINEA TRANSFERENCIA A 0418000001270 MOVEMEDIA, S.A. (MOVEMEDIA) PAGO DE PRESTAMO', -2500)
+  assert.deepEqual([entra.clase, entra.categoria], ['intercompania', 'Préstamo Movemedia'])
+  assert.deepEqual([sale.clase, sale.categoria], ['intercompania', 'Préstamo Movemedia'])
+  assert.equal(ff('BANCA EN LINEA TRANSFERENCIA A 0418000001270 MOVEMEDIA, S.A. (MOVEMEDIA) PAGO DE PLANILLA', -1348.49).clase, 'planilla')
 })
