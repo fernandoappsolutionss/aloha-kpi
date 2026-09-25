@@ -290,7 +290,7 @@ export default function EventosPage() {
         </p>
 
         {!loadError && <div className="panel" data-tour="eventos.lista">
-          {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} canWrite={canWrite} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
+          {mobileCards ? <div className="operational-list">{visible.map(ev=><Fragment key={ev.id}><OperationalCard headingLevel={2} title={ev.name} subtitle={ev.location} status={ESTADO_TXT[ev.status]||ev.status} fields={[{label:'Fecha',value:fmtFecha(ev.start_date)},{label:'Tipo',value:ev.event_type==='online'?'Online':'Presencial'},{label:'Grupo',value:ev.grupo?`Grupo ${ev.grupo.numero} · ${ev.grupo.horarioTexto||''} · ${ev.grupo.cerrado?'cerrado a inscripciones':cupoTexto(ev.grupo.cupos)}`:'Sin grupo relacionado'},{label:'Registros',value:`${ev.stats?.total??ev.registration_count??0}${ev.max_capacity?'/'+ev.max_capacity:''}`},{label:'Precio',value:ev.is_free?'Gratis':`${ev.price} ${ev.currency}`}]} actions={<>{registrationButton(ev)}{eventActions(ev)}</>}/>{openId===ev.id && <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}><Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} fechaClase={isoToLocal(ev.start_date, ev.timezone).slice(0, 10)} canWrite={canWrite} onChange={load}/></section>}</Fragment>)}</div> : <TableScroller label="Clases de prueba">
             <table className="table">
               <thead><tr>{['Clase de prueba', 'Fecha', 'Tipo', 'Estado', 'Registros', 'Precio', ''].map((h) => <th key={h} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
               <tbody>
@@ -327,7 +327,7 @@ export default function EventosPage() {
                         <tr style={{ cursor: 'default' }}>
                           <td colSpan={7} style={{ background: 'var(--surface-2)', padding: 0 }}>
                             <section id={`registros-${ev.id}`} aria-label={`Registros de ${ev.name}`}>
-                              <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} canWrite={canWrite} onChange={load} />
+                              <Registrations centroId={id} eventId={ev.id} grupoId={ev.grupo?.id} fechaClase={isoToLocal(ev.start_date, ev.timezone).slice(0, 10)} canWrite={canWrite} onChange={load} />
                             </section>
                           </td>
                         </tr>
@@ -594,7 +594,7 @@ function Field({ label, full, tour, children }) {
   return <label className="field" data-tour={tour} style={full ? { gridColumn: '1 / -1', margin: 0 } : { margin: 0 }}><span className="label">{label}</span>{children}</label>
 }
 
-function Registrations({ centroId, eventId, grupoId, canWrite = true, onChange }) {
+function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true, onChange }) {
   const mobileCards=useMobileCards()
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
@@ -724,7 +724,7 @@ function Registrations({ centroId, eventId, grupoId, canWrite = true, onChange }
             </table></TableScroller>
           )}
       {canWrite && inscribir && (
-        <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId}
+        <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId} fechaClase={fechaClase}
           returnFocusRef={inscribirReturnFocusRef}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
@@ -746,12 +746,15 @@ const desdeGrupo = (g) => {
 // estudiante con origen 'clase_prueba' y el crm_registration_id del registro
 // (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
 // de prueba tiene grupo por aperturar, viene preseleccionado en el select.
-function InscribirModal({ centroId, reg, grupoId, onClose, onSaved, returnFocusRef }) {
+function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, returnFocusRef }) {
   const complete = useDialogCallback(onSaved, centroId)
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
     nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
     origen_venta: '', representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
+    // La venta se cierra en la clase, pero el centro la registra días después:
+    // por defecto el día de la clase (nunca futuro), editable.
+    fecha: fechaClase && fechaClase <= hoyISO() ? fechaClase : hoyISO(),
   })
   const [grupos, setGrupos] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -785,12 +788,13 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved, returnFocusR
   async function save() {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
     if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
+    if (!f.fecha || f.fecha > hoyISO()) { setErr('Indica la fecha de inscripción (no puede ser futura).'); return }
     setSaving(true); setErr('')
     try {
       const res = await inscribirEstudiante(centroId, {
         nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
         origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
-        representante: f.representante, telefono: f.telefono, correo: f.correo,
+        representante: f.representante, telefono: f.telefono, correo: f.correo, fecha: f.fecha,
       })
       if (res.error) { setErr(res.error); return }
       const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
@@ -845,6 +849,7 @@ function InscribirModal({ centroId, reg, grupoId, onClose, onSaved, returnFocusR
                 </div>
               )}
             </Field>
+            <Field full label="Fecha de inscripción *"><input name="fecha" type="date" className="input" max={hoy} value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
             <Field full label="Origen del nuevo ingreso *">
               <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
                 <option value="">Seleccionar origen</option>
