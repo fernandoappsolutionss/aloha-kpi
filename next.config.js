@@ -8,6 +8,8 @@ const nextConfig = {
   // Neon usa `ws` para las transacciones interactivas. Debe cargarse con el
   // require nativo de Node para conservar su fallback de bufferutil.
   serverExternalPackages: ['ws'],
+  // Los estados de cuenta en PDF pesan ~0,5 MB; el límite por defecto (1 MB) queda justo.
+  experimental: { serverActions: { bodySizeLimit: '5mb' } },
   images: {
     remotePatterns: [
       {

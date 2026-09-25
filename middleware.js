@@ -14,6 +14,7 @@ import {
   usuarioBloqueado,
   vePanelGerencia,
 } from './lib/current-user.mjs'
+import { puedeVerCaja } from './lib/caja/acceso.mjs'
 
 const COOKIE = 'aloha_session'
 
@@ -154,6 +155,11 @@ function rutaDashboardUsuarios(pathname) {
     || pathname.startsWith('/dashboard/usuarios/')
 }
 
+// Curva 13 de caja: allowlist por correo (lib/caja/acceso.mjs), no por rol.
+function rutaDashboardCaja(pathname) {
+  return pathname === '/dashboard/caja' || pathname.startsWith('/dashboard/caja/')
+}
+
 export async function middleware(req) {
   let pathname
   try { pathname = decodeURIComponent(req.nextUrl.pathname) }
@@ -178,6 +184,7 @@ export async function middleware(req) {
   if (pathname.startsWith('/dashboard')) {
     if (!verPanel(user)) return deny(req, user)
     if (rutaDashboardUsuarios(pathname) && !puedeVerUsuarios(user)) return deny(req, user)
+    if (rutaDashboardCaja(pathname) && !puedeVerCaja(user)) return deny(req, user)
     if (rutaDashboardMaster(pathname) && !isMaster(user)) return deny(req, user)
     if (rutaDashboardLecturaGlobal(pathname) && !(isMaster(user) || esSoloLectura(user))) return deny(req, user)
   }
