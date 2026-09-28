@@ -229,6 +229,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   ]
   const configItems = [
     ...(access.canViewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
+    ...(access.canViewCaja ? [{ label: 'Curva 13 · Caja', icon: 'sheet', href: '/dashboard/caja' }] : []),
     ...(canViewCentersPage ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
     ...(canViewUsersPage ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]

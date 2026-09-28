@@ -410,7 +410,7 @@ export default async function OficioPage({ params, searchParams }) {
                 return (
                   <li key={m.id}>
                     <Link className={`ofi-fila${bloqueado ? ' ofi-fila--bloqueada' : ''}${m.id === siguiente?.id ? ' ofi-fila--siguiente' : ''}`} href={`${base}/${m.id}`}>
-                      <span className={`ent-route__number${completo ? ' ent-route__number--done' : ''}`} aria-hidden="true">{completo ? '✓' : bloqueado ? '🔒' : m.orden}</span>
+                      <span className={`ent-route__number${completo ? ' ent-route__number--done' : ''}`} aria-hidden="true">{completo ? '✓' : bloqueado ? '🔒' : plan.indexOf(m) + 1}</span>
                       <span className="ent-route__content">
                         <span className="label">{CURSOS[m.curso]?.titulo} · {m.duracionMin} min</span>
                         <strong>{m.titulo}</strong>

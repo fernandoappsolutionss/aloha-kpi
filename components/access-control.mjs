@@ -59,6 +59,8 @@ export function resolveAccess(context = {}) {
   const manageMetas = booleanCapability(capabilities, ['manageMetas', 'canManageMetas', 'viewMetas'], isMaster) && !isReadonlyGlobal
   const viewMetasPage = booleanCapability(capabilities, ['viewMetas', 'canViewMetas'], manageMetas || isReadonlyGlobal)
   const viewZoho = booleanCapability(capabilities, ['viewZoho', 'canViewZoho', 'manageZoho'], isMaster) && !isReadonlyGlobal
+  // Sin `&& !isReadonlyGlobal`: Frederick (admin_general) opera la caja.
+  const viewCaja = booleanCapability(capabilities, ['viewCaja'], false)
   const viewAdminTraining = booleanCapability(capabilities, ['viewAdminTraining', 'canViewAdminTraining'], isMaster) && !isReadonlyGlobal
   const viewOficio = booleanCapability(capabilities, ['viewOficio', 'canViewOficio', 'viewAdminTraining'], isMaster) && !isReadonlyGlobal
 
@@ -86,6 +88,7 @@ export function resolveAccess(context = {}) {
     canManageMetas: manageMetas,
     canViewMetasPage: viewMetasPage,
     canViewZoho: viewZoho,
+    canViewCaja: viewCaja,
     canViewAdminTraining: viewAdminTraining,
     canViewOficio: viewOficio,
     canOpenOwnOficio: !isReadonlyGlobal && role !== 'desconocido' && role !== '',

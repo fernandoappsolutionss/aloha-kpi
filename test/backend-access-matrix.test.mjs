@@ -86,3 +86,12 @@ test('lecturas Growth/KPI no inicializan filas para roles de solo lectura', () =
   assert.match(auto, /const shouldPersist = options\.persist !== false/)
   assert.match(auto, /if \(!shouldPersist\) return await conciliar\(sourceQuery\)/)
 })
+
+test('acciones de caja releen la allowlist en cada llamada', async () => {
+  const { ACTION_ACCESS_MATRIX, API_ACCESS_MATRIX, ACCESS_KINDS } = await import('../lib/access-matrix.mjs')
+  for (const [key, kind] of Object.entries({ ...ACTION_ACCESS_MATRIX, ...API_ACCESS_MATRIX })) {
+    if (kind !== ACCESS_KINDS.caja) continue
+    const [file, name] = key.split('#')
+    assert.match(functionSource(file, name), /requireCurrentCaja\(/, `${key} debe llamar requireCurrentCaja`)
+  }
+})

@@ -12,7 +12,7 @@
 // de mes + las pagadas modificadas desde el inicio del mes. Respeta meses
 // cerrados (mes_kpi.estado = 'cerrado').
 import { neon } from '@neondatabase/serverless'
-import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, listarFacturas } from '../lib/zoho-cobranza.mjs'
+import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, listarFacturas, esMensualidad } from '../lib/zoho-cobranza.mjs'
 
 const [year, month] = [Number(process.argv[2]), Number(process.argv[3])]
 const dry = process.argv.includes('--dry')
@@ -49,7 +49,7 @@ for (const org of ORGS_ZOHO) {
     due_date_end: `${year}-${mm}-${finMes}`,
     last_modified_time: `${year}-${mm}-01T00:00:00-0500`,
   }, refreshToken)
-  for (const inv of [...unpaid, ...paid]) {
+  for (const inv of [...unpaid, ...paid].filter(esMensualidad)) {
     const centroId = clasificarCentro(org, inv)
     if (centroId === null) {
       sinClasificar.push({ org: org.nombre, invoice: inv.invoice_number, ref: inv.reference_number })

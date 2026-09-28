@@ -12,6 +12,7 @@ import {
   puedeGestionarUsuarios,
   puedeVerUsuarios,
 } from '../lib/current-user.mjs'
+import { puedeVerCaja } from '../lib/caja/acceso.mjs'
 
 // Run the real action/layout, replacing only server I/O boundaries.
 function serverModule(path, dependencies, exports) {
@@ -27,10 +28,12 @@ test('navigation grants Zoho only to current Master, never stale role or panel c
     const { getNavigationContext } = serverModule('../app/actions/navigation.js', {
       requireCurrentUser: async () => ({ id: 7, rol, email: rol === 'admin_master' ? 'fperez@teamsolutionss.com' : `${rol}@example.invalid`, centros: [10], centro_id: 10 }),
       sql: async () => [{ id: 10, nombre: 'Centro local' }],
-      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios,
+      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerCaja,
     }, ['getNavigationContext'])
     const context = await getNavigationContext()
     assert.equal(context.capabilities.viewZoho, expected, rol)
+    // Caja va por correo: solo el Master de esta lista está en la allowlist.
+    assert.equal(context.capabilities.viewCaja, expected, `caja ${rol}`)
     assert.equal(context.actor.role, rol)
   }
 })
@@ -55,6 +58,35 @@ test('Zoho layout redirects rejected current actor to dashboard and admits curre
     }, ['ZohoLayout'])
     if (allowed) assert.equal(await ZohoLayout({ children: 'protected-content' }), 'protected-content')
     else await assert.rejects(() => ZohoLayout({ children: 'protected-content' }), /redirect:\/dashboard$/)
+  }
+})
+
+test('navigation grants caja by allowlisted email, not by role', async () => {
+  for (const [rol, email, expected] of [
+    ['admin_general', 'froberts@alohapanama.com', true],
+    ['coordinador', 'admin@alohapanama.com', true],
+    ['coordinador', 'vcampos@alohapanama.com', true],
+    ['admin_general', 'otro@alohapanama.com', false],
+    ['coordinador', 'otra@alohapanama.com', false],
+  ]) {
+    const { getNavigationContext } = serverModule('../app/actions/navigation.js', {
+      requireCurrentUser: async () => ({ id: 7, rol, email, centros: [10], centro_id: 10 }),
+      sql: async () => [{ id: 10, nombre: 'Centro local' }],
+      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerCaja,
+    }, ['getNavigationContext'])
+    const context = await getNavigationContext()
+    assert.equal(context.capabilities.viewCaja, expected, email)
+  }
+})
+
+test('caja layout redirects a rejected current actor to dashboard and admits the allowlist', async () => {
+  for (const allowed of [false, true]) {
+    const { CajaLayout } = serverModule('../app/dashboard/caja/layout.js', {
+      requireCurrentCaja: async () => { if (!allowed) throw new Error('No autorizado') },
+      redirect: (destination) => { throw new Error(`redirect:${destination}`) },
+    }, ['CajaLayout'])
+    if (allowed) assert.equal(await CajaLayout({ children: 'protected-content' }), 'protected-content')
+    else await assert.rejects(() => CajaLayout({ children: 'protected-content' }), /redirect:\/dashboard$/)
   }
 })
 

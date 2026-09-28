@@ -145,7 +145,8 @@ test('bloques: vocabulario cerrado, tablas cuadradas y NI UN "<" en todo el cont
         assert.ok(Array.isArray(b.recursos) && b.recursos.length > 0, `${m.id}: recursos vacío`)
         for (const r of b.recursos) {
           assert.ok(r.titulo, `${m.id}: recurso sin título`)
-          assert.match(r.href, /^https:\/\/drive\.google\.com\//, `${m.id}: recurso no apunta a Drive oficial`)
+          // Drive oficial, o material propio servido con sesión (materia fiscal).
+          assert.match(r.href, /^(https:\/\/drive\.google\.com\/|\/api\/entrenamiento\/)/, `${m.id}: recurso no apunta a Drive oficial`)
         }
       }
     }
@@ -666,7 +667,7 @@ test('marcarEstudiado: solo ids de oficio y solo módulos del puesto de quien es
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'marcarEstudiado')
   assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
-  assert.match(body, /m\.roles\.includes\(u\.rol\)/)
+  assert.match(body, /esDelPlan\(m, u\.rol, u\.centro_id\)/)
   assert.match(body, /INSERT INTO entrenamiento_progreso/)
 })
 

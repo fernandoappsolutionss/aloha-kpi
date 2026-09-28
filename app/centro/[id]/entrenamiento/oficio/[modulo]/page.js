@@ -28,7 +28,7 @@ import { GLOSARIO } from '../../../../../../lib/entrenamiento/oficio/glosario'
 import manifestVoz from '../../../../../../lib/entrenamiento/audio-manifest-oficio.json'
 import manifestGuia from '../../../../../../lib/entrenamiento/audio-manifest-guia.json'
 import { pasosDe, hechosDe, puertaCerrada } from '../../../../../../lib/entrenamiento/oficio/guia-pasos'
-import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
+import { minimoAprobacion, estudiado, gradienteAbierto, planDeRol, esDelPlan, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel } from '../../../../../../lib/entrenamiento/oficio/progreso'
 
 const QUIZ_SIN_LECCION = 'Antes de responder marca la lección como realizada.'
 
@@ -103,7 +103,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const revisionDisponible = (oficio.revision || []).find((r) =>
     (r.plan || []).some((x) => x.id === m.id))
   const modoRevision = Boolean(revisionSolicitada)
-  const esAlumno = !modoRevision && m.roles.includes(oficio.rol)
+  const esAlumno = !modoRevision && esDelPlan(m, oficio.rol, oficio.centroId)
   const esOficial = Boolean(revisionSolicitada || revisionDisponible)
 
   if (!esAlumno && !esOficial) {
@@ -125,7 +125,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   // eso la Administradora se abría un módulo compartido con la Asistente que
   // ella todavía no puede estudiar. Leerlo como jefa entrenadora no la exime:
   // le toca estudiarlo igual, y en orden.
-  const esSuyo = m.roles.includes(oficio.rol)
+  const esSuyo = esDelPlan(m, oficio.rol, oficio.centroId)
   const propio = progreso?.[m.id] || {}
   const abiertoParaMi = gradienteAbierto(m, progreso || {})
   const p = esAlumno ? propio : null
@@ -133,7 +133,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const abierto = esAlumno && abiertoParaMi
   const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
   const rolPlan = esAlumno ? oficio.rol : (revisionSolicitada || revisionDisponible).rol
-  const plan = planDeRol(rolPlan, MODULOS_OFICIO)
+  const plan = planDeRol(rolPlan, MODULOS_OFICIO, esAlumno ? oficio.centroId : undefined)
   const idx = plan.findIndex((x) => x.id === m.id)
   const siguiente = idx >= 0 ? plan[idx + 1] : null
   const cola = esAlumno ? '' : `?revisar=${rolPlan}`
@@ -155,7 +155,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
       {volver}
       <div className="main__head"><div>
         <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
-          Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length}
+          Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {idx >= 0 ? idx + 1 : m.orden} de {plan.length}
         </div>
         <h1 className="h-title">{m.titulo}</h1>
       </div></div>
@@ -330,7 +330,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const encabezado = (
     <div className="main__head"><div>
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>
-        Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {m.orden} de {plan.length} · {m.duracionMin} min
+        Entrenamiento en Cubierta · ALOHA · {CURSOS[m.curso]?.titulo || 'Oficio'} · Módulo {idx >= 0 ? idx + 1 : m.orden} de {plan.length} · {m.duracionMin} min
       </div>
       <h1 className="h-title">{m.titulo}</h1>
       {!esAlumno && esOficial && (

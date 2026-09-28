@@ -59,7 +59,7 @@ test('el candado mira si el módulo es tuyo, no si vienes en modo revisión', ()
   const llamada = src.slice(i, i + 120)
   assert.doesNotMatch(llamada, /\besAlumno\b/,
     'la puerta no puede depender de esAlumno: ?revisar= lo apaga y abre el módulo propio')
-  assert.match(src, /const esSuyo = m\.roles\.includes\(/,
+  assert.match(src, /const esSuyo = esDelPlan\(/,
     'la puerta se decide con "el módulo está en mi plan", que ningún parámetro de URL cambia')
 })
 

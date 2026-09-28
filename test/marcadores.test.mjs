@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  evaluarProducto, mesesProducto, semaforo, verdictoCrecimiento, BANDA_CRECIMIENTO,
+  evaluarProducto, mesesProducto, semaforo, verdictoCrecimiento, BANDA_CRECIMIENTO, cobranzaDeclarada,
 } from '../lib/marcadores.mjs'
 import {
   CUMPLIMIENTO_KEYS, PRODUCTO_KEYS, DISCIPLINA_KEYS, DISCIPLINA_GRUPOS,
@@ -445,4 +445,27 @@ test('EL PANEL Y LA PANTALLA DEL CENTRO DICEN EL MISMO "Disciplina"', () => {
   assert.equal(disciplinaPct([mes]).puntos, disciplinaPct([conMetasEnNo]).puntos)
   // El promedio plano de los 33 sí se movía: por eso no puede ser "Disciplina".
   assert.notEqual(cumplimientoPct([mes]), cumplimientoPct([conMetasEnNo]))
+})
+
+// Brisas Q3-2026: la tarjeta decía 49 vencidas, el pico del jueves posterior
+// al vencimiento de la mensualidad. La fórmula ALOHA juzga la semana por su
+// último día registrado; el mes, por la peor de sus semanas.
+test('la cobranza del mes es el peor CIERRE de semana, no el peor día', () => {
+  const meses = mesesProducto({
+    months: [9],
+    rs: [{ month: 9, ninos_inicio_mes: 100 }],
+    ks: [
+      { month: 9, semana: 2, cob_d1: 20, cob_d2: 20, cob_d3: 16, cob_d4: 15, cob_d5: 14 },
+      { month: 9, semana: 3, cob_d1: 18, cob_d2: 31, cob_d3: 46, cob_d4: 33, cob_d5: 40 },
+      // Semana en curso: los días que aún no pasan quedan en 0 (así los
+      // guardan el formulario y el cron) y no pueden abaratar la semana.
+      { month: 9, semana: 4, cob_d1: 26, cob_d2: 36, cob_d3: 20, cob_d4: 0, cob_d5: 0 },
+      { month: 9, semana: 5, cob_d1: null, cob_d2: null },
+    ],
+    mesesCalc: [],
+  })
+  assert.equal(meses[0].cobranza, 40)
+  // Una semana declarada toda en 0 sí vale 0.
+  assert.equal(cobranzaDeclarada([{ cob_d1: 0, cob_d5: 0 }]), 0)
+  assert.equal(cobranzaDeclarada([{ cob_d1: null }]), null)
 })

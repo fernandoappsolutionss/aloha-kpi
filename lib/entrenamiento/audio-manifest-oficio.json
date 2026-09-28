@@ -333,5 +333,15 @@
     "hash": "f53793c5502a",
     "file": "oficio/of-coa-14.mp3",
     "seg": 60
+  },
+  "oficio/of-fis-1": {
+    "hash": "6999ed819e73",
+    "file": "oficio/of-fis-1.mp3",
+    "seg": 51
+  },
+  "oficio/of-fis-2": {
+    "hash": "b08b41d27843",
+    "file": "oficio/of-fis-2.mp3",
+    "seg": 51
   }
 }
