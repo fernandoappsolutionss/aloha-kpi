@@ -158,6 +158,7 @@ export async function inscribirEstudiante(centroId, data) {
   }
   const fecha = data?.fecha || hoy
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
+  if (fecha > hoy) return { error: 'La fecha de inscripción no puede ser futura.' }
   const origenVenta = data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
   if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
   if (!origenVenta && requiereOrigenVenta(fecha)) return { error: 'Selecciona el origen comercial de la venta.' }
@@ -284,10 +285,13 @@ export async function actualizarEstudiante(centroId, id, data) {
   if (data?.fecha_inscripcion !== undefined && !data.fecha_inscripcion) {
     return { error: 'La fecha de inscripción no se puede vaciar: corrígela si hace falta, pero todo niño la necesita.' }
   }
+  if (data?.fecha_inscripcion && String(data.fecha_inscripcion).slice(0, 10) > hoyISO()) {
+    return { error: 'La fecha de inscripción no puede ser futura.' }
+  }
   const fechaInscripcionNueva = data?.fecha_inscripcion !== undefined
     ? String(data.fecha_inscripcion).slice(0, 10)
     : fechaIso10(est.fecha_inscripcion)
-  const corrigeInscripcion = fechaInscripcionNueva !== fechaIso10(est.fecha_inscripcion)
+  let corrigeInscripcion = fechaInscripcionNueva !== fechaIso10(est.fecha_inscripcion)
   const cierreDe = () => (data?.fecha_cierre_nivel !== undefined ? data.fecha_cierre_nivel || null : est.fecha_cierre_nivel)
   const textoDe = (campo) => {
     if (data?.[campo] === undefined) return est[campo]
@@ -329,6 +333,12 @@ export async function actualizarEstudiante(centroId, id, data) {
       WHERE estudiante_id = ${id} AND tipo = 'inscripcion'
       ORDER BY fecha, id
     `
+    // Ficha y venta pueden quedar desfasadas: el pendiente colocado después
+    // estrena su venta el día de la colocación (g1-8) y la ficha conserva su
+    // fecha vieja. Una fecha ENVIADA que difiere de la venta canónica también
+    // es corrección (el modal solo la manda si el usuario la tocó).
+    if (data?.fecha_inscripcion !== undefined && eventosIns.length === 1 &&
+      fechaIso10(eventosIns[0].fecha) !== fechaInscripcionNueva) corrigeInscripcion = true
     const [evConGrupo] = await query`
       SELECT id FROM estudiante_eventos
       WHERE estudiante_id = ${id} AND a_grupo_id IS NOT NULL LIMIT 1
