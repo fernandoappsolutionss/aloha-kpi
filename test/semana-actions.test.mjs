@@ -13,6 +13,10 @@ test('acciones semanales tienen guardas y clasificación de acceso', () => {
   assert.equal(ACTION_ACCESS_MATRIX['app/actions/semana.js#actualizarSemanaCentro'], ACCESS_KINDS.writeCentro)
   assert.equal(ACTION_ACCESS_MATRIX['app/actions/semana.js#recalcularSemanaCentro'], ACCESS_KINDS.master)
   assert.equal(ACTION_ACCESS_MATRIX['app/actions/semana.js#getTableroSemanal'], ACCESS_KINDS.readGlobal)
+  assert.equal(ACTION_ACCESS_MATRIX['app/actions/semana.js#asignarCondicion'], ACCESS_KINDS.closeMonth)
+  for (const nombre of ['agregarObjetivo', 'editarObjetivo', 'marcarObjetivo', 'eliminarObjetivo']) {
+    assert.equal(ACTION_ACCESS_MATRIX[`app/actions/semana.js#${nombre}`], ACCESS_KINDS.writeCentro)
+  }
   assert.equal(API_ACCESS_MATRIX['app/api/cron/estadisticas-semana/route.js#GET'], ACCESS_KINDS.cron)
 })
 

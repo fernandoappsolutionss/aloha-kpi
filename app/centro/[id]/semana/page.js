@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import TarjetaEstadistica from '../../../../components/semana/TarjetaEstadistica'
+import PlanSemana from '../../../../components/semana/PlanSemana'
 import { getSemanaCentro, actualizarSemanaCentro } from '../../../actions/semana'
 import { rangoSemana } from '../../../../lib/semana-cierre.mjs'
 
@@ -32,6 +33,11 @@ export default function SemanaPage() {
     finally { if (turno === solicitud.current) setActualizando(false) }
   }
 
+  async function refrescarPlan() {
+    const result = await getSemanaCentro(id)
+    setDatos(result)
+  }
+
   const rango = datos ? rangoSemana(datos.semanaAbierta) : null
   return <div className="shell">
     <Sidebar rol="usuario" centroNombre={datos?.centro?.nombre} centroId={id} />
@@ -46,9 +52,10 @@ export default function SemanaPage() {
       </div>
       {cargando && <p role="status">Cargando semana…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
-      {datos && !cargando && <div className="semana-grid">
-        {datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} />)}
-      </div>}
+      {datos && !cargando && <>
+        <div className="semana-grid">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} />)}</div>
+        <PlanSemana centroId={id} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} onRefresh={refrescarPlan} />
+      </>}
     </main>
   </div>
 }

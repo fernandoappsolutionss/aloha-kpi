@@ -12,13 +12,14 @@ test('migración semanal es de solo lectura por defecto', async () => {
   assert.doesNotMatch(calls[0], /CREATE TABLE/)
 })
 
-test('con apply ejecuta solo la migración F2, completa y en orden', async () => {
+test('con apply ejecuta las migraciones F2 y F3 completas y en orden', async () => {
   const calls = []
   const client = { query: async (sql) => { calls.push(sql); return { rows: [{}] } } }
-  assert.deepEqual(MIGRACIONES, ['2026-10-01-estadisticas-semana.sql'])
+  assert.deepEqual(MIGRACIONES, ['2026-10-01-estadisticas-semana.sql', '2026-10-01-plan-semana.sql'])
   assert.deepEqual(await runMigration(client, { apply: true, log: () => {} }), { applied: true })
-  assert.equal(calls.length, 2)
+  assert.equal(calls.length, 3)
   assert.match(calls[1], /BEGIN;[\s\S]*CREATE TABLE IF NOT EXISTS estadisticas_semana[\s\S]*CREATE TABLE IF NOT EXISTS cobranza_diaria[\s\S]*COMMIT;/)
+  assert.match(calls[2], /BEGIN;[\s\S]*CREATE TABLE IF NOT EXISTS semana_planes[\s\S]*CREATE TABLE IF NOT EXISTS semana_objetivos[\s\S]*COMMIT;/)
 })
 
 test('cron registra cobranza diaria antes de saltar el KPI mensual cerrado', () => {

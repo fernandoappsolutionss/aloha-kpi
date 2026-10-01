@@ -31,3 +31,16 @@ test('tablero semanal usa una sola acción y TableScroller', () => {
   assert.match(read('../app/dashboard/page.js'), /<TableroSemanal/)
   assert.match(read('../app/globals.css'), /@media \(max-width: 767px\)[\s\S]*\.semana-grid/)
 })
+
+test('plan y tablero muestran condición, estado y discrepancia', () => {
+  const plan = read('../components/semana/PlanSemana.js')
+  assert.match(plan, /Más condiciones/)
+  assert.match(plan, /Plazo: viernes 10:00/)
+  assert.match(plan, /Lectura de la gráfica/)
+  assert.match(plan, /Cambiar/)
+  assert.match(read('../app/centro/[id]/semana/page.js'), /<PlanSemana/)
+  assert.match(read('../components/semana/GraficaSemanal.js'), /colorCondicion\(p\.condicion\)/)
+  const tablero = read('../components/semana/TableroSemanal.js')
+  assert.match(tablero, /Condición/)
+  assert.match(tablero, /Discrepancia/)
+})
