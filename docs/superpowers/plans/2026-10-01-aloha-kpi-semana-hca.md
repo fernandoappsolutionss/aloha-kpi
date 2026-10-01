@@ -656,7 +656,7 @@ try {
   - `centros`: `id, nombre, pais` → zona horaria con `zonaHorariaCentro`.
   - `estudiantes` y `grupos`: mismas columnas que `cargarDatosCentro` de `lib/kpi-semanal-service.js` más las que necesite `matriculaAnulada` (revísalo).
   - `estudiante_eventos` con `tipo IN ('inscripcion','retiro','cambio_grupo','reincorporacion')`.
-  - `inicioMes`: `cierreMesAnterior(centroId, year, month, query)` de `lib/cadena` para el mes del jueves.
+  - `inicioMes`: `(await cierreMesAnterior(centroId, year, month, query))?.valor ?? null` de `lib/cadena` para el mes del jueves (la función devuelve `{ valor, year, month }`, no un número).
   - `kpi_semanas` de los meses que toca la semana y `cobranza_diaria` del rango.
   - Clases del CRM con `cargarClasesCrm`; si falla, `cp_asistidas` queda sin dato con el error y lo demás sigue.
   - `hoy` = `fechaCivil(now, zona)`. Para la semana abierta, el corte de la población es `min(hoy, semanaFin)`.
