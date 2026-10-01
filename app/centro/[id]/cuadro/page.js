@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { loadCuadro, savePedido, deletePedido, sincronizarConKpi } from '../../../actions/cuadro'
@@ -305,7 +306,7 @@ export default function CuadroPage() {
                 {congelado ? (
                   <><b style={{ color: 'var(--text)' }}>🔒 Este mes está cerrado:</b> ves la foto congelada al cierre{data.congeladoAt ? ` (${fmtFecha(data.congeladoAt)})` : ''}. Los retiros y movimientos nuevos van en el mes en curso; para corregir este mes, reábrelo en KPI Mensual.</>
                 ) : (
-                  <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>.</>
+                  <><b style={{ color: 'var(--text)' }}>Continúa</b> = venía del mes anterior y sigue activo. Nuevo, Reincorporado y Retirado salen de los movimientos del mes. Para sacar a un niño del cuadro usa <b style={{ color: 'var(--text)' }}>Retirar</b> en su fila; si el retiro fue un error o el niño volvió, <b style={{ color: 'var(--text)' }}>Reincorporar</b>. Si lo único mal es el <b style={{ color: 'var(--text)' }}>motivo</b>, no lo reincorpores: corrígelo en <Link href={`/centro/${id}/grupos#retirados`}>Grupos › Sin grupo y retirados</Link> (Corregir motivo). Reincorporar y volver a retirar cuenta un retiro de más.</>
                 )}
               </div>
               <TableScroller stickyFirstColumn label="Grupos del cuadro">
@@ -634,7 +635,7 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
         <Field label="Fecha de retiro"><input type="date" name="fechaRetiro" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
         <Field label="Última asistencia (opcional)"><input type="date" name="ultimaAsistencia" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
         <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
-          El niño cae en las deserciones del mes de la fecha de retiro y deja de contar en “a pagar”. Si vuelve, lo reincorporas desde esta misma tabla.
+          El niño cae en las deserciones del mes de la fecha de retiro y deja de contar en “a pagar”. Si vuelve, lo reincorporas desde esta misma tabla. Si después ves que el motivo quedó mal, se corrige en Grupos › Sin grupo y retirados (Corregir motivo), sin reincorporarlo.
         </div>
       </div>
     </Modal>

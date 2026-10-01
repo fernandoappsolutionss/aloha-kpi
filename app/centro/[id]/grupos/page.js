@@ -20,7 +20,7 @@ import {
 import {
   inscribirEstudiante, actualizarEstudiante, graduarTiny,
   revertirBajaPotencial, retirarEstudiante, reincorporarEstudiante,
-  programarRetiro, cancelarRetiroProgramado, anularMatricula,
+  programarRetiro, cancelarRetiroProgramado, anularMatricula, corregirMotivoRetiro,
   sugerenciasAnclaNinos, fijarInicioNivel, fijarInicioNivelLote,
 } from '../../../actions/estudiantes'
 import SelectorAncla from '../../../../components/SelectorAncla'
@@ -45,6 +45,8 @@ import { generarItinerario } from '../../../../lib/itinerario'
 // aula y para el niño); el modal del plan individual se abre desde el chip.
 import { LineaTiempoPlan, NotasPlan, ProgresoPlan, PlanNinoModal, mesDe } from '../../../../components/PlanNino'
 import { posicionPlanNino } from '../../../../lib/plan-nino.mjs'
+import { nombreMes } from '../../../../lib/retiros.mjs'
+import { usaIniciosClaseOperativos } from '../../../../lib/inicios-clase.mjs'
 import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado, fingerprintPlanGrupo, cohorteDeTransicion } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
@@ -76,6 +78,16 @@ const isoDia = (d) => {
   return isNaN(dt) ? '' : dt.toISOString().slice(0, 10)
 }
 const fmtDia = (d) => isoDia(d) || '—'
+// Día (AAAA-MM-DD) en Panamá de una marca de tiempo; '' si no se puede leer.
+const diaPanama = (ts) => {
+  const dt = ts ? new Date(ts) : null
+  return dt && !isNaN(dt) ? dt.toLocaleDateString('en-CA', { timeZone: 'America/Panama' }) : ''
+}
+// Lo que CUENTA en el KPI es el motivo del evento de retiro vigente
+// (loadOperaciones lo trae en e.retiro); la ficha es el respaldo de un
+// retirado sin evento.
+const motivoRetiroVigente = (e) => (e?.retiro ? e.retiro.motivo : e?.motivo_retiro) || null
+const etiquetaMotivo = (m) => (m ? MOTIVOS_RETIRO_LABELS[m] || m : '')
 const horarioTexto = (horarios) =>
   (horarios || []).length ? horarios.map((h) => `${DIAS[h.dia]} ${aHora12(aMinutos(h.hora_inicio))}–${aHora12(aMinutos(h.hora_fin))}`).join(' · ') : 'Sin horario'
 
@@ -290,10 +302,15 @@ export default function GruposPage() {
   const [status, setStatus] = useState('')
   const [tab, setTab] = useState('grupos')
   useEffect(() => {
-    const abrirSalones = () => { if (window.location.hash === '#salones') setTab('coaches') }
-    abrirSalones()
-    window.addEventListener('hashchange', abrirSalones)
-    return () => window.removeEventListener('hashchange', abrirSalones)
+    // #salones abre Coaches y salones; #retirados, la pestaña donde se corrige
+    // el motivo de un retiro (el Cuadro de Negocio enlaza aquí).
+    const abrirPorHash = () => {
+      if (window.location.hash === '#salones') setTab('coaches')
+      else if (window.location.hash === '#retirados') setTab('alumnos')
+    }
+    abrirPorHash()
+    window.addEventListener('hashchange', abrirPorHash)
+    return () => window.removeEventListener('hashchange', abrirPorHash)
   }, [])
   const [filtro, setFiltro] = useState('todos')
   const [busqueda, setBusqueda] = useState('')
@@ -318,6 +335,7 @@ export default function GruposPage() {
   const [retiroEst, setRetiroEst] = useState(null)
   const [progEst, setProgEst] = useState(null) // "Retirar el próximo mes" (R5)
   const [reincEst, setReincEst] = useState(null)
+  const [motivoEst, setMotivoEst] = useState(null) // "Corregir motivo" de un retirado
   const [anularEst, setAnularEst] = useState(null)
   const [reversoEst, setReversoEst] = useState(null)
   const [itinEdit, setItinEdit] = useState(null) // { grupo, fecha? }
@@ -414,7 +432,7 @@ export default function GruposPage() {
   }
 
   // Teclado: Esc cierra el detalle, ↑/↓ recorren la lista de grupos.
-  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || progEst || reincEst || itinEdit || verPlan)
+  const hayModal = !!(grupoModal || inscribir || editEst || retiroEst || progEst || reincEst || motivoEst || itinEdit || verPlan)
   useEffect(() => {
     function onKey(e) {
       if (tab !== 'grupos' || hayModal) return
@@ -844,9 +862,14 @@ export default function GruposPage() {
                         <tr key={e.id} style={{ cursor: 'default' }}>
                           <td style={{ fontWeight: 600, color: 'var(--text)' }}>{e.nombre}</td>
                           <td style={{ fontSize: 12 }}>{e.itinerario} {e.nivel}</td>
-                          <td><span className="pill pill--bad"><span className="dot" />{MOTIVOS_RETIRO_LABELS[e.motivo_retiro] || e.motivo_retiro || '—'}</span></td>
+                          <td>
+                            <span className="pill pill--bad"><span className="dot" />{etiquetaMotivo(motivoRetiroVigente(e)) || '—'}</span>
+                            {e.retiro?.correcciones?.length > 0 && (
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>Motivo corregido el {fmtDia(diaPanama(e.retiro.correcciones.at(-1).fecha))}</div>
+                            )}
+                          </td>
                           <td className="num" style={{ fontSize: 12 }}>{fmtDia(e.fecha_retiro)}</td>
-                          <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Corregir a matrícula anulada</button></>}</td>
+                          <td style={{ textAlign: 'right' }}>{canWrite && <><button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setMotivoEst(e) }}>Corregir motivo</button> <button className="btn" style={BTN_XS} onClick={() => { setStatus(''); setReincEst(e) }}>Reincorporar</button> <button className="btn" style={BTN_XS} onClick={() => acciones.anular(e)}>Corregir a matrícula anulada</button></>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -942,6 +965,11 @@ export default function GruposPage() {
         <ReincorporarModal centroId={id} est={reincEst} grupos={grupos}
           onClose={() => setReincEst(null)}
           onSaved={(msg) => { setReincEst(null); setStatus('✅ ' + msg); refresca() }} />
+      )}
+      {canWrite && motivoEst && (
+        <CorregirMotivoModal centroId={id} est={motivoEst}
+          onClose={() => setMotivoEst(null)}
+          onSaved={(res) => { const nombre = motivoEst.nombre; setMotivoEst(null); setStatus(mensajeMotivoCorregido(nombre, res)); refresca() }} />
       )}
       {canWrite && anularEst && (
         <AnularMatriculaModal centroId={id} est={anularEst}
@@ -1678,6 +1706,23 @@ function ItinerarioNivel({ centroId, g, it, pos, canWrite = true, onAjustar, onP
       </section>
     </div>
   )
+}
+
+// Mensaje de estado tras "Corregir motivo": el server devuelve qué cambió y qué
+// queda pendiente (otro retiro en el mismo mes, KPI del mes ya guardado).
+function mensajeMotivoCorregido(nombre, res) {
+  const mes = nombreMes(res.year, res.month)
+  const partes = res.sinCambios
+    ? [`✅ No había nada que corregir: el retiro de ${nombre} ya tiene el motivo ${etiquetaMotivo(res.motivo)}.`]
+    : [`✅ Motivo del retiro de ${nombre} corregido: ${etiquetaMotivo(res.motivoAnterior) || 'sin motivo'} → ${etiquetaMotivo(res.motivo)} (retiro de ${mes}).`]
+  if (res.sinCambios && res.eventoCambio) partes.push('La lista que tenías abierta estaba desactualizada; ya se recargó.')
+  if (!res.sinCambios && res.mismoCampoKpi) partes.push('En el KPI los dos motivos cuentan como «Otro»: los totales no cambian.')
+  const otros = res.otrosRetirosMismoMes?.length || 0
+  if (otros) {
+    partes.push(`Ojo: ${nombre} tiene ${otros === 1 ? 'otro retiro registrado' : `${otros} retiros más registrados`} en ${mes} y ${otros === 1 ? 'también cuenta' : 'también cuentan'}. Si fue un error, avísale a Administración; si el niño se retiró dos veces ese mes, está bien.`)
+  }
+  if (res.requiereGuardar) partes.push(`El KPI de ${mes} ya estaba guardado: abre KPI Mensual y vuelve a Guardar para actualizar el historial.`)
+  return partes.join(' ')
 }
 
 // Mensaje de resultado tras fijar el ancla: lo que el admin fue a buscar es la
@@ -3304,6 +3349,88 @@ function ReincorporarModal({ centroId, est, grupos, onClose, onSaved }) {
             {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario} ({g.estudiantes.length} niños){g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
           </select>
         </Field>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Modal: corregir el motivo de un retiro ya registrado ─────────────────────
+// Corrige el motivo del retiro VIGENTE (evento + ficha) sin reincorporar ni
+// volver a retirar: ese rodeo contaba un retiro y un reincorporado de más
+// (David, agosto 2026). Se muestra y se compara el motivo del EVENTO, el que
+// cuenta en el KPI; el server re-verifica todo bajo el candado del mes.
+function CorregirMotivoModal({ centroId, est, onClose, onSaved }) {
+  const complete = useDialogCallback(onSaved, centroId)
+  const retiro = est.retiro || null
+  const motivoActual = motivoRetiroVigente(est)
+  const [motivo, setMotivo] = useState(motivoActual || '')
+  const [razon, setRazon] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const mes = retiro ? nombreMes(retiro.year, retiro.month) : ''
+  const historico = !!retiro && !usaIniciosClaseOperativos(retiro.year, retiro.month)
+  const sinCambio = !!motivo && motivo === (retiro?.motivo || '') && motivo === (est.motivo_retiro || '')
+  const correcciones = retiro?.correcciones || []
+
+  async function save() {
+    setSaving(true); setErr('')
+    try {
+      const res = await corregirMotivoRetiro(centroId, est.id, {
+        motivo, razon, eventoIdEsperado: retiro?.id, motivoEsperado: retiro?.motivo ?? null,
+      })
+      if (res.error) { setErr(res.error); return }
+      complete(res)
+    } catch {
+      // Puede haberse guardado y perderse la respuesta: reintentar es seguro
+      // (el server responde "no había nada que corregir").
+      setErr('No se pudo confirmar la corrección. Revisa el motivo en la lista antes de volver a intentarlo.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal title={`Corregir motivo del retiro de ${est.nombre}`} width={520} onClose={onClose} closeDisabled={saving}
+      footer={(
+        <>
+          <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary" onClick={save}
+            disabled={saving || !retiro || historico || !motivo || sinCambio || !razon.trim()}>{saving ? 'Guardando…' : 'Corregir motivo'}</button>
+        </>
+      )}>
+      {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      <div style={{ display: 'grid', gap: 14, fontSize: 13, lineHeight: 1.6 }}>
+        <div style={{ color: 'var(--text-muted)' }}>
+          {est.itinerario} nivel {est.nivel} · retirado el {fmtDia(retiro?.fecha || est.fecha_retiro)} · motivo actual: <b style={{ color: 'var(--text)' }}>{etiquetaMotivo(motivoActual) || 'sin motivo'}</b>
+        </div>
+        {!retiro ? (
+          <div className="alert alert--error">Este niño figura retirado pero no tiene un retiro registrado: no cuenta en la deserción de ningún mes. Avísale a Administración para revisar su historial.</div>
+        ) : historico ? (
+          <div className="alert alert--error">Este retiro es de {mes}. Los meses anteriores a agosto de 2026 conservan su captura histórica: corrige sus motivos desde KPI Mensual.</div>
+        ) : (
+          <p style={{ margin: 0 }}>Sigue contando como retirado en <b>{mes}</b>: solo cambia el motivo. No hace falta reincorporarlo ni volver a retirarlo (eso suma un retiro de más).</p>
+        )}
+        <Field label="Motivo correcto *">
+          <select name="motivo_correcto" className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+            {!motivoActual && <option value="">Selecciona el motivo…</option>}
+            {MOTIVOS_RETIRO.map((m) => <option key={m} value={m}>{MOTIVOS_RETIRO_LABELS[m]}</option>)}
+          </select>
+        </Field>
+        <Field label="¿Por qué lo corriges? *">
+          <textarea name="razon_correccion" className="input" rows={2} maxLength={500} value={razon} onChange={(e) => setRazon(e.target.value)}
+            placeholder="Ej.: se cargó Económico por error; la familia avisó que terminó el programa." />
+        </Field>
+        {correcciones.length > 0 && (
+          <div>
+            <span className="label">Correcciones anteriores</span>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {correcciones.map((c, i) => (
+                <li key={i}>{fmtDia(diaPanama(c.fecha))}{c.nombre ? ` · ${c.nombre}` : ''}: {etiquetaMotivo(c.antes) || 'sin motivo'} → {etiquetaMotivo(c.despues)}{c.razon ? `. ${c.razon}` : ''}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div style={{ color: 'var(--text-dim)' }}>Queda registrado quién corrigió, cuándo y por qué. Si el mes del retiro ya está cerrado, primero hay que reabrirlo en KPI Mensual.</div>
       </div>
     </Modal>
   )

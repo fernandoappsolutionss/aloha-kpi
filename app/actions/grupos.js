@@ -236,6 +236,39 @@ export async function loadOperaciones(centroId) {
     SELECT * FROM estudiantes WHERE centro_id = ${centroId} AND estado = 'retirado'
     ORDER BY fecha_retiro DESC NULLS LAST, updated_at DESC LIMIT 5000
   `
+  // Retiro VIGENTE de cada retirado: el evento que cuenta en el KPI y el que
+  // corrige "Corregir motivo" (su id y motivo viajan de vuelta como token).
+  // Consulta aparte, mezclada aquí. Las correcciones viajan sin email ni uid:
+  // fecha, nombre, motivos y razón.
+  const vigentes = retirados.length
+    ? await sql`
+        SELECT DISTINCT ON (estudiante_id) estudiante_id, id, motivo, year, month, fecha,
+          detalle->'correcciones_motivo' AS correcciones
+        FROM estudiante_eventos
+        WHERE estudiante_id = ANY(${retirados.map((e) => Number(e.id))}::int[]) AND tipo = 'retiro'
+        ORDER BY estudiante_id, id DESC
+      `
+    : []
+  const retiroPorNino = new Map(vigentes.map((ev) => [String(ev.estudiante_id), ev]))
+  for (const e of retirados) {
+    const ev = retiroPorNino.get(String(e.id))
+    e.retiro = ev
+      ? {
+          id: Number(ev.id),
+          motivo: ev.motivo ?? null,
+          year: Number(ev.year),
+          month: Number(ev.month),
+          fecha: fechaIso10(ev.fecha),
+          correcciones: (Array.isArray(ev.correcciones) ? ev.correcciones : []).map((c) => ({
+            fecha: c?.corregido_at || null,
+            nombre: c?.actor?.nombre || null,
+            antes: c?.motivo_anterior ?? null,
+            despues: c?.motivo_nuevo ?? null,
+            razon: c?.razon || '',
+          })),
+        }
+      : null
+  }
   const anulados = await sql`
     SELECT e.*, ev.fecha AS fecha_anulacion, ev.motivo AS motivo_anulacion,
       reverso.detalle AS reverso_matricula
