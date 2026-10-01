@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resumenEncuesta, validarRespuesta, periodoAbierto, periodoPanama, normalizarNombre, telefonoIdentidad, textoFoda } from '../lib/encuestas/domain.mjs'
+import { resumenEncuesta, validarRespuesta, periodoAbierto, periodoPanama, normalizarNombre, telefonoIdentidad, textoResumenEncuesta } from '../lib/encuestas/domain.mjs'
 const respuesta = { general:4, avance:3, coach:5, atencion:4, consentimiento:true }
 test('30% es inclusivo: 29 de 100 no; 30 sí, con difusión', () => {
   const c = { activos:100, compartida_at:'2026-09-12' }
@@ -29,7 +29,7 @@ test('la campaña histórica conserva el 50% estricto con el que fue cerrada', (
 test('satisfacción y participación no son el mismo indicador', () => {
   const r=resumenEncuesta({activos:10,compartida_at:'x'},[{...respuesta,general:1},respuesta])
   assert.equal(r.participacion,20);assert.equal(r.satisfaccion,50)
-  assert.match(textoFoda('Septiembre',r),/50%.*2\/10/)
+  assert.match(textoResumenEncuesta('Septiembre',r),/50%.*2\/10/)
   assert.equal(resumenEncuesta({activos:10}).satisfaccion,null)
 })
 test('mes por Panamá, el cliente no elige fecha de respuesta', () => {

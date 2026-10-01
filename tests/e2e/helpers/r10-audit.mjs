@@ -10,7 +10,7 @@ export const ADMIN_ROUTES=['/dashboard','/dashboard/alertas','/dashboard/centros
 // hoja de SOP y el carrusel de diapositivas no los abría nadie en un viewport.
 // El actor `center` es administradora del centro 2, así que of-cen-1 es de su
 // puesto y su hoja trae el procedimiento escrito a mano.
-export const CENTER_ROUTES=['','/ruta-nivel','/kpi','/grupos','/cuadro','/eventos','/cumplimiento','/foda','/historial','/entrenamiento','/entrenamiento/meta','/entrenamiento/oficio','/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-1','/entrenamiento/oficio/of-cen-1/sop']
+export const CENTER_ROUTES=['','/ruta-nivel','/kpi','/grupos','/cuadro','/eventos','/cumplimiento','/peticiones','/historial','/entrenamiento','/entrenamiento/meta','/entrenamiento/oficio','/entrenamiento/oficio/glosario','/entrenamiento/oficio/of-cen-1','/entrenamiento/oficio/of-cen-1/sop']
 const pageErrors=new WeakMap()
 export async function actorPage(browser,testInfo,actor) {
   requireR10Gate()

@@ -24,7 +24,7 @@ for(const theme of ['light','dark']) test('WCAG A/AA completo ambos actores tema
           for(const summary of await page.locator('.chart-data summary').all())await summary.click()
           await axe(page,failures)
         }
-        await page.goto('/centro/2/foda');await ready(page);await page.getByRole('tab',{name:'Petición',exact:true}).click();await axe(page,failures)
+        await page.goto('/centro/2/peticiones');await ready(page);await page.getByRole('tab',{name:'Petición',exact:true}).click();await axe(page,failures)
         await page.goto('/centro/2/entrenamiento');await ready(page);await page.getByText('Preguntas frecuentes',{exact:true}).click();await page.locator('.ent-faq summary').first().click();await axe(page,failures)
       }
     }finally{await context.close()}

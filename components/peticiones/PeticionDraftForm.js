@@ -185,7 +185,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
           <p className="label" style={{ marginBottom: 6 }}>Borradores existentes</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {drafts.map((draft) => (
-              <div key={draft.id} className="foda-request-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div key={draft.id} className="peticiones-request-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div>
                   <p style={{ fontSize: 13 }}>{categoriaLabel(draft.categoria)}</p>
                   {draft.expired && <p style={{ color: 'var(--bad)', fontSize: 12 }}>Borrador vencido</p>}
@@ -224,7 +224,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
       <fieldset data-tour="peticiones.formulario" disabled={documentFormDisabled} aria-describedby={!uploadsAvailable ? "peticion-storage-status" : undefined} style={{ border: 'none', padding: 0, margin: 0 }}>
         {!activeDraft && (
           <div style={{ marginTop: 14 }}>
-            <div className="foda-quote-fields">
+            <div className="peticiones-quote-fields">
               <label className="field">
                 <span className="label">Categoría</span>
                 <select name="categoria" className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -253,7 +253,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
                 Borrador vencido — ya no puede editarse ni enviarse. Descártalo para empezar uno nuevo.
               </p>
             )}
-            <div className="foda-quote-fields" style={{ marginBottom: 10 }}>
+            <div className="peticiones-quote-fields" style={{ marginBottom: 10 }}>
               <label className="field">
                 <span className="label">Categoría</span>
                 <select name="categoria" className="select" value={category} onChange={onCategoryChange} disabled={activeDraft.expired}>
@@ -283,7 +283,7 @@ export default function PeticionDraftForm({ centroId, anio, trimestre, drafts, u
                     onBusyChange={setQuoteBusy} onValidated={onRefresh} onStatus={onStatus} />
                   <p className="h-sub" style={{ marginTop: 10 }}>{validCount === 1 ? 'Cotización del servicio validada. Ya puedes enviar a aprobación.' : 'Adjunta una cotización válida en PDF antes de enviar.'}</p>
                 </div> : <>
-                <div className="foda-quote-grid" style={{ marginTop: 12 }}>
+                <div className="peticiones-quote-grid" style={{ marginTop: 12 }}>
                   {quotes.map((quote, i) => (
                     <CotizacionCard key={quote.id} centroId={centroId} peticionId={activeDraft.id}
                       quote={quote} index={i} onValidated={onRefresh} onStatus={onStatus} />

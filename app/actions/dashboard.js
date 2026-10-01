@@ -157,8 +157,8 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   `
   // DISCIPLINA, y sólo disciplina. Este bucle recorría los 33
   // CUMPLIMIENTO_KEYS, o sea metía las 3 metas de PRODUCTO dentro del marcador
-  // de Disciplina y además las pesaba todas igual. La pantalla del centro y el
-  // FODA usan `disciplinaPct` (30 criterios, ponderados), así que dos
+  // de Disciplina y además las pesaba todas igual. La pantalla del centro usa
+  // `disciplinaPct` (30 criterios, ponderados), así que dos
   // pantallas con la MISMA etiqueta "Disciplina" daban números distintos
   // —ANCLAS 94% en el panel contra 100% en el centro, LOS NARANJOS hasta 8
   // puntos de diferencia—. Peor: al corregir el histórico de las 3 metas, el

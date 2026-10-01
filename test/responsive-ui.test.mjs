@@ -43,9 +43,9 @@ test('R8 mantiene fixture, autenticación propia y rutas escritoras fuera del ga
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('R10 FODA confirma descartes y borrados mediante Dialog accesible',()=>{
+test('R10 Peticiones confirma descartes y borrados mediante Dialog accesible',()=>{
   for(const path of ['PeticionesList','PeticionDraftForm','CotizacionCard']) {
-    const source=read(`../components/foda/${path}.js`)
+    const source=read(`../components/peticiones/${path}.js`)
     assert.match(source, /<Dialog/,path)
     assert.doesNotMatch(source,/\bconfirm\(/,path)
   }
@@ -122,7 +122,7 @@ test('R10 el histórico de discrepancias no depende del trimestre seleccionado',
 })
 
 test('R10 reportes conservan un main identificado y estados recuperables', () => {
-  for (const path of ['cuadro','cumplimiento','foda','historial','entrenamiento','entrenamiento/[modulo]']) {
+  for (const path of ['cuadro','cumplimiento','historial','entrenamiento','entrenamiento/[modulo]']) {
     const source = read(`../app/centro/[id]/${path}/page.js`)
     assert.match(source, /id="main-content"/, path)
     assert.match(source, /data-page-state=/, path)
@@ -145,13 +145,13 @@ test('R7 no registra mutaciones remotas ni genera artefactos con enlaces de invi
 export const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/set-password']
 export const AUTH_ACCOUNT_ROUTES = ['/perfil']
 
-export const PRODUCT_ROUTE_FILES = ['app/centro/[id]/encuestas/page.js','app/encuesta/[token]/page.js','app/encuesta/centro/[token]/page.js','app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/entrenamiento/oficio/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/dashboard/caja/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/entrenamiento/firmas/page.js','app/centro/[id]/entrenamiento/oficio/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/sop/page.js','app/centro/[id]/entrenamiento/oficio/glosario/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/mis-grupos/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
+export const PRODUCT_ROUTE_FILES = ['app/centro/[id]/encuestas/page.js','app/encuesta/[token]/page.js','app/encuesta/centro/[token]/page.js','app/page.js','app/login/page.js','app/forgot-password/page.js','app/set-password/page.js','app/perfil/page.js','app/dashboard/page.js','app/dashboard/alertas/page.js','app/dashboard/centros/page.js','app/dashboard/crecimiento/page.js','app/dashboard/entrenamiento/page.js','app/dashboard/entrenamiento/oficio/page.js','app/dashboard/historial/page.js','app/dashboard/metas/page.js','app/dashboard/ranking/page.js','app/dashboard/reporte/page.js','app/dashboard/usuarios/page.js','app/dashboard/zoho/page.js','app/dashboard/caja/page.js','app/centro/[id]/page.js','app/centro/[id]/cuadro/page.js','app/centro/[id]/cumplimiento/page.js','app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','app/centro/[id]/entrenamiento/firmas/page.js','app/centro/[id]/entrenamiento/oficio/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/page.js','app/centro/[id]/entrenamiento/oficio/[modulo]/sop/page.js','app/centro/[id]/entrenamiento/oficio/glosario/page.js','app/centro/[id]/eventos/page.js','app/centro/[id]/foda/page.js','app/centro/[id]/peticiones/page.js','app/centro/[id]/grupos/page.js','app/centro/[id]/historial/page.js','app/centro/[id]/kpi/page.js','app/centro/[id]/mis-grupos/page.js','app/centro/[id]/ruta-nivel/page.js','app/coach/[token]/page.js']
 export const NON_PRODUCT_ROUTE_FILES = ['app/e2e-primitives/page.js']
-test('R10 inventario local completo: 39 producto y una técnica, sin duplicados', () => {
+test('R10 inventario local completo: 40 producto y una técnica, sin duplicados', () => {
   const all = [...PRODUCT_ROUTE_FILES,...NON_PRODUCT_ROUTE_FILES]
-  assert.equal(PRODUCT_ROUTE_FILES.length,39)
+  assert.equal(PRODUCT_ROUTE_FILES.length,40)
   assert.equal(NON_PRODUCT_ROUTE_FILES.length,1)
-  assert.equal(new Set(all).size,40)
+  assert.equal(new Set(all).size,41)
   const actual = readdirSync(new URL('../app/',import.meta.url),{recursive:true}).map(String).filter(p=>p==='page.js'||p.endsWith('/page.js')).map(p=>`app/${p}`)
   assert.deepEqual(all.sort(),actual.sort())
 })

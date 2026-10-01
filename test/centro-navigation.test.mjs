@@ -5,7 +5,10 @@ import { hrefActivo } from '../components/nav-activo.mjs'
 
 test('KPI Mensual reúne sus cinco pantallas dentro del centro seleccionado', () => {
   const links = seccionesCentro(21)
-  assert.deepEqual(links.map(({ label }) => label), ['KPI Mensual', 'Cumplimiento', 'Encuestas', 'FODA', 'Historial'])
+  assert.deepEqual(links.map(({ label }) => label), ['KPI Mensual', 'Cumplimiento', 'Encuestas', 'Peticiones', 'Historial'])
+  assert.equal(links[3].href, '/centro/21/peticiones')
+  assert.equal(hrefKpiMensual('/centro/21/foda'), '/centro/21/kpi')
+  assert.equal(hrefKpiMensual('/centro/21/semana'), '/centro/21/kpi')
   const menu = ['/centro/21', '/centro/21/kpi', '/centro/21/grupos', '/centro/21/entrenamiento']
   for (const { href } of links) {
     assert.equal(hrefKpiMensual(href), '/centro/21/kpi')

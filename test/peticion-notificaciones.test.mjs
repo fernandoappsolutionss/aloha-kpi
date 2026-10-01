@@ -33,7 +33,7 @@ test('correo de aprobación incluye centro, categoría, texto, proveedor ganador
   assert.match(html, /Frío Total S\.A\./)
   assert.match(html, /oferta-frio-total\.pdf/)
   assert.match(html, /Gerencia General/)
-  assert.match(html, /\/centro\/10\/foda/)
+  assert.match(html, /\/centro\/10\/peticiones/)
   assert.doesNotMatch(html, /blob/i)
 })
 
@@ -52,7 +52,7 @@ test('correo de negación no menciona proveedor ganador pero conserva centro y e
   assert.match(html, /Arreglar el aire acondicionado del salón 2/)
   assert.doesNotMatch(html, /Frío Total S\.A\./)
   assert.doesNotMatch(html, /oferta-frio-total\.pdf/)
-  assert.match(html, /\/centro\/10\/foda/)
+  assert.match(html, /\/centro\/10\/peticiones/)
   assert.doesNotMatch(html, /blob/i)
 })
 

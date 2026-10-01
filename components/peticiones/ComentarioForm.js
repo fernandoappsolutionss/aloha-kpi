@@ -29,7 +29,7 @@ export default function ComentarioForm({ centroId, anio, trimestre, disabled, on
   }
 
   return (
-    <div className="foda-comment-form" style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'flex-start' }}>
+    <div className="peticiones-comment-form" style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'flex-start' }}>
       <label className="field" style={{flex:1}}><span className="label">Comentario</span>
       <textarea
         name="comentario" autoComplete="off"

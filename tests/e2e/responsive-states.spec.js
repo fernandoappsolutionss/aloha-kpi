@@ -2,7 +2,7 @@ import { test,expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { actorPage,ready,geometry } from './helpers/r10-audit.mjs'
 import {auditPage} from './helpers/audit-page.js'
-const loads={cuadro:'loadCuadro',cumplimiento:'loadCumplimiento',foda:'loadFoda',historial:'getHistorialCentro',entrenamiento:'cargarProgreso','entrenamiento/meta':'cargarProgreso'}
+const loads={cuadro:'loadCuadro',cumplimiento:'loadCumplimiento',historial:'getHistorialCentro',entrenamiento:'cargarProgreso','entrenamiento/meta':'cargarProgreso'}
 test('tema elegido actualiza controles nativos y color del navegador',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {
@@ -47,8 +47,8 @@ for(const [suffix,action]of Object.entries(loads))test('estados reales de '+suff
 test('fixture larga y rango vacío mantienen datos y límites',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {
-    await page.goto('/centro/2/foda');await ready(page)
-    expect((await page.getByLabel('Fortalezas',{exact:true}).inputValue()).length).toBeGreaterThan(500)
+    await page.goto('/centro/2/peticiones');await ready(page)
+    expect((await page.locator('.peticiones-request-row').first().locator('p').first().textContent()).length).toBeGreaterThan(500)
     await geometry(page,testInfo,'estado-largo')
     await page.goto('/centro/2/historial?vista=tabla&rango=custom&from=1900-01&to=1900-02');await ready(page)
     await expect(page.getByText('No hay meses registrados en el rango seleccionado.')).toBeVisible()

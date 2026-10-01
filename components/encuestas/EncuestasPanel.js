@@ -2,7 +2,7 @@
 import {useEffect,useState,useRef} from 'react'
 import Link from 'next/link'
 import {cargarEncuesta,prepararEncuesta,registrarDifusionEncuesta} from '../../app/actions/encuestas'
-import {PREGUNTAS,textoFoda} from '../../lib/encuestas/domain.mjs'
+import {PREGUNTAS,textoResumenEncuesta} from '../../lib/encuestas/domain.mjs'
 import {descargarArchivo,prepararCartel} from '../../lib/carteles/descargar.mjs'
 
 export {descargarArchivo} from '../../lib/carteles/descargar.mjs'
@@ -73,9 +73,9 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
       {linkManual&&<label className="survey-field">Enlace preparado<input readOnly value={linkManual} onFocus={e=>e.target.select()}/></label>}
       {status&&<p role="status">{status}</p>}{error&&<p role="alert" className="survey-error">{error}</p>}
     </div>
-    <div className="survey-box" data-tour="encuestas.resultados"><h3>2. Revisa lo que dicen y llévalo al FODA</h3><p>{textoFoda(nombreMes,r)}</p>
+    <div className="survey-box" data-tour="encuestas.resultados"><h3>2. Revisa lo que dicen</h3><p>{textoResumenEncuesta(nombreMes,r)}</p>
       <p className="h-sub">Participación mide cuántos respondieron. Satisfacción mide cómo valoraron la experiencia; una participación completa también puede revelar problemas.</p>
-      <Link className="btn" href={`/centro/${centroId}/foda`}>Abrir FODA</Link>{compact&&<Link className="btn" href={`/centro/${centroId}/encuestas?anio=${anio}&mes=${mes}`}>Ver resultados y enlaces individuales</Link>}
+      {compact&&<Link className="btn" href={`/centro/${centroId}/encuestas?anio=${anio}&mes=${mes}`}>Ver resultados y enlaces individuales</Link>}
     </div>
     {!compact&&<>
       <div className="survey-box"><h3>Resultados por pregunta</h3>{PREGUNTAS.map(p=><p key={p.id}>{p.texto} <b>{r.promedios[p.id]===null?'Sin respuestas':`${r.promedios[p.id]} / 5`}</b></p>)}</div>

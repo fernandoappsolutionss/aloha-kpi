@@ -1103,24 +1103,24 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 
 /* ---------------------------------------------------------------- */
-/*  FODA — peticiones y cotizaciones                                 */
+/*  Peticiones y cotizaciones                                         */
 /* ---------------------------------------------------------------- */
 .form-error { padding: 11px 14px; margin-top: 14px; border-radius: var(--r-sm); background: var(--bad-bg); border: 1px solid var(--bad-line); color: var(--bad-text); font-size: 13px; font-weight: 500; }
-.foda-requests { padding: 18px; margin-top: 16px; }
-.foda-request-tabs { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-2); }
-.foda-request-tabs button { min-height: 32px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600; cursor: pointer; }
-.foda-request-tabs button:hover { color: var(--text); }
-.foda-request-tabs button[aria-selected="true"] { color: var(--text); background: var(--surface-1); border-color: var(--ts-green-line); }
-.foda-quote-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.foda-quote-card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
-.foda-quote-fields { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
-.foda-request-row { padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
-@media (max-width: 960px) { .foda-quote-grid { grid-template-columns: 1fr; } }
+.peticiones-requests { padding: 18px; margin-top: 16px; }
+.peticiones-request-tabs { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-2); }
+.peticiones-request-tabs button { min-height: 32px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600; cursor: pointer; }
+.peticiones-request-tabs button:hover { color: var(--text); }
+.peticiones-request-tabs button[aria-selected="true"] { color: var(--text); background: var(--surface-1); border-color: var(--ts-green-line); }
+.peticiones-quote-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.peticiones-quote-card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+.peticiones-quote-fields { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+.peticiones-request-row { padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+@media (max-width: 960px) { .peticiones-quote-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) {
-  .foda-requests { padding: 14px; }
-  .foda-request-tabs { display: flex; width: 100%; }
-  .foda-request-tabs button { flex: 1; min-height: 44px; }
-  .foda-quote-fields { grid-template-columns: 1fr; }
+  .peticiones-requests { padding: 14px; }
+  .peticiones-request-tabs { display: flex; width: 100%; }
+  .peticiones-request-tabs button { flex: 1; min-height: 44px; }
+  .peticiones-quote-fields { grid-template-columns: 1fr; }
 }
 
 /* ═══ Tour guiado (entrenamiento) ═══ */
@@ -1555,7 +1555,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   box-shadow: 1px 0 0 var(--border);
 }
 .measured-chart { width: 100%; max-width: 100%; min-width: 0; }
-.reports-page :is(.card,.panel,.main__head > div,.foda-request-row > div,.foda-request-row > div > div) { min-width: 0; }
+.reports-page :is(.card,.panel,.main__head > div,.peticiones-request-row > div,.peticiones-request-row > div > div) { min-width: 0; }
 .reports-page :is(p,h1,h2,h3,.btn,th,td) { overflow-wrap: anywhere; }
 .reports-page .main__head > div:last-child { flex-wrap: wrap; }
 .reports-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
@@ -1603,18 +1603,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .compliance-help .compliance-help__source { margin: 12px 0 0; color: var(--text-dim); font-size: 13px; }
 .reports-page .table-scroller--sticky th:first-child,.reports-page .table-scroller--sticky td:first-child { max-width: 200px; white-space: normal; }
 .reports-page :is(input,select,textarea) { max-width: 100%; }
-.foda-request-tabs button { min-width: 44px; min-height: 44px; }
-.foda-quote-card label:has(input[type="checkbox"]) { min-height: 44px; }
+.peticiones-request-tabs button { min-width: 44px; min-height: 44px; }
+.peticiones-quote-card label:has(input[type="checkbox"]) { min-height: 44px; }
 @media (max-width: 767px) {
   .reports-grid { grid-template-columns: minmax(0,1fr); }
   .reports-page :is(input,select,textarea) { font-size: 16px !important; }
   .reports-page :is(p:not(.h-sub):not(.label):not(.caption):not(.table-scroller__hint),li) { font-size: 15px !important; }
-  .reports-page .card > div:first-child,.foda-comment-form,.foda-request-row > div:first-child { flex-wrap: wrap; }
-  .foda-comment-form { flex-direction: column; }
-  .foda-request-row > div:first-child { flex-direction: column; }
-  .foda-request-row > div:first-child > div { width: 100%; }
-  .foda-comment-form > *,.foda-request-row .btn { width: 100%; }
-  .foda-quote-grid,.foda-quote-fields { grid-template-columns: minmax(0,1fr); }
+  .reports-page .card > div:first-child,.peticiones-comment-form,.peticiones-request-row > div:first-child { flex-wrap: wrap; }
+  .peticiones-comment-form { flex-direction: column; }
+  .peticiones-request-row > div:first-child { flex-direction: column; }
+  .peticiones-request-row > div:first-child > div { width: 100%; }
+  .peticiones-comment-form > *,.peticiones-request-row .btn { width: 100%; }
+  .peticiones-quote-grid,.peticiones-quote-fields { grid-template-columns: minmax(0,1fr); }
 }
 
 @media (max-width: 767px) {

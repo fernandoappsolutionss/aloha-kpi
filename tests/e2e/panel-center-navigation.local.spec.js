@@ -31,8 +31,10 @@ for(const actor of ['admin','supervisor','coordinator']) test(`contexto centro d
     await enter(menu.locator(`a[href="/centro/${id}"]`))
     await page.waitForURL(url=>url.pathname===`/centro/${id}`);await page.waitForLoadState('networkidle')
     menu=await nav()
-    const destinations=[['Resumen',''],['KPI Semanal','/kpi'],['Grupos y Fusiones','/grupos'],['Cuadro de Negocio','/cuadro'],['Clases de Prueba','/eventos'],['Cumplimiento','/cumplimiento'],['FODA','/foda'],['Historial','/historial'],['Entrenamiento','/entrenamiento']]
+    const destinations=[['Resumen',''],['KPI Semanal','/kpi'],['Grupos y Fusiones','/grupos'],['Cuadro de Negocio','/cuadro'],['Clases de Prueba','/eventos'],['Entrenamiento','/entrenamiento']]
     for(const [label,suffix] of destinations)await expect(menu.getByRole('link',{name:label,exact:true})).toHaveAttribute('href',`/centro/${id}${suffix}`)
+    await page.goto(`/centro/${id}/kpi`);await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('link',{name:'Peticiones',exact:true})).toHaveAttribute('href',`/centro/${id}/peticiones`)
     await expect(menu.locator('a[aria-current=page]')).toHaveCount(1)
     await enter(menu.getByRole('link',{name:'Grupos y Fusiones',exact:true}))
     await page.waitForURL(url=>url.pathname===`/centro/${id}/grupos`);await page.waitForLoadState('networkidle')
