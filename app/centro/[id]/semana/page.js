@@ -25,6 +25,10 @@ export default function SemanaPage() {
     finally { if (turno === solicitud.current) setCargando(false) }
   }
   useEffect(() => { cargar() }, [id])
+  useEffect(() => {
+    // El plan aparece después de la carga; el enlace de Ruta puede llegar antes.
+    if (!cargando && window.location.hash === '#plan-batalla') document.getElementById('plan-batalla')?.scrollIntoView({ block: 'start' })
+  }, [cargando])
 
   async function actualizar() {
     const turno = ++solicitud.current
