@@ -47,7 +47,7 @@ const [centros, fichas, eventos, grupos, asistencias, meses] = await sql.transac
     FROM estudiantes ORDER BY centro_id, id
   `,
   sql`
-    SELECT id, estudiante_id, tipo, fecha, year, month, motivo, detalle
+    SELECT id, estudiante_id, tipo, fecha, year, month, motivo, origen, detalle
     FROM estudiante_eventos
     WHERE tipo IN ('inscripcion', 'retiro', 'reincorporacion')
     ORDER BY estudiante_id, fecha, id

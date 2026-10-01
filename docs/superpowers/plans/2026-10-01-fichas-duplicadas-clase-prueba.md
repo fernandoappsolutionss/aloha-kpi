@@ -50,7 +50,8 @@ Mismo centro siempre.
 - **Dentro de la transacción:**
   - Lo primero es `pg_advisory_xact_lock(20261001, centro)`: un candado de ALTAS por centro. Solo `inscribirEstudiante` crea fichas, y ninguna otra operación toma este candado, así que el orden grupos → mes_kpi → estudiantes no cambia.
   - La búsqueda se repite con la conexión de AFUERA (`sql`). Así ve todo lo confirmado, incluida el alta que acaba de soltar el candado, y no deja locks de predicado SERIALIZABLE sobre las fichas del centro. La ronda 1 los dejaba y hacía abortar la asistencia del coach.
-  - Un 40001 se reintenta hasta 3 veces con foto nueva, como hace la conciliación del KPI.
+  - Antes del candado va `SET LOCAL lock_timeout = '10s'`: un alta trabada no congela a las demás del centro.
+  - Un 40001 (serialización) o un 40P01 (deadlock) se reintenta con foto nueva, hasta 3 intentos, como hace la conciliación del KPI. Si se acaban los intentos o vence el `lock_timeout` (55P03), el centro ve «El centro tuvo varios cambios al mismo tiempo y la inscripción no se guardó. Vuelve a intentarlo.» y no queda nada escrito.
 - **Con coincidencias** responde `{ error, coincidencias, registroYaInscrito | requiereConfirmacion }` y no escribe nada.
 - **«Es otro niño»:** `ficha_nueva: { descartadas, motivo, nota }`.
   - Crea solo si el centro vio TODAS las fichas que coinciden ahora; una que apareció después vuelve a preguntar.
@@ -61,10 +62,14 @@ Mismo centro siempre.
 
 «Es este niño» no crea ficha y deja al niño donde el centro lo quiere por los caminos que ya existen:
 
-- **Retirado:** se reincorpora (`reincorporarEstudiante`) en el grupo elegido, solo si `colocacionInvalida` lo permite. La reincorporación de Grupos no lo valida. Si el nivel no coincide, la pantalla lo avisa.
-- **Sin grupo:** primera colocación con «Editar niño» (`actualizarEstudiante({ grupo_id })`). Luego se corrige la venta a la fecha del formulario.
+- **Retirado:** se reincorpora (`reincorporarEstudiante`) en el grupo elegido. `reincorporarEstudiante` ahora valida `colocacionInvalida` dentro de su transacción, con el grupo bloqueado, así que cubre también «Reincorporar» de Grupos, que antes no lo validaba. Si el nivel no coincide, la pantalla lo avisa.
+- **Sin grupo y sin venta (pendiente puro):** primera colocación con «Editar niño» (`actualizarEstudiante`) en UNA llamada con `grupo_id` y, si aplica, dos datos más:
+  - `fecha_inscripcion`, si el centro eligió la fecha del formulario. Un pendiente puro no tiene evento, así que no se bloquea el mes de su ficha vieja, que puede estar cerrado.
+  - `origen_venta` del formulario, si la ficha no tiene uno. Sin él, la venta nace «por clasificar».
+  - La venta nace hoy (g1-8/g2-1). Si el centro eligió la fecha del formulario, después se corrige por el camino del #150, que solo bloquea el mes de esa fecha y el de hoy.
+- **Sin grupo con venta** (salió a «Sin grupo»): vuelve a un grupo como movimiento y la fecha de venta sigue la regla de abajo.
 - **En otro grupo:** traslado SOLO si el centro elige «Es este niño y pasa al grupo N». Si no hay semana equivalente, el error sale tal cual.
-- **Fecha de venta:** solo si el centro la eligió, con el mismo camino del #150 (`actualizarEstudiante({ fecha_inscripcion })`). Nunca a un mes POSTERIOR al de su venta: eso es «Editar niño», a conciencia. La pantalla solo la ofrece hacia atrás o dentro del mismo mes.
+- **Fecha de venta:** solo si el centro la eligió, con el mismo camino del #150 (`actualizarEstudiante({ fecha_inscripcion })`). Nunca a un mes POSTERIOR al de su venta: eso es «Editar niño», a conciencia. La pantalla solo la ofrece hacia atrás o dentro del mismo mes, y el servicio lo vuelve a frenar. La fecha canónica llega del driver como `Date`: el servicio la normaliza (`iso10`) antes de comparar meses.
 - **Vínculo del registro:** va al final, solo si la ficha no tiene uno (CAS `IS NULL`); nunca pisa otro.
 - **Orden y fallas:** primero el grupo; si falla, no se toca nada. Si después falla la fecha, el niño ya quedó en su grupo y la respuesta lo dice.
 
@@ -77,9 +82,11 @@ Mismo centro siempre.
   - «colocarlo en el grupo N»;
   - «pasa al grupo N» o «sigue en el grupo X»;
   - «reincorporarlo»;
-  - fecha de venta a elegir, sin opción marcada;
+  - fecha de venta a elegir, sin opción marcada, y el botón no se habilita hasta elegir:
+    - con venta: «dejarla así» o «corregirla» (solo hacia atrás o dentro del mismo mes);
+    - pendiente sin venta, con una fecha en el formulario distinta de hoy: «Hoy, al colocarlo» o «la de este formulario»;
   - enlace «Abrir su ficha en Grupos» (`?ficha=<id>`).
-- **Grupos (directo):** «Es este niño» abre «Editar niño» o «Reincorporar» ahí mismo.
+- **Grupos (directo):** «Es este niño» abre «Editar niño» o «Reincorporar» ahí mismo. El `?ficha=<id>` se quita de la URL al abrir la ficha, así que recargar o volver atrás no reabre el modal.
 - **«Es otro niño»:** en ambos modales pide el motivo en pantalla, no con `confirm()`.
 
 ### 4. Script SOLO LECTURA `scripts/listar-fichas-duplicadas-2026-10-01.mjs`
@@ -93,6 +100,7 @@ Mismo centro siempre.
   - retiros posteriores a la otra ficha (posible retiro espurio);
   - la familia (otras fichas con el mismo teléfono o correo);
   - si el centro ya confirmó «es otro niño».
+- Una venta por traslado (origen `traslado`) no cuenta como venta, igual que en el KPI: se muestra aparte («llegó por traslado») y no suma «ventas de más».
 - `--json` escribe en `scripts/out/` (ignorado por git); `--centro <id>` filtra.
 
 ### 5. Tests
@@ -100,20 +108,31 @@ Mismo centro siempre.
 - `npm test`:
   - `test/ficha-existente.test.mjs`: reglas y reporte.
   - `test/inscribir-ficha-existente.test.mjs`: server action real con E/S sustituida.
-- `npm run test:inscribir:db`: concurrencia contra Postgres real y desechable. El mismo niño inscrito a la vez desde 4 pestañas deja 1 ficha; niños distintos no se frenan entre sí. Con el código de `main` el primer test FALLA (prueba de mutación).
+- `npm run test:inscribir:db`: concurrencia contra Postgres real y desechable.
+  - El mismo niño inscrito a la vez desde 4 pestañas deja 1 ficha; niños distintos no se frenan entre sí. Con el código de `main` el primer test FALLA (prueba de mutación).
+  - **Primera alta del mes, sin fila de `mes_kpi`:** el candado se retiene hasta que 4 altas de niños distintos lo esperan. La primera crea la fila del mes y las otras 3 chocan con ella (40001), se reintentan y quedan las 4 fichas. Con `INTENTOS_ALTA = 1` este test FALLA (prueba de mutación). El mismo niño ×4 en un mes sin fila deja 1 ficha.
 
 ## Validación
 
 - **Ronda 1, revisor independiente:** NO VALIDA, 10 hallazgos. Todos atendidos:
   - Al bloqueante (vincular no dejaba al niño en su grupo) y al de SSI (la lectura amplia dentro de SERIALIZABLE) se respondió con el candado de altas en lugar del re-chequeo por rango de PK que proponía el revisor: el candado no deja locks de predicado sobre las fichas.
   - Diferencias con lo que propuso: el motivo es obligatorio también en las coincidencias «posibles», por el incentivo de inscritos de la prima; y no se deshabilita la corrección por mes cerrado, porque el server responde el error sin tocar nada.
-- **Medición en Postgres 16 real** (servidor de la acción, SERIALIZABLE):
+- **Ronda 2, revisor independiente:** NO VALIDA: 1 bloqueante, 1 importante y 4 menores. Todos atendidos en la ronda 3:
+  1. **Bloqueante:** el servicio comparaba meses con `String(fecha).slice(0, 10)`, y con un `Date` del driver eso da «Tue Sep 01». El freno de «mes posterior» nunca saltaba, y una venta de septiembre podía pasar a octubre en silencio. Además, «colocarlo» ignoraba la fecha elegida. → `iso10` en el servicio, test con `new Date(...)`, y la UI respeta el radio siempre.
+  2. **Importante:** al pendiente sin venta se le retrocedía la venta sin preguntar. Si su ficha era de un mes cerrado, la corrección fallaba siempre. → Elección explícita, y fecha y origen viajan en la misma llamada de colocación.
+  3. Reintento también del 40P01, `lock_timeout` antes del candado, y prueba de la primera alta del mes sin fila de `mes_kpi`.
+  4. `colocacionInvalida` pasa a `reincorporarEstudiante`, con el grupo bloqueado: cubre los dos caminos.
+  5. `?ficha=` se limpia de la URL.
+  6. El script excluye las ventas por traslado.
+  - Señalado y fuera de alcance: en «Editar niño» de un pendiente, grupo + fecha en un solo guardado hacen nacer la venta hoy, no en la fecha. Ya pasa en `main` (regla g1-8/g2-1), pero el enlace «Abrir su ficha en Grupos» hace que ese camino se use más.
+- **Medición en Postgres 16 real** (servidor de la acción, SERIALIZABLE). Por ronda: 3 altas de niños distintos + 6 marcas de asistencia del coach, todas en el mismo grupo y al mismo tiempo (carga sintética, peor que la real):
 
-| Variante | Mismo niño ×4 a la vez (15 rondas) | Asistencia del coach con altas concurrentes (60 rondas) |
-|---|---|---|
-| `main` | 45 fichas de más | 23 × 40001 |
-| ronda 1 | 0 | 32 × 40001 |
-| ronda 2 | 0 | 7 × 40001 |
+| Variante | Mismo niño ×4 a la vez (15 rondas): fichas de más | Altas que se guardan (de 180) | Asistencias que se guardan (de 360) | Asistencia: 40001 | Asistencia: 40P01 (deadlock) |
+|---|---|---|---|---|---|
+| `main` | 45 | 37 | 41 | 23 | 296 |
+| ronda 1 | 0 | 57 | 60 | 32 | 268 |
+| ronda 2 | 0 | 172 | 59 | 7 | 294 |
+| ronda 3 (esta) | 0 | 180 | 60 | 5–6 | 294–295 |
 
-- **Deadlocks:** aparecieron en las 3 variantes, también en `main`. Es un problema que ya existe: `marcarAsistencia` bloquea el mes y luego el grupo por la FK de `asistencias`, y el alta bloquea el grupo y luego el mes. Queda como tarea aparte.
+- **Deadlocks:** aparecen en todas las variantes, también en `main`, donde el deadlock tumba 143 de 180 altas y 296 de 360 asistencias. Es un problema que ya existe: `marcarAsistencia` bloquea el mes y luego el grupo por la FK de `asistencias`, y el alta bloquea el grupo y luego el mes. Este PR reintenta el deadlock en el alta (180/180) y no empeora la asistencia. Arreglar el orden de locks de la asistencia es una tarea aparte.
 - **Sol (gpt-6-sol) NO corrió:** la sesión fue en la nube y Codex vive en la Mac. Antes del merge, correr Sol en solo lectura desde la Mac (comando en el PR).

@@ -322,6 +322,21 @@ test('reporte: una cadena de posibles hermanos no promete ventas de más', () =>
   assert.match(texto, /ventas de más si se confirman: 0 \(sin contar 1 en cadena\)/)
 })
 
+test('reporte: la llegada por traslado no cuenta como venta de más', () => {
+  const fichas = [
+    { id: 1, centro_id: 1, nombre: 'Ana Ruiz Pérez', estado: 'activo', telefono: '6123-4567' },
+    { id: 2, centro_id: 1, nombre: 'Ana Ruiz Pérez', estado: 'activo', telefono: '6123-4567' },
+  ]
+  const eventos = [
+    { id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-08-01', year: 2026, month: 8, origen: 'traslado' },
+    { id: 2, estudiante_id: 2, tipo: 'inscripcion', fecha: '2026-09-01', year: 2026, month: 9, origen: 'clase_prueba' },
+  ]
+  const [g] = armarReporteDuplicados({ fichas, eventos })
+  assert.equal(g.ventasDeMas, 0)
+  assert.deepEqual(g.ventas.map((v) => v.id), [2])
+  assert.match(textoReporteDuplicados([g]), /llegó por traslado el 2026-08-01 \(no cuenta como venta\)/)
+})
+
 test('reporte: la venta de una matrícula anulada no cuenta y la anulada no se agrupa', () => {
   const fichas = [
     { id: 1, centro_id: 1, nombre: 'Ana Ruiz', estado: 'matricula_anulada', telefono: '6123-4567' },

@@ -40,6 +40,9 @@ const tag = (ejecutar) => async (strings, ...values) => {
   return (await ejecutar(text, values)).rows
 }
 const sql = tag((text, values) => pool.query(text, values))
+// Códigos de las transacciones que abortaron (40001, 40P01…): la prueba del
+// mes sin fila verifica que el reintento de verdad se ejercitó.
+const fallas = []
 async function withTransaction(callback) {
   const client = await pool.connect()
   try {
@@ -48,6 +51,7 @@ async function withTransaction(callback) {
     await client.query('COMMIT')
     return resultado
   } catch (error) {
+    fallas.push(error?.code)
     try { await client.query('ROLLBACK') } catch {}
     throw error
   } finally {
@@ -78,10 +82,37 @@ const letras = (n) => {
   for (let k = n + 1; k > 0; k = Math.floor((k - 1) / 26)) texto = String.fromCharCode(97 + ((k - 1) % 26)) + texto
   return texto
 }
-const alta = (nombre, telefono, representante) => inscribirEstudiante(1, {
-  nombre, itinerario: 'TINY', nivel: 1, grupo_id: 10, origen: 'clase_prueba', origen_venta: 'marketing',
+const altaEn = (centroId, grupoId) => (nombre, telefono, representante) => inscribirEstudiante(centroId, {
+  nombre, itinerario: 'TINY', nivel: 1, grupo_id: grupoId, origen: 'clase_prueba', origen_venta: 'marketing',
   telefono, representante, fecha: '2026-09-25',
 })
+const alta = altaEn(1, 10)
+
+// Retiene el candado de altas del centro hasta que las `n` altas lo estén
+// esperando: todas toman su foto ANTES de que la primera confirme (el peor
+// caso, el que de verdad produce el 40001 y obliga a reintentar).
+const CANDADO_ALTAS_CENTRO = 20261001
+async function conCandadoRetenido(centroId, n, disparar) {
+  const duenio = await pool.connect()
+  try {
+    await duenio.query('SELECT pg_advisory_lock($1::int, $2::int)', [CANDADO_ALTAS_CENTRO, centroId])
+    const respuestas = disparar()
+    for (let vuelta = 0; ; vuelta++) {
+      const { rows: [{ esperando }] } = await duenio.query(
+        `SELECT COUNT(*)::int AS esperando FROM pg_locks
+         WHERE locktype = 'advisory' AND NOT granted AND objsubid = 2
+           AND classid::bigint = $1 AND objid::bigint = $2`,
+        [CANDADO_ALTAS_CENTRO, centroId])
+      if (esperando >= n) break
+      if (vuelta > 1000) throw new Error(`solo ${esperando} de ${n} altas llegaron al candado`)
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    await duenio.query('SELECT pg_advisory_unlock($1::int, $2::int)', [CANDADO_ALTAS_CENTRO, centroId])
+    return await respuestas
+  } finally {
+    duenio.release()
+  }
+}
 
 before(async () => {
   await pool.query(readFileSync(new URL('../../db/schema.sql', import.meta.url), 'utf8'))
@@ -90,6 +121,11 @@ before(async () => {
   await pool.query(`INSERT INTO grupos (id, centro_id, numero, itinerario, estado, inscripcion_abierta, fecha_inicio_clases)
     VALUES (10, 1, '66', 'TINY', 'activo', true, '2026-09-15')`)
   await pool.query(`INSERT INTO mes_kpi (centro_id, year, month, estado) VALUES (1, 2026, 9, 'abierto')`)
+  // Centros 2 y 3 SIN fila de mes_kpi: su primera alta del mes la crea
+  // (INSERT … ON CONFLICT DO NOTHING de bloquearMesesEditables).
+  await pool.query(`INSERT INTO centros (id, nombre, pais) VALUES (2, 'Centro mes nuevo', 'PA'), (3, 'Centro mes nuevo bis', 'PA')`)
+  await pool.query(`INSERT INTO grupos (id, centro_id, numero, itinerario, estado, inscripcion_abierta, fecha_inicio_clases)
+    VALUES (20, 2, '20', 'TINY', 'activo', true, '2026-09-15'), (30, 3, '30', 'TINY', 'activo', true, '2026-09-15')`)
   // Un centro con historia: 400 fichas para que el planner no trate la tabla como trivial.
   await pool.query(`INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, telefono, fecha_inscripcion)
     SELECT 1, 10, 'Veterano ' || g, 'TINY', 1, 'activo', '6' || lpad(g::text, 7, '0'), '2026-06-01'
@@ -114,4 +150,31 @@ test('niños distintos inscritos a la vez no se frenan entre sí', async () => {
   const respuestas = await Promise.all(Array.from({ length: 6 }, (_, k) =>
     alta(`Nuevo ${letras(2000 + k * 13)}`, `6${5000000 + k}`, `Madre ${letras(9000 + k * 13)}`)))
   assert.deepEqual(respuestas.map((r) => r.ok === true), [true, true, true, true, true, true])
+})
+
+test('primera alta del mes sin fila de mes_kpi: niños distintos esperando el candado se crean todos (40001 reintentado)', async () => {
+  fallas.length = 0
+  const altaMesNuevo = altaEn(2, 20)
+  const nombres = Array.from({ length: 4 }, (_, k) => `Primera ${letras(3000 + k * 17)}`)
+  const respuestas = await conCandadoRetenido(2, 4, () => Promise.all(nombres.map((nombre, k) =>
+    altaMesNuevo(nombre, `6${7000000 + k}`, `Madre ${letras(7000 + k * 17)}`))))
+  assert.deepEqual(respuestas.map((r) => r.ok === true), [true, true, true, true], JSON.stringify(respuestas))
+  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE centro_id = 2`
+  assert.equal(n, 4)
+  const [{ meses }] = await sql`SELECT COUNT(*)::int AS meses FROM mes_kpi WHERE centro_id = 2 AND year = 2026 AND month = 9`
+  assert.equal(meses, 1)
+  // La primera crea la fila del mes; las que tomaron su foto antes chocan con
+  // ella (40001) y entran al reintento con foto nueva.
+  assert.ok(fallas.includes('40001'), `sin 40001: ${JSON.stringify(fallas)}`)
+})
+
+test('primera alta del mes sin fila de mes_kpi: el mismo niño desde 4 pestañas deja UNA ficha', async () => {
+  const altaMesNuevo = altaEn(3, 30)
+  const nombre = `Valeria ${letras(4000)}`
+  const respuestas = await conCandadoRetenido(3, 4, () => Promise.all([1, 2, 3, 4].map(() =>
+    altaMesNuevo(nombre, '6333-9900', `Madre ${letras(8000)}`))))
+  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM estudiantes WHERE centro_id = 3 AND nombre = ${nombre}`
+  assert.equal(n, 1)
+  assert.equal(respuestas.filter((r) => r.ok).length, 1)
+  assert.equal(respuestas.filter((r) => r.requiereConfirmacion && r.coincidencias?.length === 1).length, 3)
 })

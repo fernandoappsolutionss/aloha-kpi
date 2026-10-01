@@ -173,6 +173,9 @@ async function fichaExistenteEn(query, centroId, nuevo, confirmacion) {
 // tomado, ninguna otra alta del centro está a medio escribir.
 const CANDADO_ALTAS_CENTRO = 20261001
 const INTENTOS_ALTA = 3
+// Se reintentan con foto nueva: serialización (40001) y deadlock (40P01, p. ej.
+// contra la asistencia del coach, que toma mes → grupo).
+const REINTENTABLES = new Set(['40001', '40P01'])
 
 // Alta de un niño (clase de prueba, inscripción directa o traslado).
 // (g1-8) Con grupo asignado: el evento de venta nace AQUÍ (con origen copiado
@@ -246,11 +249,15 @@ export async function inscribirEstudiante(centroId, data) {
   // BLOQUEADO, estudiante (ficha + ancla + cierre), evento y outbox van en la
   // MISMA transacción SERIALIZABLE — si la palanca se cerró o la ventana venció
   // entre el prechequeo y el commit, no queda nada a medias. El CRM se entera
-  // por el outbox (ya NO pushCuposAlCrm inline). Un 40001 (otra transacción se
-  // cruzó) se reintenta con foto nueva, como la conciliación del KPI.
+  // por el outbox (ya NO pushCuposAlCrm inline). Un 40001/40P01 (otra
+  // transacción se cruzó) se reintenta con foto nueva, como la conciliación
+  // del KPI.
   for (let intento = 1; ; intento++) {
     try {
       return await withTransaction(async (query) => {
+        // Ninguna espera de lock de esta alta pasa de 10 s: un alta trabada no
+        // congela a las demás del centro detrás del candado.
+        await query`SET LOCAL lock_timeout = '10s'`
         // Candado de altas del centro ANTES de todo (ninguna otra operación lo
         // toma: no altera el orden de locks grupos → mes_kpi → estudiantes).
         await query`SELECT pg_advisory_xact_lock(${CANDADO_ALTAS_CENTRO}::int, ${Number(centroId)}::int)`
@@ -318,8 +325,8 @@ export async function inscribirEstudiante(centroId, data) {
       // contra dos altas simultáneas del mismo registro de CRM: el 23505 se
       // traduce al mismo mensaje del prechequeo, nunca a un error crudo.
       if (crmId && error?.code === '23505') return { error: 'Este registro ya fue inscrito.' }
-      if (error?.code === '40001' && intento < INTENTOS_ALTA) continue
-      if (error?.code === '40001') {
+      if (REINTENTABLES.has(error?.code) && intento < INTENTOS_ALTA) continue
+      if (REINTENTABLES.has(error?.code) || error?.code === '55P03') {
         return { error: 'El centro tuvo varios cambios al mismo tiempo y la inscripción no se guardó. Vuelve a intentarlo.' }
       }
       throw error
@@ -339,8 +346,11 @@ export async function vincularFichaExistente(centroId, estudianteId, data = {}) 
   if (fechaVenta && !FECHA_RE.test(fechaVenta)) return { error: 'Fecha de venta inválida (AAAA-MM-DD).' }
   if (fechaVenta && fechaVenta > hoyISO()) return { error: 'La fecha de venta no puede ser futura.' }
   const grupoId = data?.grupo_id ? Number(data.grupo_id) : null
+  const origenVenta = data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
+  if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
+  // fecha_venta llega del driver como Date: el servicio la normaliza.
   const [ficha] = await sql`
-    SELECT e.id, e.nombre, e.estado, e.grupo_id, e.itinerario, e.nivel, e.crm_registration_id, (
+    SELECT e.id, e.nombre, e.estado, e.grupo_id, e.itinerario, e.nivel, e.origen_venta, e.crm_registration_id, (
       SELECT ev.fecha FROM estudiante_eventos ev
       WHERE ev.estudiante_id = e.id AND ev.tipo = 'inscripcion'
       ORDER BY ev.fecha, ev.id LIMIT 1
@@ -348,9 +358,8 @@ export async function vincularFichaExistente(centroId, estudianteId, data = {}) 
     FROM estudiantes e
     WHERE e.id = ${estudianteId} AND e.centro_id = ${centroId}
   `
-  const grupoDestino = grupoId ? await grupoDe(centroId, grupoId) : null
-  return await vincularFichaExistenteCon({ ficha, crmId, fechaVenta, grupoId, grupoDestino }, {
-    moverAGrupo: (id, destino) => actualizarEstudiante(centroId, id, { grupo_id: destino }),
+  return await vincularFichaExistenteCon({ ficha, crmId, fechaVenta, grupoId, origenVenta }, {
+    moverAGrupo: (id, destino, extra) => actualizarEstudiante(centroId, id, { grupo_id: destino, ...extra }),
     corregirFechaVenta: (id, fechaNueva) => actualizarEstudiante(centroId, id, { fecha_inscripcion: fechaNueva }),
     reincorporar: (id, destino) => reincorporarEstudiante(centroId, id, { grupoId: destino }),
     // CAS: solo una ficha sin registro; el índice único (centro_id,
@@ -1271,6 +1280,11 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
     if (est.estado !== 'retirado') return { error: 'El estudiante no está retirado.' }
     const errorGrupo = grupoAceptaMovimientos(g)
     if (errorGrupo) return { error: errorGrupo }
+    // (2026-10-01) La misma matriz de colocación que el alta y el traslado: un
+    // Tiny no vuelve a un grupo Kids ni un Kids <3 a un Tiny (vale para
+    // «Reincorporar» de Grupos y para «Es este niño» de la clase de prueba).
+    const errorColocacion = colocacionInvalida({ itinerario: est.itinerario, nivel: est.nivel }, g.itinerario)
+    if (errorColocacion) return { error: errorColocacion }
     await query`
       UPDATE estudiantes SET estado = 'activo', grupo_id = ${grupoId}, status_plataforma = 'INCLUIR',
         origen = COALESCE(origen, 'reincorporado'), motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}

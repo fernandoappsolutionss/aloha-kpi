@@ -366,12 +366,17 @@ export default function GruposPage() {
     else setEditEst(nino)
   }
   // ?ficha=<id>: una sola vez, cuando la operación ya cargó y se puede editar.
+  // Se quita de la URL al abrirla: recargar o volver atrás no reabre el modal.
   const fichaPedida = useRef(false)
   useEffect(() => {
     if (!data || !canWrite || fichaPedida.current) return
     fichaPedida.current = true
-    const fichaId = new URLSearchParams(window.location.search).get('ficha')
-    if (fichaId) abrirFicha(fichaId)
+    const url = new URL(window.location.href)
+    const fichaId = url.searchParams.get('ficha')
+    if (!fichaId) return
+    url.searchParams.delete('ficha')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    abrirFicha(fichaId)
   }, [data, canWrite])
 
   const metas = data?.metas || { gpnMin: 8, cupoMax: 15 }

@@ -859,27 +859,33 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
     }
   }
 
+  // Sin grupo y SIN venta (pendiente puro): al colocarlo nace su venta, hoy
+  // (g1-8/g2-1). Si el formulario trae otra fecha, el centro elige cuál vale.
+  const preguntaFechaColocacion = (c) => c.estado !== 'retirado' && c.grupo_id == null && !c.tiene_venta
+    && !!grupoForm && f.fecha !== hoyISO()
+
   // "Es este niño": no nace ficha nueva. Queda donde el centro lo quiere:
   // retirado → reincorporado en el grupo elegido; sin grupo → colocado en el
-  // grupo del formulario (su venta, con la fecha del formulario); en otro grupo
-  // → solo si el centro lo pide, pasa al del formulario (traslado).
+  // grupo del formulario; en otro grupo → solo si el centro lo pide, pasa al
+  // del formulario (traslado). La venta se toca solo con la fecha que eligió.
   async function vincular(c, { mover = false } = {}) {
     const esRetirado = c.estado === 'retirado'
     const colocar = !esRetirado && c.grupo_id == null && !!grupoForm
-    const corrige = corrigeVenta(c)
+    const preguntaFecha = corrigeVenta(c) || preguntaFechaColocacion(c)
     const eleccion = fechaElegida[c.id]
-    if (corrige && !eleccion) { setErr(`Elige cuál es la fecha real de la venta de ${c.nombre}.`); return }
+    if (preguntaFecha && !eleccion) { setErr(`Elige cuál es la fecha real de la venta de ${c.nombre}.`); return }
     const grupoRetorno = esRetirado ? grupoVueltaDe(c) : ''
     if (esRetirado && !grupoRetorno) { setErr(`Elige el grupo al que vuelve ${c.nombre}.`); return }
     const grupoDestino = esRetirado ? grupoRetorno : colocar || mover ? grupoForm.id : null
-    // Al colocarlo su venta nace hoy: con otra fecha en el formulario, se corrige a esa.
-    const fechaVenta = colocar ? (f.fecha !== hoyISO() ? f.fecha : null) : corrige && eleccion === 'formulario' ? f.fecha : null
+    const fechaVenta = preguntaFecha && eleccion === 'formulario' ? f.fecha : null
     setSaving(true); setErr('')
     try {
       const res = await vincularFichaExistente(centroId, c.id, {
         crm_registration_id: String(reg.id),
         ...(grupoDestino ? { grupo_id: Number(grupoDestino) } : {}),
         ...(fechaVenta ? { fecha_venta: fechaVenta } : {}),
+        // Solo se usa si al colocarlo nace su venta y la ficha no tiene origen.
+        ...(f.origen_venta ? { origen_venta: f.origen_venta } : {}),
       })
       if (res.error) { setErr(res.error); return }
       const grupo = (grupos || []).find((g) => String(g.id) === String(grupoDestino)) || null
@@ -918,14 +924,28 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
       )
     }
     const corrige = corrigeVenta(c)
+    const fechaColocacion = preguntaFechaColocacion(c)
     const ventaDeMesAnterior = c.tiene_venta && f.fecha !== c.fecha_venta && !corrige
     const colocar = c.grupo_id == null && !!grupoForm
     const enOtroGrupo = c.grupo_id != null && !!grupoForm && String(grupoForm.id) !== String(c.grupo_id)
     const mismoRegistro = c.fuerza === 'registro'
     const sinCambios = mismoRegistro && !corrige && !colocar && !enOtroGrupo
-    const faltaFecha = corrige && !fechaElegida[c.id]
+    const faltaFecha = (corrige || fechaColocacion) && !fechaElegida[c.id]
     return (
       <div style={ACCIONES_FICHA}>
+        {fechaColocacion && (
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="label">¿Cuándo fue la venta?</legend>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'hoy'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'hoy' }))} />
+              Hoy, al colocarlo en el grupo
+            </label>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'formulario'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'formulario' }))} />
+              El {fechaCorta(f.fecha)}, la de este formulario
+            </label>
+          </fieldset>
+        )}
         {corrige && (
           <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
             <legend className="label">¿Cuándo fue la venta?</legend>
@@ -942,7 +962,7 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
         {ventaDeMesAnterior && <p style={HINT}>Su venta ({fechaCorta(c.fecha_venta)}) es de un mes anterior a la fecha de este formulario: si está mal, corrígela con «Editar niño».</p>}
         {c.retiro_programado_para && <p style={{ ...HINT, color: 'var(--warn)' }}>Tiene un retiro programado para el {fechaCorta(c.retiro_programado_para)}: si se queda, cancélalo en Grupos.</p>}
         {sinCambios && <p style={HINT}>Ya está inscrito con este registro: no hay nada que cambiar.</p>}
-        {colocar && <p style={HINT}>Está sin grupo: se coloca en el grupo {grupoForm.numero} y su venta queda el {fechaCorta(f.fecha)}.</p>}
+        {colocar && !c.tiene_venta && <p style={HINT}>Está sin grupo y sin venta: se coloca en el grupo {grupoForm.numero} y ahí nace su venta.</p>}
         {!sinCambios && enOtroGrupo && (
           <>
             <button type="button" className="btn btn--primary" disabled={saving || faltaFecha} onClick={() => vincular(c, { mover: true })}>Es este niño y pasa al grupo {grupoForm.numero}</button>

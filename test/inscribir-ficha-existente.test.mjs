@@ -32,6 +32,7 @@ function acciones({ fichas = [], grupo = GRUPO, fallas = [], sesion = { uid: 7, 
 
   const responder = (strings, values) => {
     const texto = strings.join('?').replace(/\s+/g, ' ').trim()
+    if (/^SET LOCAL lock_timeout/.test(texto)) { orden.push(['lock_timeout']); return [] }
     if (/pg_advisory_xact_lock/.test(texto)) { orden.push(['candado', values]); return [] }
     if (/^INSERT INTO estudiantes /i.test(texto)) { escrituras.push({ texto, values }); return [{ id: 777 }] }
     if (/^INSERT INTO estudiante_eventos/i.test(texto)) { escrituras.push({ texto, values }); return [] }
@@ -51,7 +52,7 @@ function acciones({ fichas = [], grupo = GRUPO, fallas = [], sesion = { uid: 7, 
       return tandas.flat().filter((f) => ids.includes(Number(f.id)))
         .map((f) => ({ grupo_numero: f.grupo_id == null ? null : '64', fecha_venta: null, ...f }))
     }
-    if (/^SELECT e\.id, e\.nombre, e\.estado, e\.grupo_id/i.test(texto)) {
+    if (/^SELECT e\.id, e\.nombre, e\.estado, e\.grupo_id/i.test(texto) || /^SELECT \* FROM estudiantes WHERE id = \? AND centro_id = \? FOR UPDATE/i.test(texto)) {
       return tandas.flat().filter((f) => Number(f.id) === Number(values[0]))
     }
     throw new Error(`consulta inesperada en el test: ${texto}`)
@@ -79,7 +80,7 @@ function acciones({ fichas = [], grupo = GRUPO, fallas = [], sesion = { uid: 7, 
     buscarFichasCoincidentes, coincidenciasParaPantalla, decidirAlta, leerConfirmacionFichaNueva, mensajeFichaExistente,
     registroEnFichaAnulada, vincularFichaExistenteCon,
   }
-  const exportadas = vm.runInNewContext(`${source}\n;({ inscribirEstudiante, vincularFichaExistente })`, contexto)
+  const exportadas = vm.runInNewContext(`${source}\n;({ inscribirEstudiante, vincularFichaExistente, reincorporarEstudiante })`, contexto)
   return { ...exportadas, escrituras, orden, llamadas }
 }
 
@@ -90,6 +91,8 @@ const ALTA = {
 }
 const insertsDe = (escrituras, tabla) => escrituras.filter((e) => new RegExp(`^INSERT INTO ${tabla} `, 'i').test(e.texto))
 const serializacion = () => Object.assign(new Error('could not serialize access'), { code: '40001' })
+const deadlock = () => Object.assign(new Error('deadlock detected'), { code: '40P01' })
+const lockTimeout = () => Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' })
 const LUCIANO = { id: 946, nombre: 'Luciano Acosta', estado: 'retirado', grupo_id: null, telefono: '6925-0722', fecha_retiro: '2026-08-31' }
 
 test('coincidencia por crm_registration_id: no crea nada y devuelve la ficha inscrita', async () => {
@@ -170,16 +173,25 @@ test('con el candado del centro tomado se busca otra vez: la ficha que nació en
   assert.equal(r.requiereConfirmacion, true)
   assert.deepEqual(r.coincidencias.map((c) => c.id), [1030])
   assert.equal(escrituras.length, 0)
-  // Orden: prechequeo, candado (centro 5) y recién ahí la búsqueda que manda.
-  assert.deepEqual(orden.map(([paso]) => paso), ['candidatas', 'candado', 'candidatas'])
-  assert.deepEqual(orden[1][1].map(Number), [20261001, 5])
+  // Orden: prechequeo, tope de espera, candado (centro 5) y recién ahí la búsqueda que manda.
+  assert.deepEqual(orden.map(([paso]) => paso), ['candidatas', 'lock_timeout', 'candado', 'candidatas'])
+  assert.deepEqual(orden[2][1].map(Number), [20261001, 5])
 })
 
-test('un 40001 se reintenta con foto nueva; si se repite, sale como mensaje y no como error crudo', async () => {
+test('un 40001 o un deadlock se reintentan con foto nueva; si se repiten, sale un mensaje y no un error crudo', async () => {
   const una = acciones({ fallas: [serializacion()] })
   const r = await una.inscribirEstudiante(5, ALTA)
   assert.equal(r.ok, true)
   assert.equal(una.llamadas.transacciones, 2)
+
+  const trabada = acciones({ fallas: [deadlock()] })
+  assert.equal((await trabada.inscribirEstudiante(5, ALTA)).ok, true)
+  assert.equal(trabada.llamadas.transacciones, 2)
+
+  // lock_timeout: no se reintenta (otra alta del centro sigue trabada), se avisa.
+  const espera = acciones({ fallas: [lockTimeout()] })
+  assert.match((await espera.inscribirEstudiante(5, ALTA)).error, /^El centro tuvo varios cambios al mismo tiempo/)
+  assert.equal(espera.llamadas.transacciones, 1)
 
   const siempre = acciones({ fallas: [serializacion(), serializacion(), serializacion()] })
   const r2 = await siempre.inscribirEstudiante(5, ALTA)
@@ -221,6 +233,27 @@ test('vincularFichaExistente: vincula el registro a la ficha viva sin crear nada
   assert.equal((await vincularFichaExistente(5, 907, { fecha_venta: '2026-10-02' })).error, 'La fecha de venta no puede ser futura.')
   // Pasar la venta a un mes POSTERIOR no va por aquí.
   assert.match((await vincularFichaExistente(5, 907, { fecha_venta: '2026-10-01' })).error, /usa «Editar niño»/)
+  assert.equal((await vincularFichaExistente(5, 907, { origen_venta: 'tiktok' })).error, 'Origen comercial inválido.')
+})
+
+test('vincularFichaExistente: con la venta como Date (así la entrega el driver) el freno de mes posterior funciona', async () => {
+  const valeria = { id: 907, nombre: 'Valeria', estado: 'activo', grupo_id: 121, crm_registration_id: null, fecha_venta: new Date('2026-09-01T00:00:00Z') }
+  const { vincularFichaExistente, escrituras } = acciones({ fichas: [valeria] })
+  const r = await vincularFichaExistente(5, 907, { crm_registration_id: 'reg-1029', fecha_venta: '2026-10-01' })
+  assert.equal(r.error, 'Su venta es del 2026-09-01: para pasarla a un mes posterior usa «Editar niño».')
+  assert.equal(escrituras.length, 0)
+})
+
+test('reincorporar valida la colocación: un Tiny no vuelve a un grupo Kids (Grupos y clase de prueba)', async () => {
+  const luciano = { id: 946, nombre: 'Luciano Acosta', estado: 'retirado', grupo_id: null, itinerario: 'TINY', nivel: 4, centro_id: 5 }
+  const kids = { ...GRUPO, id: 140, numero: '70', itinerario: 'KIDS' }
+  const { reincorporarEstudiante, escrituras } = acciones({ fichas: [luciano], grupo: kids })
+  const r = await reincorporarEstudiante(5, 946, { grupoId: 140 })
+  assert.equal(r.error, 'Un niño Tiny no entra a un grupo Kids (manual: solo KIDS nivel 3+ cruza de itinerario).')
+  assert.equal(escrituras.length, 0)
+
+  const tiny = acciones({ fichas: [luciano] })
+  assert.equal((await tiny.reincorporarEstudiante(5, 946, { grupoId: 136 })).ok, true)
 })
 
 // ── Orquestación de "es este niño" (dependencias inyectadas) ────────────────
@@ -228,27 +261,45 @@ function deps({ mover = { ok: true }, corregir = { ok: true }, reincorporar = { 
   const orden = []
   return {
     orden,
-    moverAGrupo: async (id, grupoId) => { orden.push(['mover', id, grupoId]); return mover },
+    moverAGrupo: async (id, grupoId, extra = {}) => { orden.push(['mover', id, grupoId, extra]); return mover },
     corregirFechaVenta: async (id, fecha) => { orden.push(['corregir', id, fecha]); return corregir },
     reincorporar: async (id, grupoId) => { orden.push(['reincorporar', id, grupoId]); return reincorporar },
     vincularRegistro: async (id, crm) => { orden.push(['vincular', id, crm]); return vincular },
   }
 }
-const TINY1 = { id: 136, itinerario: 'TINY' }
-
-test('vincular: el pendiente sin grupo queda colocado y su venta con la fecha elegida', async () => {
+test('vincular: el pendiente sin venta se coloca con su fecha y origen en la MISMA llamada, y luego se corrige la venta', async () => {
   const d = deps()
-  const pendiente = { id: 980, estado: 'activo', grupo_id: null, itinerario: 'TINY', nivel: 1, fecha_venta: null }
-  const r = await vincularFichaExistenteCon({ ficha: pendiente, crmId: 'reg-1', fechaVenta: '2026-09-25', grupoId: 136, grupoDestino: TINY1 }, d)
-  assert.deepEqual(d.orden, [['mover', 980, 136], ['corregir', 980, '2026-09-25'], ['vincular', 980, 'reg-1']])
+  const pendiente = { id: 980, estado: 'activo', grupo_id: null, itinerario: 'TINY', nivel: 1, fecha_venta: null, origen_venta: null }
+  const r = await vincularFichaExistenteCon({ ficha: pendiente, crmId: 'reg-1', fechaVenta: '2026-09-25', grupoId: 136, origenVenta: 'marketing' }, d)
+  assert.deepEqual(d.orden, [
+    ['mover', 980, 136, { fecha_inscripcion: '2026-09-25', origen_venta: 'marketing' }],
+    ['corregir', 980, '2026-09-25'],
+    ['vincular', 980, 'reg-1'],
+  ])
   assert.equal(r.movido, true)
   assert.equal(r.fechaCorregida, true)
 
+  // «Hoy, al colocarlo»: solo la colocación; el origen que ya tenía se respeta.
+  const hoy = deps()
+  await vincularFichaExistenteCon({ ficha: { ...pendiente, origen_venta: 'referido' }, crmId: 'reg-1', grupoId: 136, origenVenta: 'marketing' }, hoy)
+  assert.deepEqual(hoy.orden, [['mover', 980, 136, {}], ['vincular', 980, 'reg-1']])
+
   // Ya colocado, si la fecha no se pudo corregir (mes cerrado) queda dicho.
   const mesCerrado = deps({ corregir: { error: 'El mes 09/2026 está cerrado.' } })
-  const r2 = await vincularFichaExistenteCon({ ficha: pendiente, crmId: 'reg-1', fechaVenta: '2026-09-25', grupoId: 136, grupoDestino: TINY1 }, mesCerrado)
+  const r2 = await vincularFichaExistenteCon({ ficha: pendiente, crmId: 'reg-1', fechaVenta: '2026-09-25', grupoId: 136 }, mesCerrado)
   assert.equal(r2.ok, true)
   assert.match(r2.aviso, /^Quedó en el grupo, pero su fecha de venta no se pudo corregir: El mes 09\/2026 está cerrado\./)
+})
+
+test('vincular: sin grupo pero CON venta, colocarlo no toca la venta salvo que el centro elija la fecha', async () => {
+  const legacy = { id: 981, estado: 'activo', grupo_id: null, fecha_venta: new Date('2026-08-10T00:00:00Z'), origen_venta: null }
+  const d = deps()
+  await vincularFichaExistenteCon({ ficha: legacy, crmId: 'reg-2', grupoId: 136, origenVenta: 'marketing' }, d)
+  assert.deepEqual(d.orden, [['mover', 981, 136, {}], ['vincular', 981, 'reg-2']])
+  // Nunca a un mes posterior, aunque la venta llegue como Date.
+  const adelante = deps()
+  assert.match((await vincularFichaExistenteCon({ ficha: legacy, crmId: 'reg-2', fechaVenta: '2026-09-25', grupoId: 136 }, adelante)).error, /usa «Editar niño»/)
+  assert.deepEqual(adelante.orden, [])
 })
 
 test('vincular: el que estaba en otro grupo pasa al del formulario (traslado) solo si se pide', async () => {
@@ -258,15 +309,15 @@ test('vincular: el que estaba en otro grupo pasa al del formulario (traslado) so
   assert.deepEqual(sigue.orden, [['vincular', 907, 'reg-1029']])
 
   const pasa = deps()
-  const r = await vincularFichaExistenteCon({ ficha: valeria, crmId: 'reg-1029', grupoId: 136, grupoDestino: TINY1 }, pasa)
-  assert.deepEqual(pasa.orden, [['mover', 907, 136], ['vincular', 907, 'reg-1029']])
+  const r = await vincularFichaExistenteCon({ ficha: valeria, crmId: 'reg-1029', grupoId: 136 }, pasa)
+  assert.deepEqual(pasa.orden, [['mover', 907, 136, {}], ['vincular', 907, 'reg-1029']])
   assert.equal(r.movido, true)
 
   // Sin semana equivalente en el destino el traslado no se aplica y no se toca nada más.
   const sinSemana = deps({ mover: { error: 'El traslado no se aplicó: el horario del grupo 66 no tiene una semana equivalente.' } })
-  const r2 = await vincularFichaExistenteCon({ ficha: valeria, crmId: 'reg-1029', fechaVenta: '2026-08-28', grupoId: 136, grupoDestino: TINY1 }, sinSemana)
+  const r2 = await vincularFichaExistenteCon({ ficha: valeria, crmId: 'reg-1029', fechaVenta: '2026-08-28', grupoId: 136 }, sinSemana)
   assert.match(r2.error, /^El traslado no se aplicó/)
-  assert.deepEqual(sinSemana.orden, [['mover', 907, 136]])
+  assert.deepEqual(sinSemana.orden, [['mover', 907, 136, {}]])
 })
 
 test('vincular: la fecha de venta se corrige con el camino de «Editar niño» antes de vincular, nunca a un mes posterior', async () => {
@@ -286,25 +337,23 @@ test('vincular: la fecha de venta se corrige con el camino de «Editar niño» a
   assert.deepEqual(adelante.orden, [])
 })
 
-test('vincular: el retirado vuelve como reincorporado si la colocación es válida; su venta no se toca', async () => {
+test('vincular: el retirado vuelve como reincorporado; su venta no se toca', async () => {
   const sinGrupo = deps()
   const r = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado', itinerario: 'TINY', nivel: 4 }, crmId: 'reg-999', fechaVenta: '2026-09-25' }, sinGrupo)
   assert.match(r.error, /reincorporación/)
   assert.deepEqual(sinGrupo.orden, [])
 
   const d = deps()
-  const r2 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado', itinerario: 'TINY', nivel: 4 }, crmId: 'reg-999', fechaVenta: '2026-09-25', grupoId: 136, grupoDestino: TINY1 }, d)
+  const r2 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado', itinerario: 'TINY', nivel: 4 }, crmId: 'reg-999', fechaVenta: '2026-09-25', grupoId: 136 }, d)
   assert.deepEqual(d.orden, [['reincorporar', 946, 136], ['vincular', 946, 'reg-999']])
   assert.equal(r2.reincorporado, true)
   assert.equal(r2.fechaCorregida, false)
 
-  // Un Tiny no entra a un grupo Kids (la reincorporación de Grupos no lo valida).
-  const kids = deps()
-  const r3 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado', itinerario: 'TINY', nivel: 4 }, crmId: 'reg-999', grupoId: 140, grupoDestino: { id: 140, itinerario: 'KIDS' } }, kids)
+  // El error de la reincorporación (colocación inválida, grupo cerrado) sale tal cual y no vincula.
+  const kids = deps({ reincorporar: { error: 'Un niño Tiny no entra a un grupo Kids (manual: solo KIDS nivel 3+ cruza de itinerario).' } })
+  const r3 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado' }, crmId: 'reg-999', grupoId: 140 }, kids)
   assert.match(r3.error, /Un niño Tiny no entra a un grupo Kids/)
-  assert.deepEqual(kids.orden, [])
-
-  assert.deepEqual(await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado' }, grupoId: 999, grupoDestino: null }, deps()), { error: 'El grupo no pertenece a este centro.' })
+  assert.deepEqual(kids.orden, [['reincorporar', 946, 140]])
 })
 
 test('vincular: nunca pisa otro registro, no vincula una anulada y avisa si el registro ya es de otra ficha', async () => {
@@ -341,5 +390,6 @@ test('app/actions/estudiantes.js importa la búsqueda y la orquestación desde l
   // búsqueda con la conexión de afuera (sin locks de predicado sobre las fichas).
   const cuerpo = SOURCE.slice(SOURCE.indexOf('return await withTransaction(async (query) => {'), SOURCE.indexOf('INSERT INTO estudiantes ('))
   assert.ok(cuerpo.indexOf('pg_advisory_xact_lock') >= 0 && cuerpo.indexOf('pg_advisory_xact_lock') < cuerpo.indexOf('fichaExistenteEn(sql,'))
+  assert.ok(cuerpo.indexOf("SET LOCAL lock_timeout") >= 0 && cuerpo.indexOf("SET LOCAL lock_timeout") < cuerpo.indexOf('pg_advisory_xact_lock'))
   assert.doesNotMatch(cuerpo, /fichaExistenteEn\(query,/)
 })
