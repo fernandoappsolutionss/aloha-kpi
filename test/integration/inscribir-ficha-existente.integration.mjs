@@ -110,6 +110,8 @@ async function conCandadoRetenido(centroId, n, disparar) {
     await duenio.query('SELECT pg_advisory_unlock($1::int, $2::int)', [CANDADO_ALTAS_CENTRO, centroId])
     return await respuestas
   } finally {
+    // El candado es de SESIÓN: si el sondeo falló, no vuelve tomado al pool.
+    try { await duenio.query('SELECT pg_advisory_unlock_all()') } catch {}
     duenio.release()
   }
 }

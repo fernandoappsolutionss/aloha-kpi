@@ -244,16 +244,14 @@ test('vincularFichaExistente: con la venta como Date (así la entrega el driver)
   assert.equal(escrituras.length, 0)
 })
 
-test('reincorporar valida la colocación: un Tiny no vuelve a un grupo Kids (Grupos y clase de prueba)', async () => {
+test('reincorporar NO frena por la matriz Tiny/Kids: la ficha del retirado puede tener el itinerario de cuando se fue', async () => {
+  // Regla de main, a propósito: un Tiny que vuelve con edad de Kids no tiene
+  // cómo cambiar su itinerario antes de volver. Frenarlo lo empujaría a «Es
+  // otro niño» (venta falsa). La pantalla avisa; se corrige con «Editar niño».
   const luciano = { id: 946, nombre: 'Luciano Acosta', estado: 'retirado', grupo_id: null, itinerario: 'TINY', nivel: 4, centro_id: 5 }
   const kids = { ...GRUPO, id: 140, numero: '70', itinerario: 'KIDS' }
-  const { reincorporarEstudiante, escrituras } = acciones({ fichas: [luciano], grupo: kids })
-  const r = await reincorporarEstudiante(5, 946, { grupoId: 140 })
-  assert.equal(r.error, 'Un niño Tiny no entra a un grupo Kids (manual: solo KIDS nivel 3+ cruza de itinerario).')
-  assert.equal(escrituras.length, 0)
-
-  const tiny = acciones({ fichas: [luciano] })
-  assert.equal((await tiny.reincorporarEstudiante(5, 946, { grupoId: 136 })).ok, true)
+  const { reincorporarEstudiante } = acciones({ fichas: [luciano], grupo: kids })
+  assert.equal((await reincorporarEstudiante(5, 946, { grupoId: 140 })).ok, true)
 })
 
 // ── Orquestación de "es este niño" (dependencias inyectadas) ────────────────
@@ -284,11 +282,18 @@ test('vincular: el pendiente sin venta se coloca con su fecha y origen en la MIS
   await vincularFichaExistenteCon({ ficha: { ...pendiente, origen_venta: 'referido' }, crmId: 'reg-1', grupoId: 136, origenVenta: 'marketing' }, hoy)
   assert.deepEqual(hoy.orden, [['mover', 980, 136, {}], ['vincular', 980, 'reg-1']])
 
-  // Ya colocado, si la fecha no se pudo corregir (mes cerrado) queda dicho.
-  const mesCerrado = deps({ corregir: { error: 'El mes 09/2026 está cerrado.' } })
+  // Ya colocado, si la fecha no se pudo corregir (mes cerrado) queda dicho
+  // dónde quedó la venta (sin mandar a «Editar niño», que fallaría igual).
+  const mesCerrado = deps({ corregir: { error: 'Ese mes está cerrado. Los meses históricos no admiten modificaciones.' } })
   const r2 = await vincularFichaExistenteCon({ ficha: pendiente, crmId: 'reg-1', fechaVenta: '2026-09-25', grupoId: 136 }, mesCerrado)
   assert.equal(r2.ok, true)
-  assert.match(r2.aviso, /^Quedó en el grupo, pero su fecha de venta no se pudo corregir: El mes 09\/2026 está cerrado\./)
+  assert.equal(r2.fechaCorregida, false)
+  assert.equal(r2.aviso, 'Quedó en el grupo, pero su venta no se pasó al 2026-09-25: Ese mes está cerrado. Los meses históricos no admiten modificaciones. Su venta quedó con la fecha de hoy, la de la colocación.')
+
+  // Con venta (traslado), la venta sigue en su fecha.
+  const conVenta = deps({ corregir: { error: 'Ese mes está cerrado. Los meses históricos no admiten modificaciones.' } })
+  const r3 = await vincularFichaExistenteCon({ ficha: { ...pendiente, grupo_id: 121, fecha_venta: new Date('2026-09-10T00:00:00Z') }, crmId: 'reg-1', fechaVenta: '2026-09-05', grupoId: 136 }, conVenta)
+  assert.match(r3.aviso, /Su venta sigue el 2026-09-10\.$/)
 })
 
 test('vincular: sin grupo pero CON venta, colocarlo no toca la venta salvo que el centro elija la fecha', async () => {
@@ -349,11 +354,11 @@ test('vincular: el retirado vuelve como reincorporado; su venta no se toca', asy
   assert.equal(r2.reincorporado, true)
   assert.equal(r2.fechaCorregida, false)
 
-  // El error de la reincorporación (colocación inválida, grupo cerrado) sale tal cual y no vincula.
-  const kids = deps({ reincorporar: { error: 'Un niño Tiny no entra a un grupo Kids (manual: solo KIDS nivel 3+ cruza de itinerario).' } })
-  const r3 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado' }, crmId: 'reg-999', grupoId: 140 }, kids)
-  assert.match(r3.error, /Un niño Tiny no entra a un grupo Kids/)
-  assert.deepEqual(kids.orden, [['reincorporar', 946, 140]])
+  // El error de la reincorporación (p. ej. grupo cerrado) sale tal cual y no vincula.
+  const cerrado = deps({ reincorporar: { error: 'El grupo 70 está cerrado a inscripciones: ya no entra nadie.' } })
+  const r3 = await vincularFichaExistenteCon({ ficha: { id: 946, estado: 'retirado' }, crmId: 'reg-999', grupoId: 140 }, cerrado)
+  assert.match(r3.error, /El grupo 70 está cerrado/)
+  assert.deepEqual(cerrado.orden, [['reincorporar', 946, 140]])
 })
 
 test('vincular: nunca pisa otro registro, no vincula una anulada y avisa si el registro ya es de otra ficha', async () => {

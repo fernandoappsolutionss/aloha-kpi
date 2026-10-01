@@ -62,7 +62,10 @@ Mismo centro siempre.
 
 «Es este niño» no crea ficha y deja al niño donde el centro lo quiere por los caminos que ya existen:
 
-- **Retirado:** se reincorpora (`reincorporarEstudiante`) en el grupo elegido. `reincorporarEstudiante` ahora valida `colocacionInvalida` dentro de su transacción, con el grupo bloqueado, así que cubre también «Reincorporar» de Grupos, que antes no lo validaba. Si el nivel no coincide, la pantalla lo avisa.
+- **Retirado:** se reincorpora (`reincorporarEstudiante`) en el grupo elegido.
+  - La matriz Tiny/Kids NO frena la reincorporación, igual que «Reincorporar» de Grupos en `main`. La ficha del retirado puede tener el itinerario de cuando se fue, y Grupos no deja cambiarlo antes de que vuelva. Frenarlo empujaría a «Es otro niño», que es una venta falsa.
+  - La pantalla avisa cuando el grupo no calza con su ficha, cita la regla del manual si aplica, y manda a corregir itinerario y nivel con «Editar niño».
+  - **Decisión pendiente de Fernando:** si la regla aplica también a las reincorporaciones, «Reincorporar» tiene que poder actualizar itinerario y nivel en la misma operación. Es un PR aparte.
 - **Sin grupo y sin venta (pendiente puro):** primera colocación con «Editar niño» (`actualizarEstudiante`) en UNA llamada con `grupo_id` y, si aplica, dos datos más:
   - `fecha_inscripcion`, si el centro eligió la fecha del formulario. Un pendiente puro no tiene evento, así que no se bloquea el mes de su ficha vieja, que puede estar cerrado.
   - `origen_venta` del formulario, si la ficha no tiene uno. Sin él, la venta nace «por clasificar».
@@ -71,7 +74,7 @@ Mismo centro siempre.
 - **En otro grupo:** traslado SOLO si el centro elige «Es este niño y pasa al grupo N». Si no hay semana equivalente, el error sale tal cual.
 - **Fecha de venta:** solo si el centro la eligió, con el mismo camino del #150 (`actualizarEstudiante({ fecha_inscripcion })`). Nunca a un mes POSTERIOR al de su venta: eso es «Editar niño», a conciencia. La pantalla solo la ofrece hacia atrás o dentro del mismo mes, y el servicio lo vuelve a frenar. La fecha canónica llega del driver como `Date`: el servicio la normaliza (`iso10`) antes de comparar meses.
 - **Vínculo del registro:** va al final, solo si la ficha no tiene uno (CAS `IS NULL`); nunca pisa otro.
-- **Orden y fallas:** primero el grupo; si falla, no se toca nada. Si después falla la fecha, el niño ya quedó en su grupo y la respuesta lo dice.
+- **Orden y fallas:** primero el grupo; si falla, no se toca nada. Si después falla la fecha, el niño ya quedó en su grupo, y la respuesta dice dónde quedó su venta y por qué no se movió (casi siempre, el mes de esa fecha está cerrado).
 
 ### 3. UI
 
@@ -121,10 +124,15 @@ Mismo centro siempre.
   1. **Bloqueante:** el servicio comparaba meses con `String(fecha).slice(0, 10)`, y con un `Date` del driver eso da «Tue Sep 01». El freno de «mes posterior» nunca saltaba, y una venta de septiembre podía pasar a octubre en silencio. Además, «colocarlo» ignoraba la fecha elegida. → `iso10` en el servicio, test con `new Date(...)`, y la UI respeta el radio siempre.
   2. **Importante:** al pendiente sin venta se le retrocedía la venta sin preguntar. Si su ficha era de un mes cerrado, la corrección fallaba siempre. → Elección explícita, y fecha y origen viajan en la misma llamada de colocación.
   3. Reintento también del 40P01, `lock_timeout` antes del candado, y prueba de la primera alta del mes sin fila de `mes_kpi`.
-  4. `colocacionInvalida` pasa a `reincorporarEstudiante`, con el grupo bloqueado: cubre los dos caminos.
+  4. `colocacionInvalida` pasa a `reincorporarEstudiante`, con el grupo bloqueado: cubre los dos caminos. (Revertido en la ronda 3: ver abajo.)
   5. `?ficha=` se limpia de la URL.
   6. El script excluye las ventas por traslado.
   - Señalado y fuera de alcance: en «Editar niño» de un pendiente, grupo + fecha en un solo guardado hacen nacer la venta hoy, no en la fecha. Ya pasa en `main` (regla g1-8/g2-1), pero el enlace «Abrir su ficha en Grupos» hace que ese camino se use más.
+- **Ronda 3, revisor independiente:** VALIDA. Confirmó que la colocación + corrección en dos llamadas bloquea solo los meses correctos y es idempotente ante reintentos, que el reintento del 40P01 no empeora nada, y que la prueba nueva es determinista. Dejó 3 hallazgos menores, todos atendidos:
+  1. El freno Tiny/Kids en `reincorporarEstudiante` (puesto por el hallazgo 4 de la ronda 2) dejaba sin salida a un Tiny que vuelve con edad de Kids, porque Grupos no le deja cambiar el itinerario. El atajo era «Es otro niño», o sea, una venta falsa. → Se vuelve a la regla de `main` (no frena) y se avisa en pantalla. Que la regla aplique a reincorporaciones lo decide Fernando, y eso pide un PR aparte.
+  2. El aviso cuando falla la corrección mandaba a «Editar niño», que falla igual. → Ahora dice dónde quedó la venta y por qué no se movió.
+  3. Higiene del test de integración. → `pg_advisory_unlock_all()` en el `finally`.
+  - Fuera de alcance, con propuesta: en `marcarAsistencia`, tomar `SELECT 1 FROM grupos WHERE id = $g FOR KEY SHARE` antes de `bloquearMesesEditables`. Así la asistencia toma grupo → mes como el alta, y las marcas no se bloquean entre sí porque FOR KEY SHARE es compatible consigo mismo.
 - **Medición en Postgres 16 real** (servidor de la acción, SERIALIZABLE). Por ronda: 3 altas de niños distintos + 6 marcas de asistencia del coach, todas en el mismo grupo y al mismo tiempo (carga sintética, peor que la real):
 
 | Variante | Mismo niño ×4 a la vez (15 rondas): fichas de más | Altas que se guardan (de 180) | Asistencias que se guardan (de 360) | Asistencia: 40001 | Asistencia: 40P01 (deadlock) |

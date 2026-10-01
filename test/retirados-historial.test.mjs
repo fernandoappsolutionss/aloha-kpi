@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import { ORIGENES } from '../lib/operaciones.js'
-import { colocacionInvalida } from '../lib/colocacion.mjs'
 
 const gruposSource = fs.readFileSync(new URL('../app/actions/grupos.js', import.meta.url), 'utf8')
 const estudiantesSource = fs.readFileSync(new URL('../app/actions/estudiantes.js', import.meta.url), 'utf8')
@@ -197,7 +196,6 @@ test('reincorporarEstudiante conserva el evento y marca el origen por COALESCE',
     hoyISO: () => '2026-09-21',
     ym: () => ({ year: 2026, month: 9 }),
     grupoAceptaMovimientos: () => null,
-    colocacionInvalida,
     encolarSyncCrm: async () => undefined,
   })
 

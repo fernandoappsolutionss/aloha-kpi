@@ -15,7 +15,7 @@ import CoincidenciasFicha, { ConfirmarFichaNueva, fechaCorta, nivelTexto, titulo
 import { origenDeRegistro } from '../../../../lib/registro-origen'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES_VENTA, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
-import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
+import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, colocacionInvalida, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
 import { mesClase, mesAnterior, filtrarClasesPorMes, filtrarClasesPorMomento, resumirClases } from '../../../../lib/clases-prueba.mjs'
@@ -903,6 +903,9 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
       const valor = grupoVueltaDe(c)
       const destino = aceptanMovimientos.find((g) => String(g.id) === String(valor)) || null
       const otroNivel = destino && (destino.itinerario !== c.itinerario || Number(destino.nivel) !== Number(c.nivel))
+      // La matriz Tiny/Kids no frena la reincorporación (su ficha puede tener el
+      // itinerario de cuando se fue): se avisa y se corrige con «Editar niño».
+      const reglaManual = destino ? colocacionInvalida({ itinerario: c.itinerario, nivel: c.nivel }, destino.itinerario) : null
       return (
         <div style={ACCIONES_FICHA}>
           <p style={HINT}>Si vuelve, es una reincorporación: no suma una venta nueva.</p>
@@ -915,7 +918,9 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
           </label>
           {otroNivel && (
             <p style={{ ...HINT, color: 'var(--warn)' }}>
-              Va en {nivelTexto(c.itinerario, c.nivel)} y el grupo {destino.numero} está en {nivelTexto(destino.itinerario, destino.nivel)}: confirma que ese es su grupo antes de reincorporarlo.
+              Su ficha dice {nivelTexto(c.itinerario, c.nivel)} y el grupo {destino.numero} está en {nivelTexto(destino.itinerario, destino.nivel)}: confirma que ese es su grupo antes de reincorporarlo.
+              {reglaManual ? ` ${reglaManual} Si ya creció, reincorpóralo y corrige su itinerario y nivel en «Editar niño».` : ''}
+              {' '}No lo inscribas como otro niño: sumaría una venta falsa.
             </p>
           )}
           <button type="button" className="btn btn--primary" disabled={saving || !valor} onClick={() => vincular(c)}>Es este niño: reincorporarlo</button>

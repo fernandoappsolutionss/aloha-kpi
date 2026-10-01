@@ -1280,11 +1280,6 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
     if (est.estado !== 'retirado') return { error: 'El estudiante no está retirado.' }
     const errorGrupo = grupoAceptaMovimientos(g)
     if (errorGrupo) return { error: errorGrupo }
-    // (2026-10-01) La misma matriz de colocación que el alta y el traslado: un
-    // Tiny no vuelve a un grupo Kids ni un Kids <3 a un Tiny (vale para
-    // «Reincorporar» de Grupos y para «Es este niño» de la clase de prueba).
-    const errorColocacion = colocacionInvalida({ itinerario: est.itinerario, nivel: est.nivel }, g.itinerario)
-    if (errorColocacion) return { error: errorColocacion }
     await query`
       UPDATE estudiantes SET estado = 'activo', grupo_id = ${grupoId}, status_plataforma = 'INCLUIR',
         origen = COALESCE(origen, 'reincorporado'), motivo_retiro = NULL, fecha_retiro = NULL, updated_at = ${now}
