@@ -1712,11 +1712,16 @@ function ItinerarioNivel({ centroId, g, it, pos, canWrite = true, onAjustar, onP
 // queda pendiente (otro retiro en el mismo mes, KPI del mes ya guardado).
 function mensajeMotivoCorregido(nombre, res) {
   const mes = nombreMes(res.year, res.month)
+  // El evento ya tenía ese motivo (dato viejo con la ficha distinta): el KPI
+  // no cambia, solo se alinea la ficha.
+  const soloFicha = !res.sinCambios && res.motivoAnterior === res.motivo
   const partes = res.sinCambios
     ? [`✅ No había nada que corregir: el retiro de ${nombre} ya tiene el motivo ${etiquetaMotivo(res.motivo)}.`]
-    : [`✅ Motivo del retiro de ${nombre} corregido: ${etiquetaMotivo(res.motivoAnterior) || 'sin motivo'} → ${etiquetaMotivo(res.motivo)} (retiro de ${mes}).`]
+    : soloFicha
+      ? [`✅ Motivo del retiro de ${nombre} alineado: el KPI ya lo contaba como ${etiquetaMotivo(res.motivo)} (retiro de ${mes}); solo se corrigió la ficha.`]
+      : [`✅ Motivo del retiro de ${nombre} corregido: ${etiquetaMotivo(res.motivoAnterior) || 'sin motivo'} → ${etiquetaMotivo(res.motivo)} (retiro de ${mes}).`]
   if (res.sinCambios && res.eventoCambio) partes.push('La lista que tenías abierta estaba desactualizada; ya se recargó.')
-  if (!res.sinCambios && res.mismoCampoKpi) partes.push('En el KPI los dos motivos cuentan como «Otro»: los totales no cambian.')
+  if (!res.sinCambios && !soloFicha && res.mismoCampoKpi) partes.push('En el KPI los dos motivos cuentan como «Otro»: los totales no cambian.')
   const otros = res.otrosRetirosMismoMes?.length || 0
   if (otros) {
     partes.push(`Ojo: ${nombre} tiene ${otros === 1 ? 'otro retiro registrado' : `${otros} retiros más registrados`} en ${mes} y ${otros === 1 ? 'también cuenta' : 'también cuentan'}. Si fue un error, avísale a Administración; si el niño se retiró dos veces ese mes, está bien.`)

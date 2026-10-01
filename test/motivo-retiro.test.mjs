@@ -66,10 +66,12 @@ test('cada guarda frena con un mensaje legible', () => {
     [{}, { ficha: null }, /no pertenece a este centro/],
     [{}, { ficha: { ...fichaIvannis, estado: 'activo' } }, /no está retirado/],
     [{}, { eventos: [ev1129] }, /no tiene un retiro registrado/],
-    [{}, { eventos: [{ ...ev1130, centro_id: 3 }] }, /otro centro/],
+    [{}, { eventos: [{ ...ev1130, centro_id: 3 }] }, /otro centro\. Avísale a Administración/],
     [{}, { eventos: [ev1130, { ...ev1129, id: 1131 }] }, /reincorporación posterior/],
     [{}, { ficha: { ...fichaIvannis, fecha_retiro: d(2026, 8, 16) } }, /16\/08\/2026[\s\S]*15\/08\/2026[\s\S]*no describen el mismo retiro/],
-    [{}, { ficha: { ...fichaIvannis, fecha_retiro: null } }, /sin fecha/],
+    [{}, { ficha: { ...fichaIvannis, fecha_retiro: null } }, /^La ficha no tiene fecha de retiro y el retiro registrado es del 15\/08\/2026: no describen el mismo retiro/],
+    [{}, { eventos: [{ ...ev1130, fecha: null }] }, /^La ficha dice retiro el 15\/08\/2026 y el retiro registrado no tiene fecha:/],
+    [{}, { ficha: { ...fichaIvannis, fecha_retiro: null }, eventos: [{ ...ev1130, fecha: null }] }, /^Ni la ficha ni el retiro registrado tienen fecha:/],
   ]
   for (const [extraPedido, extra, patron] of casos) {
     const r = evaluarCorreccionMotivo({ ficha: fichaIvannis, eventos: [ev1130], ...pedido(extraPedido), ...extra })

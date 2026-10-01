@@ -347,7 +347,10 @@ test('mensajeMotivoCorregido dice qué cambió y qué queda pendiente', () => {
   assert.match(completo, /El KPI de agosto 2026 ya estaba guardado: abre KPI Mensual y vuelve a Guardar/)
   assert.match(mensaje('Ana', { ...base, motivoAnterior: 'OTRO', motivo: 'NO_CONFIRMO', mismoCampoKpi: true }), /cuentan como «Otro»: los totales no cambian/)
   assert.match(mensaje('Ana', { ...base, sinCambios: true, eventoCambio: true, motivo: 'OTRO' }), /^✅ No había nada que corregir: el retiro de Ana ya tiene el motivo Otro\. La lista que tenías abierta estaba desactualizada/)
-  assert.match(mensaje('Ana', { ...base, motivoAnterior: null, motivo: 'OTRO' }), /corregido: sin motivo → Otro/)
+  assert.match(mensaje('Ana', { ...base, motivoAnterior: null, motivo: 'OTRO', mismoCampoKpi: true }), /corregido: sin motivo → Otro \(retiro de agosto 2026\)\. En el KPI los dos motivos cuentan como «Otro»/)
+  // Evento ya con el motivo nuevo y ficha distinta (dato viejo): no hay "A → A" ni «Otro» falso.
+  const soloFicha = mensaje('Ana', { ...base, motivoAnterior: 'GRADUADO', motivo: 'GRADUADO', mismoCampoKpi: true })
+  assert.equal(soloFicha, '✅ Motivo del retiro de Ana alineado: el KPI ya lo contaba como Graduado (retiro de agosto 2026); solo se corrigió la ficha.')
 })
 
 test('el Cuadro deja de enseñar el rodeo y enlaza a donde se corrige el motivo', () => {

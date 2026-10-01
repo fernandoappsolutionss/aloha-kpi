@@ -204,15 +204,28 @@ test('carrera (a): una reincorporación confirma mientras la corrección espera 
   }
 })
 
-test('carrera (b): la corrección sostiene sus locks; la reincorporación concurrente recibe 40001, nunca 40P01', async () => {
+// Corrección que se detiene justo antes de escribir: ya leyó ajustes/resumen y
+// tiene el mes, la ficha y el evento bloqueados. `enPausa` falla (no se
+// cuelga) si la corrección termina sin llegar a la pausa.
+function correccionEnPausa(extra = {}) {
+  let llego, soltar
+  const pausa = new Promise((resolve) => { llego = resolve })
+  const liberar = new Promise((resolve) => { soltar = resolve })
+  const correccion = corregir(extra, { antesDe: { patron: /^\s*UPDATE estudiante_eventos/, esperar: async () => { llego(); await liberar } } })
+  const terminoAntes = correccion.then(
+    (r) => Promise.reject(new Error(`la corrección terminó sin llegar a la pausa: ${JSON.stringify(r)}`)),
+    (error) => Promise.reject(new Error(`la corrección falló antes de la pausa: ${error.message}`)),
+  )
+  terminoAntes.catch(() => {}) // solo importa si gana la carrera
+  return { correccion, enPausa: Promise.race([pausa, terminoAntes]), soltar }
+}
+
+test('carrera (b): la corrección sostiene sus locks; una reincorporación concurrente espera la ficha y recibe 40001', async () => {
   const competidor = await pool.connect()
   const observer = await pool.connect()
-  let llego, soltar
-  const enPausa = new Promise((resolve) => { llego = resolve })
-  const liberar = new Promise((resolve) => { soltar = resolve })
+  const { correccion, enPausa, soltar } = correccionEnPausa()
   try {
-    const correccion = corregir({}, { antesDe: { patron: /^\s*UPDATE estudiante_eventos/, esperar: async () => { llego(); await liberar } } })
-    await enPausa // mes de agosto, ficha y evento ya bloqueados por la corrección
+    await enPausa
 
     await competidor.query('BEGIN ISOLATION LEVEL SERIALIZABLE')
     const pidCompetidor = await pidDe(competidor)
@@ -231,6 +244,40 @@ test('carrera (b): la corrección sostiene sus locks; la reincorporación concur
   } finally {
     soltar()
     competidor.release(); observer.release()
+  }
+})
+
+test("carrera (c'): un Guardar que espera detrás de una corrección que cambia de campo aborta con 40001 y no guarda el resumen viejo", async () => {
+  const guardar = await pool.connect()
+  const observer = await pool.connect()
+  const { correccion, enPausa, soltar } = correccionEnPausa()
+  try {
+    await enPausa
+    // Como guardarKpiMes: el INSERT de bloquearMesesEditables fija el snapshot
+    // (antes del COMMIT de la corrección) y el FOR UPDATE del mes espera.
+    await guardar.query('BEGIN ISOLATION LEVEL SERIALIZABLE')
+    const pidGuardar = await pidDe(guardar)
+    await guardar.query("INSERT INTO mes_kpi VALUES (5, 2026, 8, 'abierto', NULL) ON CONFLICT DO NOTHING")
+    const resultado = guardar.query('SELECT estado FROM mes_kpi WHERE centro_id = 5 AND year = 2026 AND month = 8 FOR UPDATE')
+      .then(async () => {
+        await guardar.query('SELECT * FROM estudiante_eventos WHERE centro_id = 5')
+        await guardar.query('SELECT * FROM estudiantes WHERE centro_id = 5')
+        await guardar.query('INSERT INTO resumen_mes VALUES (5, 2026, 8, 1, 0) ON CONFLICT (centro_id, year, month) DO UPDATE SET mot_economico = 1')
+        await guardar.query('COMMIT')
+        return null
+      })
+      .catch(async (error) => { await guardar.query('ROLLBACK').catch(() => {}); return error })
+    await esperarBloqueo(observer, { pidBloqueado: pidGuardar })
+    soltar()
+
+    assert.equal((await correccion).ok, true)
+    const error = await resultado
+    assert.equal(error?.code, '40001', `el Guardar debía abortar con 40001 y terminó con ${error?.code ?? 'COMMIT'}`)
+    assert.equal((await filas('SELECT count(*)::int AS n FROM resumen_mes'))[0].n, 0, 'no queda un resumen con el motivo viejo')
+    assert.equal((await retiro1130()).motivo, 'GRADUADO')
+  } finally {
+    soltar()
+    guardar.release(); observer.release()
   }
 })
 
