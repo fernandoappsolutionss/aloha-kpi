@@ -133,6 +133,7 @@ Mismo centro siempre.
   2. El aviso cuando falla la corrección mandaba a «Editar niño», que falla igual. → Ahora dice dónde quedó la venta y por qué no se movió.
   3. Higiene del test de integración. → `pg_advisory_unlock_all()` en el `finally`.
   - Fuera de alcance, con propuesta: en `marcarAsistencia`, tomar `SELECT 1 FROM grupos WHERE id = $g FOR KEY SHARE` antes de `bloquearMesesEditables`. Así la asistencia toma grupo → mes como el alta, y las marcas no se bloquean entre sí porque FOR KEY SHARE es compatible consigo mismo.
+- **Ronda 4, revisor independiente (sobre 7c86eba):** VALIDA se mantiene, sin hallazgos nuevos. Confirmó que volver a la regla de `main` no agrega riesgos y que el camino del aviso funciona: «Editar niño» cambia itinerario y nivel sin chocar con la matriz, que solo se valida al cambiar de grupo. Nota opcional: «Reincorporar» de Grupos sigue sin aviso de nivel, igual que en `main`.
 - **Medición en Postgres 16 real** (servidor de la acción, SERIALIZABLE). Por ronda: 3 altas de niños distintos + 6 marcas de asistencia del coach, todas en el mismo grupo y al mismo tiempo (carga sintética, peor que la real):
 
 | Variante | Mismo niño ×4 a la vez (15 rondas): fichas de más | Altas que se guardan (de 180) | Asistencias que se guardan (de 360) | Asistencia: 40001 | Asistencia: 40P01 (deadlock) |
