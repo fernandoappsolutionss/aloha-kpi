@@ -62,11 +62,11 @@ test('una propuesta automática visible da ritmo aunque todavía no esté guarda
   assert.deepEqual(result.cuotas.nuevos_inscritos, { cuota: null, propuesta: 5, estado: 'propuesta', ritmo: { esperado: 2, vaBien: false } })
 })
 
-test('porcentaje cuenta solo cuotas aprobadas con estadística disponible', () => {
+test('porcentaje exige todas las cuotas aprobadas y fotos cerradas del catálogo', () => {
   const series = {
-    nuevos_inscritos: [{ semanaFin: '2026-09-24', valor: 5 }],
-    retiros: [{ semanaFin: '2026-09-24', valor: 2 }],
-    cp_asistidas: [{ semanaFin: '2026-09-24', valor: null }],
+    nuevos_inscritos: [{ semanaFin: '2026-09-24', estado: 'cerrada', valor: 5 }],
+    retiros: [{ semanaFin: '2026-09-24', estado: 'cerrada', valor: 2 }],
+    cp_asistidas: [{ semanaFin: '2026-09-24', estado: 'cerrada', valor: null }],
   }
   const filasCuotas = [
     { codigo: 'nuevos_inscritos', semana_fin: '2026-09-24', cuota: 5, estado: 'aprobada' },
@@ -74,7 +74,8 @@ test('porcentaje cuenta solo cuotas aprobadas con estadística disponible', () =
     { codigo: 'cp_asistidas', semana_fin: '2026-09-24', cuota: 3, estado: 'aprobada' },
     { codigo: 'ninos_activos', semana_fin: '2026-09-24', cuota: 100, estado: 'propuesta' },
   ]
-  assert.equal(porcentajeCuotasCumplidas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas, semanaFin: '2026-09-24' }), 50)
+  assert.equal(porcentajeCuotasCumplidas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas, semanaFin: '2026-09-24' }), null)
+  assert.equal(porcentajeCuotasCumplidas({ catalogo: ESTADISTICAS_CENTRO.filter(m => ['nuevos_inscritos', 'retiros'].includes(m.codigo)), series, filasCuotas, semanaFin: '2026-09-24' }), 50)
   assert.equal(porcentajeCuotasCumplidas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: [], semanaFin: '2026-09-24' }), null)
 })
 

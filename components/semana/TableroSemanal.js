@@ -8,7 +8,7 @@ import { colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
 const actual = (centro, codigo) => centro.abierta[codigo]
-const estado = { sin_condicion: 'Sin condición', incompleto: 'Plan incompleto', completo: 'Plan completo' }
+const estado = { sin_condicion: 'Pendiente de asignar condición', incompleto: 'Plan incompleto', completo: 'Plan completo' }
 
 export default function TableroSemanal() {
   const [datos, setDatos] = useState(null)
@@ -39,8 +39,8 @@ export default function TableroSemanal() {
               <td>{centro.delta == null ? 'Sin dato' : `${centro.delta > 0 ? '+' : ''}${centro.delta}`}</td>
               <td className="semana-tablero__mini"><GraficaSemanal puntos={centro.serie} titulo={`Niños activos de ${centro.nombre}`} compacta /></td>
               <td>{centro.condicion ? <span className="semana-condicion" style={{ '--condicion-color': colorCondicion(centro.condicion) }}>{nombreCondicion(centro.condicion)}</span> : 'Sin condición'}{centro.discrepancia && <span className="semana-discrepancia" role="img" aria-label="Discrepancia"> ⚠ Discrepancia</span>}</td>
-              <td className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>{estado[centro.estadoPlan] || 'Sin condición'}</td>
-              <td>{centro.cuotasCumplidas == null ? 'Sin dato' : `${centro.cuotasCumplidas}%`}</td>
+              <td className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>{estado[centro.estadoPlan] || 'Pendiente'}</td>
+              <td><Link className="operations-link" href="/dashboard/ranking">{centro.cuotasCumplidas == null ? 'Sin evaluar' : `${centro.cuotasCumplidas}%`}</Link></td>
               <td>{mostrar(actual(centro, 'nuevos_inscritos'))}</td>
               <td>{mostrar(actual(centro, 'retiros'))}</td>
               <td>{mostrar(actual(centro, 'facturas_vencidas'))}</td>
