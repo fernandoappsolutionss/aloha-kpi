@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { cargarEnv, conCliente } from './migrate-caja.mjs'
 
-export const MIGRACIONES = ['2026-10-01-estadisticas-semana.sql', '2026-10-01-plan-semana.sql']
+export const MIGRACIONES = ['2026-10-01-estadisticas-semana.sql', '2026-10-01-plan-semana.sql', '2026-10-01-cuotas-semana.sql']
 
 export async function runMigration(client, { apply = false, log = console.log } = {}) {
-  const { rows: [tablas] } = await client.query("SELECT to_regclass('public.estadisticas_semana') AS estadisticas_semana, to_regclass('public.cobranza_diaria') AS cobranza_diaria, to_regclass('public.semana_planes') AS semana_planes, to_regclass('public.semana_objetivos') AS semana_objetivos")
+  const { rows: [tablas] } = await client.query("SELECT to_regclass('public.estadisticas_semana') AS estadisticas_semana, to_regclass('public.cobranza_diaria') AS cobranza_diaria, to_regclass('public.semana_planes') AS semana_planes, to_regclass('public.semana_objetivos') AS semana_objetivos, to_regclass('public.semana_cuotas') AS semana_cuotas")
   log(JSON.stringify({ modo: apply ? 'aplicar' : 'solo-lectura', ...tablas }))
   if (!apply) return { applied: false }
   for (const archivo of MIGRACIONES) {

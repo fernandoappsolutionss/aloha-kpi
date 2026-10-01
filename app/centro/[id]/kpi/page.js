@@ -26,12 +26,6 @@ const calcRes = (tipo, dias) => {
   if (tipo === 'cob') { for (let i = v.length-1; i >= 0; i--) if (v[i] > 0) return v[i]; return 0 }
   return v.reduce((a,b) => a+b, 0)
 }
-const calcMeta = (tipo, ni, metaN) => {
-  if (tipo === 'cob') return Math.round(ni * 0.015 / 5 * 10) / 10
-  if (tipo === 'des') return Math.round(ni * 0.08 / 5 * 10) / 10
-  return Math.round(metaN / 5 * 10) / 10
-}
-const cumple = (tipo, res, meta) => tipo === 'cob' ? meta > res : tipo === 'des' ? meta >= res : res >= meta
 const emptyW = () => ({ cob:['','','','',''], des:['','','','',''], ing:['','','','',''] })
 
 export default function KPIPage() {
@@ -210,7 +204,6 @@ export default function KPIPage() {
   const ni = parseInt(config.ninos_inicio)||0
   const nA = parseInt(config.nuevos_activos_mes)||0
   const gA = parseInt(config.grupos_activos)||1
-  const metaN = parseInt(config.meta_nuevos_mensual)||20
   const totalDes = semanas.reduce((a,s) => a + s.des.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const retiradosOperativos = motivosAuto ? motivosAuto.total : totalDes
@@ -235,7 +228,6 @@ export default function KPIPage() {
         className="input num kpi-mobile-input" />
     </>
   }
-  const badge = ok => <span className={`pill ${ok ? 'pill--ok' : 'pill--bad'}`}><span className="dot" />{ok ? 'Sí' : 'No'}</span>
   const locked = mesEstado === 'cerrado'
   // (g1-20) Solo el estado 'auto' bloquea ventas y retiros (el CERO también es
   // auto); en 'fallo' quedan editables con la advertencia visible.
@@ -248,8 +240,7 @@ export default function KPIPage() {
 
   const kpiRow = (tipo, label, semIdx) => {
     const s = semanas[semIdx], dias = s[tipo]
-    const res = calcRes(tipo, dias), meta = calcMeta(tipo, ni, metaN)
-    const ok = cumple(tipo, res, meta)
+    const res = calcRes(tipo, dias)
     const resColor = tipo==='cob' ? 'var(--text)' : tipo==='des' ? 'var(--bad)' : 'var(--ok)'
     const deModulo = autoIngDes && (tipo === 'ing' || tipo === 'des')
     return (
@@ -260,8 +251,6 @@ export default function KPIPage() {
         </td>
         {dias.map((d,di) => <td key={di} style={{padding:'5px 3px',textAlign:'center'}}>{weekInput(semIdx,tipo,di,'desktop')}</td>)}
         <td className="num" style={{padding:'5px 8px',textAlign:'center',fontWeight:700,color:resColor,minWidth:50}}>{res}</td>
-        <td className="num" style={{padding:'5px 6px',textAlign:'center',color:'var(--text-dim)',fontSize: 13}}>{meta}</td>
-        <td style={{padding:'5px 6px',textAlign:'center'}}>{badge(ok)}</td>
       </tr>
     )
   }
@@ -465,6 +454,7 @@ export default function KPIPage() {
           </div>
         )}
 
+        <p className="h-sub">Las cuotas de cada semana se fijan en la pestaña <Link href={`/centro/${id}/semana`}>Semana</Link>.</p>
         {/* Tabla KPI semanal */}
         <div className="panel desktop-only" style={{ marginBottom: 20 }}>
           <TableScroller label="KPI semanal">
@@ -475,15 +465,13 @@ export default function KPIPage() {
                   <th style={{ width: 210 }}>Semana / Indicador</th>
                   {['Día 1','Día 2','Día 3','Día 4','Día 5'].map(d=><th key={d} style={{ textAlign: 'center', width: 70 }}>{d}</th>)}
                   <th style={{ textAlign: 'center', width: 65 }}>Resultado</th>
-                  <th style={{ textAlign: 'center', width: 60 }}>Meta</th>
-                  <th style={{ textAlign: 'center', width: 65 }}>¿Cumple?</th>
                 </tr>
               </thead>
               <tbody>
                 {SEMANAS.map((s,i) => (
                   <Fragment key={s}>
                     <tr key={'sh'+i} style={{ cursor: 'default', background: 'var(--surface-2)' }}>
-                      <td colSpan={9} className="label" style={{ padding: '8px 16px', color: 'var(--ok-text)' }}>Semana {s}</td>
+                      <td colSpan={7} className="label" style={{ padding: '8px 16px', color: 'var(--ok-text)' }}>Semana {s}</td>
                     </tr>
                     {KPI_METRICS.map(metric=>kpiRow(metric.tipo,metric.label,i))}
                   </Fragment>
@@ -494,12 +482,12 @@ export default function KPIPage() {
         </div>
         <div className="mobile-only operational-list kpi-week-cards">
           {SEMANAS.flatMap((week,semIdx)=>KPI_METRICS.map(({tipo,label})=>{
-            const result = calcRes(tipo,semanas[semIdx][tipo]), goal = calcMeta(tipo,ni,metaN)
+            const result = calcRes(tipo,semanas[semIdx][tipo])
             return <OperationalCard key={`${week}-${tipo}`} headingLevel={2} title={`Semana ${week} · ${label}`}
               subtitle={autoIngDes && tipo !== 'cob' ? 'Del módulo · solo lectura' : undefined}
               fields={[
                 ...[0,1,2,3,4].map(day=>({label:<label htmlFor={`kpi-mobile-${semIdx}-${tipo}-${day}`} className="kpi-day-label">Día {day+1}</label>,value:weekInput(semIdx,tipo,day,'mobile')})),
-                {label:'Resultado',value:result}, {label:'Meta',value:goal}, {label:'¿Cumple?',value:badge(cumple(tipo,result,goal))},
+                {label:'Resultado',value:result},
               ]} />
           }))}
         </div>
@@ -537,7 +525,7 @@ export default function KPIPage() {
 
         {/* Nota fórmulas */}
         <div className="card" style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--ok-text)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Retiros = suma | Ventas = suma | Niños final = inicio + nuevos activos + reincorporados − retirados | Meta Cob = niños×1.5%÷5 | Meta Des = niños×8%÷5 | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
+            <strong style={{ color: 'var(--ok-text)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>Fórmulas ALOHA:</strong> Cobranza = último día | Retiros = suma | Ventas = suma | Niños final = inicio + nuevos activos + reincorporados − retirados | %CV = (120÷prom)+16 | GPN = ((niños×108)×(1−%CV%)−7800)÷niños
         </div>
       </main>
     </div>

@@ -5,6 +5,7 @@ import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import TarjetaEstadistica from '../../../../components/semana/TarjetaEstadistica'
 import PlanSemana from '../../../../components/semana/PlanSemana'
+import CuotasSemana from '../../../../components/semana/CuotasSemana'
 import { getSemanaCentro, actualizarSemanaCentro } from '../../../actions/semana'
 import { rangoSemana } from '../../../../lib/semana-cierre.mjs'
 
@@ -53,7 +54,8 @@ export default function SemanaPage() {
       {cargando && <p role="status">Cargando semana…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {datos && !cargando && <>
-        <div className="semana-grid">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} />)}</div>
+        <div className="semana-grid">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
+        <CuotasSemana centroId={id} semanaFin={datos.semanaAbierta} catalogo={datos.catalogo} resumen={datos.resumen} cuotas={datos.cuotas} puedeEscribir={datos.puedeEscribir} puedeAprobar={datos.puedeAprobar} onRefresh={refrescarPlan} />
         <PlanSemana centroId={id} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} onRefresh={refrescarPlan} />
       </>}
     </main>
