@@ -15,6 +15,7 @@ import {
   iniciosClaseMes,
   inicioVisibleKpi,
   movimientosVivosMes,
+  ninosReestrenadosPorFechaGrupo,
   periodosAfectadosCambioInicioGrupo,
   periodosAbiertosOperativos,
   proyeccionSiguienteMes,
@@ -663,4 +664,142 @@ test('cambiarse antes de arrancar toma el inicio del grupo destino', () => {
   ]
   const nino = { id: 1, estado: 'activo', grupo_id: 123, fecha_inscripcion: '2026-09-05', ultima_asistencia: '2026-09-26' }
   assert.equal(iniciosClaseMes([nino], [tarde, antes], eventos, 2026, 9)[0]?.fechaInicio, '2026-09-26')
+})
+
+// ── Candado de la reparación de fecha (actualizarGrupo, grupo veterano con fecha NULL) ──
+// Agosto 2026: los centros escribieron en la casilla de apertura la fecha de
+// inicio del NIVEL que cursan hoy y el KPI re-estrenó a sus veteranos como
+// "nuevos" del mes (Brisas 33 en vez de 12, David 22 en vez de 3). El helper
+// devuelve a quien se re-estrenaría: compara el contexto de inicio COMPLETO
+// (iniciosClase) antes y después de mover la fecha de ESE grupo.
+
+// Grupo veterano (fecha NULL = iniciado) cargado en bloque: ventas del 1-jun.
+const grupoVeterano = (overrides = {}) => grupo({ id: 7, numero: '7', fecha_inicio_clases: null, ...overrides })
+const veterano = (id, overrides = {}) => estudiante({
+  id, grupo_id: 7, nombre: `Veterano ${id}`, fecha_inscripcion: '2026-06-01', ...overrides,
+})
+const ventaVeterano = (id, overrides = {}) => inscripcion({
+  id: 1000 + id, estudiante_id: id, fecha: '2026-06-01', a_grupo_id: 7, ...overrides,
+})
+const reestrenados = (args) => ninosReestrenadosPorFechaGrupo({ grupos: [args.grupo], ...args })
+
+test('fijar la fecha del nivel en un grupo veterano sin fecha re-estrena a su gente', () => {
+  const r = reestrenados({
+    grupo: grupoVeterano(), fechaNueva: '2026-08-05', estudiantes: [veterano(1)], eventos: [ventaVeterano(1)],
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [1])
+  assert.equal(r[0].nombre, 'Veterano 1')
+  assert.equal(r[0].grupoId, 7)
+  assert.equal(r[0].fechaInicioAnterior, '2026-06-01')
+  assert.equal(r[0].fechaInicioNueva, '2026-08-05')
+})
+
+test('una apertura real anterior a todas las ventas no re-estrena a nadie', () => {
+  const base = {
+    grupo: grupoVeterano(),
+    estudiantes: [veterano(1), veterano(2)],
+    eventos: [ventaVeterano(1), ventaVeterano(2)],
+  }
+  assert.deepEqual(reestrenados({ ...base, fechaNueva: '2025-03-01' }), [])
+  // El mismo día de la venta tampoco mueve el inicio: max(venta, fecha) = venta.
+  assert.deepEqual(reestrenados({ ...base, fechaNueva: '2026-06-01' }), [])
+})
+
+test('un niño cuya venta es posterior a la fecha nueva no cuenta', () => {
+  const tardio = veterano(2, { fecha_inscripcion: '2026-09-10' })
+  const r = reestrenados({
+    grupo: grupoVeterano(),
+    fechaNueva: '2026-08-05',
+    estudiantes: [veterano(1), tardio],
+    eventos: [ventaVeterano(1), ventaVeterano(2, { fecha: '2026-09-10' })],
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [1])
+})
+
+test('un niño ya sacado del grupo, con la inscripción en este grupo, sí se evalúa', () => {
+  // Retirado y sin grupo actual: su venta sigue atribuida a este grupo.
+  const retirado = veterano(3, { grupo_id: null, estado: 'retirado' })
+  const retiro = { id: 2003, estudiante_id: 3, tipo: 'retiro', fecha: '2026-08-20', year: 2026, month: 8 }
+  assert.deepEqual(
+    reestrenados({
+      grupo: grupoVeterano(), fechaNueva: '2026-08-05', estudiantes: [retirado], eventos: [ventaVeterano(3), retiro],
+    }).map((f) => f.estudianteId),
+    [3],
+  )
+
+  // Pasó a otro grupo (cambio_grupo) que ya tenía su fecha: con la fecha nueva
+  // su cambio quedaría ANTES de iniciar aquí y su inicio pasa a ser el del cambio.
+  const g20 = grupo({ id: 20, numero: '20', fecha_inicio_clases: '2026-01-10' })
+  const movido = veterano(4, { grupo_id: 20 })
+  const cambio = { id: 3004, estudiante_id: 4, tipo: 'cambio_grupo', fecha: '2026-07-15', de_grupo_id: 7, a_grupo_id: 20 }
+  const r = ninosReestrenadosPorFechaGrupo({
+    grupo: grupoVeterano(),
+    fechaNueva: '2026-08-05',
+    grupos: [grupoVeterano(), g20],
+    estudiantes: [movido],
+    eventos: [ventaVeterano(4), cambio],
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [4])
+  assert.equal(r[0].fechaInicioAnterior, '2026-06-01')
+  assert.equal(r[0].fechaInicioNueva, '2026-07-15')
+})
+
+// El hueco que marcó Sol (ronda 2): una venta asignada al grupo A que pasa al B
+// por cambio_grupo ANTES de iniciar empieza en B. Atribuir por la inscripción
+// canónica miraba A y dejaba fijar en B una fecha que lo re-estrena; el
+// contexto de inicio completo sí lo ve.
+test('venta al grupo A, cambio al B antes de iniciar: fijar la fecha en B lo re-estrena', () => {
+  const gA = grupo({ id: 10, numero: 'A', fecha_inicio_clases: '2026-09-01' }) // en llenado
+  const gB = grupo({ id: 20, numero: 'B', fecha_inicio_clases: null }) // veterano, fecha NULL
+  const nino = estudiante({ id: 5, grupo_id: 20, nombre: 'Colocada', fecha_inscripcion: '2026-08-01' })
+  const eventos = [
+    inscripcion({ id: 501, estudiante_id: 5, fecha: '2026-08-01', a_grupo_id: 10 }),
+    { id: 502, estudiante_id: 5, tipo: 'cambio_grupo', fecha: '2026-08-10', de_grupo_id: 10, a_grupo_id: 20 },
+  ]
+  const r = ninosReestrenadosPorFechaGrupo({
+    grupo: gB, fechaNueva: '2026-08-25', grupos: [gA, gB], estudiantes: [nino], eventos,
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [5])
+  assert.equal(r[0].fechaInicioAnterior, '2026-08-10')
+  assert.equal(r[0].fechaInicioNueva, '2026-08-25')
+  // Una apertura anterior a su colocación no lo mueve.
+  assert.deepEqual(
+    ninosReestrenadosPorFechaGrupo({ grupo: gB, fechaNueva: '2026-08-01', grupos: [gA, gB], estudiantes: [nino], eventos }),
+    [],
+  )
+})
+
+test('quien dejaría de tener inicio (retiro entre la venta y la fecha nueva) se devuelve', () => {
+  const retiro = { id: 2006, estudiante_id: 6, tipo: 'retiro', fecha: '2026-07-10', year: 2026, month: 7 }
+  const r = reestrenados({
+    grupo: grupoVeterano(),
+    fechaNueva: '2026-08-05',
+    estudiantes: [veterano(6, { estado: 'retirado' })],
+    eventos: [ventaVeterano(6), retiro],
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [6])
+  assert.equal(r[0].fechaInicioAnterior, '2026-06-01')
+  assert.equal(r[0].fechaInicioNueva, null)
+})
+
+test('la guardia g1-1 sigue mandando: un grupo con itinerario nivel 2+ no re-estrena', () => {
+  const conPlan = grupoVeterano({ itinerario_clases: { nivel: 3, fecha_inicio: '2026-08-05' } })
+  assert.deepEqual(
+    reestrenados({ grupo: conPlan, fechaNueva: '2026-08-05', estudiantes: [veterano(1)], eventos: [ventaVeterano(1)] }),
+    [],
+  )
+})
+
+test('no cuentan las matrículas anuladas ni los niños de otros grupos', () => {
+  const anulada = veterano(8, { estado: 'matricula_anulada' })
+  const gOtro = grupo({ id: 9, numero: '9', fecha_inicio_clases: '2026-07-01' })
+  const deOtro = veterano(9, { grupo_id: 9 })
+  const r = ninosReestrenadosPorFechaGrupo({
+    grupo: grupoVeterano(),
+    fechaNueva: '2026-08-05',
+    grupos: [grupoVeterano(), gOtro],
+    estudiantes: [veterano(1), anulada, deOtro],
+    eventos: [ventaVeterano(1), ventaVeterano(8), ventaVeterano(9, { a_grupo_id: 9 })],
+  })
+  assert.deepEqual(r.map((f) => f.estudianteId), [1])
 })
