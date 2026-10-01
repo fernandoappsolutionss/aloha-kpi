@@ -20,6 +20,7 @@
     "db:migrate:peticiones": "node scripts/migrate-peticiones-cotizaciones-2026-08-21.mjs",
     "db:migrate:peticion-aprobacion": "node scripts/migrate-peticion-aprobacion-2026-08-22.mjs",
     "test:usuarios:db": "tsx --test --test-concurrency=1 test/integration/usuarios-concurrency.integration.mjs",
+    "test:inscribir:db": "node --test --test-concurrency=1 test/integration/inscribir-ficha-existente.integration.mjs",
     "test:peticiones:db": "node --test --test-concurrency=1 test/integration/peticiones-*.integration.mjs",
     "entrenamiento:audio": "node scripts/entrenamiento-audio.mjs",
     "oficio:planes": "node scripts/oficio-planes.mjs"
