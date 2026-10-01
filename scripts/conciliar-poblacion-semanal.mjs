@@ -12,7 +12,7 @@ export async function conciliarPoblacion({ query = sql, now = new Date(), log = 
   for (const centro of centros) {
     const hoy = fechaCivil(now, zonaHorariaCentro(centro))
     const [estudiantes, grupos, eventos] = await Promise.all([
-      query`SELECT id, grupo_id, estado, fecha_inscripcion FROM estudiantes WHERE centro_id = ${centro.id}`,
+      query`SELECT id, grupo_id, estado, fecha_inscripcion, ultima_asistencia FROM estudiantes WHERE centro_id = ${centro.id}`,
       query`SELECT id, estado, fecha_inicio_clases, itinerario_clases FROM grupos WHERE centro_id = ${centro.id}`,
       query`SELECT id, estudiante_id, tipo, fecha, year, month, origen, motivo, a_grupo_id FROM estudiante_eventos WHERE centro_id = ${centro.id} AND tipo IN ('inscripcion','retiro','cambio_grupo','reincorporacion') ORDER BY fecha, id`,
     ])

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { calcularSemanaCentro, guardarSemanaCentro, recalcularSemanas, leerSerieCentros } from '../lib/estadisticas-semana/servicio.js'
 import { cargarClasesCrm } from '../lib/kpi-auto-server.js'
 import { crmAccountForCentro } from '../lib/crm.js'
+import { conciliarPoblacion } from '../scripts/conciliar-poblacion-semanal.mjs'
 
 const consulta = (resolver) => async (strings, ...values) => resolver(strings.join('?'), values)
 const filasBase = (sql) => {
@@ -16,6 +17,47 @@ const filasBase = (sql) => {
   if (sql.includes('FROM centro_eventos')) return []
   return []
 }
+
+const estudianteSinAsistencia = { id: 1, grupo_id: 2, estado: 'activo', fecha_inscripcion: '2026-09-01', ultima_asistencia: null }
+const gruposCambio = [
+  { id: 1, estado: 'activo', fecha_inicio_clases: '2026-09-10', itinerario_clases: null },
+  { id: 2, estado: 'activo', fecha_inicio_clases: '2026-10-10', itinerario_clases: null },
+]
+const eventosCambio = [
+  { id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-09-01', year: 2026, month: 9, origen: 'venta', a_grupo_id: 1 },
+  { id: 2, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-09-12', year: 2026, month: 9, a_grupo_id: 2 },
+]
+const proyeccion = (sql) => Object.fromEntries(Object.entries(estudianteSinAsistencia)
+  .filter(([columna]) => new RegExp(`\\b${columna}\\b`).test(sql)))
+
+test('el SELECT semanal consulta asistencia para no contar un inicio movido a octubre', async () => {
+  const query = consulta((sql) => {
+    if (sql.includes('FROM estudiantes')) return [proyeccion(sql)]
+    if (sql.includes('FROM grupos')) return gruposCambio
+    if (sql.includes('FROM estudiante_eventos')) return eventosCambio
+    return filasBase(sql)
+  })
+  const result = await calcularSemanaCentro(7, '2026-10-01', { query, now: new Date('2026-09-30T12:00:00Z') })
+  assert.equal(result.ninos_activos.valor, 100)
+  assert.equal(result.ninos_activos.detalle.nuevos, 0)
+})
+
+test('la conciliación proyecta asistencia y conserva el cierre mensual de septiembre', async () => {
+  const mensajes = []
+  const query = consulta((sql, values) => {
+    if (sql.includes('FROM centros')) return [{ id: 7, nombre: 'Centro', pais: 'PA' }]
+    if (sql.includes('FROM estudiantes')) return [proyeccion(sql)]
+    if (sql.includes('FROM grupos')) return gruposCambio
+    if (sql.includes('FROM estudiante_eventos')) return eventosCambio
+    if (sql.includes('SELECT ninos_final_mes FROM resumen_mes')) return [{ ninos_final_mes: 100 }]
+    if (sql.includes('SELECT * FROM resumen_mes')) return [{ centro_id: 7, year: values[1], month: values[2], ninos_final_mes: 100 }]
+    if (sql.includes('FROM mes_kpi')) return [{ estado: 'cerrado' }]
+    return []
+  })
+  const diferencias = await conciliarPoblacion({ query, now: new Date('2026-10-01T12:00:00Z'), log: (linea) => mensajes.push(linea) })
+  assert.deepEqual(diferencias, [])
+  assert.ok(mensajes.includes('7\tCentro\t2026-09\t100\t100\t0'))
+})
 
 test('un fallo de Zoho deja esa estadística sin dato y conserva las demás', async () => {
   const query = consulta((sql) => {
