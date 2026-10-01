@@ -20,8 +20,9 @@ Decisión registrada: se desempata por superación relativa de la cuota de niño
 | --- | --- |
 | Tests nuevos de ranking | RED 0/5 antes de implementar; GREEN 5/5 |
 | Cuotas, ranking, plan, interfaz, crecimiento y notificaciones | 47/47 PASS |
-| Suite completa | 1312/1317 PASS; cinco fallos de audio ya presentes en la base |
-| Build de Next.js después del ajuste del enlace | PASS |
+| Suite completa después de generar los audios autorizados | **1317/1317 PASS**, sin fallos ni omisiones |
+| Audios en la demo compilada | 20/20 HTTP 200 con sesión de administradora ficticia; contenido exacto y reproducción por rangos 206 |
+| Build de Next.js después de integrar los veinte audios | PASS |
 | PostgreSQL real, `tests/semana-audit/cierre-funcional.mjs` | 2/2 PASS; transacciones con rollback por defecto |
 | Ranking con datos ficticios | Norte 5/5, 100%, medalla; Sur 1/5, 20%, sin medalla; Valencia sin cuotas aprobadas, sin clasificar |
 | Plan → Ruta | Completar y posponer desde Semana se reflejan en la misma recomendación de Ruta y sobreviven a recargar |
@@ -34,10 +35,13 @@ Recorrido de navegador realizado mediante CUA sobre compilación local, con role
 
 Evidencia local: `/tmp/aloha-cierre-tests.log`, `/tmp/aloha-cierre-focal.log`, `/tmp/aloha-cierre-build.log`, `/private/tmp/aloha-cierre-ranking.png` y `/private/tmp/aloha-cierre-ranking-mobile.png`. No contienen credenciales. La demo usa únicamente tres centros ficticios en la base local desechable.
 
+## Audios completados
+
+Fernando autorizó expresamente generar los veinte audios en ElevenLabs. Se crearon 17 clips de oficio/guía y tres de actualizaciones; veinte hashes contrastados con sus guiones actuales, decodificación FFmpeg completa y duración real FFprobe: 12 min 10,7 s. No se alteraron tests ni tours congelados. Inventario: `docs/entrenamiento/audios-pendientes-semana.md`. Suite final: 1317/1317 PASS. Build final PASS y demo reiniciada en puerto4577. Las rutas de oficio requieren sesión: la comprobación HTTP autenticada obtuvo los veinte MP3 completos y validó el acceso por rangos para adelantar la reproducción. Evidencia: `/private/tmp/aloha-audio-verificacion-20261001.json`, `/private/tmp/aloha-audio-http-20261001.log`, `/tmp/aloha-audio-tests.log` y `/tmp/aloha-audio-build.log`.
+
 ## Pendientes para publicar
 
-1. Audios: el inventario en seco detecta **20 clips pendientes**, los 11 de F5 más 9 faltantes anteriores (17 oficio/guía y 3 actualizaciones). La revisión automática bloqueó la llamada a ElevenLabs por falta de autorización específica para ese destino y esos guiones; se solicitó autorización a Fernando. No se generó ni envió audio. Los cinco tests siguen activos.
-2. Revisar y aplicar las tres migraciones preparadas, cargar historia desde el 13/08/2026, conciliar y calibrar con datos reales.
-3. Integrar y publicar la cadena completa de PR, seguida de comprobación productiva. F4 corrige F2: no publicar F2 aislada como resultado final.
+1. Revisar y aplicar las tres migraciones preparadas, cargar historia desde el 13/08/2026, conciliar y calibrar con datos reales.
+2. Integrar y publicar la cadena completa de PR, seguida de comprobación productiva. F4 corrige F2: no publicar F2 aislada como resultado final.
 
-Los pendientes de audio y producción no impiden revisar el flujo funcional en `http://localhost:4577/dashboard/ranking` y `http://localhost:4577/centro/1/semana#plan-batalla`.
+Los pendientes de producción no impiden revisar el flujo funcional en `http://localhost:4577/dashboard/ranking` y `http://localhost:4577/centro/1/semana#plan-batalla`.
