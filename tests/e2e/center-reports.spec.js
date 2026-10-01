@@ -2,6 +2,17 @@ import { test,expect } from '@playwright/test'
 import { actorPage,ready,geometry } from './helpers/r10-audit.mjs'
 import { r10Snapshot, readR10Manifest } from './helpers/r10-fixture.mjs'
 import { capturePage } from './helpers/audit-page.js'
+test('Semana cabe a 390 px con sus cinco gráficas',async({browser},testInfo)=>{
+  const {context,page}=await actorPage(browser,testInfo,'center')
+  try {
+    await page.setViewportSize({width:390,height:844})
+    await page.goto('/centro/2/semana');await ready(page)
+    await expect(page.getByRole('heading',{name:'Semana',exact:true})).toBeVisible()
+    await expect(page.locator('.semana-tarjeta')).toHaveCount(5)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await geometry(page,testInfo,'semana-390')
+  }finally{await context.close()}
+})
 test('Historial muestra diez gráficos y tablas equivalentes sin partir palabras',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {

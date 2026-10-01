@@ -11,6 +11,7 @@ export function seccionesCentro(centroId, section = 'kpi', rol = null) {
   const base = `/centro/${centroId}`
   if (section === 'kpi') return [
     { label: 'KPI Mensual', href: `${base}/kpi` },
+    { label: 'Semana', href: `${base}/semana` },
     { label: 'Cumplimiento', href: `${base}/cumplimiento` },
     { label: 'Encuestas', href: `${base}/encuestas` },
     { label: 'Peticiones', href: `${base}/peticiones` },

@@ -1547,6 +1547,26 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   font-size: 12px;
 }
 .table-scroller__viewport { width: max-content; min-width: 100%; }
+.semana-page,.semana-tablero { min-width: 0; }
+.semana-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.semana-tarjeta { min-width: 0; padding: 18px; overflow-wrap: anywhere; }
+.semana-tarjeta--principal { grid-column: 1 / -1; }
+.semana-tarjeta__head,.semana-tarjeta__valores { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.semana-tarjeta__head { justify-content: space-between; margin-bottom: 16px; }
+.semana-tarjeta__valores { margin-bottom: 12px; }
+.semana-tarjeta__valores > div { display: grid; gap: 4px; }
+.semana-tarjeta__valores strong { font-size: clamp(18px, 3vw, 26px); }
+.semana-tarjeta__fuente { margin-top: 12px; }
+.semana-grafica { display: block; max-width: 100%; height: auto; }
+.semana-tablero { margin-bottom: 24px; }
+.semana-tablero__contenido { padding: 16px; min-width: 0; }
+.semana-tablero__tabla { min-width: 900px; }
+.semana-tablero__mini { width: 160px; }
+@media (max-width: 767px) {
+  .semana-grid { grid-template-columns: minmax(0,1fr); }
+  .semana-tarjeta--principal { grid-column: auto; }
+  .semana-tablero__contenido { padding: 12px; }
+}
 .table-scroller--sticky th:first-child, .table-scroller--sticky td:first-child {
   position: sticky;
   left: 0;

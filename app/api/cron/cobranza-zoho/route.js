@@ -33,6 +33,13 @@ export async function GET(request) {
   const cerrados = []
   for (const [centroIdStr, vencidas] of Object.entries(porCentro)) {
     const centroId = Number(centroIdStr)
+    try {
+      await sql`
+        INSERT INTO cobranza_diaria (centro_id, fecha, vencidas) VALUES (${centroId}, ${hoy}, ${vencidas})
+        ON CONFLICT (centro_id, fecha) DO UPDATE SET vencidas = EXCLUDED.vencidas, registrado_at = now()`
+    } catch (error) {
+      console.error('[cobranza-zoho] cobranza_diaria no disponible:', error?.message)
+    }
     const [mes] = await sql`SELECT estado FROM mes_kpi WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}`
     if (mes?.estado === 'cerrado') { cerrados.push(centroId); continue }
     const d = casilla.dia
