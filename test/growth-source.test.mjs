@@ -7,6 +7,7 @@ import {
   currentPopulationFromHistory,
   selectCurrentPopulation,
 } from '../lib/growth/source.mjs'
+import { buildGrowthMetrics, normalizeGrowthMonth } from '../lib/growth/metrics.mjs'
 
 test('joins monthly summaries with declared sales, withdrawals and close state', () => {
   const history = buildGrowthHistory({
@@ -325,7 +326,7 @@ test('room counts never become a hard population cap and group places remain an 
   assert.ok(result.issues.some((issue) => issue.code === 'capacity_unverified'))
 })
 
-test('reconciles a closed trial funnel only with fully covered canonical sales and retains the declared value', () => {
+test('keeps the class cohort separate from fully classified commercial sales', () => {
   const summaries = [{ year: 2026, month: 8, cp_matriculados: 10 }]
   const students = Array.from({ length: 10 }, (_, index) => ({ id: index + 1 }))
   const events = students.map((student, index) => ({
@@ -338,13 +339,13 @@ test('reconciles a closed trial funnel only with fully covered canonical sales a
     states: [{ year: 2026, month: 8, estado: 'cerrado' }],
     weekly: [{ year: 2026, month: 8, ventas: 10 }],
   })
-  assert.equal(row.cp_matriculados, 8)
-  assert.equal(row.cp_matriculados_declared, 10)
+  assert.equal(row.cp_matriculados, 10)
   assert.equal(summaries[0].cp_matriculados, 10)
   assert.equal(row.trialFunnel.coverage, 1)
   assert.equal(row.trialFunnel.reliable, true)
-  assert.equal(row.trialFunnel.source, 'classified_sales')
-  assert.ok(row.issues.some((issue) => issue.code === 'cp_enrollment_conflict'))
+  assert.equal(row.trialFunnel.source, 'declared_summary')
+  assert.equal(row.trialFunnel.directSales, 2)
+  assert.equal(row.issues.some((issue) => issue.code === 'cp_enrollment_conflict'), false)
 })
 
 test('partial sales imports never replace the declared historical trial funnel', () => {
@@ -411,4 +412,42 @@ test('September enrollment warning clears when each sale has a linked and classi
     weekly: [{ year: 2026, month: 9, ventas: 0 }],
   })
   assert.equal(empty.issues.length, 0, 'a zero-sale month has no enrollments to link')
+})
+
+test('commercial dates classify direct sales without rewriting class cohorts', () => {
+  for (const [sales, trialSales, classEnrollments] of [[11, 9, 6], [20, 18, 12], [1, 1, 2]]) {
+    const students = Array.from({ length: sales }, (_, i) => ({ id: i + 1 }))
+    const events = students.map((student, i) => ({
+      id: i + 1, estudiante_id: student.id, tipo: 'inscripcion',
+      fecha: '2026-09-12', year: 2026, month: 9,
+      origen: i < trialSales ? 'clase_prueba' : 'directo',
+    }))
+    const [row] = buildGrowthHistory({
+      summaries: [{ year: 2026, month: 9, cp_invitados: 20, cp_asistieron: 15, cp_matriculados: classEnrollments }],
+      states: [{ year: 2026, month: 9, estado: 'cerrado' }],
+      weekly: [{ year: 2026, month: 9, ventas: sales }], students, events,
+    })
+    const normalized = normalizeGrowthMonth(row)
+    assert.equal(normalized.trialEnrollments, classEnrollments)
+    assert.equal(normalized.nonTrialSales, sales - trialSales)
+    const metrics = buildGrowthMetrics([row], { currentPeriod: '2026-10' })
+    assert.equal(metrics.rates.enrollment, classEnrollments / 15)
+    assert.equal(metrics.medians.nonTrialSales, sales - trialSales)
+    assert.equal(row.issues.some((issue) => issue.code === 'cp_enrollment_conflict'), false)
+  }
+})
+
+test('unknown commercial origin does not become an invented direct sale', () => {
+  const [row] = buildGrowthHistory({
+    summaries: [{ year: 2026, month: 9, cp_matriculados: 6 }],
+    weekly: [{ year: 2026, month: 9, ventas: 11 }],
+    students: [{ id: 1 }],
+    events: [{ id: 1, estudiante_id: 1, tipo: 'inscripcion', fecha: '2026-09-12', year: 2026, month: 9, origen: 'directo' }],
+  })
+  assert.equal(normalizeGrowthMonth(row).nonTrialSales, null)
+  assert.equal(row.issues[0].code, 'cp_classification_incomplete')
+  assert.equal(row.issues[0].affectsProjection, true)
+  const metrics = buildGrowthMetrics([{ ...row, closed: true }], { currentPeriod: '2026-10' })
+  assert.equal(metrics.medians.nonTrialSales, null)
+  assert.equal(metrics.confidence.level, 'low')
 })
