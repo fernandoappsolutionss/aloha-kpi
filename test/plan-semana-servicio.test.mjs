@@ -98,7 +98,7 @@ test('agregar objetivo vuelve a validar el paso bajo bloqueo del plan', async ()
     if (sql.includes('INSERT INTO semana_objetivos')) { inserts++; return [{ id: 4 }] }
     throw new Error(`Consulta inesperada: ${sql}`)
   }
-  await assert.rejects(agregarObjetivoEn(7, FIN, { seccion: 'formula', paso: 3, texto: 'Acción' }, { query, transaction: (work) => work(query), sesion: { id: 3 }, now: HOY }), /Paso inválido/)
+  await assert.rejects(agregarObjetivoEn(7, FIN, { seccion: 'formula', paso: 3, texto: 'Acción', responsable:'Ana', fecha:'2026-10-07', evidencia_esperada:'Registro' }, { query, transaction: (work) => work(query), sesion: { id: 3 }, now: HOY }), /Paso inválido/)
   assert.equal(inserts, 0)
   assert.equal(locks, 2)
 })

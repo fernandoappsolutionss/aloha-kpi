@@ -57,7 +57,7 @@ test('mutaciones autenticadas de centro usan guarda de escritura viva', async ()
 
 test('aprobar cuotas y dejar órdenes exigen coordinación vigente', async () => {
   const { ACTION_ACCESS_MATRIX, ACCESS_KINDS } = await import('../lib/access-matrix.mjs')
-  for (const name of ['aprobarCuotas', 'agregarOrden']) {
+  for (const name of ['aprobarCuotas', 'agregarOrden', 'verificarObjetivo']) {
     const key = `app/actions/semana.js#${name}`
     assert.equal(ACTION_ACCESS_MATRIX[key], ACCESS_KINDS.coordinacion)
     assert.match(functionSource('app/actions/semana.js', name), /requireCurrentCoordinacion\(/)
