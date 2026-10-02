@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { actualizarBorradorCuotas } from '../../lib/cuotas-semana.mjs'
 import TableScroller from '../TableScroller'
 import { guardarCuotas, aprobarCuotas } from '../../app/actions/semana'
 
@@ -7,12 +8,13 @@ const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleSt
 
 export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, cuotas, puedeEscribir, puedeAprobar, onRefresh }) {
   const [valores, setValores] = useState({})
+  const editados = useRef(new Set())
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const [estado, setEstado] = useState('')
 
   useEffect(() => {
-    setValores(Object.fromEntries(catalogo.map((meta) => [meta.codigo, cuotas[meta.codigo]?.cuota ?? cuotas[meta.codigo]?.propuesta ?? ''])))
+    setValores(previos => actualizarBorradorCuotas(catalogo, cuotas, previos, editados.current))
   }, [catalogo, cuotas])
 
   async function enviar(event) {
@@ -21,12 +23,15 @@ export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, c
     const payload = Object.fromEntries(Object.entries(valores).filter(([, valor]) => valor !== '').map(([codigo, valor]) => [codigo, Number(valor)]))
     if (!Object.keys(payload).length) { setError('Escribe al menos una cuota.'); return }
     setOcupado(true); setError(''); setEstado('')
+    let guardado = false
     try {
       if (aprobar) await aprobarCuotas(centroId, semanaFin, payload)
       else await guardarCuotas(centroId, semanaFin, payload)
+      guardado = true
+      editados.current.clear()
       await onRefresh()
       setEstado(aprobar ? 'Cuotas aprobadas.' : 'Cuotas guardadas para aprobación.')
-    } catch (cause) { setError(cause?.message || 'No se pudieron guardar las cuotas.') }
+    } catch (cause) { setError(guardado ? 'Las cuotas se guardaron. Recarga para actualizar la vista sin repetir el envío.' : cause?.message || 'No se pudieron guardar las cuotas.') }
     finally { setOcupado(false) }
   }
 
@@ -42,7 +47,7 @@ export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, c
               <th scope="row">{meta.nombre}</th>
               <td>{mostrar(resumen[meta.codigo]?.cerrada)}</td>
               <td>{mostrar(cuota.propuesta)}<p className="h-sub" style={{ maxWidth: 300, whiteSpace: 'normal' }}>{cuota.explicacion}</p></td>
-              <td>{puedeEscribir ? <input aria-label={`Cuota de ${meta.nombre}`} className="input num" type="number" inputMode="numeric" min="0" step="1" value={valores[meta.codigo] ?? ''} onChange={(event) => setValores((anterior) => ({ ...anterior, [meta.codigo]: event.target.value }))} /> : mostrar(cuota.cuota)}</td>
+              <td>{puedeEscribir ? <input disabled={ocupado} aria-label={`Cuota de ${meta.nombre}`} className="input num" type="number" inputMode="numeric" min="0" step="1" value={valores[meta.codigo] ?? ''} onChange={(event) => { editados.current.add(meta.codigo); setValores((anterior) => ({ ...anterior, [meta.codigo]: event.target.value })) }} /> : mostrar(cuota.cuota)}</td>
               <td>{cuota.estado === 'aprobada' ? 'Aprobada' : cuota.estado === 'propuesta' ? 'Propuesta' : 'Sin guardar'}</td>
             </tr>
           })}</tbody>

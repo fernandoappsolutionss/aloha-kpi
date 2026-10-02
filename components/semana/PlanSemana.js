@@ -42,7 +42,7 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
       <label className="field"><span>Evidencia del resultado</span><textarea name="evidencia" className="input" maxLength={2000} required placeholder="Qué se logró, dato obtenido y referencia para comprobarlo" /></label>
       <button className="btn" type="submit" disabled={ocupado}>Registrar acción realizada</button>
     </form>}
-    {puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id))}>Verificar evidencia</button>}
+    {puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id, { hechoAt: objetivo.hecho_at, evidencia: objetivo.evidencia_resultado }))}>Verificar evidencia</button>}
     {puedeEscribir && objetivo.seccion !== 'orden' && <div className="semana-objetivo__acciones">
       {objetivo.hecho && <button className="btn" disabled={ocupado} onClick={() => ejecutar(() => marcarObjetivo(centroId, objetivo.id, false))}>Reabrir acción</button>}
       <button type="button" className="btn" disabled={ocupado} onClick={() => setEditando((v) => !v)}>{editando ? 'Cancelar' : 'Editar'}</button>

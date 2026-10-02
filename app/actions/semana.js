@@ -170,7 +170,7 @@ export async function guardarCompromiso(centroId, datos) {
   return await guardarCompromisoEn(centroId, datos, { actorId: sesion.id })
 }
 
-export async function verificarObjetivo(centroId, objetivoId) {
+export async function verificarObjetivo(centroId, objetivoId, revision) {
   const sesion = await requireCurrentCoordinacion(centroId)
-  return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id })
+  return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id, revision })
 }

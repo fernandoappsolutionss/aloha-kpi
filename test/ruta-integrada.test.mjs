@@ -8,6 +8,12 @@ const compromiso = { periodo: '2026-10', diagnostico: 'Revisar recuperación y s
 const series = Object.fromEntries(catalogo.map((m, i) => [m.codigo, [{ semanaFin: '2026-10-01', estado: 'cerrada', valor: [150, 4, 1, 9, 8][i] }]]))
 const objetivo = { seccion: 'formula', paso: 0, texto: 'Llamar familias', responsable: 'Ana', fecha: '2026-10-07', evidencia_esperada: 'Lista de llamadas con acuerdos.' }
 
+test('refrescar otro panel conserva cuotas editadas y actualiza solo campos intactos', () => {
+  const recibidas = { ninos_activos: { cuota: 155 }, nuevos_inscritos: { propuesta: 5 } }
+  assert.deepEqual(cuotas.actualizarBorradorCuotas(catalogo.slice(0, 2), recibidas, { ninos_activos: '158', nuevos_inscritos: '4' }, new Set(['ninos_activos'])), { ninos_activos: '158', nuevos_inscritos: 5 })
+  assert.equal(cuotas.actualizarBorradorCuotas(catalogo, recibidas, { ninos_activos: '158' }, new Set()).ninos_activos, 155)
+})
+
 test('compromiso mensual exige cinco enteros y diagnóstico, sin aceptar blancos, booleanos o fechas imposibles', () => {
   assert.equal(typeof cuotas.validarCompromiso, 'function')
   assert.deepEqual(cuotas.validarCompromiso(compromiso), compromiso)

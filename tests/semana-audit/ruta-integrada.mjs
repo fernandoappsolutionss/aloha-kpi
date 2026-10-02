@@ -14,8 +14,12 @@ await conCliente(async client => {
     const [{id}] = await query`INSERT INTO semana_objetivos (plan_id,seccion,texto,responsable,fecha,evidencia_esperada) VALUES (${plan},'urgente','Llamar familias','Ana','2099-10-07','Registro de acuerdos') RETURNING id`
     const opts = {query,transaction,actorId:actor}
     await assert.rejects(marcarObjetivoEn(centro,id,true,opts), /evidencia/i)
-    await marcarObjetivoEn(centro,id,true,{...opts,evidencia:'Tres acuerdos registrados'})
-    await verificarObjetivoEn(centro,id,opts)
+    const realizada = await marcarObjetivoEn(centro,id,true,{...opts,evidencia:'Tres acuerdos registrados'})
+    const revision = { evidencia: realizada.evidencia_resultado, hechoAt: realizada.hecho_at }
+    await marcarObjetivoEn(centro,id,true,{...opts,evidencia:'Cuatro acuerdos registrados'})
+    await assert.rejects(verificarObjetivoEn(centro,id,{...opts,revision}), /cambió/i)
+    const [actualizada] = await query`SELECT * FROM semana_objetivos WHERE id=${id}`
+    await verificarObjetivoEn(centro,id,{...opts,revision:{evidencia:actualizada.evidencia_resultado,hechoAt:actualizada.hecho_at}})
     let [row] = await query`SELECT * FROM semana_objetivos WHERE id=${id}`
     assert.equal(row.hecho,true); assert.ok(row.verificado_at)
     await editarObjetivoEn(centro,id,{texto:'Nueva acción',responsable:'Ana',fecha:'2099-10-08',evidencia_esperada:'Nuevo registro'},opts)
@@ -31,4 +35,17 @@ await conCliente(async client => {
     assert.equal(stale.length,1); assert.equal(stale[0].status,'superseded')
     console.log('OK: evidencia, verificación, edición, aislamiento y acciones obsoletas en la misma semana.')
   } finally { await client.query('ROLLBACK') }
+})
+
+await conCliente(async client => {
+  const centro = -20991002
+  await client.query('INSERT INTO centros (id,nombre) VALUES ($1,$2)', [centro,'QA concurrencia descartable'])
+  try {
+    const payload = { metrics: { confidence: { level: 'low' } } }
+    const resultados = await Promise.allSettled(Array.from({ length: 4 }, () => persistGrowth(centro,'2099-10-02',payload,[])))
+    for (const resultado of resultados) assert.equal(resultado.status,'fulfilled',resultado.reason?.message)
+    const { rows } = await client.query('SELECT count(*)::int AS cantidad FROM growth_snapshots WHERE centro_id=$1',[centro])
+    assert.equal(rows[0].cantidad,1)
+    console.log('OK: cuatro recálculos concurrentes conservan una instantánea sin abortos.')
+  } finally { await client.query('DELETE FROM centros WHERE id=$1',[centro]) }
 })
