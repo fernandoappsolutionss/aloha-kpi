@@ -6,7 +6,7 @@ export default function GraficaSemanal({ puntos = [], inversa = false, unidad = 
   const margen = compacta ? { arriba: 4, derecha: 4, abajo: 4, izquierda: 4 } : undefined
   const modelo = modeloGrafica({ puntos, inversa, ancho: compacta ? 160 : 640, alto: compacta ? 48 : 220, margen })
   if (modelo.vacia) return <p className="h-sub" role="status">Sin datos todavía</p>
-  const etiqueta = `${titulo}. ${inversa ? 'Menos es mejor. ' : ''}${modelo.puntos.map((p) => `${p.semanaFin}: ${p.valor == null ? 'sin dato' : `${p.valor} ${unidad}`}`).join('; ')}`
+  const etiqueta = `${titulo}. ${inversa ? 'Menos es mejor. ' : ''}${modelo.puntos.map((p) => `${p.semanaFin}: ${p.valor == null ? 'sin dato' : `${p.valor} ${unidad}`}${p.cuota == null ? '' : `; cuota ${p.cuota}`}`).join('; ')}`
   return (
     <svg viewBox={`0 0 ${modelo.ancho} ${modelo.alto}`} width="100%" role="img" aria-label={etiqueta} className="semana-grafica">
       {!compacta && modelo.ticks.map((tick, i) => <g key={i}>

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -32,11 +33,19 @@ test('tablero semanal usa una sola acción y TableScroller', () => {
   assert.match(read('../app/globals.css'), /@media \(max-width: 767px\)[\s\S]*\.semana-grid/)
 })
 
+test('tablero muestra Sin dato si la semana abierta falla, aunque la cerrada tenga 12', () => {
+  const source = read('../components/semana/TableroSemanal.js')
+  const helper = source.match(/^const (mostrar|actual) = .*$/gm)
+  assert.equal(helper?.length, 2)
+  const { actual, mostrar } = runInNewContext(`${helper.join(';\n')};\n({ actual, mostrar })`)
+  assert.equal(mostrar(actual({ abierta: { ninos_activos: null }, cerrada: { ninos_activos: 12 } }, 'ninos_activos')), 'Sin dato')
+})
+
 test('plan y tablero muestran condición, estado y discrepancia', () => {
   const plan = read('../components/semana/PlanSemana.js')
   assert.match(plan, /Más condiciones/)
   assert.match(plan, /Plazo: viernes 10:00/)
-  assert.match(plan, /Lectura de la gráfica/)
+  assert.match(plan, /Lectura automática de la gráfica/)
   assert.match(plan, /Cambiar/)
   assert.match(read('../app/centro/[id]/semana/page.js'), /<PlanSemana/)
   assert.match(read('../components/semana/GraficaSemanal.js'), /colorCondicion\(p\.condicion\)/)

@@ -619,7 +619,7 @@ Es que dos o más fuentes den exactamente el mismo número. Si no dan lo mismo, 
 
 ### Cuadro de negocio
 
-Es el informe mensual del movimiento de niños del centro. Lo **confecciona el Asistente Administrativo en la última semana de cada mes**, y alimenta el informe FODA que la Administradora entrega a la Junta dentro de los primeros 5 días del mes siguiente. El cuadro de negocio es tuyo; el FODA es de ella.
+Es el informe mensual del movimiento de niños del centro. Lo **confecciona el Asistente Administrativo en la última semana de cada mes**, y sirve para contrastar el KPI mensual y la estadística de niños activos del cierre semanal. El cuadro de negocio es responsabilidad de la Asistente; el plan semanal, de la Administradora.
 
 **Ejemplo:** Su fórmula: niños del mes = niños del mes anterior + niños nuevos − deserciones. Se arma la última semana del mes con Zoho, kits y deserciones.
 

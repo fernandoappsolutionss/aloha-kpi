@@ -215,6 +215,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
 
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },
+    { label: 'Reunión semanal', icon: 'calendar', href: '/dashboard/reunion-semanal' },
     { label: 'Crecimiento', icon: 'target', href: '/dashboard/crecimiento' },
     { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },

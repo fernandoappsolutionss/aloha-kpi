@@ -180,9 +180,7 @@ export default function GrowthRoutePage() {
             <h1 className="h-title">Ruta al Próximo Nivel</h1>
             <p className="h-sub">{center.nombre} · actualización {data.snapshotDate}</p>
           </div>
-          <Link className="btn" href={`/centro/${id}`}>
-            Volver al resumen
-          </Link>
+          <Link className="btn btn--primary" href={`/centro/${id}/semana#plan-batalla`}>Abrir plan de batalla semanal</Link>
         </header>
 
         <section className="growth-overview" aria-labelledby="growth-overview-title">
