@@ -185,7 +185,9 @@ function siguientesPorModulo() {
     const plan = planDeRol(rol, MODULOS_OFICIO)
     for (let i = 0; i < plan.length; i += 1) {
       const m = plan[i]
-      const siguiente = plan[i + 1]?.titulo || ''
+      // La actualización semanal añade su propia cadena sin regrabar cierres históricos.
+      const cadena = plan.filter((x) => (x.curso === 'semana') === (m.curso === 'semana'))
+      const siguiente = cadena[cadena.findIndex((x) => x.id === m.id) + 1]?.titulo || ''
       const set = porModulo.get(m.id) || new Set()
       set.add(siguiente)
       porModulo.set(m.id, set)

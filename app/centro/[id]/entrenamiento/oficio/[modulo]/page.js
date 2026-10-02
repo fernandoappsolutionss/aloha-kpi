@@ -275,7 +275,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const diapositivas = <Diapositivas key="laminas" laminas={laminas} moduloId={m.id} />
   const lectura = (
     <section key="lectura" className="card ent-module-card" aria-label="Contenido del módulo">
-      <BloquesOficio bloques={m.bloques} terminos={terminos} />
+      <BloquesOficio bloques={m.bloques} terminos={terminos} centroId={id} />
       {esAlumno && (
         <MarcarEstudiado
           moduloId={m.id}

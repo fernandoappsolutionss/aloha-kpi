@@ -1420,9 +1420,15 @@ cambio, no un descuido.
 ---
 
 
+### Estadística semanal
+
+**Qué es.** Un dato de producción del centro medido con la misma definición y período para poder comparar semanas. Se lee con su unidad, fecha y fuente.
+
+**Ejemplo.** Una semana sin registro no vale cero. Una semana abierta es provisional; una estadística inversa mejora cuando su valor baja.
+
 ### Condición
 
-**Qué es.** La situación en que está el Centro según la gráfica semanal de niños activos. La Administradora la asigna al cerrar la semana.
+**Qué es.** La situación del Centro que orienta el plan semanal. La Administradora la elige y guarda revisando la gráfica de niños activos, las demás estadísticas y el contexto. Sin condición significa pendiente de asignación.
 
 **Ejemplo.** Si la matrícula dejó de crecer, revisa la gráfica y asigna la condición que corresponde antes de hacer el plan.
 

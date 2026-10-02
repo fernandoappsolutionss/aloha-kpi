@@ -34,7 +34,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url))
 // dos, hoy son cuatro y el día que entre un quinto este archivo no se entera.
 // Sigue pasando en verde con el catálogo vacío (queda en []).
 const ROLES = [...new Set(MODULOS_OFICIO.flatMap((m) => m.roles || []))].sort()
-const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota', 'recursos'])
+const T_BLOQUE = new Set(['sub', 'p', 'lista', 'pasos', 'tabla', 'nota', 'recursos', 'grafica', 'enlaces'])
 const TONOS = new Set(['regla', 'ojo', 'alerta'])
 
 // Recorre cada string de un módulo (textos, items, celdas, criterios…).
