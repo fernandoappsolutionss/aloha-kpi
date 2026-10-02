@@ -15,6 +15,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 const MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const fechaDato = (centro) => centro.ninosPeriodoFin ? `${centro.ninosFuente} · período hasta ${centro.ninosPeriodoFin.split('-').reverse().join('/')}` : 'Sin dato mensual declarado'
 const NinosTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
@@ -69,6 +70,9 @@ export default function DashboardPage() {
 
   const n = centros.length || 1
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
+  const centrosConNinos = centros.filter(c => c.ninosDisponible).length
+  const fechasNinos = new Set(centros.map(c => c.ninosPeriodoFin).filter(Boolean))
+  const fuentesNinos = new Set(centros.map(c => c.ninosFuente).filter(Boolean))
   const totNuevos = centros.reduce((a, c) => a + c.nuevos, 0)
   const totDes = centros.reduce((a, c) => a + c.desercion, 0)
   const totGrad = centros.reduce((a, c) => a + (c.graduados || 0), 0)
@@ -90,7 +94,9 @@ export default function DashboardPage() {
   const prevLabel = range.prevLabel
 
   const cards = [
-    { label: 'Niños activos', value: totNinos.toLocaleString(), icon: ic.ninos, sub: 'en todos los centros', yoy: { delta: delta(totNinos, pTotNinos), upGood: true } },
+    { label: 'Niños · último dato mensual declarado', value: centrosConNinos === centros.length && centros.length ? totNinos.toLocaleString() : 'Sin total', icon: ic.ninos,
+      sub: `${centrosConNinos}/${centros.length} centros · ${fechasNinos.size > 1 || fuentesNinos.size > 1 ? 'fuentes o fechas distintas; ver detalle por centro' : fechasNinos.size ? `${[...fuentesNinos][0]} · período hasta ${[...fechasNinos][0].split('-').reverse().join('/')}` : 'sin dato mensual disponible'}`,
+      yoy: centrosConNinos === centros.length && prev.every(c => c.ninosDisponible) ? { delta: delta(totNinos, pTotNinos), upGood: true } : null },
     { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
     { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el período', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
@@ -171,16 +177,17 @@ export default function DashboardPage() {
         {/* Table */}
         <div className="panel" style={{ marginBottom: 26 }}>
           <div className="panel__head">
-            <h2 className="panel__title">Estado de todos los centros</h2>
+            <h2 className="panel__title">Estado mensual de todos los centros</h2>
             <span className="label">{label}</span>
           </div>
+          <p className="h-sub">Período seleccionado: {label}. Niños muestra el último dato mensual declarado de cada centro dentro del período; si no lo hay, usa el dato del mes anterior. La proyección viva del mes abierto no reemplaza ese dato.</p>
           <div className="desktop-only operational-table">
           <TableScroller label="Estado de todos los centros" stickyFirstColumn>
             <table className="table operations-table--dashboard">
               <caption className="sr-only">Estado de todos los centros · {label}</caption>
               <thead>
                 <tr>
-                  {['Centro', 'Administradora', 'Niños', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
+                  {['Centro', 'Administradora', 'Niños · último declarado', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
                     <th key={h}>{h}</th>)}
                 </tr>
               </thead>
@@ -189,7 +196,7 @@ export default function DashboardPage() {
                   <tr key={i}>
                     <td><Link className="operations-link" href="/dashboard/ranking" aria-label={`Ver ranking de ${c.nombre}`}>{c.nombre}</Link></td>
                     <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
-                    <td className="num" style={{ color: 'var(--text)' }}>{c.ninos}</td>
+                    <td className="num" style={{ color: 'var(--text)' }}>{c.ninosDisponible ? c.ninos : 'Sin dato'}<div className="h-sub">{fechaDato(c)}</div></td>
                     <td className="num" style={{ fontWeight: 600, color: c.grupos > 0 ? (c.ninosGrupo >= c.metaGpn ? 'var(--ok)' : 'var(--bad)') : 'var(--text-faint)' }} title={c.grupos > 0 ? `${c.grupos} grupos · meta ≥ ${c.metaGpn}` : 'sin datos de grupos'}>{c.grupos > 0 ? c.ninosGrupo.toFixed(1) : '—'}</td>
                     <td className="num" style={{ fontWeight: 600, color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
                       {c.nuevos}<span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> /{c.meta}</span>
@@ -230,7 +237,7 @@ export default function DashboardPage() {
               status={<span className={`pill ${ESTADO_PILL[c.estado] || 'pill--warn'}`}>{c.estado}</span>}
               fields={[
                 { label: 'Administradora', value: c.admin || '—' },
-                { label: 'Niños', value: c.ninos },
+                { label: 'Niños · último declarado', value: <>{c.ninosDisponible ? c.ninos : 'Sin dato'}<br />{fechaDato(c)}</> },
                 { label: 'N/grupo', value: c.grupos > 0 ? `${c.ninosGrupo.toFixed(1)} · ${c.grupos} grupos · meta ≥ ${c.metaGpn}` : 'Sin datos de grupos' },
                 { label: 'Nuevos', value: `${c.nuevos} / ${c.meta}` },
                 { label: 'Deserción', value: c.desercion },

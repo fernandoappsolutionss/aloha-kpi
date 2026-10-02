@@ -104,7 +104,7 @@ async function cargarTablero() {
     const { series, resumen } = armarSeries(periodo.semanas, propias)
     const cuotaVista = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas: cuotasCentro, metas: metasPorSemana.get(periodo.semanaAbierta), semanaAbierta: periodo.semanaAbierta, hoy: periodo.hoy })
     const evaluacionCuotas = evaluarCuotasCerradas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: cuotasCentro, semanaFin: periodo.ultimaCerrada })
-    return { ...conPlan, semanaAbierta: periodo.semanaAbierta, ultimaCerrada: periodo.ultimaCerrada, serie: cuotaVista.series.ninos_activos, cuotas: cuotaVista.cuotas,
+    return { ...conPlan, zonaHoraria: zonaHorariaCentro(centro), semanaAbierta: periodo.semanaAbierta, ultimaCerrada: periodo.ultimaCerrada, serie: cuotaVista.series.ninos_activos, cuotas: cuotaVista.cuotas,
       cuotasCumplidas: evaluacionCuotas.porcentaje, evaluacionCuotas,
       puedeAprobar: esAdminDe(sesion, centro.id),
       lectura: lecturaCondicion(base.serie.filter((punto) => punto.semanaFin <= periodo.ultimaCerrada).map((punto) => punto.valor)) }
