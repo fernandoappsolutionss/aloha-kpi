@@ -100,7 +100,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
         const cotizacionAprobada = validQuotes.find((quote) => String(quote.id) === String(row.cotizacion_aprobada_id))
         const selectedCotizacionAprobada = cotizacionAprobadaByRow[row.id] || ''
         return (
-          <div key={row.id} className="foda-request-row">
+          <div key={row.id} className="peticiones-request-row">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                 <span className="label" style={{ color: 'var(--text-muted)' }}>{tipoLabel(row)}</span>
@@ -205,7 +205,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
             )}
 
             {canWrite && retryQuotes.length > 0 && (
-              <div className="foda-quote-grid" style={{ marginTop: 10 }}>
+              <div className="peticiones-quote-grid" style={{ marginTop: 10 }}>
                 {retryQuotes.map((quote, i) => (
                   <CotizacionCard key={quote.id} centroId={centroId} peticionId={row.id} quote={quote} index={i}
                     onValidated={onRefresh} onStatus={onStatus} />
@@ -216,7 +216,7 @@ export default function PeticionesList({ items, permissions, uploadsAvailable, c
             {canWrite && row.canAddQuote && (
               uploadsAvailable ? (
                 showAdding ? (
-                  <div className="foda-quote-grid" style={{ marginTop: 10 }}>
+                  <div className="peticiones-quote-grid" style={{ marginTop: 10 }}>
                     <CotizacionCard centroId={centroId} peticionId={row.id} quote={null} index={cotizaciones.length}
                       onValidated={async () => { setAddingFor(null); await onRefresh?.() }} onStatus={onStatus} />
                   </div>

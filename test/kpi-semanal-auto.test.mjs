@@ -4,9 +4,19 @@ import assert from 'node:assert/strict'
 import {
   VENTAS_AUTO_DESDE,
   calcularKpiSemanalAuto,
+  inscripcionesCanonicas,
   superponerSemanasAuto,
   usaKpiSemanalAuto,
 } from '../lib/kpi-semanal-auto.mjs'
+
+test('canónico elige el primer evento global de cada niño', () => {
+  const eventos = [
+    { id: 9, estudiante_id: 1, fecha: '2026-09-10' },
+    { id: 3, estudiante_id: 1, fecha: '2026-08-20' },
+    { id: 4, estudiante_id: 2, fecha: '2026-09-01' },
+  ]
+  assert.deepEqual(inscripcionesCanonicas(eventos).map((e) => e.id).sort(), [3, 4])
+})
 
 // Agosto 2026: empieza sábado; lunes 3 = S1/D1, viernes 7 = S1/D5,
 // miércoles 12 = S2/D3 (los mismos anclajes de test/bucket-habil.test.mjs).

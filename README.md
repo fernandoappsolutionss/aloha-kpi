@@ -114,14 +114,11 @@ Las fuentes congeladas del contenido viven en `docs/entrenamiento/fuente/`.
 | `kpi_semanas` | KPI semanal (cobranza/deserción/ingresos por día) |
 | `trimestres` | Agrupador para el checklist de cumplimiento |
 | `cumplimiento` | Checklist mensual (sí/no) |
-| `foda` | FODA trimestral por centro (oportunidades, amenazas, comentarios, estado) |
+| `foda` | Archivo histórico de los FODA trimestrales; la aplicación ya no lo lee ni lo escribe |
 
 ## Notas
 
 - `dashboard/ranking`, `dashboard/alertas` y `dashboard/reporte` se calculan
   desde los datos reales (Q1 2026) vía `getCentrosKpi()`.
-- El FODA persiste oportunidades, amenazas, comentarios y estado. Las
-  **fortalezas/debilidades** se muestran todavía como lista ilustrativa fija;
-  derivarlas automáticamente del checklist de cumplimiento es el siguiente paso.
-- Si ya habías ejecutado `db/schema.sql` antes de esta versión, vuelve a
-  ejecutarlo (es idempotente) para crear la nueva tabla `foda`.
+- Las peticiones están en `/centro/<id>/peticiones`. Los enlaces anteriores a
+  `/centro/<id>/foda` redirigen allí. La tabla `foda` se conserva como archivo histórico.

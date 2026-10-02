@@ -1,173 +1,78 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import Sidebar from '../../../components/Sidebar'
-import PeriodSelector from '../../../components/PeriodSelector'
-import { getCentrosKpi } from '../../actions/dashboard'
-import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
-import NivelBadge from '../../../components/NivelBadge'
 import TableScroller from '../../../components/TableScroller'
 import OperationalCard from '../../../components/OperationalCard'
-import { CENTER_LEVELS } from '../../../lib/growth/constants.mjs'
+import { getTableroSemanal } from '../../actions/semana'
+import { ordenarRankingSemanal } from '../../../lib/cuotas-semana.mjs'
 
-const MEDAL = { 1:'🥇', 2:'🥈', 3:'🥉' }
-const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
-// El color del centro lo pinta PRODUCTO, no el checklist.
-const colorSemaforo = (c) => c?.semaforo?.color === 'verde' ? 'var(--ok)' : c?.semaforo?.color === 'rojo' ? 'var(--bad)' : 'var(--warn)'
-// Orden del ranking: primero si el centro crece y cumple, después cuánto crece,
-// y sólo al final la disciplina. Ordenar por el checklist ponía a ANCLAS en el
-// podio con 88% mientras perdía 2,7 niños al mes.
-const RANGO = { verde: 0, amarillo: 1, rojo: 2 }
-const ordenProducto = (a, b) =>
-  (RANGO[a?.semaforo?.color] ?? 1) - (RANGO[b?.semaforo?.color] ?? 1)
-  || (a.metasFallidas ?? 0) - (b.metasFallidas ?? 0)
-  || (b.netMensual ?? -Infinity) - (a.netMensual ?? -Infinity)
-  || b.nuevos - a.nuevos
-const podioAccent = (pos) => pos === 1 ? 'var(--ts-green)' : pos === 2 ? 'var(--text-muted)' : 'var(--text-dim)'
+const ESTADOS = { cumplido: 'Cumple las cinco cuotas', incumplido: 'Cuotas por cumplir', sin_cuotas: 'Sin cuotas aprobadas', cuotas_incompletas: 'Faltan cuotas por aprobar', datos_pendientes: 'Faltan datos de cierre' }
+const numero = (v) => v == null ? 'Sin dato' : Number(v).toLocaleString('es-PA')
+const fecha = (v) => v.split('-').reverse().join('/')
+const resultado = (d) => d.cuota == null ? 'Sin cuota aprobada' : d.valor == null ? 'Sin dato de cierre' : d.cumple ? 'Cumplida' : d.inversa ? `Exceso: ${numero(d.falta)}` : `Faltan: ${numero(d.falta)}`
+
+function DetalleCuotas({ centro }) {
+  return <details><summary>Ver las cinco cuotas</summary><ul>
+    {centro.evaluacionCuotas.detalles.map((d) => <li key={d.codigo} style={{ marginTop: 8 }}>
+      <strong>{d.nombre}</strong><br />Resultado: {numero(d.valor)} · {d.inversa ? 'Máximo' : 'Cuota'}: {numero(d.cuota)}<br />{resultado(d)}
+    </li>)}
+  </ul></details>
+}
 
 export default function RankingPage() {
-  const [centros, setCentros] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
-  const [period, setPeriod] = useState(getCurrentPeriod())
-  const label = periodLabel(period.year, period.quarter)
-  function changePeriod(p) { writeStoredPeriod(p); setPeriod(p) }
+  const [cargando, setCargando] = useState(true)
+  async function cargar() {
+    setCargando(true); setError('')
+    try { setDatos(await getTableroSemanal()) }
+    catch { setError('No se pudo cargar el ranking semanal.') }
+    finally { setCargando(false) }
+  }
+  useEffect(() => { cargar() }, [])
+  const centros = ordenarRankingSemanal(datos?.centros || [])
+  const podio = centros.filter((c) => c.medalla)
 
-  useEffect(() => { setPeriod(readStoredPeriod()) }, [])
-  useEffect(() => {
-    let active = true
-    setLoading(true); setError('')
-    getCentrosKpi(period.year, period.quarter)
-      .then((data) => {
-        if (!active) return
-        const sorted = [...(data || [])].sort(ordenProducto)
-        setCentros(sorted.map((c, i) => ({ ...c, pos: i + 1 })))
-      })
-      .catch(() => { if (active) setError('No se pudo cargar ranking. Intenta de nuevo.') })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [period])
-
-  return (
-    <div className="shell">
-      <Sidebar rol="admin_general"/>
-      <main id="main-content" data-page-state={loading ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
-        <div className="main__head">
-          <div>
-            <div className="label" style={{ marginBottom: 10 }}>Ranking · {label}</div>
-            <h1 className="h-title">Ranking de centros</h1>
-            <p className="h-sub">Clasificación por producto: ¿el centro crece y cumple sus metas? — {label}</p>
-          </div>
-          <PeriodSelector value={period} onChange={changePeriod} />
-        </div>
-
-        {error ? <p role="alert" className="alert alert--error">{error}</p> : loading ? (
-          <div role="status" className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Cargando ranking…</div>
-        ) : centros.length === 0 ? (
-          <div className="panel" style={{ padding: 48, textAlign: 'center', color: 'var(--text-dim)' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
-            <div style={{ fontWeight: 600, color: 'var(--text)' }}>Aún no hay datos para clasificar</div>
-            <div style={{ marginTop: 6 }}>El ranking aparecerá cuando los centros registren sus KPIs.</div>
-          </div>
-        ) : (
-          <>
-            {/* Podio */}
-            <p role="status" className="sr-only">{centros.length} centros clasificados</p>
-            <div className="responsive-grid operations-grid--three">
-              {centros.slice(0, 3).map((c, i) => (
-                <div key={c.pos} className="kpi" style={{ animationDelay: `${i * 0.06}s`, '--accent': podioAccent(c.pos), textAlign: 'center', padding: '22px 18px 20px' }}>
-                  <div style={{ fontSize: 30, marginBottom: 8 }}>{MEDAL[c.pos]}</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{c.nombre}</div>
-                  <div className="label" style={{ marginBottom: 14 }}>{c.admin}</div>
-                  <div className="kpi__value" style={{ color: colorSemaforo(c) }}>
-                    <span aria-hidden="true">{c.semaforo?.forma} </span>{c.semaforo?.estado || '—'}
-                  </div>
-                  <div className="kpi__sub">{c.semaforo?.titulo || ''}</div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 18, marginTop: 16 }} className="num">
-                    <span style={{ color: 'var(--ts-green)', fontWeight: 600 }}>{c.nuevos} nuevos</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{c.ninos} niños</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 14 }}>
-                    <NivelBadge nivel={c.nivel} />
-                    {c.sig
-                      ? <div style={{ color: 'var(--text-dim)' }}>Próximo: <b style={{ color: 'var(--ts-green)' }}>Nivel {c.sig.nivel}</b> · faltan {c.sig.faltan}</div>
-                      : <div style={{ color: 'var(--ts-green)' }}>Nivel máximo</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Tabla completa */}
-            <div className="panel">
-              <div className="panel__head">
-                <h2 className="panel__title">Clasificación completa</h2>
-                <span className="label">{label}</span>
-              </div>
-              <div className="desktop-only operational-table">
-              <TableScroller label="Clasificación completa">
-                <table className="table operations-table--ranking">
-                  <caption className="sr-only">Clasificación completa · {label}</caption>
-                  <thead>
-                    <tr>{['Pos.','Centro','Administradora','Estado','Disciplina','Nuevos ing.','Niños activos','Nivel','Crecimiento'].map(h =>
-                      <th key={h}>{h}</th>
-                    )}</tr>
-                  </thead>
-                  <tbody>
-                    {centros.map(c => (
-                      <tr key={c.pos} style={{ cursor: 'default' }}>
-                        <td className="num">
-                          <span style={{ fontWeight: 700, color: c.pos <= 3 ? podioAccent(c.pos) : 'var(--text-dim)' }}>{MEDAL[c.pos] || c.pos}</span>
-                        </td>
-                        <td style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>{c.nombre}</td>
-                        <td style={{ color: 'var(--text-dim)' }}>{c.admin}</td>
-                        <td>
-                          <span className={`pill ${c.semaforo?.color === 'verde' ? 'pill--ok' : c.semaforo?.color === 'rojo' ? 'pill--bad' : 'pill--warn'}`} title={c.semaforo?.motivo}>
-                            <span className="dot" /><span aria-hidden="true">{c.semaforo?.forma}</span> {c.semaforo?.estado}
-                          </span>
-                        </td>
-                        <td className="num" style={{ color: 'var(--text-muted)' }}>{c.disciplina ?? c.cumpl}%</td>
-                        <td className="num" style={{ color: 'var(--text)' }}>{c.nuevos}</td>
-                        <td className="num" style={{ color: 'var(--text-muted)' }}>{c.ninos}</td>
-                        <td><NivelBadge nivel={c.nivel} size="sm" /></td>
-                        <td className="num" style={{ color: c.netMensual == null ? 'var(--text-dim)' : c.netMensual > 0 ? 'var(--ok)' : 'var(--bad)' }}>
-                          {c.netMensual == null ? 'sin dato' : `${c.netMensual > 0 ? '+' : ''}${c.netMensual} niños/mes`}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableScroller>
-              </div>
-              <div className="mobile-only operational-list">
-                {centros.map(c => <OperationalCard key={c.id} headingLevel={3} title={`${c.pos}. ${c.nombre}`} subtitle={c.admin}
-                  fields={[
-                    { label: 'Posición', value: c.pos }, { label: 'Administradora', value: c.admin || '—' },
-                    { label: 'Estado', value: `${c.semaforo?.estado || '—'} — ${c.semaforo?.titulo || ''}` },
-                    { label: 'Disciplina', value: `${c.disciplina ?? c.cumpl}%` }, { label: 'Nuevos ingresos', value: c.nuevos },
-                    { label: 'Niños activos', value: c.ninos }, { label: 'Nivel', value: <NivelBadge nivel={c.nivel} /> },
-                    { label: 'Crecimiento', value: c.netMensual == null ? 'sin dato' : `${c.netMensual > 0 ? '+' : ''}${c.netMensual} niños/mes` },
-                  ]} />)}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Leyenda de niveles — siempre visible */}
-        <div className="card" style={{ marginTop: 16, padding: '16px 20px' }}>
-          <div className="label" style={{ marginBottom: 12 }}>Niveles de centro · ALOHA 2026</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
-            {CENTER_LEVELS.map(({ level, threshold }) => (
-              <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <NivelBadge nivel={level} size="sm" />
-                <span className="num" style={{ color: 'var(--text-muted)' }}>≥ {threshold} niños</span>
-              </div>
-            ))}
-          </div>
-          <p style={{ color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.5, maxWidth: 760 }}>
-            El nivel se reconoce al <strong style={{ color: 'var(--text-muted)' }}>cerrar el trimestre</strong> según los niños activos
-            y aplica al <strong style={{ color: 'var(--text-muted)' }}>trimestre siguiente</strong>. Reducir la deserción ayuda a sostener el umbral alcanzado.
-          </p>
-        </div>
-      </main>
-    </div>
-  )
+  return <div className="shell">
+    <Sidebar rol="admin_general" />
+    <main id="main-content" data-page-state={cargando ? 'loading' : error ? 'error' : 'ready'} className="main operations-page">
+      <div className="main__head"><div><p className="label">Ranking · cuotas semanales</p><h1 className="h-title">Ranking de centros</h1>
+        <p className="h-sub">Última semana cerrada de cada centro. El reconocimiento exige cumplir las cinco cuotas aprobadas.</p>
+      </div><Link className="btn" href="/dashboard/reunion-semanal">Reunión semanal</Link></div>
+      {error && <p role="alert" className="alert alert--error">{error} <button className="btn" onClick={cargar}>Reintentar</button></p>}
+      {cargando ? <p role="status">Cargando ranking…</p> : !error && (!centros.length ? <div className="panel" style={{ padding: 24 }}><div>Aún no hay datos para clasificar</div></div> : <>
+        <p className="h-sub">Orden por porcentaje de cuotas cumplidas; desempate por superación porcentual de la cuota de niños activos. Los empates comparten puesto. Las cuotas sin aprobar o sin datos no clasifican.</p>
+        {podio.length ? <div className="responsive-grid operations-grid--three" aria-label="Podio de cumplimiento">
+          {podio.map((c) => <section className="kpi" key={c.id} style={{ padding: 24, textAlign: 'center' }}>
+            <span role="img" aria-label={`Puesto ${c.posicion}`} style={{ fontSize: 30 }}>{c.medalla}</span>
+            <h2 className="panel__title">{c.nombre}</h2><p className="kpi__value" style={{ color: 'var(--ok)' }}>5 de 5</p>
+            <p>Cuotas cumplidas · 100%</p><p className="h-sub">Cierre {fecha(c.ultimaCerrada)}</p>
+            <Link className="btn" href={`/centro/${c.id}/semana`}>Abrir Semana</Link>
+          </section>)}
+        </div> : <p role="status" className="alert">Sin reconocimientos esta semana. Ningún centro ha cumplido las cinco cuotas aprobadas con datos de cierre completos.</p>}
+        <section className="panel"><div className="panel__head"><h2 className="panel__title">Clasificación completa</h2></div>
+          <div className="desktop-only operational-table"><TableScroller label="Clasificación completa">
+            <table className="table operations-table--ranking"><caption className="sr-only">Clasificación por cuotas de la última semana cerrada</caption>
+              <thead><tr>{['Puesto', 'Centro', 'Cierre', 'Estado', 'Cumplidas', 'Cumplimiento', 'Detalle'].map((t) => <th key={t}>{t}</th>)}</tr></thead>
+              <tbody>{centros.map((c) => <tr key={c.id}>
+                <td>{c.medalla || c.posicion || '—'}</td><th scope="row"><Link className="operations-link" href={`/centro/${c.id}/semana`}>{c.nombre}</Link></th>
+                <td>{fecha(c.ultimaCerrada)}</td><td><span className={`pill ${c.evaluacionCuotas.estado === 'cumplido' ? 'pill--ok' : 'pill--warn'}`}>{ESTADOS[c.evaluacionCuotas.estado]}</span></td>
+                <td>{c.evaluacionCuotas.cumplidas} de {c.evaluacionCuotas.total}</td><td>{c.evaluacionCuotas.porcentaje == null ? 'Sin clasificar' : `${c.evaluacionCuotas.porcentaje}%`}</td>
+                <td><DetalleCuotas centro={c} /></td>
+              </tr>)}</tbody>
+            </table>
+          </TableScroller></div>
+          <div className="mobile-only operational-list">{centros.map((c) => <OperationalCard key={c.id} headingLevel={3} title={`${c.medalla || c.posicion || '—'} · ${c.nombre}`} subtitle={`Cierre ${fecha(c.ultimaCerrada)}`}
+            fields={[
+              { label: 'Estado', value: ESTADOS[c.evaluacionCuotas.estado] },
+              { label: 'Cuotas cumplidas', value: `${c.evaluacionCuotas.cumplidas} de ${c.evaluacionCuotas.total}` },
+              { label: 'Cumplimiento', value: c.evaluacionCuotas.porcentaje == null ? 'Sin clasificar' : `${c.evaluacionCuotas.porcentaje}%` },
+              { label: 'Cuotas y resultados', value: <DetalleCuotas centro={c} /> },
+              { label: 'Centro', value: <Link className="operations-link" href={`/centro/${c.id}/semana`}>Abrir Semana</Link> },
+            ]} />)}</div>
+        </section>
+      </>)}
+    </main>
+  </div>
 }

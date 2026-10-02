@@ -426,7 +426,7 @@ test('el VERDE es alcanzable: la rama R2 no es código muerto', () => {
 test('EL PANEL Y LA PANTALLA DEL CENTRO DICEN EL MISMO "Disciplina"', () => {
   // El panel del supervisor calculaba su "Disciplina" recorriendo los 33
   // CUMPLIMIENTO_KEYS a peso plano: metía las 3 metas de PRODUCTO dentro del
-  // marcador de Disciplina, mientras la pantalla del centro y el FODA usaban
+  // marcador de Disciplina, mientras la pantalla del centro usaba
   // `disciplinaPct` (30 criterios, ponderados). Dos pantallas con la MISMA
   // etiqueta y números distintos — ANCLAS 94% contra 100%, LOS NARANJOS hasta 8
   // puntos. Y al corregir el histórico de las 3 metas, el número del panel iba

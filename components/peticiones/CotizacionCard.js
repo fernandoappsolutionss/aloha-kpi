@@ -152,7 +152,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
   const titulo = preapproved ? 'Cotización del servicio' : Number.isFinite(index) ? `Cotización ${index + 1}` : 'Cotización'
 
   return (
-    <div className="foda-quote-card">
+    <div className="peticiones-quote-card">
       {confirmRemove && <Dialog open title="Quitar cotización" onClose={()=>setConfirmRemove(false)} closeDisabled={busy} footer={<><button type="button" className="btn" disabled={busy} onClick={()=>setConfirmRemove(false)}>Cancelar</button><button type="button" className="btn btn--primary" disabled={busy} onClick={async()=>{await quitarIntento();setConfirmRemove(false)}}>Quitar</button></>}><p>Se quitará este intento de cotización. Confirma que deseas continuar.</p></Dialog>}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span className="label">{titulo}</span>
@@ -172,7 +172,7 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
       ) : (
         <div>
           {preapproved ? <p className="h-sub">Proveedor aprobado: {preapprovedSupplierName}</p> : <>
-          <div className="foda-quote-fields">
+          <div className="peticiones-quote-fields">
             <label className="field">
               <span className="label">Razón social</span>
               <input className="input" name="proveedorRazonSocial" value={values.proveedorRazonSocial}
