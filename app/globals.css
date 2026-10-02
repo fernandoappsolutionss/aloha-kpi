@@ -1557,15 +1557,68 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tarjeta__valores > div { display: grid; gap: 4px; }
 .semana-tarjeta__valores strong { font-size: clamp(18px, 3vw, 26px); }
 .semana-tarjeta__fuente { margin-top: 12px; }
+.semana-tarjeta__cuota { margin: 10px 0; }
+.semana-ritmo { margin: 10px 0 14px; }
+.semana-ritmo p { margin: 0 0 6px; }
+.semana-ritmo progress { display: block; width: min(100%,320px); height: 12px; }
+.semana-ritmo--bien { color: var(--ok-text); }
+.semana-ritmo--atras { color: var(--bad-text); }
 .semana-grafica { display: block; max-width: 100%; height: auto; }
 .semana-tablero { margin-bottom: 24px; }
 .semana-tablero__contenido { padding: 16px; min-width: 0; }
 .semana-tablero__tabla { min-width: 900px; }
 .semana-tablero__mini { width: 160px; }
+.semana-condicion { display: inline-block; padding: 4px 9px; border: 1px solid var(--condicion-color); border-radius: var(--r-pill); color: var(--condicion-color); font-weight: 700; white-space: nowrap; }
+.semana-discrepancia,.semana-plan--vencido { color: var(--bad-text); font-weight: 700; }
+.semana-discrepancia { display: block; margin-top: 4px; }
+.semana-plan { margin-top: 24px; padding: 20px; min-width: 0; overflow-wrap: anywhere; }
+.semana-plan__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.semana-plan__condicion,.semana-plan__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0; }
+.semana-plan__selector,.semana-plan__seccion { margin-top: 20px; }
+.semana-condiciones { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,140px),1fr)); gap: 8px; margin: 12px 0; }
+.semana-condiciones__opcion { min-height: 44px; padding: 10px; border: 1px solid var(--condicion-color); border-radius: var(--r-sm); background: var(--surface-1); color: var(--condicion-color); font: inherit; font-weight: 700; cursor: pointer; }
+.semana-condiciones__opcion--activa { box-shadow: inset 0 0 0 2px var(--condicion-color); }
+.semana-plan__variantes { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 0; padding: 0; margin: 12px 0; }
+.semana-plan__variantes legend { font-weight: 700; }
+.semana-plan__variantes label { display: inline-flex; align-items: center; min-height: 44px; gap: 8px; }
+.semana-plan__pasos { padding-left: 25px; }
+.semana-plan__pasos > li { margin: 16px 0; padding-left: 5px; }
+.semana-plan__objetivos { list-style: none; padding: 0; }
+.semana-objetivo { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.semana-objetivo__fila,.semana-objetivo__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.semana-objetivo__check { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+.semana-objetivo__check input { width: 20px; height: 20px; }
+.semana-objetivo--hecho { text-decoration: line-through; color: var(--text-dim); }
+.semana-objetivo-form { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto; gap: 8px; margin: 10px 0 18px; }
+.semana-objetivo-form > * { min-width: 0; }
+.semana-plan .input { min-width: 0; min-height: 44px; font-size: 16px; }
+.semana-plan .btn { min-height: 44px; }
+.semana-cuotas,.semana-reunion,.semana-reunion__centro { min-width: 0; }
+.semana-cuotas { margin-top: 24px; padding: 18px; }
+.semana-cuotas__tabla { min-width: 620px; }
+.semana-cuotas .input { width: 90px; min-height: 44px; font-size: 16px; }
+.semana-cuotas__acciones,.semana-reunion__acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.semana-cuotas .btn,.semana-reunion .btn { min-height: 44px; }
+.semana-reunion__lista { display: grid; gap: 18px; }
+.semana-reunion__centro { padding: 18px; overflow-wrap: anywhere; }
+.semana-reunion__head,.semana-reunion__estado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.semana-reunion__estado { margin: 14px 0; }
+.semana-reunion__cuotas { list-style: none; padding: 0; display: grid; gap: 6px; }
+.semana-reunion__cuotas li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; border-bottom: 1px solid var(--border); padding: 6px 0; }
+.semana-reunion__cuotas li > :first-child { flex: 1 1 180px; }
+.semana-reunion__orden { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+.semana-reunion__orden h3 { grid-column: 1 / -1; margin: 0; }
+.semana-reunion__orden .field { min-width: 0; }
+.semana-reunion__orden .input { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+.semana-reunion__orden .btn { justify-self: start; }
 @media (max-width: 767px) {
   .semana-grid { grid-template-columns: minmax(0,1fr); }
   .semana-tarjeta--principal { grid-column: auto; }
   .semana-tablero__contenido { padding: 12px; }
+  .semana-plan { padding: 14px; }
+  .semana-objetivo-form { grid-template-columns: minmax(0,1fr); }
+  .semana-cuotas,.semana-reunion__centro { padding: 14px; }
+  .semana-reunion__orden { grid-template-columns: minmax(0,1fr); }
 }
 .table-scroller--sticky th:first-child, .table-scroller--sticky td:first-child {
   position: sticky;

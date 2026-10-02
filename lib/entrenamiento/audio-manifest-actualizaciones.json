@@ -9,13 +9,13 @@
     "generadoAt": "2026-09-07T11:30:31.164Z"
   },
   "encuestas/intro": {
-    "file": "actualizaciones/encuestas/intro-83044685d617.mp3",
-    "hash": "83044685d617",
+    "file": "actualizaciones/encuestas/intro-ea37d810558a.mp3",
+    "hash": "ea37d810558a",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 319364,
-    "segundos": 39.845442,
-    "generadoAt": "2026-09-12T16:10:36.357Z"
+    "bytes": 319782,
+    "segundos": 39.891882,
+    "generadoAt": "2026-10-01T21:25:41.288Z"
   },
   "encuestas/en-1": {
     "file": "actualizaciones/encuestas/en-1-77fff88773e6.mp3",
@@ -63,13 +63,13 @@
     "generadoAt": "2026-09-12T16:10:45.886Z"
   },
   "encuestas/en-6": {
-    "file": "actualizaciones/encuestas/en-6-5fab0fde1b46.mp3",
-    "hash": "5fab0fde1b46",
+    "file": "actualizaciones/encuestas/en-6-f40ed33e677c.mp3",
+    "hash": "f40ed33e677c",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 207560,
-    "segundos": 25.867029,
-    "generadoAt": "2026-09-07T11:30:55.483Z"
+    "bytes": 212367,
+    "segundos": 26.470748,
+    "generadoAt": "2026-10-01T21:25:45.809Z"
   },
   "cumplimiento/intro": {
     "file": "actualizaciones/cumplimiento/intro-c9acdd221c38.mp3",
@@ -495,13 +495,13 @@
     "generadoAt": "2026-09-07T18:10:21.173Z"
   },
   "peticiones/pe-1": {
-    "file": "actualizaciones/peticiones/pe-1-330a7e0d1992.mp3",
-    "hash": "330a7e0d1992",
+    "file": "actualizaciones/peticiones/pe-1-6c01e7cc26cd.mp3",
+    "hash": "6c01e7cc26cd",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 119371,
-    "segundos": 14.860771,
-    "generadoAt": "2026-09-07T18:10:24.130Z"
+    "bytes": 126058,
+    "segundos": 15.696689,
+    "generadoAt": "2026-10-01T21:25:49.460Z"
   },
   "peticiones/pe-2": {
     "file": "actualizaciones/peticiones/pe-2-4c3192ddc34d.mp3",

@@ -66,6 +66,10 @@ test('clases realizadas se cortan por fecha civil del centro', () => {
     { start_date: '2026-09-25T02:00:00Z', status: 'completed', stats: stats(2) },
   ]
   assert.equal(cpAsistidasSemana({ clases, desde: '2026-09-18', hasta: '2026-09-24', timeZone: 'America/Panama', now: new Date('2026-09-30T12:00:00Z') }).valor, 5)
+  assert.equal(cpAsistidasSemana({
+    clases: [{ start_date: '2026-10-02T04:30:00Z', timezone: 'America/Caracas', status: 'completed', stats: stats(2) }],
+    desde: '2026-09-25', hasta: '2026-10-01', timeZone: 'America/Panama', now: new Date('2026-10-03T12:00:00Z'),
+  }).valor, 2)
 })
 
 test('fechas civiles rotas no producen cifras semanales aparentes', () => {

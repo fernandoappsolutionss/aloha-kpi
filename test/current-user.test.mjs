@@ -194,6 +194,14 @@ test('coordinador operativo: manda en sus centros y en ninguno más', () => {
   assert.throws(() => assertAdmin(coord), /No autorizado/)
 })
 
+test('solo coordinación asignada o Master puede aprobar cuotas y dejar órdenes', () => {
+  assert.equal(currentUser.assertCoordinacion(coordinador, 10), coordinador)
+  assert.equal(currentUser.assertCoordinacion(master, 99), master)
+  for (const [actor, centro] of [[coordinador, 11], [sinCentros, 10], [admin10, 10], [asistente12, 12], [general, 10], [supervisor, 10]]) {
+    assert.throws(() => currentUser.assertCoordinacion(actor, centro), /No autorizado/)
+  }
+})
+
 test('coordinador sin centros asignados no entra a ninguno', () => {
   const coord = { id: 9, rol: 'coordinador', centro_id: null, centros: [] }
   assert.deepEqual(centrosDe(coord), [])

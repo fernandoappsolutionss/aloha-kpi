@@ -12,6 +12,17 @@ test('series conservan huecos como null y resumen abierto/cerrado', () => {
   assert.deepEqual(r.resumen.ninos_activos, { abierta: 103, cerrada: 102, anterior: 100, delta: 2 })
 })
 
+test('si falta la semana recién cerrada, resumen y cambio quedan sin dato', () => {
+  const r = armarSeries(semanas, [fila(1, semanas[0], 'ninos_activos', 100)])
+  assert.deepEqual(r.resumen.ninos_activos, { abierta: null, cerrada: null, anterior: 100, delta: null })
+})
+
+test('la serie lleva la condición asignada de cada semana', () => {
+  const r = armarSeries(semanas, [{ ...fila(1, semanas[0], 'ninos_activos', 100), condicion: 'normal' }])
+  assert.equal(r.series.ninos_activos[0].condicion, 'normal')
+  assert.equal(r.series.ninos_activos[1].condicion, null)
+})
+
 test('consolidado no inventa cero cuando falta algún centro', () => {
   const centros = [{ id: 1, nombre: 'Uno' }, { id: 2, nombre: 'Dos' }]
   const filas = [
