@@ -48,8 +48,8 @@ test('presenta propuesta, ritmo de flujo y marcas históricas sin convertir ause
   const result = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas, metas, semanaAbierta: '2026-10-01', hoy: '2026-09-27' })
   assert.equal(result.series.nuevos_inscritos[0].cuota, 4)
   assert.equal(result.series.nuevos_inscritos[1].cuota, 7)
-  assert.deepEqual(result.cuotas.nuevos_inscritos, { cuota: 7, propuesta: 5, estado: 'propuesta', ritmo: { esperado: 3, vaBien: false } })
-  assert.deepEqual(result.cuotas.ninos_activos, { cuota: null, propuesta: null, estado: null, ritmo: null })
+  assert.deepEqual(sinExplicacion(result.cuotas.nuevos_inscritos), { cuota: 7, propuesta: 5, estado: 'propuesta', ritmo: { esperado: 3, vaBien: false } })
+  assert.deepEqual(sinExplicacion(result.cuotas.ninos_activos), { cuota: null, propuesta: null, estado: null, ritmo: null })
 })
 
 test('una propuesta automática visible da ritmo aunque todavía no esté guardada', () => {
@@ -59,7 +59,7 @@ test('una propuesta automática visible da ritmo aunque todavía no esté guarda
     resumen: { nuevos_inscritos: { cerrada: 3, abierta: 1 }, ninos_activos: { cerrada: 200 } },
     filasCuotas: [], metas, semanaAbierta: '2026-10-01', hoy: '2026-09-27',
   })
-  assert.deepEqual(result.cuotas.nuevos_inscritos, { cuota: null, propuesta: 5, estado: 'propuesta', ritmo: { esperado: 2, vaBien: false } })
+  assert.deepEqual(sinExplicacion(result.cuotas.nuevos_inscritos), { cuota: null, propuesta: 5, estado: 'propuesta', ritmo: { esperado: 2, vaBien: false } })
 })
 
 test('porcentaje exige todas las cuotas aprobadas y fotos cerradas del catálogo', () => {
@@ -104,3 +104,5 @@ test('cada centro usa su fecha civil al cambiar de semana', () => {
   assert.equal(periodos[7].semanaAbierta, '2026-10-01')
   assert.equal(periodos[7].ultimaCerrada, '2026-09-24')
 })
+
+function sinExplicacion({ explicacion, ...campos }) { return campos }

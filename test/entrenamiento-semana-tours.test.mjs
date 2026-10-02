@@ -41,7 +41,7 @@ test('actions rechazan tour y quiz ajenos antes de SQL; aceptan solo el recorrid
 })
 
 test('guiones usan solo observar; todos los targets están presentes aun sin condición o cuotas guardadas', () => {
-  const files = ['app/centro/[id]/semana/page.js','components/semana/PlanSemana.js','components/semana/CuotasSemana.js'].map(read).join('\n')
+  const files = ['app/centro/[id]/semana/page.js','components/semana/PlanSemana.js','components/semana/CuotasSemana.js','components/semana/TrabajoSemanal.js'].map(read).join('\n')
   for (const m of nuevos) for (const p of m.pasos) {
     assert.equal(p.tipo, 'mostrar')
     assert.ok(files.includes(`data-tour="${p.target}"`), p.target)

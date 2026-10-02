@@ -4,9 +4,8 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
-import TarjetaEstadistica from '../../../../components/semana/TarjetaEstadistica'
-import PlanSemana from '../../../../components/semana/PlanSemana'
-import CuotasSemana from '../../../../components/semana/CuotasSemana'
+import TrabajoSemanal from '../../../../components/semana/TrabajoSemanal'
+import GuiaRutaPlan from '../../../../components/semana/GuiaRutaPlan'
 import { getSemanaCentro, actualizarSemanaCentro } from '../../../actions/semana'
 import { rangoSemana } from '../../../../lib/semana-cierre.mjs'
 
@@ -65,9 +64,8 @@ export default function SemanaPage() {
           <a className="btn" href="#semana-cuotas-title">Ir a cuotas semanales</a>
           <a className="btn btn--primary" href="#plan-batalla">Ir al plan de batalla</a>
         </nav>
-        <div className="semana-grid" data-tour="semana.graficas">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
-        <CuotasSemana centroId={id} semanaFin={datos.semanaAbierta} catalogo={datos.catalogo} resumen={datos.resumen} cuotas={datos.cuotas} puedeEscribir={datos.puedeEscribir} puedeAprobar={datos.puedeAprobar} onRefresh={refrescarPlan} />
-        <PlanSemana centroId={id} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} onRefresh={refrescarPlan} />
+        <GuiaRutaPlan centroId={id} />
+        <TrabajoSemanal centroId={id} datos={datos} onRefresh={refrescarPlan} />
       </>}
     </main>
   </div>

@@ -7,11 +7,11 @@ import { fechaCivil, rangoSemana, semanaAbierta, sumarDias, ultimasSemanas, zona
 import { ESTADISTICAS_CENTRO } from '../../lib/estadisticas-semana/catalogo.mjs'
 import { armarSeries, armarTablero } from '../../lib/estadisticas-semana/presentacion.mjs'
 import { calcularSemanaCentro, guardarSemanaCentro, leerSerieCentros } from '../../lib/estadisticas-semana/servicio.js'
-import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion } from '../../lib/plan-semana-servicio.js'
+import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion, verificarObjetivoEn } from '../../lib/plan-semana-servicio.js'
 import { enriquecerTableroConPlanes } from '../../lib/plan-semana.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
 import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro } from '../../lib/cuotas-semana.mjs'
-import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn } from '../../lib/cuotas-semana-servicio.js'
+import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn, leerCompromiso, guardarCompromisoEn } from '../../lib/cuotas-semana-servicio.js'
 
 async function vistaCentro(centroId, session) {
   const [centro] = await sql`SELECT id, nombre, pais FROM centros WHERE id = ${centroId}`
@@ -19,13 +19,14 @@ async function vistaCentro(centroId, session) {
   const zonaHoraria = zonaHorariaCentro(centro)
   const abierta = semanaAbierta(new Date(), zonaHoraria)
   const semanas = ultimasSemanas(abierta, 12)
-  const [filas, filasCuotas, metas] = await Promise.all([
+  const [filas, filasCuotas, metas, compromiso] = await Promise.all([
     leerSerieCentros([Number(centroId)], semanas),
     leerCuotasCentros([Number(centroId)], semanas),
     metasDeSemana(abierta),
+    leerCompromiso(centroId, abierta.slice(0, 7)),
   ])
   const { series: baseSeries, resumen } = armarSeries(semanas, filas)
-  const { series, cuotas } = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series: baseSeries, resumen, filasCuotas, metas, semanaAbierta: abierta, hoy: fechaCivil(new Date(), zonaHoraria) })
+  const { series, cuotas } = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series: baseSeries, resumen, filasCuotas, metas, compromiso, semanaAbierta: abierta, hoy: fechaCivil(new Date(), zonaHoraria) })
   const fechas = filas.map((fila) => fila.calculado_at).filter(Boolean).map((fecha) => new Date(fecha).getTime())
   const ultimaCerrada = sumarDias(abierta, -7)
   const plan = await cargarPlan(centroId, ultimaCerrada, { sesion: session })
@@ -42,6 +43,7 @@ async function vistaCentro(centroId, session) {
     puedeAsignar: puedeAsignarCondicion(session),
     puedeAprobar: esAdminDe(session, centroId),
     cuotas,
+    compromiso,
     plan,
   }
 }
@@ -83,17 +85,18 @@ async function cargarTablero() {
   const cierres = [...new Set(Object.values(periodos).map((periodo) => periodo.ultimaCerrada))]
   const abiertas = [...new Set(Object.values(periodos).map((periodo) => periodo.semanaAbierta))]
   const ids = centros.map((centro) => centro.id)
-  const [filas, filasCuotas, metasEntradas, planes] = await Promise.all([
+  const [filas, filasCuotas, metasEntradas, planes, compromisos] = await Promise.all([
     leerSerieCentros(ids, todasSemanas),
     leerCuotasCentros(ids, todasSemanas),
     Promise.all(abiertas.map(async (semana) => [semana, await metasDeSemana(semana)])),
     ids.length ? sql`SELECT * FROM semana_planes WHERE centro_id = ANY(${ids}::int[]) AND semana_fin = ANY(${cierres}::date[])` : [],
+    ids.length ? sql`SELECT * FROM ruta_compromisos_mes WHERE centro_id=ANY(${ids}::int[]) AND periodo=ANY(${abiertas.map(fin => fin.slice(0, 7))}::text[])` : [],
   ])
   const metasPorSemana = new Map(metasEntradas)
   const tablero = armarTablero(centros, semanas, filas)
   const ultimaCerrada = sumarDias(abierta, -7)
   const planIds = planes.map((plan) => plan.id)
-  const objetivos = planIds.length ? await sql`SELECT plan_id, seccion, paso FROM semana_objetivos WHERE plan_id = ANY(${planIds}::bigint[])` : []
+  const objetivos = planIds.length ? await sql`SELECT * FROM semana_objetivos WHERE plan_id = ANY(${planIds}::bigint[])` : []
   const presentados = centros.map((centro) => {
     const periodo = periodos[centro.id]
     const propias = filas.filter((fila) => Number(fila.centro_id) === Number(centro.id))
@@ -102,7 +105,8 @@ async function cargarTablero() {
     const planCentro = planes.filter((plan) => Number(plan.centro_id) === Number(centro.id) && (plan.semana_fin instanceof Date ? plan.semana_fin.toISOString().slice(0, 10) : String(plan.semana_fin).slice(0, 10)) === periodo.ultimaCerrada)
     const conPlan = enriquecerTableroConPlanes([base], planCentro, objetivos, periodo.ultimaCerrada, now)[0]
     const { series, resumen } = armarSeries(periodo.semanas, propias)
-    const cuotaVista = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas: cuotasCentro, metas: metasPorSemana.get(periodo.semanaAbierta), semanaAbierta: periodo.semanaAbierta, hoy: periodo.hoy })
+    const compromiso = compromisos.find(f => Number(f.centro_id) === Number(centro.id) && f.periodo === periodo.semanaAbierta.slice(0, 7))
+    const cuotaVista = prepararCuotas({ compromiso, catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas: cuotasCentro, metas: metasPorSemana.get(periodo.semanaAbierta), semanaAbierta: periodo.semanaAbierta, hoy: periodo.hoy })
     const evaluacionCuotas = evaluarCuotasCerradas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: cuotasCentro, semanaFin: periodo.ultimaCerrada })
     return { ...conPlan, zonaHoraria: zonaHorariaCentro(centro), semanaAbierta: periodo.semanaAbierta, ultimaCerrada: periodo.ultimaCerrada, serie: cuotaVista.series.ninos_activos, cuotas: cuotaVista.cuotas,
       cuotasCumplidas: evaluacionCuotas.porcentaje, evaluacionCuotas,
@@ -136,9 +140,9 @@ export async function editarObjetivo(centroId, objetivoId, datos) {
   return await editarObjetivoEn(centroId, objetivoId, datos)
 }
 
-export async function marcarObjetivo(centroId, objetivoId, hecho) {
+export async function marcarObjetivo(centroId, objetivoId, hecho, evidencia) {
   await requireCurrentWriteCentro(centroId)
-  return await marcarObjetivoEn(centroId, objetivoId, hecho)
+  return await marcarObjetivoEn(centroId, objetivoId, hecho, { evidencia })
 }
 
 export async function eliminarObjetivo(centroId, objetivoId) {
@@ -159,4 +163,14 @@ export async function aprobarCuotas(centroId, semanaFin, cuotas) {
 export async function agregarOrden(centroId, semanaFin, datos) {
   const sesion = await requireCurrentCoordinacion(centroId)
   return await agregarOrdenEn(centroId, semanaFin, datos, { actorId: sesion.id })
+}
+
+export async function guardarCompromiso(centroId, datos) {
+  const sesion = await requireCurrentPuedeCerrarMes(centroId)
+  return await guardarCompromisoEn(centroId, datos, { actorId: sesion.id })
+}
+
+export async function verificarObjetivo(centroId, objetivoId, revision) {
+  const sesion = await requireCurrentCoordinacion(centroId)
+  return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id, revision })
 }

@@ -10,7 +10,8 @@ function queryFalso() {
     const statement = strings.join('?')
     calls.push({ statement, values })
     if (statement.includes('FROM centros')) return [{ id: 7, pais: 'PA' }]
-    if (statement.includes('FROM estadisticas_semana')) return [{ codigo: 'ninos_activos', valor: 200 }, { codigo: 'nuevos_inscritos', valor: 3 }]
+    if (statement.includes('FROM estadisticas_semana')) return [{ codigo: 'ninos_activos', valor: 200, semana_fin:'2026-09-24', estado:'cerrada' }, { codigo: 'nuevos_inscritos', valor: 3, semana_fin:'2026-09-24', estado:'cerrada' }]
+    if (statement.includes('FROM ruta_compromisos_mes')) return []
     if (statement.includes('FROM metas')) return [{ meta_nuevos_ingresos_mes: 20, meta_desercion_mes: 8, meta_cobranza_max: 1 }]
     if (statement.includes('INSERT INTO semana_cuotas')) return [{ codigo: values[2], cuota: values[3], estado: 'propuesta' }]
     if (statement.includes('INSERT INTO semana_objetivos')) return [{ id: 9, texto: values[1], seccion: 'orden' }]
