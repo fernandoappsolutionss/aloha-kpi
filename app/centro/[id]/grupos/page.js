@@ -50,6 +50,7 @@ import { grupoIniciado, fingerprintPlanGrupo, cohorteDeTransicion } from '../../
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
 import TableScroller from '../../../../components/TableScroller'
 import Dialog, { ModalPortal, useModalLayer, useDialogCallback } from '../../../../components/Dialog'
+import CoincidenciasFicha, { ConfirmarFichaNueva, tituloCoincidencias } from '../../../../components/CoincidenciasFicha'
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -348,6 +349,35 @@ export default function GruposPage() {
     setFus(null)
     await load()
   }
+
+  // Abre la ficha de un niño por id: «Es este niño» del modal de inscripción y
+  // el enlace ?ficha=<id> que deja la clase de prueba. Vivo → «Editar niño»
+  // (fecha de venta, grupo); retirado → «Reincorporar».
+  function abrirFicha(fichaId) {
+    const todos = [
+      ...(data?.grupos || []).flatMap((g) => g.estudiantes || []),
+      ...(data?.sinGrupo || []),
+      ...(data?.retirados || []),
+    ]
+    const nino = todos.find((e) => String(e.id) === String(fichaId))
+    if (!nino) { setStatus('❌ No encontré esa ficha entre los niños activos, sin grupo o retirados del centro.'); return }
+    setStatus('')
+    if (nino.estado === 'retirado') setReincEst(nino)
+    else setEditEst(nino)
+  }
+  // ?ficha=<id>: una sola vez, cuando la operación ya cargó y se puede editar.
+  // Se quita de la URL al abrirla: recargar o volver atrás no reabre el modal.
+  const fichaPedida = useRef(false)
+  useEffect(() => {
+    if (!data || !canWrite || fichaPedida.current) return
+    fichaPedida.current = true
+    const url = new URL(window.location.href)
+    const fichaId = url.searchParams.get('ficha')
+    if (!fichaId) return
+    url.searchParams.delete('ficha')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    abrirFicha(fichaId)
+  }, [data, canWrite])
 
   const metas = data?.metas || { gpnMin: 8, cupoMax: 15 }
   const grupos = data?.grupos || []
@@ -892,6 +922,7 @@ export default function GruposPage() {
       )}
       {canWrite && inscribir && (
         <InscribirModal centroId={id} grupos={grupos} grupoPrefill={inscribir.grupoId}
+          onAbrirFicha={(c) => { setInscribir(null); abrirFicha(c.id) }}
           onClose={() => setInscribir(null)}
           onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg); refresca() }} />
       )}
@@ -2898,7 +2929,7 @@ function ItinerarioModal({ centroId, g, nuevaExcepcion, onClose, onSaved }) {
 }
 
 // ── Modal: inscribir niño ────────────────────────────────────────────────────
-function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
+function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAbrirFicha }) {
   const complete = useDialogCallback(onSaved, centroId)
   const [f, setF] = useState({ nombre: '', itinerario: 'TINY', nivel: 1, grupo_id: grupoPrefill ? String(grupoPrefill) : '', origen: 'directo', origen_venta: '', fecha: hoyISO(), fecha_cierre_nivel: '', representante: '', correo: '', telefono: '' })
   // (g1-11) El cierre de nivel es un OVERRIDE MANUAL: solo viaja si el usuario
@@ -2906,6 +2937,11 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   const [cierreTocado, setCierreTocado] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  // (2026-10-01) Fichas del centro que parecen ser este niño: el server no
+  // crea nada hasta que el centro confirme, con motivo, que es OTRO niño.
+  const [existentes, setExistentes] = useState(null)
+  const [confirmando, setConfirmando] = useState(false)
+  const [confirmacion, setConfirmacion] = useState({ motivo: '', nota: '' })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo')
   // Inscribir es siempre un niño NUEVO: el select deshabilita tanto la palanca
@@ -2913,9 +2949,11 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
   const hoy = hoyISO()
   const ventanaPorId = new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoy)]))
 
-  async function save() {
+  async function save(confirmarFichaNueva = false) {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
     if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
+    if (confirmarFichaNueva && !confirmacion.motivo) { setErr('Elige por qué es otro niño.'); return }
+    if (confirmarFichaNueva && confirmacion.motivo === 'otro' && !confirmacion.nota.trim()) { setErr('Escribe por qué es otro niño.'); return }
     setSaving(true); setErr('')
     try {
       const data = {
@@ -2924,7 +2962,17 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
         representante: f.representante, correo: f.correo, telefono: f.telefono,
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
+      // Las fichas que el centro VIO: si aparece otra, el server vuelve a preguntar.
+      if (confirmarFichaNueva) data.ficha_nueva = { descartadas: existentes.coincidencias.map((c) => c.id), ...confirmacion }
       const res = await inscribirEstudiante(centroId, data)
+      if (res.coincidencias?.length) {
+        const vistas = new Set((existentes?.coincidencias || []).map((c) => c.id))
+        const nuevas = res.coincidencias.filter((c) => !vistas.has(c.id))
+        setExistentes({ coincidencias: res.coincidencias, registroYaInscrito: !!res.registroYaInscrito })
+        setConfirmando(false)
+        if (confirmarFichaNueva && nuevas.length) setErr(`Apareció otra ficha que puede ser este niño (${nuevas.map((c) => c.nombre).join(', ')}): revísala antes de confirmar.`)
+        return
+      }
       if (res.error) { setErr(res.error); return }
       const g = activos.find((x) => String(x.id) === String(f.grupo_id))
       complete(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
@@ -2935,15 +2983,44 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
     }
   }
 
+  // Si es el mismo niño, su ficha se corrige donde siempre: «Editar niño»
+  // (fecha de venta, grupo) o «Reincorporar» si está retirado.
+  const accionesDe = (c) => onAbrirFicha ? (
+    <div style={{ marginTop: 8 }}>
+      <button type="button" className="btn" disabled={saving} onClick={() => onAbrirFicha(c)}>
+        {c.estado === 'retirado' ? 'Es este niño: reincorporarlo' : 'Es este niño: abrir su ficha'}
+      </button>
+    </div>
+  ) : null
+
   return (
-    <Modal title="Inscribir niño" width={600} onClose={onClose} closeDisabled={saving}
-      footer={(
+    <Modal title={existentes ? tituloCoincidencias(existentes.coincidencias) : 'Inscribir niño'} width={600} onClose={onClose} closeDisabled={saving}
+      footer={existentes && confirmando ? (
+        <>
+          <button className="btn" onClick={() => { setConfirmando(false); setErr('') }} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary" onClick={() => save(true)} disabled={saving}>{saving ? 'Guardando…' : 'Crear ficha nueva'}</button>
+        </>
+      ) : existentes ? (
+        <>
+          <button className="btn" onClick={() => { setExistentes(null); setErr('') }} disabled={saving}>Volver al formulario</button>
+          {!existentes.registroYaInscrito && <button className="btn" onClick={() => { setConfirmando(true); setErr('') }} disabled={saving}>Es otro niño: inscribir igual</button>}
+        </>
+      ) : (
         <>
           <button className="btn" data-tour="inscribir.cancelar" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" data-tour="inscribir.confirmar" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Inscribir'}</button>
+          <button className="btn btn--primary" data-tour="inscribir.confirmar" onClick={() => save()} disabled={saving}>{saving ? 'Guardando…' : 'Inscribir'}</button>
         </>
       )}>
       {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {existentes ? (
+        <div>
+          <p className="h-sub" style={{ marginTop: 0 }}>
+            {f.nombre.trim()} parece tener ficha en el centro. Si es el mismo niño, no lo inscribas otra vez (cada ficha nueva cuenta como una venta más): corrige su ficha con «Editar niño» (fecha de venta, grupo) o, si está retirado, con «Reincorporar».
+          </p>
+          <CoincidenciasFicha coincidencias={existentes.coincidencias} renderAcciones={confirmando ? null : accionesDe} />
+          {confirmando && <ConfirmarFichaNueva coincidencias={existentes.coincidencias} valor={confirmacion} onChange={setConfirmacion} />}
+        </div>
+      ) : (
       <div className="dialog-form-grid">
         <Field full label="Nombre del niño *" tour="inscribir.nombre"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
         <Field label="Itinerario">
@@ -2989,6 +3066,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved }) {
         <Field label="Teléfono"><input name="telefono" type="tel" autoComplete="tel" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
         <Field full label="Correo"><input name="correo" type="email" autoComplete="email" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
       </div>
+      )}
     </Modal>
   )
 }
