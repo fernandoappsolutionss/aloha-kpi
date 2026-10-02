@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../../components/Sidebar'
 import Link from 'next/link'
+import { getNavigationContext } from '../../../../actions/navigation'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarProgreso, responderQuiz } from '../../../../actions/entrenamiento'
-import { MODULOS } from '../../../../../lib/entrenamiento/modulos'
+import { modulosDeRol } from '../../../../../lib/entrenamiento/modulos'
 import { completado } from '../../../../../lib/entrenamiento/progreso'
 import manifest from '../../../../../lib/entrenamiento/audio-catalogo'
 
@@ -17,9 +18,16 @@ export default function ModuloPage() {
 }
 
 function ContenidoModulo({ id, moduloId }) {
-  const modulo = useMemo(() => MODULOS.find((m) => m.id === moduloId), [moduloId])
-  const idx = MODULOS.findIndex((m) => m.id === moduloId)
-  const siguiente = MODULOS[idx + 1] || null
+  const [rol, setRol] = useState(null)
+  const modulos = useMemo(() => modulosDeRol(rol), [rol])
+  const modulo = modulos.find((m) => m.id === moduloId)
+  const idx = modulos.findIndex((m) => m.id === moduloId)
+  const siguiente = modulos[idx + 1] || null
+  useEffect(() => {
+    let activo = true
+    getNavigationContext().then((c) => { if (activo) setRol(c?.actor?.role || 'desconocido') }).catch(() => { if (activo) setRol('desconocido') })
+    return () => { activo = false }
+  }, [])
   const [nombre, setNombre] = useState('Centro')
   const [progreso, setProgreso] = useState(null)
   const [cargandoProgreso, setCargandoProgreso] = useState(true)
@@ -53,7 +61,8 @@ function ContenidoModulo({ id, moduloId }) {
     return () => { activo = false }
   }, [recargaProgreso])
 
-  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main id="main-content" data-page-state="error" className="main ent-page"><Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link><div role="alert" className="alert alert--error">Este módulo no existe.</div></main></div>
+  if (rol === null) return <p role="status">Consultando tu puesto…</p>
+  if (!modulo) return <div className="shell"><Sidebar rol="usuario" centroNombre={nombre} centroId={id} /><main id="main-content" data-page-state="error" className="main ent-page"><Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link><div role="alert" className="alert alert--error">Este recorrido no está disponible para tu puesto.</div></main></div>
 
   const progresoConocido = progreso !== null
   const p = progreso?.[modulo.id]
@@ -89,7 +98,7 @@ function ContenidoModulo({ id, moduloId }) {
       <main id="main-content" data-page-state={cargandoProgreso ? 'loading' : errorProgreso ? 'error' : 'ready'} className="main ent-page">
         <div className="main__head"><div>
           <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
-          <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Módulo {modulo.orden} de {MODULOS.length} · {modulo.duracionMin} min</div>
+          <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Módulo {modulo.orden} de {modulos.length} · {modulo.duracionMin} min</div>
           <h1 className="h-title">{modulo.titulo}</h1>
           {listo && <div className="ent-pill ent-pill--ok" style={{ display: 'inline-block', marginTop: 6 }}>✓ Completado</div>}
         </div></div>

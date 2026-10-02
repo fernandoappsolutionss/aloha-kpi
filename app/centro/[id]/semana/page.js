@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import TarjetaEstadistica from '../../../../components/semana/TarjetaEstadistica'
@@ -26,8 +27,9 @@ export default function SemanaPage() {
   }
   useEffect(() => { cargar() }, [id])
   useEffect(() => {
-    // El plan aparece después de la carga; el enlace de Ruta puede llegar antes.
-    if (!cargando && window.location.hash === '#plan-batalla') document.getElementById('plan-batalla')?.scrollIntoView({ block: 'start' })
+    // Ambos destinos aparecen después de la carga asíncrona.
+    const anchor = window.location.hash.slice(1)
+    if (!cargando && ['plan-batalla', 'semana-cuotas-title'].includes(anchor)) document.getElementById(anchor)?.scrollIntoView({ block: 'start' })
   }, [cargando])
 
   async function actualizar() {
@@ -48,7 +50,7 @@ export default function SemanaPage() {
     <Sidebar rol="usuario" centroNombre={datos?.centro?.nombre} centroId={id} />
     <main id="main-content" data-page-state={cargando ? 'loading' : error && !datos ? 'error' : 'ready'} className="main reports-page semana-page">
       <CentroNavigation centroId={id} />
-      <div className="main__head">
+      <div className="main__head" data-tour="semana.periodo">
         <div><div className="label" style={{ marginBottom: 10 }}>Mi centro · Semana de cierre</div><h1 className="h-title">Semana</h1>
           {rango && <p className="h-sub">Semana del {rango.desde} al {rango.hasta} · {datos.centro.nombre}</p>}
           {datos?.ultimoCalculo && <p className="h-sub">Último cálculo: {new Date(datos.ultimoCalculo).toLocaleString('es-PA', { timeZone: datos.centro.zonaHoraria })}</p>}
@@ -58,11 +60,12 @@ export default function SemanaPage() {
       {cargando && <p role="status">Cargando semana…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {datos && !cargando && <>
+        <p data-tour="semana.formacion"><Link className="btn" href={`/centro/${id}/entrenamiento/oficio#actualizacion-semanal`}>Actualización semanal · gráficas, condiciones y práctica de tu puesto →</Link></p>
         <nav aria-label="Secciones de la semana" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
           <a className="btn" href="#semana-cuotas-title">Ir a cuotas semanales</a>
           <a className="btn btn--primary" href="#plan-batalla">Ir al plan de batalla</a>
         </nav>
-        <div className="semana-grid">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
+        <div className="semana-grid" data-tour="semana.graficas">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
         <CuotasSemana centroId={id} semanaFin={datos.semanaAbierta} catalogo={datos.catalogo} resumen={datos.resumen} cuotas={datos.cuotas} puedeEscribir={datos.puedeEscribir} puedeAprobar={datos.puedeAprobar} onRefresh={refrescarPlan} />
         <PlanSemana centroId={id} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} onRefresh={refrescarPlan} />
       </>}

@@ -74,6 +74,7 @@ export async function getHigienePendientes(centroId) {
     .map((alumno) => ({
       id: alumno.id,
       nombre: alumno.nombre,
+      grupoId: alumno.grupo_id,
       grupoNumero: alumno.grupo_id == null ? null : (gruposPorId.get(String(alumno.grupo_id))?.numero ?? null),
       alta: iso10(alumno.created_at),
     }))

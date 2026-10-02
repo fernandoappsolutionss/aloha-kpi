@@ -30,7 +30,7 @@ export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, c
     finally { setOcupado(false) }
   }
 
-  return <section className="panel semana-cuotas" aria-labelledby="semana-cuotas-title">
+  return <section data-tour="semana.cuotas" className="panel semana-cuotas" aria-labelledby="semana-cuotas-title">
     <div className="panel__head"><div><p className="label">Semana abierta · cierre {semanaFin}</p><h2 id="semana-cuotas-title" className="panel__title">Cuotas semanales</h2></div></div>
     <form onSubmit={enviar}>
       <TableScroller label="Cuotas semanales por estadística" stickyFirstColumn>

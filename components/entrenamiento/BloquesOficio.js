@@ -7,6 +7,8 @@
 // No importa el catálogo ni el glosario: recibe por props solo los términos de
 // SU módulo. Así la prosa de los 40 módulos nunca entra al bundle del cliente.
 import { useState } from 'react'
+import Link from 'next/link'
+import GraficaSemanal from '../semana/GraficaSemanal'
 import { marcarTerminos } from '../../lib/entrenamiento/oficio/progreso'
 
 // "a **b** c" → [{b:false,t:'a '},{b:true,t:'b'},{b:false,t:' c'}]
@@ -85,7 +87,7 @@ function Tabla({ bloque }) {
   )
 }
 
-export default function BloquesOficio({ bloques, terminos }) {
+export default function BloquesOficio({ bloques, terminos, centroId }) {
   // Un solo Set por render: el auto-enlace no repite el mismo término párrafo
   // tras párrafo, solo la primera vez que aparece en el módulo.
   const ya = new Set()
@@ -110,6 +112,19 @@ export default function BloquesOficio({ bloques, terminos }) {
                 <p>{renderRico({ texto: b.texto, terminos, ya })}</p>
               </div>
             )
+          case 'grafica':
+            return <figure key={i} style={{ margin: '24px 0' }}>
+              <figcaption><strong>{b.titulo}</strong><p>{b.texto}</p></figcaption>
+              <GraficaSemanal titulo={b.titulo} puntos={b.puntos} inversa={b.inversa} unidad={b.unidad} />
+              <Tabla bloque={{ encabezados: ['Cierre', 'Valor', 'Cuota aprobada'], filas: b.puntos.map((p) => [p.semanaFin, p.valor == null ? 'Sin dato' : `${p.valor} ${b.unidad}`, p.cuota == null ? 'Sin cuota aprobada en este ejemplo' : String(p.cuota)]) }} />
+            </figure>
+          case 'enlaces':
+            return <nav key={i} aria-label={b.titulo} className="ofi-nota ofi-nota--ojo">
+              <strong>{b.titulo}</strong>
+              <ul className="ofi-lista">{b.recursos.map((r) => <li key={r.href}>
+                <Link href={r.href.replace('{centroId}', encodeURIComponent(centroId))}>{r.titulo}</Link>
+              </li>)}</ul>
+            </nav>
           case 'recursos':
             return (
               <div key={i} className="ofi-nota ofi-nota--ojo">

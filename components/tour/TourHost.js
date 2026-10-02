@@ -11,9 +11,10 @@
 // conservan la key → el tour sobrevive a la navegación entre páginas.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { MODULOS } from '../../lib/entrenamiento/modulos'
+import { modulosDeRol, MODULOS } from '../../lib/entrenamiento/modulos'
 import { rutaDePaso } from '../../lib/entrenamiento/progreso'
 import manifest from '../../lib/entrenamiento/audio-catalogo'
+import { getNavigationContext } from '../../app/actions/navigation'
 import { marcarTourVisto } from '../../app/actions/entrenamiento'
 
 const ANCHO_TARJETA = 360
@@ -23,9 +24,15 @@ const AVISO_MS = 2500 // a los 2,5 s se avisa "todavía no veo…", pero se sigu
 export default function TourHost() {
   const pathname = usePathname()
   const sp = useSearchParams()
+  const [rol, setRol] = useState(null)
+  useEffect(() => {
+    let activo = true
+    getNavigationContext().then((c) => { if (activo) setRol(c?.actor?.role || 'desconocido') }).catch(() => { if (activo) setRol('desconocido') })
+    return () => { activo = false }
+  }, [])
   if (pathname?.includes('/entrenamiento/oficio')) return null
   const tourId = sp.get('tour')
-  if (!tourId) return null
+  if (!tourId || !modulosDeRol(rol).some((m) => m.id === tourId)) return null
   return <TourActivo key={tourId} tourId={tourId} />
 }
 
@@ -50,6 +57,7 @@ function TourActivo({ tourId }) {
   const [errorGuardar, setErrorGuardar] = useState('')
   const audioRef = useRef(null)
   const targetRef = useRef(null)
+  const vistosRef = useRef(new Set())
   const cardRef = useRef(null)   // para medir la altura real de la tarjeta al posicionarla
   const titleRef = useRef(null)
   const previousFocusRef = useRef(null)
@@ -80,6 +88,13 @@ function TourActivo({ tourId }) {
 
   const terminar = useCallback(async () => {
     if (!modulo || terminando) return
+    // Los recorridos históricos admiten targets no aplicables por datos o permisos.
+    const pendiente = modulo.exigeTodosLosPasos ? modulo.pasos.findIndex((p) => !vistosRef.current.has(p.id)) : -1
+    if (pendiente !== -1) {
+      setErrorGuardar('Falta ver un elemento del recorrido. Volvemos al primer paso pendiente; espera a que cargue.')
+      irA(pendiente + 1)
+      return
+    }
     setTerminando(true); setErrorGuardar('')
     try {
       const r = await marcarTourVisto(modulo.id)
@@ -89,7 +104,7 @@ function TourActivo({ tourId }) {
       setErrorGuardar('No se pudo guardar el recorrido. Revisa tu conexión y vuelve a pulsar Terminar.')
       setTerminando(false)
     }
-  }, [modulo, terminando, router, centroId])
+  }, [modulo, terminando, router, centroId, irA])
 
   // Mide el elemento del paso. Si la página lo re-creó (ya no está conectado),
   // lo vuelve a buscar por su data-tour para seguirlo; si no está, no toca rect.
@@ -119,6 +134,7 @@ function TourActivo({ tourId }) {
       const el = document.querySelector(`[data-tour="${step.target}"]`)
       if (el) {
         targetRef.current = el
+        vistosRef.current.add(step.id)
         try { el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }) } catch {}
         medir()
         setEstado('listo')

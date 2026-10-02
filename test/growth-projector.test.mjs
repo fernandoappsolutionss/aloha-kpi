@@ -194,7 +194,7 @@ test('separates commercial sales target from minimum for level without inventing
 
 test('retention cannot count graduates as avoidable and invalid funnels cannot produce acquisition gains', () => {
   const m = metrics({ medians: { newActives: 10, withdrawals: 10, realAttrition: 2, reincorporations: 0, invitations: 40 }, rates: { attendance: 0.5, enrollment: 0.5, activePerSale: 1 } })
-  m.issues = [{ code: 'cp_enrollment_conflict' }]
+  m.issues = [{ code: 'invalid_funnel' }]
   const r = projectGrowth({ currentChildren: 100, currentPeriod: '2026-09', metrics: m, interventions: [
     { kind: 'class_loss', baseline: 20, target: 0 }, { kind: 'invitations', baseline: 40, target: 100 },
   ] })
@@ -208,4 +208,11 @@ test('resolved classification warnings retain the conditional acquisition curve'
   const r = projectGrowth({ currentChildren: 100, currentPeriod: '2026-09', metrics: m, interventions: [{ kind: 'invitations', baseline: 40, target: 80 }] })
   assert.equal(r.scenarios.action.series[0].newActives, 20)
   assert.equal(r.acquisitionModel.provisional, true)
+})
+
+test('unknown direct sales leave invitation requirements unestimated', () => {
+  const m = metrics({ medians: { nonTrialSales: null } })
+  const result = projectGrowth({ currentChildren: 100, currentPeriod: '2026-09', metrics: m, monthlySalesTarget: 20 })
+  assert.equal(result.requirements.commercial.monthlySalesTarget, 20)
+  assert.equal(result.requirements.commercial.monthlyInvitations, null)
 })

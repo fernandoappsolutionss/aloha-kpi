@@ -45,8 +45,8 @@ test('median and percentile are deterministic for even and odd samples', () => {
 
 test('builds weighted funnel rates and separates trial from non-trial sales', () => {
   const rows = [
-    month(0, { ventas: 10, cp_invitados: 10, cp_asistieron: 5, cp_matriculados: 2 }),
-    month(1, { ventas: 20, cp_invitados: 30, cp_asistieron: 15, cp_matriculados: 9 }),
+    month(0, { ventas: 10, cp_invitados: 10, cp_asistieron: 5, cp_matriculados: 2, trialFunnel: { reliable: true, directSales: 8 } }),
+    month(1, { ventas: 20, cp_invitados: 30, cp_asistieron: 15, cp_matriculados: 9, trialFunnel: { reliable: true, directSales: 11 } }),
   ]
 
   const metrics = buildGrowthMetrics(rows)

@@ -58,11 +58,11 @@ test('corregirQuiz: 3/3 aprueba, menos no, fuera de rango no cuenta', () => {
   assert.deepEqual(corregirQuiz(null, [0, 2, 1]), { puntaje: 0, correctas: [false, false, false], aprobado: false })
 })
 
-test('hay 12 módulos con ids únicos y en orden 1..12', () => {
-  assert.equal(MODULOS.length, 12)
+test('hay 14 módulos con ids únicos y en orden 1..14', () => {
+  assert.equal(MODULOS.length, 14)
   const ids = MODULOS.map((m) => m.id)
-  assert.equal(new Set(ids).size, 12)
-  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  assert.equal(new Set(ids).size, 14)
+  assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
 })
 
 test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos y 1-3 errores', () => {

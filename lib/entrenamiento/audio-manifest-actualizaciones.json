@@ -538,5 +538,122 @@
     "bytes": 174333,
     "segundos": 21.733878,
     "generadoAt": "2026-09-07T18:10:34.445Z"
+  },
+  "semana-graficas/intro": {
+    "file": "actualizaciones/semana-graficas/intro-ac49b5fb943a.mp3",
+    "hash": "ac49b5fb943a",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 145493,
+    "segundos": 18.111565,
+    "generadoAt": "2026-10-02T14:18:38.730Z"
+  },
+  "semana-graficas/sg-1": {
+    "file": "actualizaciones/semana-graficas/sg-1-284c40e45a44.mp3",
+    "hash": "284c40e45a44",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 115400,
+    "segundos": 14.349932,
+    "generadoAt": "2026-10-02T14:18:42.219Z"
+  },
+  "semana-graficas/sg-2": {
+    "file": "actualizaciones/semana-graficas/sg-2-0da06f19f5b7.mp3",
+    "hash": "0da06f19f5b7",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 120834,
+    "segundos": 15.046531,
+    "generadoAt": "2026-10-02T14:18:45.064Z"
+  },
+  "semana-graficas/sg-3": {
+    "file": "actualizaciones/semana-graficas/sg-3-63d4710605f4.mp3",
+    "hash": "63d4710605f4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 143195,
+    "segundos": 17.832925,
+    "generadoAt": "2026-10-02T14:18:48.222Z"
+  },
+  "semana-graficas/sg-4": {
+    "file": "actualizaciones/semana-graficas/sg-4-631c10a72ddc.mp3",
+    "hash": "631c10a72ddc",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 137970,
+    "segundos": 17.182766,
+    "generadoAt": "2026-10-02T14:18:51.196Z"
+  },
+  "semana-graficas/sg-5": {
+    "file": "actualizaciones/semana-graficas/sg-5-6c067c96c852.mp3",
+    "hash": "6c067c96c852",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 152808,
+    "segundos": 19.040363,
+    "generadoAt": "2026-10-02T14:18:54.472Z"
+  },
+  "semana-plan/intro": {
+    "file": "actualizaciones/semana-plan/intro-326faed4a137.mp3",
+    "hash": "326faed4a137",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 148419,
+    "segundos": 18.483084,
+    "generadoAt": "2026-10-02T14:18:57.648Z"
+  },
+  "semana-plan/sp-1": {
+    "file": "actualizaciones/semana-plan/sp-1-5bd7e783e968.mp3",
+    "hash": "5bd7e783e968",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 125013,
+    "segundos": 15.55737,
+    "generadoAt": "2026-10-02T14:19:00.487Z"
+  },
+  "semana-plan/sp-2": {
+    "file": "actualizaciones/semana-plan/sp-2-4cc3318eb526.mp3",
+    "hash": "4cc3318eb526",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 143195,
+    "segundos": 17.832925,
+    "generadoAt": "2026-10-02T14:19:03.465Z"
+  },
+  "semana-plan/sp-3": {
+    "file": "actualizaciones/semana-plan/sp-3-74b00f5d48e9.mp3",
+    "hash": "74b00f5d48e9",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 152808,
+    "segundos": 19.040363,
+    "generadoAt": "2026-10-02T14:19:06.495Z"
+  },
+  "semana-plan/sp-4": {
+    "file": "actualizaciones/semana-plan/sp-4-4a3074e873b6.mp3",
+    "hash": "4a3074e873b6",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 119789,
+    "segundos": 14.907211,
+    "generadoAt": "2026-10-02T14:19:09.178Z"
+  },
+  "semana-plan/sp-5": {
+    "file": "actualizaciones/semana-plan/sp-5-bbbe0ca94631.mp3",
+    "hash": "bbbe0ca94631",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 130656,
+    "segundos": 16.253968,
+    "generadoAt": "2026-10-02T14:19:12.095Z"
+  },
+  "semana-plan/sp-6": {
+    "file": "actualizaciones/semana-plan/sp-6-5692f5a2d998.mp3",
+    "hash": "5692f5a2d998",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 141732,
+    "segundos": 17.647166,
+    "generadoAt": "2026-10-02T14:19:15.233Z"
   }
 }

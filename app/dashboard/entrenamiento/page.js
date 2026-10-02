@@ -45,7 +45,7 @@ export default function EntrenamientoAdminPage() {
 
   async function reiniciar(u) {
     if (!canReset) return
-    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${data.modulos.length} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando una persona nueva ocupa el puesto y usa el mismo correo.`)
+    const ok = window.confirm(`¿Borrar el progreso de ${u.nombre} en esta pantalla?\n\nVuelve a 0 de ${u.total} módulos de "cómo usar el sistema". No toca su entrenamiento de oficio ni las maniobras que le firmó su jefe entrenador.\n\nÚsalo cuando una persona nueva ocupa el puesto y usa el mismo correo.`)
     if (!ok) return
     const r = await reiniciarProgreso(u.id)
     if (r?.error) { setError(r.error); return }
@@ -91,6 +91,7 @@ export default function EntrenamientoAdminPage() {
                     <td><b>{u.nombre}</b><div className="h-sub" style={{ margin: 0 }}>{nombreDeRol(u.rol)}</div><div className="h-sub" style={{ margin: 0 }}>{u.email}</div></td>
                     <td>{u.centro}</td>
                     {data.modulos.map((m) => {
+                      if (m.roles && !m.roles.includes(u.rol)) return <td key={m.id} style={{ textAlign: 'center' }} title="No corresponde a este puesto">No aplica</td>
                       const p = u.progreso[m.id]
                       if (completado(p)) return <td key={m.id} style={{ textAlign: 'center', color: 'var(--ok)' }} title={`Quiz aprobado ${fmt(p.quizAprobadoAt)} · ${p.intentos} intento(s)`}>✓ {fmt(p.quizAprobadoAt)}</td>
                       if (p?.tourVistoAt) return <td key={m.id} style={{ textAlign: 'center', color: 'var(--warn)' }} title={`Tour visto ${fmt(p.tourVistoAt)} · ${p.intentos} intento(s) de quiz`}>tour</td>
