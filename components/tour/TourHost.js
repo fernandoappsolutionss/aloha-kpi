@@ -88,7 +88,8 @@ function TourActivo({ tourId }) {
 
   const terminar = useCallback(async () => {
     if (!modulo || terminando) return
-    const pendiente = modulo.pasos.findIndex((p) => !vistosRef.current.has(p.id))
+    // Los recorridos históricos admiten targets no aplicables por datos o permisos.
+    const pendiente = modulo.exigeTodosLosPasos ? modulo.pasos.findIndex((p) => !vistosRef.current.has(p.id)) : -1
     if (pendiente !== -1) {
       setErrorGuardar('Falta ver un elemento del recorrido. Volvemos al primer paso pendiente; espera a que cargue.')
       irA(pendiente + 1)

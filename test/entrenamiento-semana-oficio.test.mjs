@@ -137,3 +137,15 @@ test('la lección común delimita las operaciones del plan a la Administradora',
   }
   assert.ok(comun.drills[0].pasos.some((paso) => /en una hoja/.test(paso)))
 })
+
+
+test('A la vista pide hojas accesibles y reserva gráficas y fórmulas para lectura', () => {
+  const graficas = nuevos.find(m => m.id === 'of-sem-1')
+  const condiciones = nuevos.find(m => m.id === 'of-sem-2')
+  assert.deepEqual(graficas.masa, ['Una hoja para anotar valores, fechas y conclusiones.'])
+  assert.deepEqual(condiciones.masa, ['La hoja con tu lectura de gráficas del módulo anterior.', 'Una hoja para preparar objetivos con responsable, fecha y evidencia.'])
+  for (const id of ['of-sem-1', 'of-sem-2']) {
+    assert.match(GUIA[id].vista, /aparecerán más adelante, en el paso de lectura/)
+    assert.doesNotMatch(GUIA[id].vista, /Ten (delante|a la vista) las (gráficas|fórmulas)/)
+  }
+})

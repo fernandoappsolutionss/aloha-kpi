@@ -53,20 +53,37 @@ test('guiones usan solo observar; todos los targets están presentes aun sin con
   for (const p of ['app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','components/tour/TourHost.js']) assert.match(read(p), /modulosDeRol\(/)
 })
 
-test('terminar no marca progreso al omitir target ni al entrar directamente en último paso; permite terminar tras carga tardía', async () => {
+test('solo los dos recorridos nuevos exigen ver todos sus targets', () => {
+  assert.deepEqual(MODULOS.filter(m => m.exigeTodosLosPasos).map(m => m.id), ['semana-graficas', 'semana-plan'])
+})
+
+test('terminar permite omisiones históricas aplicables y rechaza omisión/deep-link de ambos tours nuevos', async () => {
   const src = read('components/tour/TourHost.js')
   const body = src.match(/const terminar = useCallback\(async \(\) => \{([\s\S]*?)\n  \}, \[modulo, terminando/)[1]
-  const vistosRef = {current: new Set()}
-  const modulo = nuevos[0]
-  let writes = 0, destino
-  const terminar = new Function('modulo','terminando','vistosRef','setErrorGuardar','irA','setTerminando','marcarTourVisto','router','centroId', `return async () => {${body}}`)(
-    modulo,false,vistosRef,()=>{},n=>{destino=n},()=>{},async()=>{writes++;return{ok:true}}, {push:()=>{}}, 1,
-  )
-  await terminar(); assert.equal(writes,0);assert.equal(destino,1)
-  modulo.pasos.slice(1).forEach(p=>vistosRef.current.add(p.id))
-  await terminar();assert.equal(writes,0);assert.equal(destino,1)
-  vistosRef.current.add(modulo.pasos[0].id)
-  await terminar();assert.equal(writes,1)
+  const ejecutar = (modulo, vistosRef) => {
+    const estado = { writes: 0, destino: null }
+    estado.terminar = new Function('modulo','terminando','vistosRef','setErrorGuardar','irA','setTerminando','marcarTourVisto','router','centroId', `return async () => {${body}}`)(
+      modulo,false,vistosRef,()=>{},n=>{estado.destino=n},()=>{},async()=>{estado.writes++;return{ok:true}}, {push:()=>{}}, 1,
+    )
+    return estado
+  }
+  for (const [id, ausente] of [['fusiones', 'fu-5'], ['cierre', 'ci-5']]) {
+    const modulo = MODULOS.find(m => m.id === id)
+    const vistosRef = {current: new Set(modulo.pasos.filter(p => p.id !== ausente).map(p => p.id))}
+    const estado = ejecutar(modulo, vistosRef)
+    await estado.terminar()
+    assert.equal(estado.writes, 1, `${id}: el target no aplicable admite omisión`)
+    assert.equal(estado.destino, null)
+  }
+  for (const modulo of nuevos) {
+    const vistosRef = {current: new Set([modulo.pasos.at(-1).id])}
+    const estado = ejecutar(modulo, vistosRef)
+    await estado.terminar(); assert.equal(estado.writes,0);assert.equal(estado.destino,1)
+    modulo.pasos.slice(1).forEach(p=>vistosRef.current.add(p.id))
+    await estado.terminar();assert.equal(estado.writes,0);assert.equal(estado.destino,1)
+    vistosRef.current.add(modulo.pasos[0].id)
+    await estado.terminar();assert.equal(estado.writes,1)
+  }
   assert.match(src, /if \(el\) \{\s*targetRef.current = el\s*vistosRef.current.add\(step.id\)/)
 })
 
