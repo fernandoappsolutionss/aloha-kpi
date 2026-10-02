@@ -32,3 +32,11 @@ test('fecha y plazo usan la zona del centro', () => {
   assert.equal(zonaHorariaCentro({ pais: 'VE' }), 'America/Caracas')
   assert.equal(zonaHorariaCentro({ pais: 'PA' }), 'America/Panama')
 })
+
+test('viernes en Caracas aún es jueves en Panamá y abre semanas distintas', () => {
+  const instante = new Date('2026-10-02T04:30:00Z')
+  assert.equal(fechaCivil(instante, 'America/Caracas'), '2026-10-02')
+  assert.equal(fechaCivil(instante, 'America/Panama'), '2026-10-01')
+  assert.equal(semanaAbierta(instante, 'America/Caracas'), '2026-10-08')
+  assert.equal(semanaAbierta(instante, 'America/Panama'), '2026-10-01')
+})

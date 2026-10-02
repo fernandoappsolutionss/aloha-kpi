@@ -12,7 +12,7 @@ const fecha = (valor) => valor?.split('-').reverse().join('/') || '—'
 const mostrarActual = (centro, codigo) => {
   const valor = actual(centro, codigo)
   if (valor != null) return mostrar(valor)
-  if (!centro.calculoAbierto) return 'Sin cálculo todavía'
+  if (!centro.calculoAbierto[codigo]) return 'Sin cálculo todavía'
   const error = codigo === 'ninos_activos' ? centro.serie.at(-1)?.detalle?.error : null
   return error === 'Falta el cierre del mes anterior.' ? error : 'Sin dato del cálculo'
 }

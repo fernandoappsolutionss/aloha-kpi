@@ -48,8 +48,9 @@ test('metadatos distinguen cálculo ausente de indicador calculado sin valor', (
   const tablero = armarTablero(centros, semanas, [
     { ...fila(1, semanas[2], 'ninos_activos', null, 'abierta'), detalle: { error: 'Falta el cierre del mes anterior.' }, calculado_at: '2026-10-02T11:00:00.000Z' },
   ])
-  assert.equal(tablero.centros[0].calculoAbierto, true)
+  assert.equal(tablero.centros[0].calculoAbierto.ninos_activos, true)
+  assert.equal(tablero.centros[0].calculoAbierto.retiros, false)
   assert.equal(tablero.centros[0].serie.at(-1).detalle.error, 'Falta el cierre del mes anterior.')
   assert.equal(tablero.centros[0].serie.at(-1).calculadoAt, '2026-10-02T11:00:00.000Z')
-  assert.equal(tablero.centros[1].calculoAbierto, false)
+  assert.equal(tablero.centros[1].calculoAbierto.ninos_activos, false)
 })

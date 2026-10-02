@@ -7,7 +7,7 @@ import { disciplinaPct } from '../../lib/checklist'
 import { hoyISO } from '../../lib/operaciones'
 import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { ninosDeclarados } from '../../lib/kpi-calc'
+import { datoNinosDeclarados } from '../../lib/kpi-calc'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { cobranzaDeclarada, evaluarProducto, semaforo, verdictoCrecimiento } from '../../lib/marcadores.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
@@ -257,12 +257,8 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     // Los niños del panel son los DECLARADOS en el KPI semanal: el mes abierto
     // no proyecta aquí; se muestran los niños con los que TERMINÓ el último
     // mes declarado (o la semilla previa al rango si no hay ninguno).
-    const ninos = ninosDeclarados(months, prev?.ninos_final_mes)
-    const ultimoDeclarado = months.filter((m) => m.declarado).at(-1)
-    const ninosDisponible = !!ultimoDeclarado || prev?.ninos_final_mes != null
-    const fuenteMes = ultimoDeclarado || (ninosDisponible ? { year: py, month: pm } : null)
-    const ninosPeriodoFin = fuenteMes ? new Date(Date.UTC(fuenteMes.year, fuenteMes.month, 0)).toISOString().slice(0, 10) : null
-    const ninosFuente = ultimoDeclarado ? 'KPI mensual declarado' : ninosDisponible ? 'resumen_mes previo al período' : null
+    const datoNinos = datoNinosDeclarados(months, prev?.ninos_final_mes, { year: py, month: pm })
+    const ninos = datoNinos.valor
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
@@ -320,7 +316,8 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const ninosGrupo = grupos > 0 ? ninos / grupos : 0
     const gpnBajo = grupos > 0 && ninosGrupo < metaGpn
     return {
-      id: c.id, nombre: c.nombre, admin, ninos, ninosDisponible, ninosPeriodoFin, ninosFuente,
+      id: c.id, nombre: c.nombre, admin, ninos,
+      ninosDisponible: datoNinos.disponible, ninosPeriodoFin: datoNinos.periodoFin, ninosFuente: datoNinos.fuente,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,

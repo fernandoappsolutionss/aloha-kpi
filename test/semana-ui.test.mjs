@@ -64,9 +64,11 @@ test('semana recién abierta y cálculo sin dato tienen mensajes diferentes', ()
   const mostrarActual = source.match(/const mostrarActual = [\s\S]*?\n}/)?.[0]
   const { mostrar } = runInNewContext(`${helpers.join(';\n')};\n${mostrarActual};\n({ mostrar: mostrarActual })`)
   const base = { abierta: { ninos_activos: null }, serie: [{ detalle: { error: 'Falta el cierre del mes anterior.' } }] }
-  assert.equal(mostrar({ ...base, calculoAbierto: false }, 'ninos_activos'), 'Sin cálculo todavía')
-  assert.equal(mostrar({ ...base, calculoAbierto: true }, 'ninos_activos'), 'Falta el cierre del mes anterior.')
-  assert.equal(mostrar({ ...base, calculoAbierto: true, abierta: { ninos_activos: 0 } }, 'ninos_activos'), '0')
+  assert.equal(mostrar({ ...base, calculoAbierto: { ninos_activos: false } }, 'ninos_activos'), 'Sin cálculo todavía')
+  assert.equal(mostrar({ ...base, calculoAbierto: { ninos_activos: true, retiros: false } }, 'ninos_activos'), 'Falta el cierre del mes anterior.')
+  assert.equal(mostrar({ ...base, calculoAbierto: { ninos_activos: true, retiros: false } }, 'retiros'), 'Sin cálculo todavía')
+  assert.equal(mostrar({ ...base, calculoAbierto: { facturas_vencidas: true } }, 'facturas_vencidas'), 'Sin dato del cálculo')
+  assert.equal(mostrar({ ...base, calculoAbierto: { ninos_activos: true }, abierta: { ninos_activos: 0 } }, 'ninos_activos'), '0')
 })
 
 test('plan y tablero muestran condición, estado y discrepancia', () => {
