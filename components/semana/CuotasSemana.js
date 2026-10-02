@@ -41,7 +41,7 @@ export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, c
             return <tr key={meta.codigo}>
               <th scope="row">{meta.nombre}</th>
               <td>{mostrar(resumen[meta.codigo]?.cerrada)}</td>
-              <td>{mostrar(cuota.propuesta)}</td>
+              <td>{mostrar(cuota.propuesta)}<p className="h-sub" style={{ maxWidth: 300, whiteSpace: 'normal' }}>{cuota.explicacion}</p></td>
               <td>{puedeEscribir ? <input aria-label={`Cuota de ${meta.nombre}`} className="input num" type="number" inputMode="numeric" min="0" step="1" value={valores[meta.codigo] ?? ''} onChange={(event) => setValores((anterior) => ({ ...anterior, [meta.codigo]: event.target.value }))} /> : mostrar(cuota.cuota)}</td>
               <td>{cuota.estado === 'aprobada' ? 'Aprobada' : cuota.estado === 'propuesta' ? 'Propuesta' : 'Sin guardar'}</td>
             </tr>

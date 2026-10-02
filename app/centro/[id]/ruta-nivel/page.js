@@ -15,6 +15,9 @@ import {
 } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
+import TrabajoSemanal from '../../../../components/semana/TrabajoSemanal'
+import GuiaRutaPlan from '../../../../components/semana/GuiaRutaPlan'
+import { getSemanaCentro } from '../../../actions/semana'
 import { getCentroGrowth, updateGrowthRecommendation } from '../../../actions/growth'
 import {
   confidenceMeta,
@@ -42,6 +45,8 @@ const KIND_LABELS = {
 }
 
 const STATUS_LABELS = {
+  superseded: 'Sustituida por datos actuales',
+  expired: 'Vencida',
   completed: 'Tarea realizada',
   dismissed: 'Descartada',
   postponed: 'Pospuesta 7 días',
@@ -101,6 +106,8 @@ function etaLabel(scenario, confidence) {
 
 export default function GrowthRoutePage() {
   const { id } = useParams()
+  const [semana, setSemana] = useState(null)
+  const [errorSemana, setErrorSemana] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -114,8 +121,15 @@ export default function GrowthRoutePage() {
     setLoading(true)
     setError('')
     setData(null)
+    setSemana(null)
+    setErrorSemana('')
     getCentroGrowth(id)
-      .then((result) => { if (alive) setData(result) })
+      .then(async (result) => {
+        if (!alive) return
+        setData(result)
+        try { const weekly = await getSemanaCentro(id); if (alive) { setSemana(weekly); setErrorSemana('') } }
+        catch { if (alive) setErrorSemana('No se pudo cargar el plan semanal. Reintenta para trabajar las cuotas y la condición.') }
+      })
       .catch((cause) => {
         console.error('[GrowthRoutePage]', cause)
         if (alive) setError('No se pudo calcular la ruta de crecimiento.')
@@ -123,6 +137,13 @@ export default function GrowthRoutePage() {
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [id])
+
+  async function refrescarPlan() {
+    const growth = await getCentroGrowth(id)
+    setData(growth)
+    setSemana(await getSemanaCentro(id))
+    setErrorSemana('')
+  }
 
   const chartRows = useMemo(() => scenarioChartRows(data?.projection, { history: data?.metrics?.months, currentPeriod: data?.operational?.currentPeriod, startPeriod: data?.metrics?.window?.startPeriod }), [data])
 
@@ -157,7 +178,7 @@ export default function GrowthRoutePage() {
     setRecommendationError('')
     try {
       const updated = await updateGrowthRecommendation(id, recommendationId, command)
-      if (updated.growth) setData(updated.growth)
+      if (updated.growth) { setData(updated.growth); setSemana(await getSemanaCentro(id)) }
       else {
         setData(current => ({ ...current, recommendations: current.recommendations.map(item => String(item.id) === String(updated.id) ? { ...item, ...updated } : item) }))
         setRecommendationError(updated.refreshError || 'La decisión se guardó. Actualiza el escenario.')
@@ -180,9 +201,11 @@ export default function GrowthRoutePage() {
             <h1 className="h-title">Ruta al Próximo Nivel</h1>
             <p className="h-sub">{center.nombre} · actualización {data.snapshotDate}</p>
           </div>
-          <Link className="btn btn--primary" href={`/centro/${id}/semana#plan-batalla`}>Abrir plan de batalla semanal</Link>
+          <a className="btn btn--primary" href="#trabajo-semanal">Preparar mes y plan de batalla</a>
         </header>
 
+        <GuiaRutaPlan centroId={id} />
+        <nav aria-label="Recorrido de la ruta" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}><a className="btn" href="#projection-title">Proyección al nivel</a><a className="btn" href="#compromiso-mensual">Meta mensual</a><a className="btn" href="#semana-cuotas-title">Cinco cuotas</a><a className="btn" href="#plan-batalla">Condición y fórmula</a></nav>
         <section className="growth-overview" aria-labelledby="growth-overview-title">
           <div className="growth-overview__main">
             <div className="growth-overview__eyebrow">
@@ -303,6 +326,8 @@ export default function GrowthRoutePage() {
           <strong>Precisión histórica</strong>
           <span>{metrics.precision?.sampleSize >= 6 ? `${metrics.precision.sampleSize} cierres evaluados · error medio ${metrics.precision.engineMae ?? '—'} niños` : `Aún sin muestra suficiente: ${metrics.precision?.sampleSize || 0} cierres evaluados. La calidad de los datos no equivale a precisión del pronóstico.`}</span>
         </div>
+        {errorSemana && <p className="alert alert--error" role="alert">{errorSemana} <button className="btn" onClick={() => refrescarPlan().catch(() => setErrorSemana('No se pudo cargar el plan. Intenta nuevamente.'))}>Reintentar plan</button></p>}
+        {semana && <TrabajoSemanal centroId={id} datos={semana} siguienteNivel={next} onRefresh={refrescarPlan} />}
         <section className="growth-section" aria-labelledby="actions-title">
           <div className="growth-section__head">
             <div>

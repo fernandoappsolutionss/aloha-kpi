@@ -5,6 +5,7 @@
 // Server Component: la prosa del catálogo se queda en el servidor y al
 // navegador solo baja lo que se pinta.
 import Link from 'next/link'
+import GuiaRutaPlan from '../../../../../components/semana/GuiaRutaPlan'
 import Sidebar from '../../../../../components/Sidebar'
 import CentroNavigation from '../../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../../actions/centros'
@@ -71,6 +72,7 @@ export default async function OficioPage({ params, searchParams }) {
           barrido R10. */}
       <main className="main ent-page" id="main-content" data-page-state={estado}>
         <CentroNavigation centroId={id} section="entrenamiento" />
+        <GuiaRutaPlan centroId={id} />
         {contenido}
       </main>
     </div>
