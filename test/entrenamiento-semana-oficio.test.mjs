@@ -120,3 +120,20 @@ test('las maniobras por puesto exigen operación real supervisada, guardado y re
     assert.match(practica.gradiente, /Si todavía no hay una tarea real válida, espera/)
   }
 })
+
+test('la lección común delimita las operaciones del plan a la Administradora', () => {
+  const comun = nuevos.find((m) => m.id === 'of-sem-2')
+  assert.equal(comun.roles.length, 4)
+  assert.match(comun.sop.cuando, /Administradora.*ejecuta/)
+  assert.match(comun.sop.cuando, /demás puestos ensayan en una hoja/)
+  const aviso = comun.bloques.find((b) => b.titulo === 'Qué hace cada puesto')
+  assert.match(aviso.texto, /Asistente, coach y coordinación analizan y ensayan.*hoja/)
+  assert.match(aviso.texto, /práctica de su puesto con sus permisos habituales/)
+  const operativos = comun.bloques.filter((b) => b.t === 'pasos' && !b.formula)
+  for (const paso of [...comun.sop.pasos, ...operativos.flatMap((b) => b.items)]) {
+    if (/elige|guarda|agrega|pulsa|marca/i.test(paso)) {
+      assert.match(paso, /^La Administradora /, `operación común sin delimitar autoridad: ${paso}`)
+    }
+  }
+  assert.ok(comun.drills[0].pasos.some((paso) => /en una hoja/.test(paso)))
+})
