@@ -7,7 +7,7 @@ import { colorCondicion, nombreCondicion } from '../../../lib/condiciones/formul
 import { getReunionSemanal, aprobarCuotas, agregarOrden } from '../../actions/semana'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
-const estados = { sin_condicion: 'Sin condición', incompleto: 'Plan incompleto', completo: 'Plan completo' }
+const estados = { sin_condicion: 'Pendiente de asignar condición', incompleto: 'Plan incompleto', completo: 'Plan completo' }
 
 export default function ReunionSemanalPage() {
   const [datos, setDatos] = useState(null)
@@ -57,7 +57,7 @@ export default function ReunionSemanalPage() {
         {datos.centros.map((centro) => <section className="panel semana-reunion__centro" key={centro.id} aria-labelledby={`reunion-centro-${centro.id}`}>
           <div className="panel__head semana-reunion__head"><div><h2 className="panel__title" id={`reunion-centro-${centro.id}`}>{centro.nombre}</h2><p className="h-sub">Niños activos: {mostrar(centro.cerrada.ninos_activos)} · Δ última cerrada: {centro.deltaCerrada == null ? 'Sin dato' : `${centro.deltaCerrada > 0 ? '+' : ''}${centro.deltaCerrada}`}</p></div><Link className="btn" href={`/centro/${centro.id}/semana`}>Abrir Semana</Link></div>
           <GraficaSemanal puntos={centro.serie} titulo={`Niños activos de ${centro.nombre}`} unidad="niños" compacta />
-          <div className="semana-reunion__estado"><span>{centro.condicion ? <span className="semana-condicion" style={{ '--condicion-color': colorCondicion(centro.condicion) }}>{nombreCondicion(centro.condicion)}</span> : 'Sin condición'}</span><span className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>{estados[centro.estadoPlan] || 'Sin condición'}</span><span>Lectura: {centro.lectura.condicion ? nombreCondicion(centro.lectura.condicion) : 'Sin dato'}</span></div>
+          <div className="semana-reunion__estado"><span>Condición asignada: {centro.condicion ? <span className="semana-condicion" style={{ '--condicion-color': colorCondicion(centro.condicion) }}>{nombreCondicion(centro.condicion)}</span> : 'Sin asignar'}</span><span className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>Estado del plan: {estados[centro.estadoPlan] || 'Pendiente'}{centro.plazoVencido && centro.estadoPlan !== 'completo' ? ' · Plazo vencido' : ''}</span><span>Lectura automática: {centro.lectura.condicion ? nombreCondicion(centro.lectura.condicion) : 'Sin dato'}</span></div>
           {centro.discrepancia && <p role="alert" className="alert alert--error">La condición asignada está por encima de lo que muestra la gráfica.</p>}
           <h3>Cuotas de la semana abierta</h3>
           <ul className="semana-reunion__cuotas">{datos.catalogo.map((meta) => <li key={meta.codigo}><span>{meta.nombre}</span><strong>{mostrar(centro.cuotas[meta.codigo]?.cuota ?? centro.cuotas[meta.codigo]?.propuesta)}</strong><span className="label">{centro.cuotas[meta.codigo]?.estado === 'aprobada' ? 'Aprobada' : centro.cuotas[meta.codigo]?.cuota != null ? 'Propuesta' : 'Sugerida'}</span></li>)}</ul>

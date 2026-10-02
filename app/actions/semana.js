@@ -10,7 +10,7 @@ import { calcularSemanaCentro, guardarSemanaCentro, leerSerieCentros } from '../
 import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion } from '../../lib/plan-semana-servicio.js'
 import { enriquecerTableroConPlanes } from '../../lib/plan-semana.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
-import { prepararCuotas, porcentajeCuotasCumplidas, ordenarReunion, periodosCentro } from '../../lib/cuotas-semana.mjs'
+import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro } from '../../lib/cuotas-semana.mjs'
 import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn } from '../../lib/cuotas-semana-servicio.js'
 
 async function vistaCentro(centroId, session) {
@@ -103,8 +103,9 @@ async function cargarTablero() {
     const conPlan = enriquecerTableroConPlanes([base], planCentro, objetivos, periodo.ultimaCerrada, now)[0]
     const { series, resumen } = armarSeries(periodo.semanas, propias)
     const cuotaVista = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas: cuotasCentro, metas: metasPorSemana.get(periodo.semanaAbierta), semanaAbierta: periodo.semanaAbierta, hoy: periodo.hoy })
+    const evaluacionCuotas = evaluarCuotasCerradas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: cuotasCentro, semanaFin: periodo.ultimaCerrada })
     return { ...conPlan, semanaAbierta: periodo.semanaAbierta, ultimaCerrada: periodo.ultimaCerrada, serie: cuotaVista.series.ninos_activos, cuotas: cuotaVista.cuotas,
-      cuotasCumplidas: porcentajeCuotasCumplidas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: cuotasCentro, semanaFin: periodo.ultimaCerrada }),
+      cuotasCumplidas: evaluacionCuotas.porcentaje, evaluacionCuotas,
       puedeAprobar: esAdminDe(sesion, centro.id),
       lectura: lecturaCondicion(base.serie.filter((punto) => punto.semanaFin <= periodo.ultimaCerrada).map((punto) => punto.valor)) }
   })
