@@ -353,5 +353,35 @@
     "hash": "df7fc8c70ba6",
     "file": "oficio/of-cop-12.mp3",
     "seg": 49
+  },
+  "oficio/of-sem-1": {
+    "hash": "67cda651219b",
+    "file": "oficio/of-sem-1.mp3",
+    "seg": 40
+  },
+  "oficio/of-sem-2": {
+    "hash": "2009989eca0c",
+    "file": "oficio/of-sem-2.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-adm": {
+    "hash": "592db76dae9a",
+    "file": "oficio/of-sem-adm.mp3",
+    "seg": 43
+  },
+  "oficio/of-sem-asi": {
+    "hash": "e8691d6ce2b2",
+    "file": "oficio/of-sem-asi.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-coa": {
+    "hash": "6eb17b191ad7",
+    "file": "oficio/of-sem-coa.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-cop": {
+    "hash": "3c531055183e",
+    "file": "oficio/of-sem-cop.mp3",
+    "seg": 42
   }
 }
