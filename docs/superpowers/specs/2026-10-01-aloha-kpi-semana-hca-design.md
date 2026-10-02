@@ -27,7 +27,7 @@ Que ALOHA se dirija con la tecnología administrativa de Hubbard: cada centro ti
 |---|---|---|---|---|
 | `ninos_activos` | Niños activos al cierre | nivel | no | Cierre del mes anterior (`cierreMesAnterior` de `lib/cadena`) + inicios de clase del mes con inicio ≤ jueves + reincorporaciones del mes con fecha ≤ jueves − retiros operativos del mes con fecha ≤ jueves. Es el mismo balance del KPI mensual cortado en el jueves: si el jueves es el último día del mes, debe coincidir con el balance vivo del mes. |
 | `nuevos_inscritos` | Nuevos inscritos | flujo | no | Primer evento global de inscripción de cada niño (mismo canónico que `lib/kpi-semanal-auto.mjs`), sin traslados ni matrículas anuladas, con fecha dentro de la semana. |
-| `retiros` | Retiros | flujo | sí | Retiros operativos (`retirosActivosMes`) de los meses que toca la semana, con fecha dentro de la semana y motivo distinto de graduado. Un retiro sin fecha no entra en ninguna semana. |
+| `retiros` | Retiros | flujo | sí | Retiros operativos (`retirosActivosMes`) de los meses que toca la semana, con fecha dentro de la semana y motivo distinto de graduado. Un retiro sin fecha cuenta el último día de su mes, igual que en el balance mensual: así la caída de niños activos y el retiro aparecen en la misma semana. |
 | `facturas_vencidas` | Facturas de mensualidad vencidas | nivel | sí | El último conteo diario del cron de Zoho dentro de la semana (jueves; si falta, el día hábil anterior más cercano de la misma semana). Se lee de `kpi_semanas.cob_dN` con `semanaDiaKpi`. |
 | `cp_asistidas` | Clases de prueba asistidas | flujo | no | Suma de `stats.attended` del CRM en clases realizadas (`published`/`completed`) cuya fecha civil cae dentro de la semana. |
 

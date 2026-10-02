@@ -7,6 +7,7 @@ import NivelBadge from '../../components/NivelBadge'
 import TableScroller from '../../components/TableScroller'
 import OperationalCard from '../../components/OperationalCard'
 import MeasuredChart from '../../components/MeasuredChart'
+import TableroSemanal from '../../components/semana/TableroSemanal'
 import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
@@ -124,6 +125,8 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        <TableroSemanal />
 
         {/* KPI cards */}
         {loading ? <p role="status">Cargando panel…</p> : error ? <p role="alert" className="alert alert--error">{error}</p> : <>

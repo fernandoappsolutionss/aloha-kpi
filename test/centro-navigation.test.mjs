@@ -3,10 +3,11 @@ import assert from 'node:assert/strict'
 import { hrefKpiMensual, seccionesCentro } from '../components/centro-navigation.mjs'
 import { hrefActivo } from '../components/nav-activo.mjs'
 
-test('KPI Mensual reúne sus cinco pantallas dentro del centro seleccionado', () => {
+test('KPI Mensual reúne sus seis pantallas dentro del centro seleccionado', () => {
   const links = seccionesCentro(21)
-  assert.deepEqual(links.map(({ label }) => label), ['KPI Mensual', 'Cumplimiento', 'Encuestas', 'Peticiones', 'Historial'])
-  assert.equal(links[3].href, '/centro/21/peticiones')
+  assert.deepEqual(links.map(({ label }) => label), ['KPI Mensual', 'Semana', 'Cumplimiento', 'Encuestas', 'Peticiones', 'Historial'])
+  assert.equal(links[1].href, '/centro/21/semana')
+  assert.equal(links[4].href, '/centro/21/peticiones')
   assert.equal(hrefKpiMensual('/centro/21/foda'), '/centro/21/kpi')
   assert.equal(hrefKpiMensual('/centro/21/semana'), '/centro/21/kpi')
   const menu = ['/centro/21', '/centro/21/kpi', '/centro/21/grupos', '/centro/21/entrenamiento']
