@@ -13,7 +13,10 @@ const tieneFiscal = (plan) => plan.some((m) => FIS.includes(m.id))
 test('fiscal: entra al plan de administradora y asistente SOLO en Los Naranjos', () => {
   for (const rol of ['administradora', 'asistente']) {
     const naranjos = planDeRol(rol, MODULOS_OFICIO, CENTRO_LOS_NARANJOS)
-    assert.deepEqual(naranjos.slice(-2).map((m) => m.id), FIS, `${rol}: los dos fiscales cierran su plan en Los Naranjos`)
+    const semanales = new Set(['of-sem-1', 'of-sem-2', 'of-sem-adm', 'of-sem-asi', 'of-sem-coa', 'of-sem-cop'])
+    const previo = naranjos.filter((m) => !semanales.has(m.id))
+    assert.deepEqual(previo.slice(-2).map((m) => m.id), FIS, `${rol}: conserva el cierre fiscal del plan anterior`)
+    assert.deepEqual(naranjos.slice(-3).map((m) => m.id), ['of-sem-1', 'of-sem-2', rol === 'administradora' ? 'of-sem-adm' : 'of-sem-asi'])
     assert.equal(tieneFiscal(planDeRol(rol, MODULOS_OFICIO, 3)), false, `${rol}: otro centro no lo recibe`)
     assert.equal(tieneFiscal(planDeRol(rol, MODULOS_OFICIO)), false, `${rol}: sin centro, fuera (fail-closed)`)
     // El resto del plan no cambia por el centro.
