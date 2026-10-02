@@ -41,6 +41,34 @@ test('tablero muestra Sin dato si la semana abierta falla, aunque la cerrada ten
   assert.equal(mostrar(actual({ abierta: { ninos_activos: null }, cerrada: { ninos_activos: 12 } }, 'ninos_activos')), 'Sin dato')
 })
 
+test('panel distingue períodos, cobertura y fuente del dato mensual', () => {
+  const tablero = read('../components/semana/TableroSemanal.js')
+  const dashboard = read('../app/dashboard/page.js')
+  const action = read('../app/actions/dashboard.js')
+  assert.match(tablero, /centro\.semanaAbierta/)
+  assert.match(tablero, /centro\.ultimaCerrada/)
+  assert.match(tablero, /centro\.zonaHoraria/)
+  assert.match(tablero, /p\.subtotal/)
+  assert.match(tablero, /p\.disponibles.*p\.total/)
+  assert.match(tablero, /Sin cálculo todavía/)
+  assert.match(tablero, /Sin dato del cálculo/)
+  assert.match(dashboard, /último dato mensual declarado/)
+  assert.match(dashboard, /fechaDato\(c\)/)
+  assert.match(action, /ninosPeriodoFin/)
+  assert.match(action, /ninosFuente/)
+})
+
+test('semana recién abierta y cálculo sin dato tienen mensajes diferentes', () => {
+  const source = read('../components/semana/TableroSemanal.js')
+  const helpers = source.match(/^const (mostrar|actual) = .*$/gm)
+  const mostrarActual = source.match(/const mostrarActual = [\s\S]*?\n}/)?.[0]
+  const { mostrar } = runInNewContext(`${helpers.join(';\n')};\n${mostrarActual};\n({ mostrar: mostrarActual })`)
+  const base = { abierta: { ninos_activos: null }, serie: [{ detalle: { error: 'Falta el cierre del mes anterior.' } }] }
+  assert.equal(mostrar({ ...base, calculoAbierto: false }, 'ninos_activos'), 'Sin cálculo todavía')
+  assert.equal(mostrar({ ...base, calculoAbierto: true }, 'ninos_activos'), 'Falta el cierre del mes anterior.')
+  assert.equal(mostrar({ ...base, calculoAbierto: true, abierta: { ninos_activos: 0 } }, 'ninos_activos'), '0')
+})
+
 test('plan y tablero muestran condición, estado y discrepancia', () => {
   const plan = read('../components/semana/PlanSemana.js')
   assert.match(plan, /Más condiciones/)

@@ -258,6 +258,11 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     // no proyecta aquí; se muestran los niños con los que TERMINÓ el último
     // mes declarado (o la semilla previa al rango si no hay ninguno).
     const ninos = ninosDeclarados(months, prev?.ninos_final_mes)
+    const ultimoDeclarado = months.filter((m) => m.declarado).at(-1)
+    const ninosDisponible = !!ultimoDeclarado || prev?.ninos_final_mes != null
+    const fuenteMes = ultimoDeclarado || (ninosDisponible ? { year: py, month: pm } : null)
+    const ninosPeriodoFin = fuenteMes ? new Date(Date.UTC(fuenteMes.year, fuenteMes.month, 0)).toISOString().slice(0, 10) : null
+    const ninosFuente = ultimoDeclarado ? 'KPI mensual declarado' : ninosDisponible ? 'resumen_mes previo al período' : null
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
@@ -315,7 +320,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const ninosGrupo = grupos > 0 ? ninos / grupos : 0
     const gpnBajo = grupos > 0 && ninosGrupo < metaGpn
     return {
-      id: c.id, nombre: c.nombre, admin, ninos,
+      id: c.id, nombre: c.nombre, admin, ninos, ninosDisponible, ninosPeriodoFin, ninosFuente,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,
