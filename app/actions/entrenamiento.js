@@ -6,7 +6,7 @@
 import { sql } from '../../lib/db'
 import { requireSession, requireCurrentUser, requireCurrentMaster, requireCurrentTraining, isAdminRole } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
-import { MODULOS } from '../../lib/entrenamiento/modulos'
+import { modulosDeRol, MODULOS } from '../../lib/entrenamiento/modulos'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas'
 import { corregirQuiz, porcentaje } from '../../lib/entrenamiento/progreso'
 
@@ -54,9 +54,9 @@ export async function cargarProgreso() {
 // null para gerencia: admin_general/supervisor no se entrenan (spec §14).
 export async function resumenProgreso() {
   return runAction('resumenProgreso', async () => {
-    const s = await requireSession()
+    const s = await requireCurrentUser()
     if (isAdminRole(s.rol) || s.rol === 'coordinador') return null
-    return porcentaje(await progresoDeSesion(), MODULOS)
+    return porcentaje(await progresoDeSesion(), modulosDeRol(s.rol))
   })
 }
 
@@ -66,6 +66,7 @@ export async function marcarTourVisto(modulo) {
   return runAction('marcarTourVisto', async () => {
     const u = await requireCurrentTraining()
     if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
+    if (!modulosDeRol(u.rol).some((m) => m.id === modulo)) return { error: 'Este recorrido no corresponde a tu puesto.' }
     await sql`
       INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
       VALUES (${u.id}, ${modulo}, now(), now())
@@ -82,6 +83,7 @@ export async function responderQuiz(modulo, respuestas) {
   return runAction('responderQuiz', async () => {
     const u = await requireCurrentTraining()
     if (!MODULO_IDS.has(modulo)) return { error: 'Módulo desconocido.' }
+    if (!modulosDeRol(u.rol).some((m) => m.id === modulo)) return { error: 'Este recorrido no corresponde a tu puesto.' }
     // Forma estricta: 3 enteros. Un payload malformado no cuenta como intento.
     const r = Array.isArray(respuestas) ? respuestas : null
     if (!r || r.length !== 3 || !r.every(Number.isInteger)) return { error: 'Respuestas inválidas.' }
@@ -118,11 +120,11 @@ export async function matrizProgreso(centroId = null) {
     const porUsuario = {}
     for (const r of rows) (porUsuario[r.usuario_id] ||= {})[r.modulo] = aCamel(r)
     return {
-      modulos: MODULOS.map((m) => ({ id: m.id, titulo: m.titulo })),
+      modulos: MODULOS.map((m) => ({ id: m.id, titulo: m.titulo, roles: m.roles || null })),
       usuarios: usuarios.map((u) => {
         const progreso = porUsuario[u.id] || {}
-        const p = porcentaje(progreso, MODULOS)
-        return { id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, centro: u.centro || '—', centroId: u.centro_id, progreso, completados: p.completados, pct: p.pct }
+        const p = porcentaje(progreso, modulosDeRol(u.rol))
+        return { id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, centro: u.centro || '—', centroId: u.centro_id, progreso, completados: p.completados, total: p.total, pct: p.pct }
       }),
     }
   })

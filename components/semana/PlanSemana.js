@@ -85,7 +85,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   const objetivos = datos.objetivos || []
   const sinCondicion = !datos.plan.condicion
   const estrategico = datos.estrategico.map((item) => ({ ...item, ...accionesGuardadas[item.id] })).filter((item) => !['completed', 'dismissed'].includes(item.status))
-  return <section id="plan-batalla" className="panel semana-plan" aria-labelledby="semana-plan-title">
+  return <section data-tour="semana.plan" id="plan-batalla" className="panel semana-plan" aria-labelledby="semana-plan-title">
     <div className="panel__head semana-plan__head"><div><p className="label">Plan de batalla</p><h2 id="semana-plan-title" className="panel__title">Condición y plan — semana que cerró el {semanaFin}</h2></div>
       <div className={datos.plazoVencido && datos.estado !== 'completo' ? 'semana-plan--vencido' : ''}><strong>{estado}</strong><p className="h-sub">Plazo: viernes 10:00</p></div>
     </div>
@@ -94,6 +94,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {'lectura' in datos && <p className="h-sub">Lectura automática de la gráfica: {datos.lectura.condicion ? nombreCondicion(datos.lectura.condicion) : 'Sin dato'} ({datos.lectura.motivo})</p>}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
 
+    <div data-tour="semana.condicion">
     {!sinCondicion && !cambiando && <div className="semana-plan__condicion"><span className="semana-condicion" style={{ '--condicion-color': colorCondicion(datos.plan.condicion) }}>{nombreCondicion(datos.plan.condicion)}</span>
       {puedeAsignar && <button type="button" className="btn" onClick={() => setCambiando(true)}>Cambiar</button>}</div>}
     {(sinCondicion || cambiando) && (puedeAsignar ? <div className="semana-plan__selector">
@@ -107,11 +108,15 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
       <div className="semana-plan__acciones"><button type="button" className="btn btn--primary" disabled={!seleccion || ocupado} onClick={async () => { if (await ejecutar(() => asignarCondicion(centroId, semanaFin, { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante }))) setCambiando(false) }}>Guardar condición</button>{cambiando && <button type="button" className="btn" onClick={() => setCambiando(false)}>Cancelar</button>}</div>
     </div> : <p className="h-sub">{puedeEscribir ? 'La condición la asigna la administradora' : 'Condición pendiente de asignación.'}</p>)}
 
+    </div>
+    <div data-tour="semana.formula">
+    {sinCondicion && <p className="h-sub">La fórmula y sus objetivos aparecerán al asignar la condición.</p>}
     {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula</h3><ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><p>{texto}</p>
       <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion="formula" paso={paso} ejecutar={ejecutar} ocupado={ocupado} />}
     </li>)}</ol></section>}
 
+    </div>
     {[['urgente', 'Urgentes'], ['pendiente', 'Pendientes'], ['orden', 'Órdenes del coordinador']].map(([seccion, titulo]) => <section className="semana-plan__seccion" key={seccion}><h3>{titulo}</h3>
       <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && seccion !== 'orden' && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion={seccion} ejecutar={ejecutar} ocupado={ocupado} />}
