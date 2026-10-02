@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CONDICIONES, colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.mjs'
 import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo } from '../../app/actions/semana'
+import { updateGrowthRecommendation } from '../../app/actions/growth'
 
 const fechaInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''
 
@@ -55,6 +56,8 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   const [mas, setMas] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const [accionesGuardadas, setAccionesGuardadas] = useState({})
   useEffect(() => {
     setSeleccion(datos.plan.condicion || '')
     setAlcance(datos.plan.alcance_peligro || 'personal')
@@ -63,21 +66,32 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   }, [datos.plan.condicion, datos.plan.alcance_peligro, datos.plan.variante_afluencia])
 
   async function ejecutar(work) {
-    setOcupado(true); setError('')
-    try { await work(); await onRefresh(); return true }
-    catch (e) { setError(e?.message || 'No se pudo guardar el plan.'); return false }
+    setOcupado(true); setError(''); setMensaje('')
+    let guardado = false
+    try { await work(); guardado = true; await onRefresh(); return true }
+    catch (e) { setError(guardado ? 'Los cambios se guardaron. No se pudo actualizar la vista; recarga sin repetir la acción.' : e?.message || 'No se pudo guardar el plan.'); return false }
     finally { setOcupado(false) }
   }
 
-  const estado = datos.estado === 'completo' ? 'Plan completo' : datos.estado === 'sin_condicion' ? 'Sin condición' : `Falta un objetivo en el paso ${datos.pasoFaltante}`
+  async function seguirAccion(item, command) {
+    await ejecutar(async () => {
+      const result = await updateGrowthRecommendation(centroId, item.id, command)
+      setAccionesGuardadas((previas) => ({ ...previas, [item.id]: { status: result.status, due_date: result.due_date } }))
+      setMensaje(result.refreshError || (command === 'complete' ? 'Tarea realizada. El resultado se verificará con las próximas estadísticas.' : command === 'postpone' ? 'Acción pospuesta siete días en Ruta de Nivel y en el plan.' : 'Acción descartada en Ruta de Nivel y en el plan.'))
+    })
+  }
+
+  const estado = datos.estado === 'completo' ? 'Plan completo' : datos.estado === 'sin_condicion' ? 'Pendiente de asignar condición' : `Falta un objetivo en el paso ${datos.pasoFaltante}`
   const objetivos = datos.objetivos || []
   const sinCondicion = !datos.plan.condicion
-  return <section className="panel semana-plan" aria-labelledby="semana-plan-title">
+  const estrategico = datos.estrategico.map((item) => ({ ...item, ...accionesGuardadas[item.id] })).filter((item) => !['completed', 'dismissed'].includes(item.status))
+  return <section id="plan-batalla" className="panel semana-plan" aria-labelledby="semana-plan-title">
     <div className="panel__head semana-plan__head"><div><p className="label">Plan de batalla</p><h2 id="semana-plan-title" className="panel__title">Condición y plan — semana que cerró el {semanaFin}</h2></div>
       <div className={datos.plazoVencido && datos.estado !== 'completo' ? 'semana-plan--vencido' : ''}><strong>{estado}</strong><p className="h-sub">Plazo: viernes 10:00</p></div>
     </div>
     {error && <p role="alert" className="alert alert--error">{error}</p>}
-    {'lectura' in datos && <p className="h-sub">Lectura de la gráfica: {datos.lectura.condicion ? nombreCondicion(datos.lectura.condicion) : 'Sin dato'} ({datos.lectura.motivo})</p>}
+    {mensaje && <p role="status" className="alert">{mensaje}</p>}
+    {'lectura' in datos && <p className="h-sub">Lectura automática de la gráfica: {datos.lectura.condicion ? nombreCondicion(datos.lectura.condicion) : 'Sin dato'} ({datos.lectura.motivo})</p>}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
 
     {!sinCondicion && !cambiando && <div className="semana-plan__condicion"><span className="semana-condicion" style={{ '--condicion-color': colorCondicion(datos.plan.condicion) }}>{nombreCondicion(datos.plan.condicion)}</span>
@@ -102,8 +116,15 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
       <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && seccion !== 'orden' && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion={seccion} ejecutar={ejecutar} ocupado={ocupado} />}
     </section>)}
-    <section className="semana-plan__seccion"><h3>Plan estratégico</h3><p className="h-sub">Recomendaciones pendientes de Ruta al próximo nivel · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta</Link></p>
-      <ul className="semana-plan__objetivos">{datos.estrategico.map((item) => <li className="semana-objetivo" key={item.id}><strong>{item.title}</strong><p>{item.action}</p><p className="h-sub">{item.responsible || 'Sin responsable'}{item.due_date ? ` · ${fechaInput(item.due_date)}` : ''}</p></li>)}</ul>
+    <section className="semana-plan__seccion" aria-labelledby="plan-estrategico-title"><h3 id="plan-estrategico-title">Plan estratégico · Ruta de Nivel</h3><p className="h-sub">Estas son las mismas acciones de Ruta al próximo nivel. Lo que registres aquí también se actualiza allá. · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta y su historial</Link></p>
+      {!estrategico.length && <p className="h-sub">No hay acciones estratégicas pendientes guardadas. Abre la ruta para revisar las recomendaciones del centro.</p>}
+      <ul className="semana-plan__objetivos">{estrategico.map((item) => <li className="semana-objetivo" key={item.id}><strong>{item.title}</strong><p>{item.action}</p><p className="h-sub">{item.responsible || 'Sin responsable'}{item.due_date ? ` · ${item.status === 'postponed' ? 'Pospuesta hasta ' : 'Fecha: '}${fechaInput(item.due_date)}` : ''}</p>
+        {puedeEscribir && <div className="semana-objetivo__acciones" aria-label={`Seguimiento de ${item.title}`}>
+          <button type="button" className="btn btn--primary" disabled={ocupado} onClick={() => seguirAccion(item, 'complete')}>Marcar tarea realizada</button>
+          {item.status !== 'postponed' && <button type="button" className="btn" disabled={ocupado} onClick={() => seguirAccion(item, 'postpone')}>Posponer 7 días</button>}
+          <button type="button" className="btn" disabled={ocupado} onClick={() => seguirAccion(item, 'dismiss')}>Descartar</button>
+        </div>}
+      </li>)}</ul>
     </section>
   </section>
 }

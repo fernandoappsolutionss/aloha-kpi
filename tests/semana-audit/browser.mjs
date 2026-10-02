@@ -55,7 +55,10 @@ try {
       ]).then(text => payloads.push(text)).catch(() => {}))
     }
   })
-  await open(admin, '/centro/1/semana')
+  await open(admin, '/centro/1/semana#plan-batalla')
+  const planViewport = await admin.evaluate(() => ({ top: document.getElementById('plan-batalla')?.getBoundingClientRect().top, height: innerHeight }))
+  assert.ok(planViewport.top >= 0 && planViewport.top < planViewport.height, `El acceso directo debe mostrar el plan: ${JSON.stringify(planViewport)}`)
+  pass('Enlace directo espera la carga y desplaza al plan de batalla')
   await admin.getByRole('heading', { name: 'Cuotas semanales', exact: true }).waitFor()
   assert.equal(await admin.getByRole('button', { name: 'Aprobar cuotas', exact: true }).count(), 0)
   assert.equal(await admin.getByText(/Lectura de la gráfica:/).count(), 0)

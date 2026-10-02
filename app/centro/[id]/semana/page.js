@@ -25,6 +25,10 @@ export default function SemanaPage() {
     finally { if (turno === solicitud.current) setCargando(false) }
   }
   useEffect(() => { cargar() }, [id])
+  useEffect(() => {
+    // El plan aparece después de la carga; el enlace de Ruta puede llegar antes.
+    if (!cargando && window.location.hash === '#plan-batalla') document.getElementById('plan-batalla')?.scrollIntoView({ block: 'start' })
+  }, [cargando])
 
   async function actualizar() {
     const turno = ++solicitud.current
@@ -54,6 +58,10 @@ export default function SemanaPage() {
       {cargando && <p role="status">Cargando semana…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {datos && !cargando && <>
+        <nav aria-label="Secciones de la semana" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <a className="btn" href="#semana-cuotas-title">Ir a cuotas semanales</a>
+          <a className="btn btn--primary" href="#plan-batalla">Ir al plan de batalla</a>
+        </nav>
         <div className="semana-grid">{datos.catalogo.map((meta) => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
         <CuotasSemana centroId={id} semanaFin={datos.semanaAbierta} catalogo={datos.catalogo} resumen={datos.resumen} cuotas={datos.cuotas} puedeEscribir={datos.puedeEscribir} puedeAprobar={datos.puedeAprobar} onRefresh={refrescarPlan} />
         <PlanSemana centroId={id} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} onRefresh={refrescarPlan} />

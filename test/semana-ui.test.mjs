@@ -45,7 +45,7 @@ test('plan y tablero muestran condición, estado y discrepancia', () => {
   const plan = read('../components/semana/PlanSemana.js')
   assert.match(plan, /Más condiciones/)
   assert.match(plan, /Plazo: viernes 10:00/)
-  assert.match(plan, /Lectura de la gráfica/)
+  assert.match(plan, /Lectura automática de la gráfica/)
   assert.match(plan, /Cambiar/)
   assert.match(read('../app/centro/[id]/semana/page.js'), /<PlanSemana/)
   assert.match(read('../components/semana/GraficaSemanal.js'), /colorCondicion\(p\.condicion\)/)
