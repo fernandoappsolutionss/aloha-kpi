@@ -12,7 +12,7 @@ import { encolarSyncCrm, encolarOutboxEn } from '../../lib/llenado-service'
 import { fechaLimiteNuevos } from '../../lib/llenado.mjs'
 import { generarItinerario, normalizarExcepciones, regenerarSufijo, versionesDe } from '../../lib/itinerario'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
-import { periodosAfectadosCambioInicioGrupo } from '../../lib/inicios-clase.mjs'
+import { periodosAfectadosCambioInicioGrupo, ninosReestrenadosPorFechaGrupo } from '../../lib/inicios-clase.mjs'
 import { enriquecerNinos, crearMemoPlanes, calendarioVersionadoDe, generarItinerarioVersionado } from '../../lib/plan-nino.mjs'
 import {
   grupoIniciado,
@@ -441,7 +441,8 @@ export async function actualizarGrupo(centroId, grupoId, data) {
       // FIJARLE su fecha real — sin él quedaría ineditable para siempre
       // (regresión: antes del remodelado actualizarGrupo sí la fijaba). Solo
       // aplica con la fecha actual en NULL, solo acepta fecha PASADA o de hoy
-      // (una futura sacaría al veterano del Cuadro, g1-1) y protege los meses
+      // (una futura sacaría al veterano del Cuadro, g1-1), rechaza la que
+      // re-estrenaría a sus niños como "nuevos" (más abajo) y protege los meses
       // que el inicio efectivo de sus niños pueda mover.
       const reparaFechaNull = grupoBloqueado.fecha_inicio_clases == null && inicioEditado
       const extras = clavesNoPermitidasPostInicio(data)
@@ -453,16 +454,40 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         if (fechaIso10(fechaInicio) > hoyPanama) {
           return { error: 'El grupo ya opera: su fecha de inicio de clases solo puede registrarse en el pasado (o hoy). Una fecha futura lo sacaría del Cuadro de Negocio.' }
         }
+        // Candado (agosto 2026): la fecha del grupo es su APERTURA; la del nivel
+        // que cursa vive en «Itinerario del grupo» (g2-1). Los centros
+        // escribieron aquí la del nivel y el KPI contó a sus veteranos como
+        // "nuevos" del mes (Brisas 33 en vez de 12, David 22 en vez de 3). Se
+        // rechaza toda fecha que mueva hacia adelante el inicio de algún niño.
+        // El helper compara el contexto de inicio COMPLETO (iniciosClase), así
+        // que necesita lo mismo que el Cuadro: todos los grupos, la última
+        // asistencia y los eventos inscripcion, cambio_grupo y retiro.
+        const grupos = await query`
+          SELECT id, numero, estado, fecha_inicio_clases, itinerario_clases
+          FROM grupos WHERE centro_id = ${centroId}
+        `
         const estudiantes = await query`
-          SELECT id, grupo_id, fecha_inscripcion FROM estudiantes
-          WHERE centro_id = ${centroId}
+          SELECT id, nombre, grupo_id, estado, fecha_inscripcion, ultima_asistencia
+          FROM estudiantes WHERE centro_id = ${centroId}
         `
         const eventos = await query`
           SELECT id, estudiante_id, tipo, fecha, a_grupo_id
           FROM estudiante_eventos
-          WHERE centro_id = ${centroId} AND tipo = 'inscripcion'
+          WHERE centro_id = ${centroId} AND tipo IN ('inscripcion', 'cambio_grupo', 'retiro')
           ORDER BY fecha, id
         `
+        const reestrenados = ninosReestrenadosPorFechaGrupo({
+          grupo: grupoBloqueado,
+          fechaNueva: fechaInicio,
+          grupos,
+          estudiantes,
+          eventos,
+        })
+        if (reestrenados.length) {
+          const n = reestrenados.length
+          const [anio, mes, dia] = fechaIso10(fechaInicio).split('-')
+          return { error: `Este grupo ya tenía ${n} ${n === 1 ? 'niño' : 'niños'} antes del ${dia}/${mes}/${anio}: esa fecha es el inicio de su nivel actual, no la apertura del grupo. Cárgala en «Itinerario del grupo» (nivel y fecha de inicio del nivel). Si no sabes cuándo abrió el grupo, deja vacía la fecha de inicio de clases: así cuenta como grupo que ya venía dando clases.` }
+        }
         const periodos = periodosAfectadosCambioInicioGrupo({
           grupo: grupoBloqueado,
           fechaNueva: fechaInicio,
