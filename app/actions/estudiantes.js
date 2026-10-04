@@ -20,6 +20,7 @@ import { ORIGENES_ANCLA, TIPOS_EVENTO_ANCLA, errorFechaAncla, sugerenciasAncla, 
 import { idsDeLote, preparaFijadoAncla } from '../../lib/ancla-lote.mjs'
 import { matriculaAnulada, validarSolicitudAnulacion } from '../../lib/anulacion-matricula.mjs'
 import { anularMatriculaEn } from '../../lib/anulacion-matricula-service.mjs'
+import { corregirMotivoRetiroEn } from '../../lib/motivo-retiro-service.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -1149,4 +1150,34 @@ export async function reincorporarEstudiante(centroId, id, { grupoId } = {}) {
     return { ok: true }
   })
   return resultado
+}
+
+// Corrige el motivo del retiro VIGENTE sin crear eventos: evento 'retiro' +
+// ficha en la misma transacción, bajo el candado del mes del retiro. Reemplaza
+// el rodeo retiro → reincorporación → retiro, que contaba un retiro y un
+// reincorporado de más (David, agosto 2026). La pantalla manda el retiro y el
+// motivo que mostró (eventoIdEsperado/motivoEsperado): si cambiaron, se
+// rechaza. Reglas y candados en lib/motivo-retiro-service.mjs. Sin outbox CRM:
+// el motivo no mueve cupos.
+export async function corregirMotivoRetiro(centroId, id, data = {}) {
+  const sesion = await requireCurrentWriteCentro(centroId)
+  const motivo = data?.motivo
+  if (!MOTIVOS_RETIRO.includes(motivo)) return { error: 'Motivo de retiro inválido.' }
+  try {
+    return await withTransaction((query) => corregirMotivoRetiroEn(query, {
+      centroId,
+      estudianteId: id,
+      motivo,
+      razon: data?.razon,
+      eventoIdEsperado: data?.eventoIdEsperado,
+      motivoEsperado: data?.motivoEsperado ?? null,
+      actor: { uid: sesion.uid, email: sesion.email || null, nombre: sesion.nombre || null },
+      ahora: new Date().toISOString(),
+    }, { bloquearMesesEditables }), { isolationLevel: 'Serializable' })
+  } catch (error) {
+    if (['40001', '40P01'].includes(error?.code)) {
+      return { error: 'La ficha o su mes cambió mientras corregías. Recarga y revisa antes de intentar otra vez.' }
+    }
+    throw error
+  }
 }

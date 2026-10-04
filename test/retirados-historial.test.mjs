@@ -7,6 +7,7 @@ import { ORIGENES } from '../lib/operaciones.js'
 const gruposSource = fs.readFileSync(new URL('../app/actions/grupos.js', import.meta.url), 'utf8')
 const estudiantesSource = fs.readFileSync(new URL('../app/actions/estudiantes.js', import.meta.url), 'utf8')
 const pageSource = fs.readFileSync(new URL('../app/centro/[id]/grupos/page.js', import.meta.url), 'utf8')
+const cuadroSource = fs.readFileSync(new URL('../app/centro/[id]/cuadro/page.js', import.meta.url), 'utf8')
 
 // Extrae una declaración sin intentar parsear los imports/JSX que rodean a las
 // funciones. El escáner ignora strings y comentarios para no cerrar el bloque
@@ -210,4 +211,152 @@ test('reincorporarEstudiante conserva el evento y marca el origen por COALESCE',
   assert.match(evento.texto, /\(estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id\)/i)
   assert.match(evento.texto, /'reincorporacion'/i)
   assert.deepEqual(evento.values, [22, 7, 2026, 9, '2026-09-21', 4])
+})
+
+// ── Corregir motivo del retiro (David, agosto 2026) ─────────────────────────
+// Lo que se ejecuta en vm vive en otro realm: se compara vía JSON/spread.
+const plano = (valor) => JSON.parse(JSON.stringify(valor))
+
+test('loadOperaciones adjunta a cada retirado su retiro vigente, con correcciones sin email ni uid', async () => {
+  const retirados = [
+    { id: 230, nombre: 'Ivannis', estado: 'retirado', motivo_retiro: 'GRADUADO' },
+    { id: 999, nombre: 'Sin evento', estado: 'retirado', motivo_retiro: 'OTRO' },
+  ]
+  const vigentes = [{
+    estudiante_id: 230, id: 1130, motivo: 'GRADUADO', year: 2026, month: 8, fecha: '2026-08-15',
+    correcciones: [{
+      motivo_anterior: 'ECONOMICO', motivo_ficha_anterior: 'ECONOMICO', motivo_nuevo: 'GRADUADO', razon: 'Terminó el programa.',
+      corregido_at: '2026-10-01T15:00:00.000Z', actor: { uid: 9, email: 'admin@centro.test', nombre: 'Admin David' }, evento_id: 1130,
+    }],
+  }]
+  const queries = []
+  const sql = async (strings, ...values) => {
+    const texto = sqlTexto(strings)
+    queries.push({ texto, values })
+    if (/SELECT nombre FROM centros/i.test(texto)) return [{ nombre: 'David' }]
+    if (/estado\s*=\s*'retirado'/i.test(texto)) return retirados.map((r) => ({ ...r }))
+    if (/DISTINCT ON \(estudiante_id\)/i.test(texto)) return vigentes
+    return []
+  }
+  const loadOperaciones = ejecutarFuncion(gruposSource, 'loadOperaciones', {
+    sql,
+    requireCentroAccess: async () => undefined,
+    cargarGrupos: async () => [],
+    metasOperativas: async () => ({ gpnMin: 8, cupoMax: 15 }),
+    hoyISO: () => '2026-10-01',
+    fechaIso10: (value) => String(value).slice(0, 10),
+  })
+
+  const resultado = await loadOperaciones(5)
+
+  assert.deepEqual(plano(resultado.retirados.find((e) => e.id === 230).retiro), {
+    id: 1130, motivo: 'GRADUADO', year: 2026, month: 8, fecha: '2026-08-15',
+    correcciones: [{ fecha: '2026-10-01T15:00:00.000Z', nombre: 'Admin David', antes: 'ECONOMICO', despues: 'GRADUADO', razon: 'Terminó el programa.' }],
+  })
+  assert.doesNotMatch(JSON.stringify(resultado.retirados), /admin@centro\.test|"uid"/)
+  assert.equal(resultado.retirados.find((e) => e.id === 999).retiro, null)
+  const consulta = queries.find(({ texto }) => /DISTINCT ON \(estudiante_id\)/i.test(texto))
+  assert.match(consulta.texto, /tipo = 'retiro'/)
+  assert.match(consulta.texto, /ORDER BY estudiante_id, id DESC/)
+  assert.doesNotMatch(consulta.texto, /LIMIT/, 'sin LIMIT: el test de 5000 lee el primer LIMIT del texto')
+  assert.deepEqual([...consulta.values[0]], [230, 999])
+})
+
+test('corregirMotivoRetiro: guarda de escritura primero, Serializable explícito y 40001/40P01 legibles', async () => {
+  const sesion = { uid: 9, email: 'admin@centro.test', nombre: 'Admin David' }
+  const crear = (llamadas, extra = {}) => ejecutarFuncion(estudiantesSource, 'corregirMotivoRetiro', {
+    requireCurrentWriteCentro: async (centroId) => { llamadas.push(['guarda', centroId]); return sesion },
+    MOTIVOS_RETIRO: ['GRADUADO', 'ECONOMICO', 'OTRO'],
+    withTransaction: async (callback, opciones) => { llamadas.push(['tx', plano(opciones)]); return callback('QUERY') },
+    corregirMotivoRetiroEn: async (query, args, deps) => { llamadas.push(['servicio', query, plano(args), Object.keys(deps)]); return { ok: true } },
+    bloquearMesesEditables: async () => null,
+    ...extra,
+  })
+
+  const llamadas = []
+  const datos = { motivo: 'GRADUADO', razon: 'Terminó el programa.', eventoIdEsperado: 1130, motivoEsperado: 'ECONOMICO' }
+  assert.equal((await crear(llamadas)('5', 230, datos)).ok, true)
+  assert.deepEqual(llamadas.map(([tipo]) => tipo), ['guarda', 'tx', 'servicio'])
+  assert.deepEqual(llamadas[1][1], { isolationLevel: 'Serializable' })
+  const [, query, args, deps] = llamadas[2]
+  assert.equal(query, 'QUERY')
+  assert.deepEqual(deps, ['bloquearMesesEditables'])
+  assert.equal(args.centroId, '5')
+  assert.equal(args.estudianteId, 230)
+  assert.equal(args.motivo, 'GRADUADO')
+  assert.equal(args.razon, 'Terminó el programa.')
+  assert.equal(args.eventoIdEsperado, 1130)
+  assert.equal(args.motivoEsperado, 'ECONOMICO')
+  assert.deepEqual(args.actor, sesion)
+  assert.match(args.ahora, /^\d{4}-\d{2}-\d{2}T/)
+
+  const sinPermiso = []
+  await assert.rejects(crear(sinPermiso, { requireCurrentWriteCentro: async () => { throw new Error('Tu rol es de solo lectura.') } })('5', 230, datos), /solo lectura/)
+  assert.equal(sinPermiso.length, 0, 'sin permiso no se abre transacción')
+
+  const motivoMalo = []
+  assert.equal((await crear(motivoMalo)('5', 230, { ...datos, motivo: 'INVENTADO' })).error, 'Motivo de retiro inválido.')
+  assert.deepEqual(motivoMalo.map(([tipo]) => tipo), ['guarda'])
+
+  for (const code of ['40001', '40P01']) {
+    const choque = crear([], { withTransaction: async () => { throw Object.assign(new Error('could not serialize'), { code }) } })
+    assert.match((await choque('5', 230, datos)).error, /La ficha o su mes cambió mientras corregías/)
+  }
+  const otro = crear([], { withTransaction: async () => { throw new Error('se cayó la base') } })
+  await assert.rejects(otro('5', 230, datos), /se cayó la base/)
+})
+
+test('retirados: "Corregir motivo" solo con escritura, modal con token del evento y razón, hash #retirados', () => {
+  const inicio = pageSource.indexOf('{data?.retirados?.length > 0 ? (')
+  const fin = pageSource.indexOf('No hay retiros recientes.', inicio)
+  const panel = pageSource.slice(inicio, fin)
+
+  assert.match(panel, /\{canWrite && <><button className="btn" style=\{BTN_XS\} onClick=\{\(\) => \{ setStatus\(''\); setMotivoEst\(e\) \}\}>Corregir motivo<\/button>/)
+  assert.match(panel, /etiquetaMotivo\(motivoRetiroVigente\(e\)\)/)
+  assert.match(panel, /Motivo corregido el \{fmtDia\(diaPanama\(e\.retiro\.correcciones\.at\(-1\)\.fecha\)\)\}/)
+  assert.match(pageSource, /\{canWrite && motivoEst && \(\s*<CorregirMotivoModal centroId=\{id\} est=\{motivoEst\}/)
+  assert.match(pageSource, /const hayModal = !!\([^)]*\bmotivoEst\b[^)]*\)/)
+  assert.match(pageSource, /window\.location\.hash === '#retirados'\) setTab\('alumnos'\)/)
+
+  const modal = extraerFuncion(pageSource, 'CorregirMotivoModal')
+  assert.match(modal, /corregirMotivoRetiro\(centroId, est\.id, \{\s*motivo, razon, eventoIdEsperado: retiro\?\.id, motivoEsperado: retiro\?\.motivo \?\? null,\s*\}\)/)
+  assert.match(modal, /disabled=\{saving \|\| !retiro \|\| historico \|\| !motivo \|\| sinCambio \|\| !razon\.trim\(\)\}/)
+  assert.match(modal, /maxLength=\{500\}/)
+  assert.match(modal, /usaIniciosClaseOperativos\(retiro\.year, retiro\.month\)/)
+  assert.match(modal, /No hace falta reincorporarlo ni volver a retirarlo/)
+})
+
+test('motivoRetiroVigente: manda el motivo del evento (el que cuenta en el KPI); la ficha solo sin evento', () => {
+  const linea = pageSource.match(/^const motivoRetiroVigente = .+$/m)?.[0]
+  assert.ok(linea, 'No se encontró motivoRetiroVigente')
+  const motivoRetiroVigente = vm.runInNewContext(`${linea}\nmotivoRetiroVigente`)
+  assert.equal(motivoRetiroVigente({ motivo_retiro: 'ECONOMICO', retiro: { motivo: 'GRADUADO' } }), 'GRADUADO')
+  assert.equal(motivoRetiroVigente({ motivo_retiro: 'ECONOMICO', retiro: { motivo: null } }), null)
+  assert.equal(motivoRetiroVigente({ motivo_retiro: 'ECONOMICO', retiro: null }), 'ECONOMICO')
+})
+
+test('mensajeMotivoCorregido dice qué cambió y qué queda pendiente', () => {
+  const mensaje = ejecutarFuncion(pageSource, 'mensajeMotivoCorregido', {
+    nombreMes: (y, m) => `${m === 8 ? 'agosto' : m} ${y}`,
+    etiquetaMotivo: (m) => ({ GRADUADO: 'Graduado', ECONOMICO: 'Económico', OTRO: 'Otro', NO_CONFIRMO: 'No confirmó continuidad' }[m] || ''),
+  })
+  const base = { ok: true, year: 2026, month: 8, otrosRetirosMismoMes: [] }
+  assert.equal(mensaje('Ivannis', { ...base, motivoAnterior: 'ECONOMICO', motivo: 'GRADUADO' }), '✅ Motivo del retiro de Ivannis corregido: Económico → Graduado (retiro de agosto 2026).')
+  const completo = mensaje('Ivannis', { ...base, motivoAnterior: 'ECONOMICO', motivo: 'GRADUADO', otrosRetirosMismoMes: [1128], requiereGuardar: true })
+  assert.match(completo, /Ojo: Ivannis tiene otro retiro registrado en agosto 2026 y también cuenta\. Si fue un error, avísale a Administración; si el niño se retiró dos veces ese mes, está bien\./)
+  assert.match(completo, /El KPI de agosto 2026 ya estaba guardado: abre KPI Mensual y vuelve a Guardar/)
+  assert.match(mensaje('Ana', { ...base, motivoAnterior: 'OTRO', motivo: 'NO_CONFIRMO', mismoCampoKpi: true }), /cuentan como «Otro»: los totales no cambian/)
+  assert.match(mensaje('Ana', { ...base, sinCambios: true, eventoCambio: true, motivo: 'OTRO' }), /^✅ No había nada que corregir: el retiro de Ana ya tiene el motivo Otro\. La lista que tenías abierta estaba desactualizada/)
+  assert.match(mensaje('Ana', { ...base, motivoAnterior: null, motivo: 'OTRO', mismoCampoKpi: true }), /corregido: sin motivo → Otro \(retiro de agosto 2026\)\. En el KPI los dos motivos cuentan como «Otro»/)
+  // Evento ya con el motivo nuevo y ficha distinta (dato viejo): no hay "A → A" ni «Otro» falso.
+  const soloFicha = mensaje('Ana', { ...base, motivoAnterior: 'GRADUADO', motivo: 'GRADUADO', mismoCampoKpi: true })
+  assert.equal(soloFicha, '✅ Motivo del retiro de Ana alineado: el KPI ya lo contaba como Graduado (retiro de agosto 2026); solo se corrigió la ficha.')
+})
+
+test('el Cuadro deja de enseñar el rodeo y enlaza a donde se corrige el motivo', () => {
+  assert.match(cuadroSource, /^import Link from 'next\/link'$/m)
+  assert.match(cuadroSource, /<Link href=\{`\/centro\/\$\{id\}\/grupos#retirados`\}>Grupos › Sin grupo y retirados<\/Link>/)
+  assert.doesNotMatch(cuadroSource, /si fue un error o el niño volvió/)
+  assert.match(cuadroSource, /Reincorporar y volver a retirar cuenta un retiro de más/)
+  assert.match(cuadroSource, /Si después ves que el motivo quedó mal, se corrige en Grupos › Sin grupo y retirados/)
 })
