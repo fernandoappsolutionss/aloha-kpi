@@ -2,6 +2,17 @@ import { test,expect } from '@playwright/test'
 import { actorPage,ready,geometry } from './helpers/r10-audit.mjs'
 import { r10Snapshot, readR10Manifest } from './helpers/r10-fixture.mjs'
 import { capturePage } from './helpers/audit-page.js'
+test('Semana cabe a 390 px con sus cinco gráficas',async({browser},testInfo)=>{
+  const {context,page}=await actorPage(browser,testInfo,'center')
+  try {
+    await page.setViewportSize({width:390,height:844})
+    await page.goto('/centro/2/semana');await ready(page)
+    await expect(page.getByRole('heading',{name:'Semana',exact:true})).toBeVisible()
+    await expect(page.locator('.semana-tarjeta')).toHaveCount(5)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await geometry(page,testInfo,'semana-390')
+  }finally{await context.close()}
+})
 test('Historial muestra diez gráficos y tablas equivalentes sin partir palabras',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {
@@ -36,17 +47,17 @@ test('Historial muestra diez gráficos y tablas equivalentes sin partir palabras
 test('fallos de guardado conservan ready, contenido y controles recuperables',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {
-    for(const suffix of ['cuadro','cumplimiento','foda']) {
+    for(const suffix of ['cuadro','cumplimiento']) {
       await page.goto('/centro/2/'+suffix);await ready(page)
       const before=await r10Snapshot()
       if(suffix==='cuadro')await page.getByRole('button',{name:'Nuevo pedido',exact:true}).click()
       const abort=route=>route.request().method()==='POST'?route.abort('failed'):route.continue()
       await page.route('**/centro/2/**',abort)
-      await page.getByRole('button',{name:suffix==='cuadro'?'Guardar pedido':suffix==='foda'?'Guardar FODA':'Guardar',exact:true}).click()
+      await page.getByRole('button',{name:suffix==='cuadro'?'Guardar pedido':'Guardar',exact:true}).click()
       await expect(page.locator('#main-content')).toHaveAttribute('data-page-state','ready')
       const scope=suffix==='cuadro'?page.getByRole('dialog'):page.locator('#main-content')
       await expect(scope.getByRole('status').filter({hasText:/Error|No se pudo|Failed to fetch/i})).toBeVisible()
-      await expect(page.getByRole('button',{name:suffix==='cuadro'?'Guardar pedido':suffix==='foda'?'Guardar FODA':'Guardar',exact:true})).toBeEnabled()
+      await expect(page.getByRole('button',{name:suffix==='cuadro'?'Guardar pedido':'Guardar',exact:true})).toBeEnabled()
       await page.unroute('**/centro/2/**',abort)
       if(suffix==='cuadro')await page.getByRole('dialog').getByRole('button',{name:'Cancelar',exact:true}).click()
       expect(await r10Snapshot()).toEqual(before)
@@ -117,7 +128,7 @@ test('reportes: matrices tabs y formación conservan lectura e interacción loca
       await expect(row.getByRole('button',{name:'No',exact:true})).toHaveCount(1)
     }
     await geometry(page,testInfo,'cumplimiento-matriz')
-    await page.goto('/centro/2/foda');await ready(page)
+    await page.goto('/centro/2/peticiones');await ready(page)
     await page.getByRole('tab',{name:'Comentario',exact:true}).focus();await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tabpanel',{name:'Petición',exact:true})).toBeVisible()
     await page.keyboard.press('Home')
@@ -128,11 +139,11 @@ test('reportes: matrices tabs y formación conservan lectura e interacción loca
     if(testInfo.project.use.viewport.width<768) {
       const editor=page.getByRole('textbox',{name:'Editar comentario',exact:true})
       const ratio=await editor.evaluate(n=>n.getBoundingClientRect().width/n.parentElement.parentElement.getBoundingClientRect().width)
-      expect(ratio,'Editor FODA ocupa la fila completa').toBeGreaterThan(.95)
+      expect(ratio,'Editor de peticiones ocupa la fila completa').toBeGreaterThan(.95)
     }
-    await geometry(page,testInfo,'foda-edicion')
+    await geometry(page,testInfo,'peticiones-edicion')
     await page.getByRole('button',{name:'Cancelar',exact:true}).click()
-    await geometry(page,testInfo,'foda-tabs')
+    await geometry(page,testInfo,'peticiones-tabs')
     await page.goto('/centro/2/entrenamiento');await ready(page)
     await page.getByText('Preguntas frecuentes',{exact:true}).click()
     await page.locator('.ent-faq summary').first().click()
@@ -143,16 +154,16 @@ test('reportes: matrices tabs y formación conservan lectura e interacción loca
     expect(await r10Snapshot()).toEqual(before)
   }finally{await context.close()}
 })
-test('FODA gerencia cancela confirmaciones destructivas sin cambiar registros',async({browser},testInfo)=>{
+test('Peticiones gerencia cancela confirmaciones destructivas sin cambiar registros',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'admin')
   try {
-    await page.goto('/centro/2/foda');await ready(page)
+    await page.goto('/centro/2/peticiones');await ready(page)
     const before=await r10Snapshot()
     await page.getByRole('button',{name:'Eliminar',exact:true}).click()
     await expect(page.getByRole('dialog',{name:'Eliminar registro',exact:true})).toBeVisible()
-    await geometry(page,testInfo,'foda-confirmacion')
+    await geometry(page,testInfo,'peticiones-confirmacion')
     await page.getByRole('dialog').getByRole('button',{name:'Cancelar',exact:true}).click()
-    await page.locator('.foda-request-row').last().getByRole('button',{name:'Anulada',exact:true}).click()
+    await page.locator('.peticiones-request-row').last().getByRole('button',{name:'Anulada',exact:true}).click()
     await expect(page.getByRole('dialog',{name:'Anular petición',exact:true})).toBeVisible()
     await page.getByRole('dialog').getByRole('button',{name:'Cancelar',exact:true}).click()
     expect(await r10Snapshot()).toEqual(before)

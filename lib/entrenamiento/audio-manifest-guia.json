@@ -380,14 +380,14 @@
     "seg": 44
   },
   "guia/of-cen-10/cierre": {
-    "hash": "1667cc3c34c7",
+    "hash": "f5d2f43f88c8",
     "file": "guia/of-cen-10/cierre.mp3",
-    "seg": 31
+    "seg": 33
   },
   "guia/of-cen-11/vista": {
-    "hash": "d4f726472bec",
+    "hash": "6d0b409c056e",
     "file": "guia/of-cen-11/vista.mp3",
-    "seg": 34
+    "seg": 29
   },
   "guia/of-cen-10/palabras": {
     "hash": "bb497aa7269b",
@@ -395,14 +395,14 @@
     "seg": 42
   },
   "guia/of-cen-11/cierre": {
-    "hash": "0ed297eb4542",
+    "hash": "cb5f592f20bb",
     "file": "guia/of-cen-11/cierre.mp3",
-    "seg": 35
+    "seg": 37
   },
   "guia/of-cen-11/palabras": {
-    "hash": "23cf298dc9fc",
+    "hash": "f37401606f21",
     "file": "guia/of-cen-11/palabras.mp3",
-    "seg": 47
+    "seg": 30
   },
   "guia/of-cen-12/vista": {
     "hash": "f03d9c5373e3",
@@ -1043,5 +1043,130 @@
     "hash": "56cd096cf617",
     "file": "guia/of-fis-2/cierre.mp3",
     "seg": 24
+  },
+  "guia/of-cop-10/cierre": {
+    "hash": "89726d30f88e",
+    "file": "guia/of-cop-10/cierre.mp3",
+    "seg": 40
+  },
+  "guia/of-cop-11/vista": {
+    "hash": "7f34fd5da3ea",
+    "file": "guia/of-cop-11/vista.mp3",
+    "seg": 32
+  },
+  "guia/of-cop-11/palabras": {
+    "hash": "54b2cf9f9c58",
+    "file": "guia/of-cop-11/palabras.mp3",
+    "seg": 38
+  },
+  "guia/of-cop-11/cierre": {
+    "hash": "5da8f4a7edd7",
+    "file": "guia/of-cop-11/cierre.mp3",
+    "seg": 25
+  },
+  "guia/of-cop-12/vista": {
+    "hash": "a45842f1df9e",
+    "file": "guia/of-cop-12/vista.mp3",
+    "seg": 31
+  },
+  "guia/of-cop-12/palabras": {
+    "hash": "0fcbb15e36b1",
+    "file": "guia/of-cop-12/palabras.mp3",
+    "seg": 41
+  },
+  "guia/of-cop-12/cierre": {
+    "hash": "32c48bb57cb0",
+    "file": "guia/of-cop-12/cierre.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-1/vista": {
+    "hash": "773cc3b5088c",
+    "file": "guia/of-sem-1/vista.mp3",
+    "seg": 28
+  },
+  "guia/of-sem-1/palabras": {
+    "hash": "d48af21d17ba",
+    "file": "guia/of-sem-1/palabras.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-1/cierre": {
+    "hash": "1a2bafa0ede2",
+    "file": "guia/of-sem-1/cierre.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-2/vista": {
+    "hash": "0dd8e8f453db",
+    "file": "guia/of-sem-2/vista.mp3",
+    "seg": 28
+  },
+  "guia/of-sem-2/palabras": {
+    "hash": "af5382120ed9",
+    "file": "guia/of-sem-2/palabras.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-2/cierre": {
+    "hash": "bdbec3fa0c6d",
+    "file": "guia/of-sem-2/cierre.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-adm/vista": {
+    "hash": "96662945b0b3",
+    "file": "guia/of-sem-adm/vista.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-adm/palabras": {
+    "hash": "fe3904339dff",
+    "file": "guia/of-sem-adm/palabras.mp3",
+    "seg": 28
+  },
+  "guia/of-sem-adm/cierre": {
+    "hash": "f1b224e7f4e4",
+    "file": "guia/of-sem-adm/cierre.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-asi/vista": {
+    "hash": "322dea0fdb11",
+    "file": "guia/of-sem-asi/vista.mp3",
+    "seg": 26
+  },
+  "guia/of-sem-asi/palabras": {
+    "hash": "2254b60eb746",
+    "file": "guia/of-sem-asi/palabras.mp3",
+    "seg": 26
+  },
+  "guia/of-sem-asi/cierre": {
+    "hash": "03309aa986b3",
+    "file": "guia/of-sem-asi/cierre.mp3",
+    "seg": 29
+  },
+  "guia/of-sem-coa/vista": {
+    "hash": "48f7b6354010",
+    "file": "guia/of-sem-coa/vista.mp3",
+    "seg": 25
+  },
+  "guia/of-sem-coa/palabras": {
+    "hash": "96d845a71c95",
+    "file": "guia/of-sem-coa/palabras.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-coa/cierre": {
+    "hash": "20f1923bdb01",
+    "file": "guia/of-sem-coa/cierre.mp3",
+    "seg": 28
+  },
+  "guia/of-sem-cop/vista": {
+    "hash": "3cde4a313158",
+    "file": "guia/of-sem-cop/vista.mp3",
+    "seg": 26
+  },
+  "guia/of-sem-cop/palabras": {
+    "hash": "f11f175f88f6",
+    "file": "guia/of-sem-cop/palabras.mp3",
+    "seg": 29
+  },
+  "guia/of-sem-cop/cierre": {
+    "hash": "261d73917a9f",
+    "file": "guia/of-sem-cop/cierre.mp3",
+    "seg": 27
   }
 }

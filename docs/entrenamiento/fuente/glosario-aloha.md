@@ -133,7 +133,7 @@ cambio, no un descuido.
 
 ### Amenaza
 
-**Qué es.** En el FODA: algo de afuera que te puede hacer daño si no te preparas. Es externo: no lo controlas, pero sí puedes anticiparlo.
+**Qué es.** Algo de afuera que puede perjudicar al Centro si no te preparas. Es externo: no lo controlas, pero sí puedes anticiparlo.
 
 **Ejemplo.** Ejemplo real: abrió una academia de refuerzo a dos cuadras con el mismo horario de las 6:30 p.m.
 
@@ -317,7 +317,7 @@ cambio, no un descuido.
 
 **Qué es.** La clase gratuita de una hora, una vez por semana, donde niños y padres conocen el programa. Es la principal herramienta de venta del centro: mientras los niños están en el salón, el Administrador da la charla a los padres y la Asistente envía las cotizaciones.
 
-**Ejemplo.** De 20 padres en lista asistieron 15 y se inscribieron 8: eso es 75 % de asistencia y 54 % de inscripción, y ambos números van al FODA del mes.
+**Ejemplo.** De 20 padres en lista asistieron 15 y se inscribieron 8: eso es 75 % de asistencia y 54 % de inscripción, y ambos números sirven para revisar la captación del mes.
 
 **No lo confundas con** la **Clase para Padres**: la de prueba es para familias que todavía no son clientes; la de padres es para familias que ya inscribieron.
 
@@ -535,7 +535,7 @@ cambio, no un descuido.
 
 ### Debilidad
 
-**Qué es.** En el FODA: algo de adentro que te frena y que sí puedes cambiar. Es interno y es responsabilidad tuya, no mala suerte.
+**Qué es.** Algo de adentro del Centro que te frena y que sí puedes cambiar. Es interno y es responsabilidad tuya, no mala suerte.
 
 **Ejemplo.** Ejemplo real: el 40 % de los retirados de agosto tenía padres que no fueron a la Clase para Padres.
 
@@ -597,7 +597,7 @@ cambio, no un descuido.
 
 ### Encuesta de satisfacción
 
-**Qué es.** El formulario que se envía a los padres por correo y WhatsApp durante el cierre de nivel, para medir qué tan conformes están. Los porcentajes van al FODA del mes.
+**Qué es.** El formulario que se envía a los padres por correo y WhatsApp durante el cierre de nivel, para medir qué tan conformes están. Las respuestas ayudan a escoger mejoras para el plan de batalla.
 
 **Ejemplo.** Antes de terminar el cierre se le pide a los padres que la respondan ahí mismo; después es mucho más difícil que la llenen.
 
@@ -605,7 +605,7 @@ cambio, no un descuido.
 
 **Qué es.** Otro nombre de la Clase para Padres. Es la misma actividad: en los controles de asistencia y en los indicadores aparece con este nombre.
 
-**Ejemplo.** El indicador de Escuela de Padres del FODA es el porcentaje de padres que asistieron respecto del número de niños del grupo.
+**Ejemplo.** El indicador de Escuela de Padres es el porcentaje de padres que asistieron respecto del número de niños del grupo.
 
 ### Evaluación
 
@@ -713,17 +713,9 @@ cambio, no un descuido.
 
 **Ejemplo.** En el cierre de nivel casi siempre hay dos niños asignados a la demostración de lectura de flashcards.
 
-### FODA
-
-**Qué es.** El informe mensual del centro que el Administrador entrega a la Junta en los primeros 5 días del mes. Su nombre son las iniciales de Fortalezas, Oportunidades, Debilidades y Amenazas: lo bueno y lo malo de adentro, y lo bueno y lo malo de afuera.
-
-**Ejemplo.** Los porcentajes de clases de prueba, Escuela de Padres, retiros y satisfacción del mes anterior van dentro del FODA.
-
-*También lo vas a ver escrito:* informe FODA, matriz FODA.
-
 ### Fortaleza
 
-**Qué es.** En el FODA: algo de adentro del Centro que ya te está funcionando y sobre lo que puedes apoyarte. Es interno y lo controlas tú.
+**Qué es.** Algo de adentro del Centro que ya te está funcionando y sobre lo que puedes apoyarte. Es interno y lo controlas tú.
 
 **Ejemplo.** Ejemplo real: el 92 % de los padres asistió a la Clase para Padres del grupo que abrió en agosto — ese grupo es el que menos retiros tiene.
 
@@ -847,9 +839,9 @@ cambio, no un descuido.
 
 ### Junta Directiva
 
-**Qué es.** El grupo de dueños y directivos de la empresa operadora de los centros. Es el jefe directo del Administrador, aprueba permisos, decide el programa de primas y recibe el FODA mensual.
+**Qué es.** El grupo de dueños y directivos de la empresa operadora de los centros. Es el jefe directo del Administrador, aprueba permisos, decide el programa de primas y revisa el avance de los centros en la Reunión semanal.
 
-**Ejemplo.** El FODA se entrega a la Junta Directiva dentro de los primeros 5 días de cada mes.
+**Ejemplo.** El plan de la semana se completa antes del viernes a las 10:00 para la Reunión semanal.
 
 **No lo confundas con** el **Corporativo ALOHA**, que es la franquiciadora, una empresa distinta.
 
@@ -899,7 +891,7 @@ cambio, no un descuido.
 
 **Ejemplo.** El cuadro de KPI es la base del programa de primas para el personal administrativo.
 
-**No lo confundas con** el **FODA**: el KPI es el número; el FODA es el análisis escrito alrededor de esos números.
+**No lo confundas con** el **plan de batalla**: el KPI mide el resultado mensual; el plan dice qué acciones se harán durante la semana.
 
 ## L
 
@@ -1037,7 +1029,7 @@ cambio, no un descuido.
 
 ### Oportunidad
 
-**Qué es.** En el FODA: algo de afuera del Centro que podrías aprovechar si actúas. Es externo: no lo controlas, pero puedes tomarlo.
+**Qué es.** Algo de afuera del Centro que podrías aprovechar si actúas. Es externo: no lo controlas, pero puedes tomarlo.
 
 **Ejemplo.** Ejemplo real: el colegio de la esquina cambió de horario y libera las tardes de martes — hay espacio para abrir un grupo Tiny en ese bloque.
 
@@ -1427,6 +1419,45 @@ cambio, no un descuido.
 
 ---
 
+
+### Estadística semanal
+
+**Qué es.** Un dato de producción del centro medido con la misma definición y período para poder comparar semanas. Se lee con su unidad, fecha y fuente.
+
+**Ejemplo.** Una semana sin registro no vale cero. Una semana abierta es provisional; una estadística inversa mejora cuando su valor baja.
+
+### Condición
+
+**Qué es.** La situación del Centro que orienta el plan semanal. La Administradora la elige y guarda revisando la gráfica de niños activos, las demás estadísticas y el contexto. Sin condición significa pendiente de asignación.
+
+**Ejemplo.** Si la matrícula dejó de crecer, revisa la gráfica y asigna la condición que corresponde antes de hacer el plan.
+
+**No lo confundas con** la **condición para la prima**: esa es una meta del KPI mensual que afecta un pago; la condición del centro guía el plan semanal.
+
+### Fórmula de la condición
+
+**Qué es.** Los pasos que aparecen al elegir una condición. Debajo de cada paso se escribe al menos un objetivo concreto con responsable y fecha.
+
+**Ejemplo.** Un plan queda incompleto si un paso de la fórmula no tiene objetivo.
+
+### Semana de cierre
+
+**Qué es.** La semana de viernes a jueves que se nombra por su jueves. El viernes siguiente, antes de las 10:00, la Administradora completa el plan.
+
+**Ejemplo.** La semana que termina un jueves se revisa el viernes siguiente antes de la Reunión semanal.
+
+### Cuota semanal
+
+**Qué es.** El valor que se busca para una estadística en la semana que empieza. La Administradora lo propone y el coordinador lo aprueba.
+
+**Ejemplo.** Una cuota propuesta de nuevos inscritos todavía no está aprobada hasta que el coordinador la revise.
+
+### Plan de batalla
+
+**Qué es.** Los objetivos para actuar durante la semana: fórmula de la condición, urgentes, pendientes, órdenes del coordinador y plan estratégico.
+
+**Ejemplo.** Antes del viernes a las 10:00, cada paso de la fórmula debe tener un objetivo con responsable y fecha.
+
 ## Los pares que más se confunden
 
 Repásalos antes de operar: casi todos los errores de un colaborador nuevo salen de esta tabla.
@@ -1447,7 +1478,7 @@ Repásalos antes de operar: casi todos los errores de un colaborador nuevo salen
 | Portafolio (Class Dojo) | Portafolio académico | El de Class Dojo guarda los trabajos del niño. El académico guarda los documentos del centro. |
 | Cuenta por cobrar | Cuenta incobrable | La primera todavía se espera cobrar. La segunda ya se dio por perdida y va al Drive. |
 | Prima de producción | Bono por puntualidad | La prima es por metas de negocio. El bono es del Coach por llegar 20 minutos antes. |
-| KPI | FODA | El KPI es el número. El FODA es el análisis escrito alrededor de esos números. |
+| KPI | Plan de batalla | El KPI mide el resultado mensual. El plan contiene los objetivos de la semana. |
 | Planilla | Nómina | La planilla es el documento con los montos. La nómina es el pago en sí, los 15 y 30. |
 | Junta Directiva | Corporativo ALOHA | La Junta dirige la operación de los centros. El Corporativo es el dueño de la marca. |
 | Administrador de Centro | Coordinador Operativo | El Administrador manda dentro del centro. El Coordinador Operativo es corporativo y ve todos los centros. |

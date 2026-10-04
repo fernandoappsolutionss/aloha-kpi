@@ -9,13 +9,13 @@
     "generadoAt": "2026-09-07T11:30:31.164Z"
   },
   "encuestas/intro": {
-    "file": "actualizaciones/encuestas/intro-83044685d617.mp3",
-    "hash": "83044685d617",
+    "file": "actualizaciones/encuestas/intro-ea37d810558a.mp3",
+    "hash": "ea37d810558a",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 319364,
-    "segundos": 39.845442,
-    "generadoAt": "2026-09-12T16:10:36.357Z"
+    "bytes": 319782,
+    "segundos": 39.891882,
+    "generadoAt": "2026-10-01T21:25:41.288Z"
   },
   "encuestas/en-1": {
     "file": "actualizaciones/encuestas/en-1-77fff88773e6.mp3",
@@ -63,13 +63,13 @@
     "generadoAt": "2026-09-12T16:10:45.886Z"
   },
   "encuestas/en-6": {
-    "file": "actualizaciones/encuestas/en-6-5fab0fde1b46.mp3",
-    "hash": "5fab0fde1b46",
+    "file": "actualizaciones/encuestas/en-6-f40ed33e677c.mp3",
+    "hash": "f40ed33e677c",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 207560,
-    "segundos": 25.867029,
-    "generadoAt": "2026-09-07T11:30:55.483Z"
+    "bytes": 212367,
+    "segundos": 26.470748,
+    "generadoAt": "2026-10-01T21:25:45.809Z"
   },
   "cumplimiento/intro": {
     "file": "actualizaciones/cumplimiento/intro-c9acdd221c38.mp3",
@@ -495,13 +495,13 @@
     "generadoAt": "2026-09-07T18:10:21.173Z"
   },
   "peticiones/pe-1": {
-    "file": "actualizaciones/peticiones/pe-1-330a7e0d1992.mp3",
-    "hash": "330a7e0d1992",
+    "file": "actualizaciones/peticiones/pe-1-6c01e7cc26cd.mp3",
+    "hash": "6c01e7cc26cd",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 119371,
-    "segundos": 14.860771,
-    "generadoAt": "2026-09-07T18:10:24.130Z"
+    "bytes": 126058,
+    "segundos": 15.696689,
+    "generadoAt": "2026-10-01T21:25:49.460Z"
   },
   "peticiones/pe-2": {
     "file": "actualizaciones/peticiones/pe-2-4c3192ddc34d.mp3",
@@ -538,5 +538,122 @@
     "bytes": 174333,
     "segundos": 21.733878,
     "generadoAt": "2026-09-07T18:10:34.445Z"
+  },
+  "semana-graficas/intro": {
+    "file": "actualizaciones/semana-graficas/intro-ac49b5fb943a.mp3",
+    "hash": "ac49b5fb943a",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 145493,
+    "segundos": 18.111565,
+    "generadoAt": "2026-10-02T14:18:38.730Z"
+  },
+  "semana-graficas/sg-1": {
+    "file": "actualizaciones/semana-graficas/sg-1-284c40e45a44.mp3",
+    "hash": "284c40e45a44",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 115400,
+    "segundos": 14.349932,
+    "generadoAt": "2026-10-02T14:18:42.219Z"
+  },
+  "semana-graficas/sg-2": {
+    "file": "actualizaciones/semana-graficas/sg-2-0da06f19f5b7.mp3",
+    "hash": "0da06f19f5b7",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 120834,
+    "segundos": 15.046531,
+    "generadoAt": "2026-10-02T14:18:45.064Z"
+  },
+  "semana-graficas/sg-3": {
+    "file": "actualizaciones/semana-graficas/sg-3-63d4710605f4.mp3",
+    "hash": "63d4710605f4",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 143195,
+    "segundos": 17.832925,
+    "generadoAt": "2026-10-02T14:18:48.222Z"
+  },
+  "semana-graficas/sg-4": {
+    "file": "actualizaciones/semana-graficas/sg-4-631c10a72ddc.mp3",
+    "hash": "631c10a72ddc",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 137970,
+    "segundos": 17.182766,
+    "generadoAt": "2026-10-02T14:18:51.196Z"
+  },
+  "semana-graficas/sg-5": {
+    "file": "actualizaciones/semana-graficas/sg-5-6c067c96c852.mp3",
+    "hash": "6c067c96c852",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 152808,
+    "segundos": 19.040363,
+    "generadoAt": "2026-10-02T14:18:54.472Z"
+  },
+  "semana-plan/intro": {
+    "file": "actualizaciones/semana-plan/intro-326faed4a137.mp3",
+    "hash": "326faed4a137",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 148419,
+    "segundos": 18.483084,
+    "generadoAt": "2026-10-02T14:18:57.648Z"
+  },
+  "semana-plan/sp-1": {
+    "file": "actualizaciones/semana-plan/sp-1-5bd7e783e968.mp3",
+    "hash": "5bd7e783e968",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 125013,
+    "segundos": 15.55737,
+    "generadoAt": "2026-10-02T14:19:00.487Z"
+  },
+  "semana-plan/sp-2": {
+    "file": "actualizaciones/semana-plan/sp-2-4cc3318eb526.mp3",
+    "hash": "4cc3318eb526",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 143195,
+    "segundos": 17.832925,
+    "generadoAt": "2026-10-02T14:19:03.465Z"
+  },
+  "semana-plan/sp-3": {
+    "file": "actualizaciones/semana-plan/sp-3-74b00f5d48e9.mp3",
+    "hash": "74b00f5d48e9",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 152808,
+    "segundos": 19.040363,
+    "generadoAt": "2026-10-02T14:19:06.495Z"
+  },
+  "semana-plan/sp-4": {
+    "file": "actualizaciones/semana-plan/sp-4-4a3074e873b6.mp3",
+    "hash": "4a3074e873b6",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 119789,
+    "segundos": 14.907211,
+    "generadoAt": "2026-10-02T14:19:09.178Z"
+  },
+  "semana-plan/sp-5": {
+    "file": "actualizaciones/semana-plan/sp-5-bbbe0ca94631.mp3",
+    "hash": "bbbe0ca94631",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 130656,
+    "segundos": 16.253968,
+    "generadoAt": "2026-10-02T14:19:12.095Z"
+  },
+  "semana-plan/sp-6": {
+    "file": "actualizaciones/semana-plan/sp-6-5692f5a2d998.mp3",
+    "hash": "5692f5a2d998",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 141732,
+    "segundos": 17.647166,
+    "generadoAt": "2026-10-02T14:19:15.233Z"
   }
 }

@@ -55,9 +55,9 @@
     "seg": 49
   },
   "oficio/of-hat-adm": {
-    "hash": "e84b3279b8b2",
+    "hash": "4a33f0a24e6a",
     "file": "oficio/of-hat-adm.mp3",
-    "seg": 51
+    "seg": 52
   },
   "oficio/of-hat-asi": {
     "hash": "af0325a92e62",
@@ -90,9 +90,9 @@
     "seg": 47
   },
   "oficio/of-cen-3": {
-    "hash": "597ce02a532a",
+    "hash": "8085fa1712d0",
     "file": "oficio/of-cen-3.mp3",
-    "seg": 49
+    "seg": 50
   },
   "oficio/of-cen-4": {
     "hash": "59ed6e70e2e7",
@@ -130,9 +130,9 @@
     "seg": 47
   },
   "oficio/of-cen-13": {
-    "hash": "02fd7008c4da",
+    "hash": "ad75992a6bfb",
     "file": "oficio/of-cen-13.mp3",
-    "seg": 49
+    "seg": 42
   },
   "oficio/of-cen-12": {
     "hash": "4985f01e4e47",
@@ -140,9 +140,9 @@
     "seg": 51
   },
   "oficio/of-cen-11": {
-    "hash": "6ab36cf14333",
+    "hash": "9640656af089",
     "file": "oficio/of-cen-11.mp3",
-    "seg": 46
+    "seg": 39
   },
   "oficio/of-zoh-2": {
     "hash": "bc238a05bbc7",
@@ -343,5 +343,45 @@
     "hash": "b08b41d27843",
     "file": "oficio/of-fis-2.mp3",
     "seg": 51
+  },
+  "oficio/of-cop-11": {
+    "hash": "06577f1a5b2a",
+    "file": "oficio/of-cop-11.mp3",
+    "seg": 56
+  },
+  "oficio/of-cop-12": {
+    "hash": "df7fc8c70ba6",
+    "file": "oficio/of-cop-12.mp3",
+    "seg": 49
+  },
+  "oficio/of-sem-1": {
+    "hash": "67cda651219b",
+    "file": "oficio/of-sem-1.mp3",
+    "seg": 40
+  },
+  "oficio/of-sem-2": {
+    "hash": "2009989eca0c",
+    "file": "oficio/of-sem-2.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-adm": {
+    "hash": "592db76dae9a",
+    "file": "oficio/of-sem-adm.mp3",
+    "seg": 43
+  },
+  "oficio/of-sem-asi": {
+    "hash": "e8691d6ce2b2",
+    "file": "oficio/of-sem-asi.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-coa": {
+    "hash": "6eb17b191ad7",
+    "file": "oficio/of-sem-coa.mp3",
+    "seg": 41
+  },
+  "oficio/of-sem-cop": {
+    "hash": "3c531055183e",
+    "file": "oficio/of-sem-cop.mp3",
+    "seg": 42
   }
 }

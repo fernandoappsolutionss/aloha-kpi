@@ -99,6 +99,7 @@ export default function CarrilOficio({ centroId }) {
 
   const { avance, drills, cursos, siguiente, revision } = datos
   const base = `/centro/${centroId}/entrenamiento/oficio`
+  const semanal = cursos.find((c) => c.id === 'semana')
   // LOS DOS CARRILES A LA VEZ. Quien tiene plan propio y además le firma el hat
   // a alguien —la Administradora al Coach y a la Asistente; el Coordinador
   // Operativo a los tres— tiene que ver las dos cosas. Antes el servidor elegía
@@ -118,6 +119,7 @@ export default function CarrilOficio({ centroId }) {
         <Link className="btn btn--primary" href={base}>{avance.estudiados > 0 ? 'Continuar mi oficio' : 'Ver mi puesto'} <span aria-hidden="true">→</span></Link>
       </div>
 
+      {semanal && <p className="alert"><strong>Actualización semanal {semanal.hatted < semanal.total ? 'pendiente' : 'completada'}</strong> · {semanal.hatted} de {semanal.total} módulos con maniobra firmada. <Link href={`${base}#actualizacion-semanal`}>Ver gráficas, condiciones y práctica de mi puesto →</Link></p>}
       <div className="ofi-carril__barras">
         <div>
           <div className="label">Estudiado</div>

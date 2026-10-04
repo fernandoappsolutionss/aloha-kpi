@@ -7,7 +7,7 @@ import { disciplinaPct } from '../../lib/checklist'
 import { hoyISO } from '../../lib/operaciones'
 import { movimientosVivosMes, periodosAbiertosOperativos, resumenConCuadroVivo } from '../../lib/inicios-clase.mjs'
 import { motivosParaKpi } from '../../lib/cuadro-calc'
-import { ninosDeclarados } from '../../lib/kpi-calc'
+import { datoNinosDeclarados } from '../../lib/kpi-calc'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { cobranzaDeclarada, evaluarProducto, semaforo, verdictoCrecimiento } from '../../lib/marcadores.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
@@ -157,8 +157,8 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   `
   // DISCIPLINA, y sólo disciplina. Este bucle recorría los 33
   // CUMPLIMIENTO_KEYS, o sea metía las 3 metas de PRODUCTO dentro del marcador
-  // de Disciplina y además las pesaba todas igual. La pantalla del centro y el
-  // FODA usan `disciplinaPct` (30 criterios, ponderados), así que dos
+  // de Disciplina y además las pesaba todas igual. La pantalla del centro usa
+  // `disciplinaPct` (30 criterios, ponderados), así que dos
   // pantallas con la MISMA etiqueta "Disciplina" daban números distintos
   // —ANCLAS 94% en el panel contra 100% en el centro, LOS NARANJOS hasta 8
   // puntos de diferencia—. Peor: al corregir el histórico de las 3 metas, el
@@ -257,7 +257,8 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     // Los niños del panel son los DECLARADOS en el KPI semanal: el mes abierto
     // no proyecta aquí; se muestran los niños con los que TERMINÓ el último
     // mes declarado (o la semilla previa al rango si no hay ninguno).
-    const ninos = ninosDeclarados(months, prev?.ninos_final_mes)
+    const datoNinos = datoNinosDeclarados(months, prev?.ninos_final_mes, { year: py, month: pm })
+    const ninos = datoNinos.valor
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
     // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
@@ -316,6 +317,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const gpnBajo = grupos > 0 && ninosGrupo < metaGpn
     return {
       id: c.id, nombre: c.nombre, admin, ninos,
+      ninosDisponible: datoNinos.disponible, ninosPeriodoFin: datoNinos.periodoFin, ninosFuente: datoNinos.fuente,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,

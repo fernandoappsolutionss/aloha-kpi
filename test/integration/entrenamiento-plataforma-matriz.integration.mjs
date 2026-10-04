@@ -4,7 +4,7 @@ import test, { before, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
-import { MODULOS } from '../../lib/entrenamiento/modulos.js'
+import { MODULOS, modulosDeRol } from '../../lib/entrenamiento/modulos.js'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas.js'
 import { porcentaje, corregirQuiz } from '../../lib/entrenamiento/progreso.js'
 import { assertMaster, assertOficio, esGerencia } from '../../lib/current-user.mjs'
@@ -25,11 +25,11 @@ const source = readFileSync(new URL('../../app/actions/entrenamiento.js', import
   .replace(/export async function /g, 'async function ')
 const actions = new Function(
   'sql', 'requireSession', 'requireCurrentUser', 'requireCurrentMaster', 'requireCurrentTraining',
-  'isAdminRole', 'fallo', 'MODULOS', 'RESPUESTAS', 'corregirQuiz', 'porcentaje',
+  'isAdminRole', 'fallo', 'modulosDeRol', 'MODULOS', 'RESPUESTAS', 'corregirQuiz', 'porcentaje',
   `${source}\nreturn { matrizProgreso, cargarProgreso, marcarTourVisto, responderQuiz };`,
 )(
   sql, async () => actor, async () => actor, async () => assertMaster(actor), async () => assertOficio(actor),
-  esGerencia, (_name, error) => ({ error: error.message }), MODULOS, RESPUESTAS, corregirQuiz, porcentaje,
+  esGerencia, (_name, error) => ({ error: error.message }), modulosDeRol, MODULOS, RESPUESTAS, corregirQuiz, porcentaje,
 )
 
 before(async () => {

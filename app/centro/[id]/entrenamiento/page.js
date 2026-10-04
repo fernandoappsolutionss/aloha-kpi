@@ -9,7 +9,7 @@ import { getCentroNombre } from '../../../actions/centros'
 import { getNavigationContext } from '../../../actions/navigation'
 import { cargarProgreso } from '../../../actions/entrenamiento'
 import CarrilOficio from '../../../../components/entrenamiento/CarrilOficio'
-import { MODULOS, ERRORES_GLOBALES, FAQ } from '../../../../lib/entrenamiento/modulos'
+import { modulosDeRol, ERRORES_GLOBALES, FAQ } from '../../../../lib/entrenamiento/modulos'
 import { completado, porcentaje, siguienteModulo } from '../../../../lib/entrenamiento/progreso'
 
 const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short' }) : ''
@@ -21,23 +21,13 @@ export default function EntrenamientoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retry, setRetry] = useState(0)
-  // EL COACH NO OPERA EL CENTRO, así que los 9 recorridos no son para él: los
-  // nueve arrancan en /ruta-nivel, /grupos, /eventos, /cuadro o /kpi
-  // (lib/entrenamiento/modulos.js), y el middleware le rebota esas cinco rutas
-  // de vuelta aquí. Es además la pantalla donde ATERRIZA: destino() lo manda a
-  // este árbol, o sea que lo primero que veía al entrar era una barra
-  // "0 de 9 recorridos" que no puede llenar nunca, con su plan real debajo.
-  // El rol se pregunta al servidor, como hace el menú; no se deduce de la ruta.
-  // null mientras no se sabe; 'desconocido' si el servidor no contestó. Se
-  // distinguen a propósito: la pista de los recorridos NO se pinta mientras el
-  // rol está en el aire (si no, al Coach le parpadea delante lo que después se
-  // le quita), pero SÍ se pinta si la consulta falló — dejar a todo el mundo
-  // sin los 9 recorridos por un error de red sería peor que el parpadeo.
+  // El rol se consulta al servidor: sin rol confirmado no se ofrecen recorridos.
   const [rolActor, setRolActor] = useState(null)
   const esCoach = rolActor === 'coach'
   const esConsultaGlobal = isReadonlyGlobalRole(rolActor)
   const veOficio = Boolean(rolActor && rolActor !== 'desconocido' && !esConsultaGlobal)
-  const veRecorridos = rolActor !== null && !esCoach
+  const modulos = useMemo(() => modulosDeRol(rolActor), [rolActor])
+  const veRecorridos = modulos.length > 0
 
   useEffect(() => {
     let activo = true
@@ -61,10 +51,10 @@ export default function EntrenamientoPage() {
     return () => { activo = false }
   }, [id, retry])
 
-  const resumen = useMemo(() => porcentaje(progreso, MODULOS), [progreso])
-  const siguiente = useMemo(() => siguienteModulo(progreso, MODULOS), [progreso])
-  const recomendado = MODULOS.find((m) => m.id === siguiente)
-  const iniciado = MODULOS.some((m) => {
+  const resumen = useMemo(() => porcentaje(progreso, modulos), [progreso, modulos])
+  const siguiente = useMemo(() => siguienteModulo(progreso, modulos), [progreso, modulos])
+  const recomendado = modulos.find((m) => m.id === siguiente)
+  const iniciado = modulos.some((m) => {
     const p = progreso[m.id]
     return p?.tourVistoAt || p?.quizAprobadoAt || p?.intentos > 0
   })
@@ -97,7 +87,7 @@ export default function EntrenamientoPage() {
                   prometerle al Coach "dos cosas distintas" y quitarle una es
                   peor que decir el nombre del centro medio segundo antes. */}
               {nombre}
-              {veRecorridos && !esConsultaGlobal && <> · Son dos cosas distintas: <b>usar el sistema</b> ({MODULOS.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).</>}
+              {veRecorridos && !esConsultaGlobal && <> · Son dos cosas distintas: <b>usar el sistema</b> ({modulos.length} recorridos guiados) y <b>tu oficio</b> (los módulos de tu puesto, cada uno con su maniobra).</>}
               {veRecorridos && esConsultaGlobal && <> · Consulta de recorridos del sistema. El oficio del puesto no está disponible para Gerencia General.</>}
               {esCoach && <> · Los módulos de tu puesto, cada uno con su maniobra. Los recorridos de cómo operar el sistema no son de tu puesto: tu trabajo del día lo marcas desde tu enlace de Coach.</>}
             </p>
@@ -141,7 +131,7 @@ export default function EntrenamientoPage() {
                       {esConsultaGlobal ? ' puedes repasarlos cuando necesites revisar una pantalla.' : ' ahora sigue tu oficio, los módulos de tu puesto con su maniobra.'}
                     </p>
                     {veOficio && <Link className="btn btn--primary ent-start__cta" href={`/centro/${id}/entrenamiento/oficio`}>Empezar mi oficio <span aria-hidden="true">→</span></Link>}
-                    <p className="ent-start__note"><Link className="tour-card__link" href={moduloHref(MODULOS[0].id)}>Repasar los recorridos del sistema</Link></p>
+                    <p className="ent-start__note"><Link className="tour-card__link" href={moduloHref(modulos[0].id)}>Repasar los recorridos del sistema</Link></p>
                   </>
                 )}
               </div>
@@ -166,7 +156,7 @@ export default function EntrenamientoPage() {
               <div className="ent-help__body">
                 <p className="h-sub">Sigue el orden recomendado o abre el tema que necesitas consultar.</p>
                 <ol className="ent-route">
-                  {MODULOS.map((m) => {
+                  {modulos.map((m) => {
                     const e = estadoDe(m)
                     return (
                       <li key={m.id}>

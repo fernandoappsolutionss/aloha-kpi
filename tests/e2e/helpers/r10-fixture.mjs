@@ -44,7 +44,7 @@ export async function prepareR10Fixture() {
   await r10Transaction(async q => {
     for (const [table,ids] of Object.entries(R10_IDS)) if ((await q(`SELECT id FROM ${table} WHERE id=ANY($1::int[])`,[ids])).length) throw new Error(`Colisión R10 en ${table}; no se adopta ni sobrescribe.`)
     if ((await q('SELECT id FROM usuarios WHERE email=$1',[R10_EMAIL])).length) throw new Error('Colisión usuario R10.')
-    const m = {marker:R10_MARKER,ids:R10_IDS,today,past,token,accessToken,phase:'preparing',derived:{},months:[],quarter:[2,Number(today.slice(0,4)),Math.ceil(Number(today.slice(5,7))/3)]}
+    const m = {marker:R10_MARKER,ids:R10_IDS,today,past,token,accessToken,phase:'preparing',derived:{},months:[]}
     await save(manifestPath,m)
     await q("INSERT INTO centros(id,nombre,region,pais) VALUES(2,'Centro R10 Operaciones de Aprendizaje Integral Panamá',$1,'PA')",[R10_MARKER])
     await q("INSERT INTO usuarios(id,nombre,email,password_hash,rol,centro_id) VALUES(1000003,$1,$2,$3,'administradora',2)",[R10_MARKER,R10_EMAIL,password])
@@ -120,7 +120,6 @@ async function seedReports(q,m) {
   const values=CUMPLIMIENTO_KEYS.map((_,i)=>i===0?'no':'si')
   for(const mes of [1,2,3]) await q('INSERT INTO cumplimiento(trimestre_id,mes,'+CUMPLIMIENTO_KEYS.join(',')+') VALUES(1000040,$1,'+CUMPLIMIENTO_KEYS.map((_,i)=>'$'+(i+2)).join(',')+')',[mes,...values])
   const long='Texto ficticio de auditoría R10: aprendizaje y seguimiento operativo. '.repeat(12)+'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.repeat(4)
-  await q("INSERT INTO foda(centro_id,anio,trimestre,fortalezas,debilidades,oportunidades,amenazas,comentarios,comentario_estado) VALUES(2,$1,$2,$3,$3,$3,$3,$3,'Próximo trimestre')",[year,quarter,long])
   await q("INSERT INTO pedidos_material(id,centro_id,year,month,fecha,producto,itinerario,nivel,grupo_id,cantidad,monto,observaciones) VALUES(1000041,2,$1,$2,$3,'KIT','TINY',3,1000013,2,24,$4)",[year,month,m.today,long])
   for(let back=13;back>=1;back--) {
     const date=new Date(Date.UTC(year,month-1-back,1)), key=[2,date.getUTCFullYear(),date.getUTCMonth()+1]
@@ -150,7 +149,6 @@ async function cleanupReports(q,m) {
   await save(manifestPath,m)
   for(const table of ['peticion_estado_historial','peticion_cotizaciones','peticiones','cuadro_mensual','pedidos_material']) await q('DELETE FROM '+table+' WHERE id=ANY($1::int[])',[R10_IDS[table]])
   await q('DELETE FROM cumplimiento WHERE trimestre_id=1000040 AND mes=ANY($1::int[])',[[1,2,3]])
-  await q('DELETE FROM foda WHERE centro_id=$1 AND anio=$2 AND trimestre=$3',m.quarter)
   await q('DELETE FROM trimestres WHERE id=1000040')
   for(const table of ['kpi_auto_ajustes','kpi_semanas','resumen_mes','mes_kpi']) for(const key of m.reportKeys[table]) await q('DELETE FROM '+table+' WHERE centro_id=$1 AND year=$2 AND month=$3'+(table==='kpi_semanas'?' AND semana=$4':''),table==='kpi_semanas'?[key.centro_id,key.year,key.month,key.semana]:[key.centro_id,key.year,key.month])
   await q('DELETE FROM password_tokens WHERE token=$1 AND user_id=1000006',[m.accessToken])

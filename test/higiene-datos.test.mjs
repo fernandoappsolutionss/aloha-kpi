@@ -39,7 +39,7 @@ test('enrollment warning distinguishes individual linkage from the monthly acqui
   assert.match(aviso.accion, /canal de captación/)
   assert.deepEqual(aviso.items, ['Septiembre 2026'])
   assert.equal(aviso.donde.href, '/centro/6/grupos')
-  assert.equal(aviso.bloquea, false)
+  assert.equal(aviso.bloquea, true)
 })
 
 test('un centro con todo cargado no dibuja nada', () => {
@@ -171,7 +171,19 @@ test('los nombres y los números llegan enteros a la pantalla', () => {
   })
   assert.equal(punto(resultado, 'alumnos-sin-inicio').items[0], 'Freanny Porras · sin grupo · alta 2026-08-24')
   assert.deepEqual(punto(resultado, 'grupos-sin-fecha').items, ['#4', 'KINDER 1A'])
-  assert.equal(punto(resultado, 'grupos-sin-fecha').titulo, '2 grupos activos sin fecha de inicio de clases')
+  assert.equal(punto(resultado, 'grupos-sin-fecha').titulo, '2 grupos activos sin apertura histórica registrada')
+})
+
+test('un grupo sin apertura no implica que todos sus alumnos carezcan de inicio', () => {
+  const resultado = higieneDeDatos({
+    centroId: 1, growth: growth(),
+    gruposSinFecha: [{ id: 36, numero: '36' }],
+    alumnosSinInicio: [{ id: 3, nombre: 'Pendiente', grupoId: 36, grupoNumero: '36' }],
+  })
+  const aviso = punto(resultado, 'grupos-sin-fecha')
+  assert.match(aviso.accion, /1 alumno de estos grupos sigue sin inicio operativo/)
+  assert.match(aviso.accion, /itinerario/)
+  assert.doesNotMatch(aviso.accion, /todos sus niños/)
 })
 
 test('una issue sin ficha en el catálogo no se pierde: conserva el mensaje del motor', () => {
@@ -187,7 +199,7 @@ test('una issue sin ficha en el catálogo no se pierde: conserva el mensaje del 
 
 test('una issue ya resuelta no bloquea ni inventa trabajo', () => {
   assert.equal(fuerzaConfianzaBaja({ code: 'cp_enrollment_conflict', severity: 'warning', resolved: true }), false)
-  assert.equal(fuerzaConfianzaBaja({ code: 'cp_classification_incomplete', severity: 'warning' }), false)
+  assert.equal(fuerzaConfianzaBaja({ code: 'cp_classification_incomplete', severity: 'warning' }), true)
   assert.equal(fuerzaConfianzaBaja({ code: 'stock_balance', severity: 'error' }), true)
 })
 

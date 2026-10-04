@@ -5,10 +5,12 @@
 // Server Component: la prosa del catálogo se queda en el servidor y al
 // navegador solo baja lo que se pinta.
 import Link from 'next/link'
+import GuiaRutaPlan from '../../../../../components/semana/GuiaRutaPlan'
 import Sidebar from '../../../../../components/Sidebar'
 import CentroNavigation from '../../../../../components/CentroNavigation'
 import { getCentroNombre } from '../../../../actions/centros'
 import { cargarOficio } from '../../../../actions/entrenamiento-oficio'
+import { modulosDeRol } from '../../../../../lib/entrenamiento/modulos'
 import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../lib/entrenamiento/oficio/catalogo'
 import { estudiado, esDePapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../lib/entrenamiento/oficio/progreso'
 import { puertaCerrada } from '../../../../../lib/entrenamiento/oficio/guia-pasos'
@@ -70,6 +72,7 @@ export default async function OficioPage({ params, searchParams }) {
           barrido R10. */}
       <main className="main ent-page" id="main-content" data-page-state={estado}>
         <CentroNavigation centroId={id} section="entrenamiento" />
+        <GuiaRutaPlan centroId={id} />
         {contenido}
       </main>
     </div>
@@ -306,6 +309,9 @@ export default async function OficioPage({ params, searchParams }) {
     </>)
   }
 
+  const semanales = plan.filter((m) => m.curso === 'semana')
+  const pendientesSemana = semanales.filter((m) => !estudiado(progreso[m.id]) || (m.drills > 0 && !progreso[m.id]?.drillFirmadoAt))
+  const recorridosSemana = modulosDeRol(rol).filter((m) => m.id.startsWith('semana-'))
   const hat = plan.find((m) => m.curso === 'hat')
   // El módulo del propio puesto es de los últimos del bloque A: para quien
   // empieza está cerrado. Prometerle ahí su producto y un botón "Estudiar mi
@@ -326,6 +332,12 @@ export default async function OficioPage({ params, searchParams }) {
   return shell('ready', <>
     <Link className="tour-card__link" href={`/centro/${id}/entrenamiento`}>← Volver a Entrenamiento</Link>
 
+    {semanales.length > 0 && <section id="actualizacion-semanal" className="card" aria-labelledby="actualizacion-semanal-title" style={{ scrollMarginTop: 24 }}>
+      <h2 id="actualizacion-semanal-title">Actualización semanal {pendientesSemana.length ? 'pendiente' : 'completada'}</h2>
+      <p>Dos lecciones comunes y una práctica de tu puesto. {pendientesSemana.length} de {semanales.length} módulos pendientes de estudio o maniobra firmada. Tu formación anterior conserva su progreso.</p>
+      <ul>{semanales.map((m) => <li key={m.id}><Link href={`${base}/${m.id}`}>{m.titulo}</Link></li>)}</ul>
+      {recorridosSemana.length > 0 && <p>Recorridos de pantalla: {recorridosSemana.map((m, i) => <span key={m.id}>{i > 0 && ' · '}<Link href={`/centro/${id}/entrenamiento/${m.id}`}>{m.titulo}</Link></span>)}</p>}
+    </section>}
     <div className="main__head"><div>
       <div className="label" style={{ marginTop: 8, marginBottom: 10 }}>Mi centro · Entrenamiento de oficio</div>
       <h1 className="h-title">{hat ? hat.titulo : 'Tu oficio'}</h1>

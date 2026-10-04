@@ -19,7 +19,7 @@ const opcionCorrecta = (id, patronPregunta) => {
   return modulo.quiz[idx].opciones[RESPUESTAS_COACH_ONLINE[id][idx]]
 }
 
-test('Online se integra como tres módulos nuevos al final del plan Coach', () => {
+test('Online conserva su secuencia histórica antes de la actualización semanal Coach', () => {
   assert.deepEqual(COACH_ONLINE.map((m) => m.id), ['of-coa-12', 'of-coa-13', 'of-coa-14'])
   assert.deepEqual(COACH_ONLINE.map((m) => m.orden), [25, 26, 27])
   assert.deepEqual(COACH_ONLINE.map((m) => m.curso), ['coach', 'coach', 'coach'])
@@ -32,7 +32,9 @@ test('Online se integra como tres módulos nuevos al final del plan Coach', () =
     .filter((m) => m.roles.includes('coach'))
     .sort((a, b) => a.orden - b.orden)
     .map((m) => m.id)
-  assert.deepEqual(planCoach.slice(-4), ['of-coa-11', 'of-coa-12', 'of-coa-13', 'of-coa-14'])
+  const semanales = new Set(['of-sem-1', 'of-sem-2', 'of-sem-adm', 'of-sem-asi', 'of-sem-coa', 'of-sem-cop'])
+  assert.deepEqual(planCoach.filter(id => !semanales.has(id)).slice(-4), ['of-coa-11', 'of-coa-12', 'of-coa-13', 'of-coa-14'])
+  assert.deepEqual(planCoach.slice(-3), ['of-sem-1', 'of-sem-2', 'of-sem-coa'])
 })
 
 test('Online conserva las reglas exactas auditadas del Manual', () => {

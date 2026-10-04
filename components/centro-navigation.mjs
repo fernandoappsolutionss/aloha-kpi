@@ -2,7 +2,7 @@ import { rolesQueFirma, tienePlanPropio } from '../lib/entrenamiento/oficio/prog
 import { isMasterRole, isReadonlyGlobalRole } from './access-control.mjs'
 
 export function hrefKpiMensual(path) {
-  const match = typeof path === 'string' && path.match(/^\/centro\/([^/]+)\/(?:kpi|cumplimiento|encuestas|foda|historial)(?:\/|$)/)
+  const match = typeof path === 'string' && path.match(/^\/centro\/([^/]+)\/(?:kpi|cumplimiento|encuestas|foda|peticiones|semana|historial)(?:\/|$)/)
   return match ? `/centro/${match[1]}/kpi` : null
 }
 
@@ -11,9 +11,10 @@ export function seccionesCentro(centroId, section = 'kpi', rol = null) {
   const base = `/centro/${centroId}`
   if (section === 'kpi') return [
     { label: 'KPI Mensual', href: `${base}/kpi` },
+    { label: 'Semana', href: `${base}/semana` },
     { label: 'Cumplimiento', href: `${base}/cumplimiento` },
     { label: 'Encuestas', href: `${base}/encuestas` },
-    { label: 'FODA', href: `${base}/foda` },
+    { label: 'Peticiones', href: `${base}/peticiones` },
     { label: 'Historial', href: `${base}/historial` },
   ]
   if (section !== 'entrenamiento' || !rol) return []
