@@ -10,11 +10,12 @@ import {
   eliminarEvento, duplicarEvento, listarRegistros, agregarInvitado, marcarAsistencia, marcarPago,
 } from '../../../actions/eventos'
 import { listarGruposActivos } from '../../../actions/grupos'
-import { inscribirEstudiante } from '../../../actions/estudiantes'
+import { inscribirEstudiante, vincularFichaExistente } from '../../../actions/estudiantes'
+import CoincidenciasFicha, { ConfirmarFichaNueva, fechaCorta, nivelTexto, tituloCoincidencias } from '../../../../components/CoincidenciasFicha'
 import { origenDeRegistro } from '../../../../lib/registro-origen'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES_VENTA, hoyISO } from '../../../../lib/operaciones'
 import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
-import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
+import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, colocacionInvalida, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
 import { mesClase, mesAnterior, filtrarClasesPorMes, filtrarClasesPorMomento, resumirClases } from '../../../../lib/clases-prueba.mjs'
@@ -742,10 +743,31 @@ const desdeGrupo = (g) => {
   return { itinerario: g.itinerario, nivel: Math.min(Math.max(1, Number(g.nivel) || 1), NIVEL_MAX[g.itinerario] || 1) }
 }
 
+const HINT = { fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 0' }
+const ACCIONES_FICHA = { display: 'grid', gap: 8, marginTop: 10 }
+const RADIO = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44, cursor: 'pointer' }
+const mesDe = (iso) => String(iso || '').slice(0, 7)
+
+function mensajeVinculo(c, res, { fecha, grupo }) {
+  let base
+  if (res.reincorporado) base = `${c.nombre} volvió como reincorporado${grupo ? ` en el grupo ${grupo.numero}` : ''}.`
+  else if (res.movido && c.grupo_id == null) base = `${c.nombre} quedó colocado${grupo ? ` en el grupo ${grupo.numero}` : ''}${res.fechaCorregida ? ` con su venta del ${fechaCorta(fecha)}` : ''}.`
+  else if (res.movido) base = `${c.nombre} pasó${grupo ? ` al grupo ${grupo.numero}` : ' de grupo'}${res.fechaCorregida ? ` y su venta quedó el ${fechaCorta(fecha)}` : ''}.`
+  else if (res.fechaCorregida) base = `${c.nombre} ya tenía ficha: su venta quedó el ${fechaCorta(fecha)}.`
+  else if (c.fuerza === 'registro') base = `${c.nombre} ya estaba inscrito con este registro.`
+  else base = `${c.nombre} ya tenía ficha: quedó vinculado a esta clase de prueba.`
+  return `${base} No se creó otra ficha.${res.aviso ? ` ${res.aviso}` : ''}`
+}
+
 // Pasa un registro de la clase de prueba al módulo de grupos: crea el
-// estudiante con origen 'clase_prueba' y el crm_registration_id del registro
-// (inscribirEstudiante rechaza el duplicado si ya fue inscrito). Si la clase
-// de prueba tiene grupo por aperturar, viene preseleccionado en el select.
+// estudiante con origen 'clase_prueba' y el crm_registration_id del registro.
+// Si la clase de prueba tiene grupo por aperturar, viene preseleccionado.
+// (2026-10-01) Si el niño YA tiene ficha en el centro (lib/ficha-existente.mjs),
+// el server no crea nada y devuelve las coincidencias: el modal pasa a «Este
+// niño ya tiene ficha» y «Es este niño» lo deja donde el centro lo quiere
+// (colocarlo, pasarlo de grupo o reincorporarlo en el grupo del formulario),
+// corrigiendo la venta solo si el centro elige la fecha. «Es otro niño» crea la
+// ficha con motivo obligatorio, que queda en el rastro de la venta.
 function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, returnFocusRef }) {
   const complete = useDialogCallback(onSaved, centroId)
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
@@ -759,6 +781,13 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
   const [grupos, setGrupos] = useState(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  // Fichas que ya tiene el niño (respuesta del server) y lo que el centro
+  // eligió por ficha: qué fecha de venta vale y a qué grupo vuelve el retirado.
+  const [existentes, setExistentes] = useState(null)
+  const [fechaElegida, setFechaElegida] = useState({})
+  const [grupoVuelta, setGrupoVuelta] = useState({})
+  const [confirmando, setConfirmando] = useState(false)
+  const [confirmacion, setConfirmacion] = useState({ motivo: '', nota: '' })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
   useEffect(() => {
@@ -784,18 +813,42 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
   const abiertos = ordenarPorLimiteNuevos((grupos || []).filter((g) => aceptaNuevosEnSelector(g, hoy)))
   const vinculado = grupoId ? (grupos || []).find((x) => String(x.id) === String(grupoId)) : null
   const vinculoCerrado = vinculado && !aceptaNuevosEnSelector(vinculado, hoy) ? vinculado : null
+  // El grupo elegido en el formulario: ahí es donde el centro quiere al niño.
+  const grupoForm = f.grupo_id ? (grupos || []).find((g) => String(g.id) === String(f.grupo_id)) || null : null
+  // Reincorporar es MOVIMIENTO: solo la palanca del grupo manda, no la ventana
+  // de niños nuevos (mismo criterio que reincorporarEstudiante).
+  const aceptanMovimientos = (grupos || []).filter((g) => g.inscripcionAbierta !== false)
+  const grupoVueltaDe = (c) => grupoVuelta[c.id]
+    ?? (aceptanMovimientos.some((g) => String(g.id) === String(f.grupo_id)) ? String(f.grupo_id) : '')
+  // La venta de la ficha se puede corregir aquí solo hacia ATRÁS o dentro del
+  // mismo mes (la venta cerrada en la clase que el centro registró tarde). Pasar
+  // una venta a un mes posterior es «Editar niño», a conciencia.
+  const corrigeVenta = (c) => c.estado !== 'retirado' && c.tiene_venta && f.fecha !== c.fecha_venta
+    && (f.fecha < c.fecha_venta || mesDe(f.fecha) === mesDe(c.fecha_venta))
 
-  async function save() {
+  async function save(confirmarFichaNueva = false) {
     if (!f.nombre.trim()) { setErr('El nombre del niño es requerido.'); return }
     if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     if (!f.fecha || f.fecha > hoyISO()) { setErr('Indica la fecha de inscripción (no puede ser futura).'); return }
+    if (confirmarFichaNueva && !confirmacion.motivo) { setErr('Elige por qué es otro niño.'); return }
+    if (confirmarFichaNueva && confirmacion.motivo === 'otro' && !confirmacion.nota.trim()) { setErr('Escribe por qué es otro niño.'); return }
     setSaving(true); setErr('')
     try {
       const res = await inscribirEstudiante(centroId, {
         nombre: f.nombre, itinerario: f.itinerario, nivel: f.nivel, grupo_id: f.grupo_id || null,
         origen: 'clase_prueba', origen_venta: f.origen_venta, crm_registration_id: String(reg.id),
         representante: f.representante, telefono: f.telefono, correo: f.correo, fecha: f.fecha,
+        // Las fichas que el centro VIO: si aparece otra, el server vuelve a preguntar.
+        ...(confirmarFichaNueva ? { ficha_nueva: { descartadas: existentes.coincidencias.map((c) => c.id), ...confirmacion } } : {}),
       })
+      if (res.coincidencias?.length) {
+        const vistas = new Set((existentes?.coincidencias || []).map((c) => c.id))
+        const nuevas = res.coincidencias.filter((c) => !vistas.has(c.id))
+        setExistentes({ coincidencias: res.coincidencias, registroYaInscrito: !!res.registroYaInscrito })
+        setConfirmando(false)
+        if (confirmarFichaNueva && nuevas.length) setErr(`Apareció otra ficha que puede ser este niño (${nuevas.map((c) => c.nombre).join(', ')}): revísala antes de confirmar.`)
+        return
+      }
       if (res.error) { setErr(res.error); return }
       const g = (grupos || []).find((x) => String(x.id) === String(f.grupo_id))
       complete(g ? `Inscrito en el grupo ${g.numero}.` : 'Inscrito (sin grupo asignado).')
@@ -806,23 +859,181 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
     }
   }
 
+  // Sin grupo y SIN venta (pendiente puro): al colocarlo nace su venta, hoy
+  // (g1-8/g2-1). Si el formulario trae otra fecha, el centro elige cuál vale.
+  const preguntaFechaColocacion = (c) => c.estado !== 'retirado' && c.grupo_id == null && !c.tiene_venta
+    && !!grupoForm && f.fecha !== hoyISO()
+
+  // "Es este niño": no nace ficha nueva. Queda donde el centro lo quiere:
+  // retirado → reincorporado en el grupo elegido; sin grupo → colocado en el
+  // grupo del formulario; en otro grupo → solo si el centro lo pide, pasa al
+  // del formulario (traslado). La venta se toca solo con la fecha que eligió.
+  async function vincular(c, { mover = false } = {}) {
+    const esRetirado = c.estado === 'retirado'
+    const colocar = !esRetirado && c.grupo_id == null && !!grupoForm
+    const preguntaFecha = corrigeVenta(c) || preguntaFechaColocacion(c)
+    const eleccion = fechaElegida[c.id]
+    if (preguntaFecha && !eleccion) { setErr(`Elige cuál es la fecha real de la venta de ${c.nombre}.`); return }
+    const grupoRetorno = esRetirado ? grupoVueltaDe(c) : ''
+    if (esRetirado && !grupoRetorno) { setErr(`Elige el grupo al que vuelve ${c.nombre}.`); return }
+    const grupoDestino = esRetirado ? grupoRetorno : colocar || mover ? grupoForm.id : null
+    const fechaVenta = preguntaFecha && eleccion === 'formulario' ? f.fecha : null
+    setSaving(true); setErr('')
+    try {
+      const res = await vincularFichaExistente(centroId, c.id, {
+        crm_registration_id: String(reg.id),
+        ...(grupoDestino ? { grupo_id: Number(grupoDestino) } : {}),
+        ...(fechaVenta ? { fecha_venta: fechaVenta } : {}),
+        // Solo se usa si al colocarlo nace su venta y la ficha no tiene origen.
+        ...(f.origen_venta ? { origen_venta: f.origen_venta } : {}),
+      })
+      if (res.error) { setErr(res.error); return }
+      const grupo = (grupos || []).find((g) => String(g.id) === String(grupoDestino)) || null
+      complete(mensajeVinculo(c, res, { fecha: fechaVenta || f.fecha, grupo }))
+    } catch {
+      setErr('No se pudo guardar. Revisa tu conexión e intenta nuevamente.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function accionesDe(c) {
+    const enlaceFicha = <Link href={`/centro/${centroId}/grupos?ficha=${c.id}`} style={{ fontSize: 12 }}>Abrir su ficha en Grupos</Link>
+    if (c.estado === 'retirado') {
+      const valor = grupoVueltaDe(c)
+      const destino = aceptanMovimientos.find((g) => String(g.id) === String(valor)) || null
+      const otroNivel = destino && (destino.itinerario !== c.itinerario || Number(destino.nivel) !== Number(c.nivel))
+      // La matriz Tiny/Kids no frena la reincorporación (su ficha puede tener el
+      // itinerario de cuando se fue): se avisa y se corrige con «Editar niño».
+      const reglaManual = destino ? colocacionInvalida({ itinerario: c.itinerario, nivel: c.nivel }, destino.itinerario) : null
+      return (
+        <div style={ACCIONES_FICHA}>
+          <p style={HINT}>Si vuelve, es una reincorporación: no suma una venta nueva.</p>
+          <label className="field" style={{ margin: 0 }}>
+            <span className="label">Vuelve al grupo</span>
+            <select name={`grupo-vuelta-${c.id}`} className="input" value={valor} onChange={(e) => setGrupoVuelta((p) => ({ ...p, [c.id]: e.target.value }))}>
+              <option value="">{grupos === null ? 'Cargando grupos…' : 'Elegir grupo'}</option>
+              {aceptanMovimientos.map((g) => <option key={g.id} value={g.id}>Grupo {g.numero} · {nivelTexto(g.itinerario, g.nivel)}</option>)}
+            </select>
+          </label>
+          {otroNivel && (
+            <p style={{ ...HINT, color: 'var(--warn)' }}>
+              Su ficha dice {nivelTexto(c.itinerario, c.nivel)} y el grupo {destino.numero} está en {nivelTexto(destino.itinerario, destino.nivel)}: confirma que ese es su grupo antes de reincorporarlo.
+              {reglaManual ? ` ${reglaManual} Si ya creció, reincorpóralo y corrige su itinerario y nivel en «Editar niño».` : ''}
+              {' '}No lo inscribas como otro niño: sumaría una venta falsa.
+            </p>
+          )}
+          <button type="button" className="btn btn--primary" disabled={saving || !valor} onClick={() => vincular(c)}>Es este niño: reincorporarlo</button>
+          {enlaceFicha}
+        </div>
+      )
+    }
+    const corrige = corrigeVenta(c)
+    const fechaColocacion = preguntaFechaColocacion(c)
+    const ventaDeMesAnterior = c.tiene_venta && f.fecha !== c.fecha_venta && !corrige
+    const colocar = c.grupo_id == null && !!grupoForm
+    const enOtroGrupo = c.grupo_id != null && !!grupoForm && String(grupoForm.id) !== String(c.grupo_id)
+    const mismoRegistro = c.fuerza === 'registro'
+    const sinCambios = mismoRegistro && !corrige && !colocar && !enOtroGrupo
+    const faltaFecha = (corrige || fechaColocacion) && !fechaElegida[c.id]
+    return (
+      <div style={ACCIONES_FICHA}>
+        {fechaColocacion && (
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="label">¿Cuándo fue la venta?</legend>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'hoy'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'hoy' }))} />
+              Hoy, al colocarlo en el grupo
+            </label>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'formulario'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'formulario' }))} />
+              El {fechaCorta(f.fecha)}, la de este formulario
+            </label>
+          </fieldset>
+        )}
+        {corrige && (
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="label">¿Cuándo fue la venta?</legend>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'ficha'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'ficha' }))} />
+              El {fechaCorta(c.fecha_venta)}, como dice su ficha: dejarla así
+            </label>
+            <label style={RADIO}>
+              <input type="radio" name={`fecha-venta-${c.id}`} checked={fechaElegida[c.id] === 'formulario'} onChange={() => setFechaElegida((p) => ({ ...p, [c.id]: 'formulario' }))} />
+              El {fechaCorta(f.fecha)}, la de este formulario: corregirla
+            </label>
+          </fieldset>
+        )}
+        {ventaDeMesAnterior && <p style={HINT}>Su venta ({fechaCorta(c.fecha_venta)}) es de un mes anterior a la fecha de este formulario: si está mal, corrígela con «Editar niño».</p>}
+        {c.retiro_programado_para && <p style={{ ...HINT, color: 'var(--warn)' }}>Tiene un retiro programado para el {fechaCorta(c.retiro_programado_para)}: si se queda, cancélalo en Grupos.</p>}
+        {sinCambios && <p style={HINT}>Ya está inscrito con este registro: no hay nada que cambiar.</p>}
+        {colocar && !c.tiene_venta && <p style={HINT}>Está sin grupo y sin venta: se coloca en el grupo {grupoForm.numero} y ahí nace su venta.</p>}
+        {!sinCambios && enOtroGrupo && (
+          <>
+            <button type="button" className="btn btn--primary" disabled={saving || faltaFecha} onClick={() => vincular(c, { mover: true })}>Es este niño y pasa al grupo {grupoForm.numero}</button>
+            <button type="button" className="btn" disabled={saving || faltaFecha} onClick={() => vincular(c)}>Es este niño: sigue en el grupo {c.grupo_numero}</button>
+          </>
+        )}
+        {!sinCambios && !enOtroGrupo && (
+          <button type="button" className="btn btn--primary" disabled={saving || faltaFecha} onClick={() => vincular(c)}>
+            {colocar ? `Es este niño: colocarlo en el grupo ${grupoForm.numero}`
+              : mismoRegistro ? 'Guardar la fecha de venta'
+              : c.grupo_id == null ? 'Es este niño: vincularlo (sigue sin grupo)'
+              : 'Es este niño: vincularlo'}
+          </button>
+        )}
+        {enlaceFicha}
+      </div>
+    )
+  }
+
+  const titulo = existentes ? tituloCoincidencias(existentes.coincidencias) : 'Inscribir niño'
+  const hayFuerte = existentes?.coincidencias.some((c) => c.fuerza !== 'posible')
   const niveles = Array.from({ length: NIVEL_MAX[f.itinerario] || 1 }, (_, i) => i + 1)
   return (
     <Dialog
       open
-      title="Inscribir niño"
+      title={titulo}
       returnFocusRef={returnFocusRef}
       width={480}
       onClose={onClose}
       closeDisabled={saving}
-      footer={(
+      footer={!existentes ? (
         <>
           <button className="btn" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" onClick={save} disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</button>
+          <button className="btn btn--primary" onClick={() => save()} disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</button>
+        </>
+      ) : existentes.registroYaInscrito ? (
+        <>
+          <button className="btn" onClick={() => { setExistentes(null); setErr('') }} disabled={saving}>Volver al formulario</button>
+          <button className="btn" onClick={onClose} disabled={saving}>Cerrar</button>
+        </>
+      ) : confirmando ? (
+        <>
+          <button className="btn" onClick={() => { setConfirmando(false); setErr('') }} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary" onClick={() => save(true)} disabled={saving}>{saving ? 'Creando…' : 'Crear ficha nueva'}</button>
+        </>
+      ) : (
+        <>
+          <button className="btn" onClick={() => { setExistentes(null); setErr('') }} disabled={saving}>Volver al formulario</button>
+          <button className="btn" onClick={() => { setConfirmando(true); setErr('') }} disabled={saving}>Es otro niño: crear ficha nueva</button>
         </>
       )}
     >
       {err && <div role="alert" className="alert alert--error" style={{ marginBottom: 14 }}>{err}</div>}
+      {existentes ? (
+        <div>
+          <p className="h-sub" style={{ marginTop: 0 }}>
+            {existentes.registroYaInscrito
+              ? 'Este registro de la clase de prueba ya fue inscrito. No hace falta otra ficha: si la fecha de la venta está mal, corrígela aquí.'
+              : hayFuerte
+                ? `${f.nombre.trim()} ya tiene ficha en el centro. Si es el mismo niño, no crees otra: cada ficha nueva cuenta como una venta más.`
+                : `Revisa si ${f.nombre.trim()} es alguno de estos niños. Si es el mismo, no crees otra ficha: cada ficha nueva cuenta como una venta más.`}
+          </p>
+          <CoincidenciasFicha coincidencias={existentes.coincidencias} renderAcciones={confirmando ? null : accionesDe} />
+          {confirmando && <ConfirmarFichaNueva coincidencias={existentes.coincidencias} valor={confirmacion} onChange={setConfirmacion} />}
+        </div>
+      ) : (
           <div className="dialog-form-grid">
             <Field full label="Nombre del niño *"><input name="nombre" className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} /></Field>
             <Field label="Itinerario">
@@ -860,6 +1071,7 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
             <Field label="Teléfono"><input type="tel" name="telefono" className="input" value={f.telefono} onChange={(e) => set('telefono', e.target.value)} /></Field>
             <Field label="Correo"><input type="email" name="correo" className="input" value={f.correo} onChange={(e) => set('correo', e.target.value)} /></Field>
           </div>
+      )}
     </Dialog>
   )
 }

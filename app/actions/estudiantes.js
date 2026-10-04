@@ -20,6 +20,11 @@ import { ORIGENES_ANCLA, TIPOS_EVENTO_ANCLA, errorFechaAncla, sugerenciasAncla, 
 import { idsDeLote, preparaFijadoAncla } from '../../lib/ancla-lote.mjs'
 import { matriculaAnulada, validarSolicitudAnulacion } from '../../lib/anulacion-matricula.mjs'
 import { anularMatriculaEn } from '../../lib/anulacion-matricula-service.mjs'
+import {
+  buscarFichasCoincidentes, coincidenciasParaPantalla, decidirAlta, leerConfirmacionFichaNueva, mensajeFichaExistente,
+  registroEnFichaAnulada,
+} from '../../lib/ficha-existente.mjs'
+import { vincularFichaExistenteCon } from '../../lib/ficha-existente-service.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -118,14 +123,75 @@ function posicionEn(lado, ancla, nivel, hoy, memo) {
   return { estado: p.estado, indice: p.indice }
 }
 
+// Las fichas que coincidieron, con lo que la pantalla muestra: grupo y la
+// venta canónica (primer evento de inscripción, el mismo que cuenta el KPI).
+async function detalleCoincidencias(query, centroId, coincidencias) {
+  const ids = coincidencias.map((c) => Number(c.ficha.id))
+  if (!ids.length) return []
+  const filas = await query`
+    SELECT e.id, e.nombre, e.estado, e.grupo_id, g.numero AS grupo_numero, e.itinerario, e.nivel, e.origen,
+      e.crm_registration_id, e.representante, e.correo, e.telefono, e.fecha_inscripcion, e.fecha_retiro,
+      e.retiro_programado_para, (
+        SELECT ev.fecha FROM estudiante_eventos ev
+        WHERE ev.estudiante_id = e.id AND ev.tipo = 'inscripcion'
+        ORDER BY ev.fecha, ev.id LIMIT 1
+      ) AS fecha_venta
+    FROM estudiantes e
+    LEFT JOIN grupos g ON g.id = e.grupo_id
+    WHERE e.centro_id = ${centroId} AND e.id = ANY(${ids}::int[])
+  `
+  const porId = new Map(filas.map((f) => [String(f.id), f]))
+  return coincidencias.map((c) => ({ ...c, ficha: { ...c.ficha, ...(porId.get(String(c.ficha.id)) || {}) } }))
+}
+
+// ¿El niño del formulario ya tiene ficha en el centro? Devuelve la respuesta
+// que corta el alta (con las coincidencias para la pantalla) o la decisión de
+// crear (con la confirmación "es otro niño" si la hubo). Incluye retiradas: el
+// que vuelve es una reincorporación, no una venta. `soltarRegistro`: el
+// registro de CRM lo tiene una matrícula ANULADA — el niño vuelve como venta
+// nueva, sin ese registro (el índice único no admite dos fichas con él).
+async function fichaExistenteEn(query, centroId, nuevo, confirmacion) {
+  const candidatas = await query`
+    SELECT id, nombre, estado, crm_registration_id, telefono, correo, representante
+    FROM estudiantes WHERE centro_id = ${centroId}
+  `
+  const coincidencias = buscarFichasCoincidentes(nuevo, candidatas)
+  const decision = decidirAlta(coincidencias, confirmacion)
+  if (decision.crear) return { decision, soltarRegistro: registroEnFichaAnulada(nuevo.crm_registration_id, candidatas) }
+  const detalle = await detalleCoincidencias(query, centroId, coincidencias)
+  return {
+    respuesta: {
+      error: mensajeFichaExistente(detalle),
+      coincidencias: coincidenciasParaPantalla(detalle),
+      ...(decision.registroYaInscrito ? { registroYaInscrito: true } : { requiereConfirmacion: true }),
+    },
+  }
+}
+
+// Candado de ALTAS por centro (pg_advisory_xact_lock de dos claves: este
+// número + el centro). Solo inscribirEstudiante crea fichas: con el candado
+// tomado, ninguna otra alta del centro está a medio escribir.
+const CANDADO_ALTAS_CENTRO = 20261001
+const INTENTOS_ALTA = 3
+// Se reintentan con foto nueva: serialización (40001) y deadlock (40P01, p. ej.
+// contra la asistencia del coach, que toma mes → grupo).
+const REINTENTABLES = new Set(['40001', '40P01'])
+
 // Alta de un niño (clase de prueba, inscripción directa o traslado).
 // (g1-8) Con grupo asignado: el evento de venta nace AQUÍ (con origen copiado
 // atómicamente, g1-17) y el ancla = max(fecha_inscripcion,
 // grupo.fecha_inicio_clases). SIN grupo: flujo `pendiente` — ficha solamente,
 // SIN evento de venta y SIN ancla; ambos nacen en la PRIMERA COLOCACIÓN
 // (actualizarEstudiante, tratada como niño nuevo).
+// (2026-10-01) Antes de crear se busca en el centro una ficha del MISMO niño
+// (lib/ficha-existente.mjs). Si la hay, no se crea nada y la respuesta trae
+// `coincidencias`: el niño que ya tiene ficha se vincula
+// (vincularFichaExistente) en vez de sumar otra venta. `ficha_nueva`
+// ({ descartadas, motivo, nota }: "es otro niño") crea igual solo si el centro
+// vio TODAS las fichas que coinciden ahora, y deja rastro (motivo y quién) en
+// el evento de venta. El mismo registro de CRM no se salta nunca.
 export async function inscribirEstudiante(centroId, data) {
-  await requireCurrentWriteCentro(centroId)
+  const sesion = await requireCurrentWriteCentro(centroId)
   const nombre = data?.nombre?.trim()
   if (!nombre) return { error: 'El nombre es requerido.' }
   const itinerario = data?.itinerario || 'TINY'
@@ -136,6 +202,21 @@ export async function inscribirEstudiante(centroId, data) {
   if (!ORIGENES.includes(origen)) return { error: 'Origen inválido.' }
   const grupoId = data?.grupo_id || null
   const hoy = hoyISO()
+  const crmId = data?.crm_registration_id?.trim() || null
+  const confirmacion = leerConfirmacionFichaNueva(data?.ficha_nueva)
+  if (confirmacion.error) return { error: confirmacion.error }
+  const fichaNueva = {
+    nombre,
+    crm_registration_id: crmId,
+    telefono: data?.telefono,
+    correo: data?.correo,
+    representante: data?.representante,
+  }
+  // Primero la pregunta de fondo: ¿es un niño nuevo? Si ya tiene ficha, eso
+  // le sirve más al centro que un "grupo cerrado" o un "mes cerrado".
+  // Prechequeo amable; la garantía es el mismo chequeo con el candado tomado.
+  const previa = await fichaExistenteEn(sql, centroId, fichaNueva, confirmacion)
+  if (previa.respuesta) return previa.respuesta
   if (grupoId) {
     const g = await grupoDe(centroId, grupoId)
     if (!g) return { error: 'El grupo no pertenece a este centro.' }
@@ -151,11 +232,6 @@ export async function inscribirEstudiante(centroId, data) {
     const errCol = colocacionInvalida({ itinerario, nivel }, g.itinerario)
     if (errCol) return { error: errCol }
   }
-  const crmId = data?.crm_registration_id?.trim() || null
-  if (crmId) {
-    const [dup] = await sql`SELECT id FROM estudiantes WHERE centro_id = ${centroId} AND crm_registration_id = ${crmId}`
-    if (dup) return { error: 'Este registro ya fue inscrito.' }
-  }
   const fecha = data?.fecha || hoy
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
   if (fecha > hoy) return { error: 'La fecha de inscripción no puede ser futura.' }
@@ -170,68 +246,138 @@ export async function inscribirEstudiante(centroId, data) {
 
   const now = new Date().toISOString()
   // (g2-3) Alta ATÓMICA: mes editable, gate de ventana sobre el grupo releído y
-  // BLOQUEADO, duplicado de CRM, estudiante (ficha + ancla + cierre), evento y
-  // outbox van en la MISMA transacción SERIALIZABLE — si la palanca se cerró o
-  // la ventana venció entre el prechequeo y el commit, no queda nada a medias.
-  // El CRM se entera por el outbox (ya NO pushCuposAlCrm inline).
-  let resultado
-  try {
-    resultado = await withTransaction(async (query) => {
-      // ORDEN DE LOCKS grupos → mes_kpi → estudiantes, el mismo de
-      // actualizarGrupo (PR #81): tomarlos siempre en este orden evita deadlocks
-      // entre editar el grupo e inscribir en él. El ORDEN DE MENSAJES no cambia:
-      // se bloquea primero y se evalúa después.
-      const g = grupoId ? await grupoDe(centroId, grupoId, query, { bloquear: true }) : null
-      // El mes KPI solo importa cuando nace el evento de venta (con grupo). El
-      // alta pendiente es ficha pura: ningún periodo del cuadro se toca (g1-8).
-      if (grupoId) {
-        const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
-        if (errorMes) return { error: errorMes }
-        if (!g) return { error: 'El grupo no pertenece a este centro.' }
-        // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
-        // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
-        const errorGrupo = grupoAceptaNinosNuevos(g, hoy)
-        if (errorGrupo) return { error: errorGrupo }
-        const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
-        if (errorColocacion) return { error: errorColocacion }
-      }
-      if (crmId) {
-        const [dup] = await query`
-          SELECT id FROM estudiantes
-          WHERE centro_id = ${centroId} AND crm_registration_id = ${crmId}
+  // BLOQUEADO, estudiante (ficha + ancla + cierre), evento y outbox van en la
+  // MISMA transacción SERIALIZABLE — si la palanca se cerró o la ventana venció
+  // entre el prechequeo y el commit, no queda nada a medias. El CRM se entera
+  // por el outbox (ya NO pushCuposAlCrm inline). Un 40001/40P01 (otra
+  // transacción se cruzó) se reintenta con foto nueva, como la conciliación
+  // del KPI.
+  for (let intento = 1; ; intento++) {
+    try {
+      return await withTransaction(async (query) => {
+        // Ninguna espera de lock de esta alta pasa de 10 s: un alta trabada no
+        // congela a las demás del centro detrás del candado.
+        await query`SET LOCAL lock_timeout = '10s'`
+        // Candado de altas del centro ANTES de todo (ninguna otra operación lo
+        // toma: no altera el orden de locks grupos → mes_kpi → estudiantes).
+        await query`SELECT pg_advisory_xact_lock(${CANDADO_ALTAS_CENTRO}::int, ${Number(centroId)}::int)`
+        // ¿El niño ya tiene ficha? Se lee con la conexión de AFUERA (`sql`):
+        // ve todo lo confirmado, incluida la alta que acaba de soltar el
+        // candado, y no deja locks de predicado SERIALIZABLE sobre las fichas
+        // del centro (esos locks hacían abortar la asistencia del coach o una
+        // edición que corrieran al mismo tiempo).
+        const existente = await fichaExistenteEn(sql, centroId, fichaNueva, confirmacion)
+        if (existente.respuesta) return existente.respuesta
+        const { decision } = existente
+        // ORDEN DE LOCKS grupos → mes_kpi → estudiantes, el mismo de
+        // actualizarGrupo (PR #81): tomarlos siempre en este orden evita deadlocks
+        // entre editar el grupo e inscribir en él. El ORDEN DE MENSAJES no cambia:
+        // se bloquea primero y se evalúa después.
+        const g = grupoId ? await grupoDe(centroId, grupoId, query, { bloquear: true }) : null
+        // El mes KPI solo importa cuando nace el evento de venta (con grupo). El
+        // alta pendiente es ficha pura: ningún periodo del cuadro se toca (g1-8).
+        if (grupoId) {
+          const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
+          if (errorMes) return { error: errorMes }
+          if (!g) return { error: 'El grupo no pertenece a este centro.' }
+          // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
+          // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
+          const errorGrupo = grupoAceptaNinosNuevos(g, hoy)
+          if (errorGrupo) return { error: errorGrupo }
+          const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
+          if (errorColocacion) return { error: errorColocacion }
+        }
+        // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
+        // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
+        const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
+        const crmAlta = existente.soltarRegistro ? null : crmId
+        const [e] = await query`
+          INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
+            origen_venta, crm_registration_id, fecha_inscripcion, fecha_inicio_nivel, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
+          VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
+            ${origenVenta}, ${crmAlta}, ${fecha}, ${ancla}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
+            ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
+          RETURNING id
         `
-        if (dup) return { error: 'Este registro ya fue inscrito.' }
+        if (grupoId) {
+          // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
+          // Si el centro confirmó que es OTRO niño pese a fichas parecidas, el
+          // rastro (cuáles descartó, por qué y quién) queda en el detalle.
+          const detalleVenta = decision.confirmacion
+            ? JSON.stringify({
+              ficha_nueva_confirmada: {
+                ...decision.confirmacion,
+                actor: sesion?.email || sesion?.nombre || (sesion?.uid != null ? String(sesion.uid) : null),
+              },
+            })
+            : null
+          await query`
+            INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen, detalle)
+            VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen}, ${detalleVenta})
+          `
+          // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
+          await encolarSyncCrm([grupoId], 'inscripcion', query)
+        }
+        return { ok: true, estudianteId: e.id, pendiente: !grupoId }
+      })
+    } catch (error) {
+      // El índice único (centro_id, crm_registration_id) es la última palabra
+      // contra dos altas simultáneas del mismo registro de CRM: el 23505 se
+      // traduce al mismo mensaje del prechequeo, nunca a un error crudo.
+      if (crmId && error?.code === '23505') return { error: 'Este registro ya fue inscrito.' }
+      if (REINTENTABLES.has(error?.code) && intento < INTENTOS_ALTA) continue
+      if (REINTENTABLES.has(error?.code) || error?.code === '55P03') {
+        return { error: 'El centro tuvo varios cambios al mismo tiempo y la inscripción no se guardó. Vuelve a intentarlo.' }
       }
-      // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
-      // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
-      const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
-      const [e] = await query`
-        INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
-          origen_venta, crm_registration_id, fecha_inscripcion, fecha_inicio_nivel, fecha_cierre_nivel, representante, correo, telefono, notas, updated_at)
-        VALUES (${centroId}, ${grupoId}, ${nombre}, ${itinerario}, ${nivel}, 'activo', 'INCLUIR', ${origen},
-          ${origenVenta}, ${crmId}, ${fecha}, ${ancla}, ${fechaCierre}, ${data?.representante?.trim() || null}, ${data?.correo?.trim() || null},
-          ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
-        RETURNING id
-      `
-      if (grupoId) {
-        // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
-        await query`
-          INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen)
-          VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen})
-        `
-        // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
-        await encolarSyncCrm([grupoId], 'inscripcion', query)
-      }
-      return { ok: true, estudianteId: e.id, pendiente: !grupoId }
-    })
-  } catch (error) {
-    // El índice único (centro_id, crm_registration_id) es la última palabra
-    // contra dos altas simultáneas del mismo registro de CRM: el 23505 se
-    // traduce al mismo mensaje del prechequeo, nunca a un error crudo.
-    if (crmId && error?.code === '23505') return { error: 'Este registro ya fue inscrito.' }
-    throw error
+      throw error
+    }
   }
-  return resultado
+}
+
+// "Es este niño": el registro de la clase de prueba se vincula a la ficha que
+// el niño YA tiene (lib/ficha-existente-service.mjs). No nace ficha nueva:
+// `grupo_id` lo deja en el grupo del formulario (reincorpora al retirado,
+// coloca al pendiente o traslada al que estaba en otro grupo, por los caminos
+// de siempre) y `fecha_venta` corrige su venta solo si el centro lo eligió.
+export async function vincularFichaExistente(centroId, estudianteId, data = {}) {
+  await requireCurrentWriteCentro(centroId)
+  const crmId = data?.crm_registration_id == null ? null : String(data.crm_registration_id).trim() || null
+  const fechaVenta = data?.fecha_venta ? String(data.fecha_venta).slice(0, 10) : null
+  if (fechaVenta && !FECHA_RE.test(fechaVenta)) return { error: 'Fecha de venta inválida (AAAA-MM-DD).' }
+  if (fechaVenta && fechaVenta > hoyISO()) return { error: 'La fecha de venta no puede ser futura.' }
+  const grupoId = data?.grupo_id ? Number(data.grupo_id) : null
+  const origenVenta = data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
+  if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
+  // fecha_venta llega del driver como Date: el servicio la normaliza.
+  const [ficha] = await sql`
+    SELECT e.id, e.nombre, e.estado, e.grupo_id, e.itinerario, e.nivel, e.origen_venta, e.crm_registration_id, (
+      SELECT ev.fecha FROM estudiante_eventos ev
+      WHERE ev.estudiante_id = e.id AND ev.tipo = 'inscripcion'
+      ORDER BY ev.fecha, ev.id LIMIT 1
+    ) AS fecha_venta
+    FROM estudiantes e
+    WHERE e.id = ${estudianteId} AND e.centro_id = ${centroId}
+  `
+  return await vincularFichaExistenteCon({ ficha, crmId, fechaVenta, grupoId, origenVenta }, {
+    moverAGrupo: (id, destino, extra) => actualizarEstudiante(centroId, id, { grupo_id: destino, ...extra }),
+    corregirFechaVenta: (id, fechaNueva) => actualizarEstudiante(centroId, id, { fecha_inscripcion: fechaNueva }),
+    reincorporar: (id, destino) => reincorporarEstudiante(centroId, id, { grupoId: destino }),
+    // CAS: solo una ficha sin registro; el índice único (centro_id,
+    // crm_registration_id) frena el registro que ya usa otra ficha.
+    vincularRegistro: async (id, crm) => {
+      try {
+        const filas = await sql`
+          UPDATE estudiantes SET crm_registration_id = ${crm}, updated_at = ${new Date().toISOString()}
+          WHERE id = ${id} AND centro_id = ${centroId} AND crm_registration_id IS NULL
+          RETURNING id
+        `
+        return filas.length === 1 ? { ok: true } : { cambio: true }
+      } catch (error) {
+        if (error?.code === '23505') return { yaUsado: true }
+        throw error
+      }
+    },
+  })
 }
 
 // Edición general — TODO en UNA transacción (ficha + ancla + cierre + eventos
