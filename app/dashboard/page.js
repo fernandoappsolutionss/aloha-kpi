@@ -6,25 +6,13 @@ import PanelFilter from '../../components/PanelFilter'
 import NivelBadge from '../../components/NivelBadge'
 import TableScroller from '../../components/TableScroller'
 import OperationalCard from '../../components/OperationalCard'
-import MeasuredChart from '../../components/MeasuredChart'
 import TableroSemanal from '../../components/semana/TableroSemanal'
-import { getCentrosKpiRango, getNinosSerie } from '../actions/dashboard'
+import { getCentrosKpiRango } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
-const MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const fechaDato = (centro) => centro.ninosPeriodoFin ? `${centro.ninosFuente} · período hasta ${centro.ninosPeriodoFin.split('-').reverse().join('/')}` : 'Sin dato mensual declarado'
-const NinosTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 12px', boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
-      <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</div>
-      <div style={{ color: 'var(--ts-green)' }}>Niños: <b>{payload[0].value}</b></div>
-    </div>
-  )
-}
 
 /* tiny dim icons for KPI cards */
 const ic = {
@@ -43,7 +31,6 @@ export default function DashboardPage() {
   const [prev, setPrev] = useState([])
   const [nombre, setNombre] = useState('')
   const [filter, setFilter] = useState({ mode: 'trimestre' })
-  const [serie, setSerie] = useState([])
   const criticos = centros.filter(c => c.estado === 'Crítico').length
   const range = resolvePanelRange(filter)
 
@@ -55,11 +42,9 @@ export default function DashboardPage() {
     Promise.all([
       getCentrosKpiRango(r.fromY, r.fromM, r.toY, r.toM),
       getCentrosKpiRango(r.prev.fromY, r.prev.fromM, r.prev.toY, r.prev.toM),
-      getNinosSerie(r.fromY, r.fromM, r.toY, r.toM),
-    ]).then(([data, previous, rows]) => {
+    ]).then(([data, previous]) => {
       if (!active) return
       setCentros(data || []); setPrev(previous || [])
-      setSerie((rows || []).map(row => ({ ...row, label: MES_CORTO[row.month - 1] + " '" + String(row.year).slice(2) })))
     }).catch(() => { if (active) setError('No se pudo cargar el panel. Intenta de nuevo.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -250,39 +235,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Gráfico general de niños + filtros rápidos (al final del panel) */}
-        <div className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Evolución de niños activos</h2>
-            <span className="label">{label}</span>
-          </div>
-          <div style={{ padding: '18px 12px 8px' }}>
-            {serie.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 0', fontSize: 13 }}>Sin datos de niños para el rango seleccionado.</div>
-            ) : (
-              <>
-              <MeasuredChart label="Evolución de niños activos" minHeight={280}>
-                {({ width, height }) => <AreaChart width={width} height={height} data={serie} margin={{ top: 6, right: 16, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gNinos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--ts-green)" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="var(--ts-green)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--chart-muted)', fontFamily: 'var(--font-mono)' }} allowDecimals={false} width={44} />
-                  <Tooltip content={<NinosTooltip />} />
-                  <Area type="monotone" dataKey="ninos" name="Niños" stroke="var(--ts-green)" strokeWidth={2.5} fill="url(#gNinos)" dot={{ r: 3, fill: 'var(--ts-green)' }} activeDot={{ r: 5 }} />
-                </AreaChart>}
-              </MeasuredChart>
-              <div className="chart-legend dashboard-chart-legend" role="group" aria-label="Datos de evolución de niños activos">
-                {serie.map(row => <span key={`${row.year}-${row.month}`}>{row.label}: <strong>{row.ninos}</strong> niños</span>)}
-              </div>
-              </>
-            )}
-          </div>
-        </div>
         </>}
       </main>
     </div>

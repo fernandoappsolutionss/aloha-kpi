@@ -14,7 +14,7 @@ export function dashboardIsOperational({origin}) {
  const text=main.innerText
  return /^Hola,/.test(main.querySelector('h1')?.textContent.trim()||'')
   && /\d+ centros activos · seguimiento en tiempo real/.test(text)
-  && [...main.querySelectorAll('h2')].some(node=>node.textContent.trim()==='Evolución de niños activos')
+  && [...main.querySelectorAll('h2')].some(node=>node.textContent.trim()==='Semana operativa por centro')
   && !/Cargando (?:panel|centros)|No se pudo cargar/i.test(text)
   && !main.querySelector('[role="alert"]')
 }
