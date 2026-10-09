@@ -31,7 +31,7 @@ test('rollback usa el predicate real: rechaza Dashboard detenido/error y acepta 
   const origin = new URL(test.info().project.use.baseURL || 'http://127.0.0.1:3011').origin
   await page.route('**/*', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<main></main>' }))
   await page.goto('/dashboard')
-  const content = '<h1>Hola, Fixture.</h1><p>2 centros activos · seguimiento en tiempo real</p><h2>Evolución de niños activos</h2>'
+  const content = '<h1>Hola, Fixture.</h1><p>2 centros activos · seguimiento en tiempo real</p><h2>Semana operativa por centro</h2>'
   for (const html of [
     '<main></main>',
     `<main data-page-state="loading">${content}</main>`,

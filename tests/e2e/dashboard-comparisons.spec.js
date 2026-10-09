@@ -128,32 +128,12 @@ test('Entrenamiento conserva completo, tour y quiz con módulos nombrados y rese
   await audit(page, page.viewportSize().width)
 })
 
-test('Dashboard mide el SVG con su wrapper y expone toda la serie como texto fuera de img', async ({ page }) => {
+test('Dashboard conserva el seguimiento semanal sin duplicarlo con la gráfica mensual', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 15_000 })
-  const chart = page.getByRole('img', { name: 'Evolución de niños activos', exact: true })
-  await expect(chart).toBeVisible()
-  const svg = chart.locator('svg.recharts-surface')
-  await expect(svg).toBeVisible()
-  const legend = page.getByRole('group', { name: 'Datos de evolución de niños activos' })
-  await expect(legend).toBeVisible()
-  expect(await legend.evaluate(el => Boolean(el.closest('[role="img"]')))).toBe(false)
-  for (const month of ["Jul '26", "Ago '26", "Sep '26"]) await expect(legend).toContainText(month)
-  // Comparar la alternativa textual con el valor real que expone cada punto.
-  const entries = legend.locator(':scope > span')
-  const dots = chart.locator('.recharts-area-dots circle')
-  await expect(dots).toHaveCount(3)
-  for (let i = 0; i < 3; i++) {
-    const value = await entries.nth(i).locator('strong').innerText()
-    await dots.nth(i).hover({ force: true })
-    await expect(chart.locator('.recharts-tooltip-wrapper')).toContainText(`Niños: ${value}`)
-  }
-  const originalWidth = page.viewportSize().width
-  for (const targetWidth of [originalWidth, Math.max(320, originalWidth - 50), originalWidth]) {
-    await page.setViewportSize({ width: targetWidth, height: 900 })
-    await expect.poll(async () => Math.abs((await chart.boundingBox()).width - (await svg.boundingBox()).width)).toBeLessThanOrEqual(1)
-    expect((await svg.boundingBox()).width).toBeLessThanOrEqual(targetWidth)
-  }
+  await expect(page.getByRole('heading', { name: 'Semana operativa por centro', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Evolución de niños activos', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('group', { name: 'Datos de evolución de niños activos' })).toHaveCount(0)
   await audit(page, page.viewportSize().width)
 })
 

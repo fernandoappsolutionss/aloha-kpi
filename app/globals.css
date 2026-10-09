@@ -1010,7 +1010,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 @media (max-width: 767px) {
   .training-admin-table th:first-child { width: 185px; }
 }
-.dashboard-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px; font-size: 13px; color: var(--text-dim); }
 
 @media (max-width: 1280px) {
   .growth-model-band { grid-template-columns: minmax(0, 1fr); gap: 14px; }
