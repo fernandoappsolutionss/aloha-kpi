@@ -132,6 +132,7 @@ test('Dashboard conserva el seguimiento semanal sin duplicarlo con la gráfica m
   await page.goto('/dashboard')
   await expect(page.locator('#main-content[data-page-state="ready"]')).toHaveCount(1, { timeout: 15_000 })
   await expect(page.getByRole('heading', { name: 'Semana operativa por centro', exact: true })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Estadísticas semanales por centro', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Evolución de niños activos', exact: true })).toHaveCount(0)
   await expect(page.getByRole('group', { name: 'Datos de evolución de niños activos' })).toHaveCount(0)
   await audit(page, page.viewportSize().width)
