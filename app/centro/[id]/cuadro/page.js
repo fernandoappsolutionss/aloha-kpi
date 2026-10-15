@@ -260,7 +260,7 @@ export default function CuadroPage() {
 
             {/* Royalties por nivel */}
             {congelado && data.conciliacion?.tipo === 'cuadro_negocio_documental' && (
-              <div className="alert" style={{ marginBottom: 20 }}>
+              <div className="alert" style={{ display: 'block', marginBottom: 20, overflowWrap: 'anywhere' }}>
                 <strong>Cuadro conciliado con el documento de {NOMBRES_MES[month - 1]} {year}.</strong>
                 <div>Fuente: {data.conciliacion.archivo}</div>
                 {!!data.conciliacion.ajusteInicio?.diferencia && <div>Ajuste de apertura documentado: {data.conciliacion.ajusteInicio.diferencia > 0 ? '+' : ''}{data.conciliacion.ajusteInicio.diferencia} niños respecto al cierre anterior.</div>}
