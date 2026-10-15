@@ -6,6 +6,8 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
   const delta = resumen.delta
   const mejora = delta == null || delta === 0 ? null : meta.inversa ? delta < 0 : delta > 0
   const error = serie.at(-1)?.detalle?.error
+  const aviso = serie.at(-1)?.detalle?.aviso
+  const reconstruida = serie.some(punto => punto.detalle?.reconstruida)
   const objetivo = cuota.cuota ?? cuota.propuesta
   return (
     <section className={`card semana-tarjeta${principal ? ' semana-tarjeta--principal' : ''}`}>
@@ -25,6 +27,8 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
         <span className={cuota.ritmo.vaBien ? 'semana-ritmo--bien' : 'semana-ritmo--atras'}>{cuota.ritmo.vaBien ? 'Al ritmo' : 'Por debajo del ritmo'}</span>
       </div>}
       {error && <p role="status" className="alert alert--error">Sin dato: {error}</p>}
+      {aviso && <p className="h-sub">{aviso}</p>}
+      {reconstruida && <p className="h-sub">Los cierres que no tenían cifra se muestran calculados desde los registros; están pendientes de conciliación.</p>}
       <GraficaSemanal puntos={serie} inversa={meta.inversa} unidad={meta.unidad} titulo={meta.nombre} />
       <p className="h-sub semana-tarjeta__fuente">Fuente: {meta.fuente}</p>
     </section>

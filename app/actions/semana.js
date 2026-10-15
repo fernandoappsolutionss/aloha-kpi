@@ -6,7 +6,7 @@ import { alcancePanel } from '../../lib/alcance.js'
 import { fechaCivil, rangoSemana, semanaAbierta, sumarDias, ultimasSemanas, zonaHorariaCentro } from '../../lib/semana-cierre.mjs'
 import { ESTADISTICAS_CENTRO } from '../../lib/estadisticas-semana/catalogo.mjs'
 import { armarSeries, armarTablero } from '../../lib/estadisticas-semana/presentacion.mjs'
-import { calcularSemanaCentro, guardarSemanaCentro, leerSerieCentros } from '../../lib/estadisticas-semana/servicio.js'
+import { calcularSemanaCentro, guardarSemanaCentro, leerSerieCentros, completarSerieCentro } from '../../lib/estadisticas-semana/servicio.js'
 import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion, verificarObjetivoEn } from '../../lib/plan-semana-servicio.js'
 import { enriquecerTableroConPlanes } from '../../lib/plan-semana.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
@@ -17,16 +17,18 @@ async function vistaCentro(centroId, session) {
   const [centro] = await sql`SELECT id, nombre, pais FROM centros WHERE id = ${centroId}`
   if (!centro) throw new Error('Centro desconocido.')
   const zonaHoraria = zonaHorariaCentro(centro)
-  const abierta = semanaAbierta(new Date(), zonaHoraria)
+  const now = new Date()
+  const abierta = semanaAbierta(now, zonaHoraria)
   const semanas = ultimasSemanas(abierta, 12)
-  const [filas, filasCuotas, metas, compromiso] = await Promise.all([
+  const [guardadas, filasCuotas, metas, compromiso] = await Promise.all([
     leerSerieCentros([Number(centroId)], semanas),
     leerCuotasCentros([Number(centroId)], semanas),
     metasDeSemana(abierta),
     leerCompromiso(centroId, abierta.slice(0, 7)),
   ])
+  const { filas, resultadosMes } = await completarSerieCentro(centroId, semanas, guardadas, { now })
   const { series: baseSeries, resumen } = armarSeries(semanas, filas)
-  const { series, cuotas } = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series: baseSeries, resumen, filasCuotas, metas, compromiso, semanaAbierta: abierta, hoy: fechaCivil(new Date(), zonaHoraria) })
+  const { series, cuotas } = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series: baseSeries, resumen, filasCuotas, metas, compromiso, semanaAbierta: abierta, hoy: fechaCivil(now, zonaHoraria) })
   const fechas = filas.map((fila) => fila.calculado_at).filter(Boolean).map((fecha) => new Date(fecha).getTime())
   const ultimaCerrada = sumarDias(abierta, -7)
   const plan = await cargarPlan(centroId, ultimaCerrada, { sesion: session })
@@ -38,6 +40,8 @@ async function vistaCentro(centroId, session) {
     catalogo: ESTADISTICAS_CENTRO,
     series,
     resumen,
+    resultadosMes,
+    fechaDatos: fechaCivil(now, zonaHoraria),
     ultimoCalculo: fechas.length ? new Date(Math.max(...fechas)).toISOString() : null,
     puedeEscribir: puedeEscribirCentro(session, centroId),
     puedeAsignar: puedeAsignarCondicion(session),

@@ -59,7 +59,7 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
   </li>
 }
 
-export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh }) {
+export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh, prioridades, ajustes }) {
   const [seleccion, setSeleccion] = useState(datos.plan.condicion || '')
   const [alcance, setAlcance] = useState(datos.plan.alcance_peligro || 'personal')
   const [variante, setVariante] = useState(datos.plan.variante_afluencia || 'accion')
@@ -105,6 +105,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {datos.plan.fundamento && <p><strong>Fundamento de la condición:</strong> {datos.plan.fundamento}</p>}
     {error && <p role="alert" className="alert alert--error">{error}</p>}
     {mensaje && <p role="status" className="alert">{mensaje}</p>}
+    {ajustes}
     {'lectura' in datos && <p className="h-sub">Lectura automática de la gráfica: {datos.lectura.condicion ? nombreCondicion(datos.lectura.condicion) : 'Sin dato'} ({datos.lectura.motivo})</p>}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
 
@@ -136,7 +137,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
       <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && seccion !== 'orden' && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion={seccion} ejecutar={ejecutar} ocupado={ocupado} />}
     </section>)}
-    <section className="semana-plan__seccion" aria-labelledby="plan-estrategico-title"><h3 id="plan-estrategico-title">Plan estratégico · Ruta de Nivel</h3><p className="h-sub">Estas son las mismas acciones de Ruta al próximo nivel. Lo que registres aquí también se actualiza allá. · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta y su historial</Link></p>
+    {prioridades || <section className="semana-plan__seccion" aria-labelledby="plan-estrategico-title"><h3 id="plan-estrategico-title">Plan estratégico · Ruta de Nivel</h3><p className="h-sub">Estas son las mismas acciones de Ruta al próximo nivel. Lo que registres aquí también se actualiza allá. · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta y su historial</Link></p>
       {!estrategico.length && <p className="h-sub">No hay acciones estratégicas pendientes guardadas. Abre la ruta para revisar las recomendaciones del centro.</p>}
       <ul className="semana-plan__objetivos">{estrategico.map((item) => <li className="semana-objetivo" key={item.id}><strong>{item.title}</strong><p>{item.action}</p><p className="h-sub">{item.responsible || 'Sin responsable'}{item.due_date ? ` · ${item.status === 'postponed' ? 'Pospuesta hasta ' : 'Fecha: '}${fechaInput(item.due_date)}` : ''}</p>
         {puedeEscribir && <div className="semana-objetivo__acciones" aria-label={`Seguimiento de ${item.title}`}>
@@ -145,6 +146,6 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
           <button type="button" className="btn" disabled={ocupado} onClick={() => seguirAccion(item, 'dismiss')}>Descartar</button>
         </div>}
       </li>)}</ul>
-    </section>
+    </section>}
   </section>
 }

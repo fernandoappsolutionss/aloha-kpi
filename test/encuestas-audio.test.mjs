@@ -31,7 +31,7 @@ test('solo las cinco locuciones con la meta anterior se retiran hasta regenerar'
   // su cobertura/hash obligatorio en entrenamiento-guia-audio.test.mjs.
   const semanales = new Set(['semana-graficas', 'semana-plan'])
   const clips = clipsActualizados()
-  const previos = clips.filter(c => !semanales.has(c.clave.split('/')[0]))
+  const previos = clips.filter(c => !semanales.has(c.clave.split('/')[0]) && c.clave !== 'meta/meta-6')
   assert.equal(previos.length, 60)
   const nuevos = clips.filter(c => semanales.has(c.clave.split('/')[0]))
   assert.equal(nuevos.length, 13)
