@@ -11,6 +11,7 @@ import { datoNinosDeclarados } from '../../lib/kpi-calc'
 import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { cobranzaDeclarada, evaluarProducto, semaforo, verdictoCrecimiento } from '../../lib/marcadores.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
+import { conCierresDocumentales } from '../../lib/cierre-documental-server'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -28,6 +29,7 @@ function monthList(fromY, fromM, toY, toM) {
 }
 
 async function aplicarMesesAbiertosVivos(rows, prevRows, lo, hi, centroIds = []) {
+  rows = await conCierresDocumentales(rows)
   try {
     const estados = await sql`
       SELECT centro_id, year, month, estado FROM mes_kpi
@@ -415,7 +417,7 @@ export async function getNinosSerie(desdeY, desdeM, hastaY, hastaM) {
   const pm = desdeM === 1 ? 12 : desdeM - 1
   // Esta serie SUMA los centros: hay que recortar las filas, no solo la lista.
   let rows = soloDeMisCentros(await sql`
-    SELECT centro_id, year, month, ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
+    SELECT *
     FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`, centroIds)
   const prev = soloDeMisCentros(
     await sql`SELECT centro_id, ninos_final_mes FROM resumen_mes WHERE year = ${py} AND month = ${pm}`,

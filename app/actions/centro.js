@@ -12,6 +12,7 @@ import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { VENTAS_AUTO_DESDE } from '../../lib/kpi-semanal-auto.mjs'
 import { usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
 import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
+import { conCierresDocumentales } from '../../lib/cierre-documental-server'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -28,6 +29,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
     ORDER BY month
   `
+  rs = await conCierresDocumentales(rs)
   let ks = await sql`
     SELECT * FROM kpi_semanas
     WHERE centro_id = ${centroId} AND year = ${year} AND month BETWEEN ${lo} AND ${hi}
@@ -121,10 +123,10 @@ export async function getCentroResumen(centroId, year, trimestre) {
 
   // Graduación anual (logro): graduados del año vs deserción total (bajas) y vs alumnado.
   // Graduarse = completar todos los niveles (≈4–5 años), por eso se mide por año.
-  let rsAnio = await sql`SELECT year, month, ninos_inicio_mes, mot_graduado FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
-  // Deserción anual: ing/des salen SIEMPRE de la superposición del motor
-  // semanal (una sola derivación); del automático de resumen solo se toman los
-  // campos que ese motor no cubre (mot_graduado y compañía).
+  let rsAnio = await sql`SELECT * FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} ORDER BY month`
+  rsAnio = await conCierresDocumentales(rsAnio)
+  // Deserción anual: el motor semanal aporta los movimientos. Un cierre
+  // documental conciliado prevalece en su mes sin inventar fechas diarias.
   let ksAnio = await sql`SELECT centro_id, year, month, semana, des_d1, des_d2, des_d3, des_d4, des_d5 FROM kpi_semanas WHERE centro_id = ${centroId} AND year = ${year}`
   ;({ filas: ksAnio } = await superponerKpiAbiertos({
     filas: ksAnio,
@@ -137,7 +139,11 @@ export async function getCentroResumen(centroId, year, trimestre) {
     rsAnio = mezclarResumenAutomatico(rsAnio, autoYear, autoMonth, automatic)
   }
   const graduadosAnio = rsAnio.reduce((a, r) => a + (r.mot_graduado || 0), 0)
-  const bajasAnio = ksAnio.reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+  const bajasAnio = Array.from({ length: 12 }, (_, i) => i + 1).reduce((sum, month) => {
+    const r = rsAnio.find(r => Number(r.month) === month)
+    const semanal = ksAnio.filter(w => Number(w.month) === month).reduce((a, w) => a + (w.des_d1 || 0) + (w.des_d2 || 0) + (w.des_d3 || 0) + (w.des_d4 || 0) + (w.des_d5 || 0), 0)
+    return sum + (r?.retiros_operativos_mes ?? semanal)
+  }, 0)
   const ninosInicioAnio = rsAnio.find((r) => (r.ninos_inicio_mes || 0) > 0)?.ninos_inicio_mes || 0
   const graduacion = {
     graduados: graduadosAnio,
@@ -209,6 +215,7 @@ export async function getHistorialCentro(centroId) {
     SELECT * FROM resumen_mes WHERE centro_id = ${centroId}
     ORDER BY year ASC, month ASC
   `
+  resumen = await conCierresDocumentales(resumen)
   const estados = await sql`
     SELECT year, month, estado, cerrado_at FROM mes_kpi WHERE centro_id = ${centroId}
   `
@@ -236,6 +243,12 @@ export async function getHistorialCentro(centroId) {
     acumulado.nuevos_ingresos_venta += (fila.ing_d1 || 0) + (fila.ing_d2 || 0) + (fila.ing_d3 || 0) + (fila.ing_d4 || 0) + (fila.ing_d5 || 0)
     acumulado.total_desercion += (fila.des_d1 || 0) + (fila.des_d2 || 0) + (fila.des_d3 || 0) + (fila.des_d4 || 0) + (fila.des_d5 || 0)
     porMes.set(clave, acumulado)
+  }
+  for (const r of resumen) {
+    if (r.retiros_operativos_mes == null) continue
+    const key = `${r.year}-${r.month}`
+    const actual = porMes.get(key) || { year: r.year, month: r.month, nuevos_ingresos_venta: 0 }
+    porMes.set(key, { ...actual, total_desercion: r.retiros_operativos_mes })
   }
   const semanas = [...porMes.values()]
   // Fotos mensuales del Cuadro de Negocio (solo métricas compactas: la foto

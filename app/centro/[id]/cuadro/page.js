@@ -259,6 +259,14 @@ export default function CuadroPage() {
             </div>
 
             {/* Royalties por nivel */}
+            {congelado && data.conciliacion?.tipo === 'cuadro_negocio_documental' && (
+              <div className="alert" style={{ marginBottom: 20 }}>
+                <strong>Cuadro conciliado con el documento de {NOMBRES_MES[month - 1]} {year}.</strong>
+                <div>Fuente: {data.conciliacion.archivo}</div>
+                {!!data.conciliacion.ajusteInicio?.diferencia && <div>Ajuste de apertura documentado: {data.conciliacion.ajusteInicio.diferencia > 0 ? '+' : ''}{data.conciliacion.ajusteInicio.diferencia} niños respecto al cierre anterior.</div>}
+                {!!data.conciliacion.observaciones?.length && <details><summary>Observaciones del archivo de origen</summary><ul>{data.conciliacion.observaciones.map((text, i) => <li key={i}>{text}</li>)}</ul></details>}
+              </div>
+            )}
             <div className="panel" style={{ marginBottom: 20 }} data-tour="cuadro.royalties">
               <div className="panel__head">
                 <h3 className="panel__title">Royalties</h3>
