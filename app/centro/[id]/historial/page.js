@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts'
+import { BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import Link from 'next/link'
 import TableScroller from '../../../../components/TableScroller'
 import MeasuredChart from '../../../../components/MeasuredChart'
+import GraficaMensualHca from '../../../../components/GraficaMensualHca'
 import { getHistorialCentro } from '../../../actions/centro'
 import { balanceMensual, finalVisibleKpi, inicioVisibleKpi, valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
 
@@ -248,10 +249,6 @@ export default function HistorialPage() {
   const originPct = sharePercentages(chartData, ['orig_referido', 'orig_marketing', 'orig_centro', 'orig_activaciones'])
   const desertionPct = sharePercentages(chartData, ['mot_perdida_clase', 'mot_economico', 'mot_tecnica', 'mot_horario'])
   const funnelPct = funnelPercentages(chartData, ['cp_invitados', 'cp_asistieron', 'cp_matriculados'], 'cp_invitados')
-  const goalPct = {
-    nuevos_ingresos_venta: sumKey(chartData, 'meta_nuevos') > 0 ? (sumKey(chartData, 'nuevos_ingresos_venta') / sumKey(chartData, 'meta_nuevos')) * 100 : 0,
-    meta_nuevos: 100,
-  }
   const visibleRangeLabel = visibleMeses.length
     ? `${visibleMeses[0].mesLabel} - ${visibleMeses[visibleMeses.length - 1].mesLabel}`
     : 'Sin meses en este rango'
@@ -415,65 +412,18 @@ export default function HistorialPage() {
               {vistaBtn('cuadro','Cuadro de negocio')}
             </div>
 
-            {/* VISTA: TENDENCIAS */}
-            {vistaActiva === 'tendencias' && chartData.length > 0 && (
+            {/* VISTA: TENDENCIAS — una estadística y una escala por gráfica. */}
+            {vistaActiva === 'tendencias' && visibleMeses.length > 0 && <>
+              <p className="hca-history-guide">Lectura HCA · Tramos rectos por mes, azul cuando mejora y rojo cuando empeora. El mes abierto es provisional. Estas tendencias mensuales complementan la lectura semanal del plan de batalla.</p>
               <div className="reports-grid">
-
-                {/* Gráfica 1: Niños (inicio vs final) */}
-                <ChartCard title="Evolución de Niños por Mes" data={chartData} columns={[["ninos_inicio","Inicio mes"],["ninos_final","Final mes"]]}>
-<MeasuredChart label="Gráfico 1: serie mensual" minHeight={220}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
-                      <Line type="monotone" dataKey="ninos_inicio" name="Inicio mes" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
-                      <Line type="monotone" dataKey="ninos_final" name="Final mes" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                    </LineChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Gráfica 2: ventas, nuevos activos y meta comercial */}
-                <ChartCard title="Ventas, Activos y Meta" sub="La meta comercial aplica solo a ventas" data={chartData} columns={[["nuevos_ingresos_venta","Nuevos ingresos venta"],["nuevos_activos","Nuevos activos"],["meta_nuevos","Meta venta"]]}>
-<MeasuredChart label="Gráfico 2: serie mensual" minHeight={220}>{({width,height}) => <ComposedChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend content={(props) => <LegendWithPercent {...props} percentages={goalPct} />}/>
-                      <Bar dataKey="nuevos_ingresos_venta" name="Nuevos ingresos venta" fill={C.green} radius={[4,4,0,0]}/>
-                      <Line type="monotone" dataKey="nuevos_activos" name="Nuevos activos" stroke={C.mut} strokeWidth={2.5} dot={{r:4,fill:'var(--surface-1)',stroke:C.mut,strokeWidth:2}}/>
-                      <Line type="stepAfter" dataKey="meta_nuevos" name="Meta venta" stroke={C.warn} strokeWidth={2.5} strokeDasharray="6 5" dot={{r:3,fill:C.warn}}/>
-                    </ComposedChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Gráfica 3: Promedio niños/grupo */}
-                <ChartCard title="Promedio Niños por Grupo" sub="Meta: ≥ 8 niños/grupo" data={chartData} columns={[["prom_grupo","Prom. niños/grupo"]]}>
-<MeasuredChart label="Gráfico 3: serie mensual" minHeight={200}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint} domain={[0,'auto']}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <ReferenceLine y={8} stroke={C.warn} strokeDasharray="5 5" label={{value:'Meta 8',fill:C.warn,fontSize:13,position:'right'}}/>
-                      <Line type="monotone" dataKey="prom_grupo" name="Prom. niños/grupo" stroke={C.green} strokeWidth={2.5} dot={{r:4,fill:C.green}}/>
-                    </LineChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Gráfica 4: %CV y GPN */}
-                <ChartCard title="%CV y GPN (Rentabilidad)" sub="%CV = Costo Variable. GPN = Ganancia por Niño" data={chartData} columns={[["pcv","%CV"],["gpn","GPN $"]]}>
-<MeasuredChart label="Gráfico 4: serie mensual" minHeight={200}>{({width,height}) => <LineChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis yAxisId="left" tick={axisTick} stroke={C.faint} label={{value:'%CV',angle:-90,position:'insideLeft',fontSize:13,fill:C.dim}}/>
-                      <YAxis yAxisId="right" orientation="right" tick={axisTick} stroke={C.faint} label={{value:'GPN $',angle:90,position:'insideRight',fontSize:13,fill:C.dim}}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
-                      <Line yAxisId="left" type="monotone" dataKey="pcv" name="%CV" stroke={C.mut} strokeWidth={2} dot={{r:4}}/>
-                      <Line yAxisId="right" type="monotone" dataKey="gpn" name="GPN $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                    </LineChart>}</MeasuredChart>
-                </ChartCard>
-
+                <GraficaMensualHca centroId={id} titulo="Niños al cierre del mes" campo="ninos_final" unidad="niños" rows={visibleMeses} todas={meses} descripcion="El cierre del mes abierto incluye los inicios y retiros programados; todavía no es un cierre confirmado."/>
+                <GraficaMensualHca centroId={id} titulo="Nuevos ingresos por venta" campo="nuevos_ingresos_venta" unidad="inscritos" rows={visibleMeses} todas={meses} meta="meta_nuevos"/>
+                <GraficaMensualHca centroId={id} titulo="Nuevos activos del mes" campo="nuevos_activos" unidad="niños" rows={visibleMeses} todas={meses} descripcion="Niños que comienzan clases en el mes; su fecha de venta puede ser anterior."/>
+                <GraficaMensualHca centroId={id} titulo="Promedio de niños por grupo" campo="prom_grupo" unidad="niños/grupo" rows={visibleMeses} todas={meses} meta={8}/>
+                <GraficaMensualHca centroId={id} titulo="Costo variable (%CV)" campo="pcv" unidad="%" rows={visibleMeses} todas={meses} inversa descripcion="Eje inverso: los valores menores se ubican arriba. Reducir el costo variable es mejorar."/>
+                <GraficaMensualHca centroId={id} titulo="Ganancia por niño (GPN)" campo="gpn" unidad="$ por niño" rows={visibleMeses} todas={meses}/>
               </div>
-            )}
+            </>}
 
             {/* VISTA: COMPARATIVA */}
             {vistaActiva === 'comparativa' && chartData.length > 0 && (
@@ -684,9 +634,9 @@ export default function HistorialPage() {
               )
             })()}
 
-            {chartData.length === 0 && (
+            {visibleMeses.length === 0 && (
               <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
-                Los meses tienen datos de configuración pero aún no hay suficiente información para graficar. Ingresa los datos en el KPI Mensual y guarda.
+                No hay meses registrados en este rango. Selecciona otro periodo para consultar el historial.
               </div>
             )}
 

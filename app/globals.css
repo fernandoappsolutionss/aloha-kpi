@@ -1641,6 +1641,21 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .reports-page :is(p,h1,h2,h3,.btn,th,td) { overflow-wrap: anywhere; }
 .reports-page .main__head > div:last-child { flex-wrap: wrap; }
 .reports-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.hca-history-guide { margin: 0 0 20px; padding: 14px 18px; border-left: 3px solid #385AE2; background: var(--surface-2); line-height: 1.6; }
+.hca-monthly { min-width: 0; padding: 20px; }
+.hca-monthly__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.hca-monthly__head .panel__title { font-size: 16px; }
+.hca-monthly__scroll { max-width: 100%; margin-top: 16px; }
+.hca-monthly__scroll .table-scroller__viewport { width: 100%; }
+.hca-monthly__svg { width: 100%; display: block; }
+.hca-monthly__svg text { fill: var(--text-dim); font: 11px var(--font-mono); }
+.hca-monthly__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; margin: 12px 0; }
+.hca-mejora { color: #385AE2; }
+.hca-empeora { color: #C8423B; }
+.hca-monthly__scale { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin: 12px 0; }
+.hca-monthly__scale label { display: grid; gap: 6px; flex: 1 1 180px; min-width: 0; font-size: 13px; }
+.hca-monthly__scale input { width: 100%; min-height: 44px; }
+.hca-monthly__scale [role="alert"] { flex-basis: 100%; color: var(--bad); }
 .reports-tabs { flex-wrap: wrap; }
 .reports-pedido-form { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; }
 /* ponytail: los 3 grupos de disciplina van en columnas, no apilados. Cada tabla

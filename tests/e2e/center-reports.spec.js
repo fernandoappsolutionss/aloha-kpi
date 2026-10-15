@@ -13,7 +13,7 @@ test('Semana cabe a 390 px con sus cinco gráficas',async({browser},testInfo)=>{
     await geometry(page,testInfo,'semana-390')
   }finally{await context.close()}
 })
-test('Historial muestra diez gráficos y tablas equivalentes sin partir palabras',async({browser},testInfo)=>{
+test('Historial muestra doce gráficos y tablas equivalentes sin partir palabras',async({browser},testInfo)=>{
   const {context,page}=await actorPage(browser,testInfo,'center')
   try {
     await page.goto('/centro/2/historial');await ready(page)
@@ -28,19 +28,19 @@ test('Historial muestra diez gráficos y tablas equivalentes sin partir palabras
     }))
     expect(broken).toEqual([])
     let count=0
-    for(const [label,charts]of [['Tendencias',4],['Comparativa',4],['Cuadro de negocio',2],['Tabla detalle',0]]) {
+    for(const [label,charts]of [['Tendencias',6],['Comparativa',4],['Cuadro de negocio',2],['Tabla detalle',0]]) {
       await page.getByRole('group',{name:'Vistas del historial'}).getByRole('button',{name:label,exact:true}).click()
-      await expect(page.locator('.measured-chart')).toHaveCount(charts)
+      await expect(page.locator('.measured-chart, .hca-monthly__svg')).toHaveCount(charts)
       for(const chart of await page.locator('.measured-chart').all())await expect(chart.locator('.recharts-wrapper > svg.recharts-surface')).toBeVisible()
       count+=charts
-      for(const detail of await page.locator('.chart-data').all()) {
+      for(const detail of await page.locator('.chart-data').filter({has:page.locator('table')}).all()) {
         await detail.locator('summary').click()
         await expect(detail.locator('tbody tr').first().locator('th')).not.toHaveText('')
         expect(await detail.locator('tbody tr').count()).toBeGreaterThan(0)
       }
       await geometry(page,testInfo,'historial-'+label)
     }
-    expect(count).toBe(10)
+    expect(count).toBe(12)
     expect(await r10Snapshot()).toEqual(before)
   }finally{await context.close()}
 })
