@@ -1642,6 +1642,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .reports-page .main__head > div:last-child { flex-wrap: wrap; }
 .reports-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
 .hca-history-guide { margin: 0 0 20px; padding: 14px 18px; border-left: 3px solid #385AE2; background: var(--surface-2); line-height: 1.6; }
+.hca-history-group { margin: 24px 0 32px; min-width: 0; }
 .hca-monthly { min-width: 0; padding: 20px; }
 .hca-monthly__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .hca-monthly__head .panel__title { font-size: 16px; }
