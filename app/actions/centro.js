@@ -280,6 +280,8 @@ export async function getHistorialCentro(centroId) {
     resumenes: resumen,
     estados,
     centroIds: [centroId],
+    // Un mes futuro vacío no es una observación histórica ni una proyección.
+    hasta: yearActual * 100 + monthActual,
     periodoActual: yearActual * 100 + monthActual,
   })
 
