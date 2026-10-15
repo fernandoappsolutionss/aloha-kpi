@@ -1,33 +1,25 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import Link from 'next/link'
 import TableScroller from '../../../../components/TableScroller'
-import MeasuredChart from '../../../../components/MeasuredChart'
 import GraficaMensualHca from '../../../../components/GraficaMensualHca'
+import { COMPARATIVA_HCA, CUADRO_HCA, numeroRegistrado, resumenComparativo, mesesConCuadro } from '../../../../lib/historial-graficas-hca.mjs'
 import { getHistorialCentro } from '../../../actions/centro'
 import { balanceMensual, finalVisibleKpi, inicioVisibleKpi, valorHistorialMes } from '../../../../lib/inicios-clase.mjs'
 
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-/* Paleta conectada al tema: en light las barras grises ya no se pierden. */
+/* Colores de los indicadores y las tablas conectados al tema. */
 const C = {
   green:  'var(--ok-text)',
-  greenDeep: 'var(--ts-green-deep)',
   mut:    'var(--chart-muted)',
   dim:    'var(--text-dim)',
-  faint:  'var(--chart-axis)',
   bad:    'var(--bad)',
-  warn:   'var(--warn)',
-  text:   'var(--text)',
-  track:  'var(--chart-track)',
-  cursor: 'var(--chart-cursor)',
 }
-const GRID = 'var(--chart-grid)'
 
 const calcPcv = (prom) => prom > 0 ? (120/prom) + 16 : 0
 const calcGpn = (ninosFinal, pcv) => ninosFinal > 0 ? (((ninosFinal*108)*(1-pcv/100)-7800)/ninosFinal) : 0
@@ -42,22 +34,6 @@ const parseMonthInput = (value) => {
   const [year, month] = value.split('-').map(Number)
   return Number.isFinite(year) && Number.isFinite(month) ? (year * 12) + month : null
 }
-const sumKey = (data, key) => data.reduce((acc, row) => acc + (Number(row[key]) || 0), 0)
-const pctLabel = (value) => {
-  if (!Number.isFinite(value)) return '0%'
-  const digits = Math.abs(value) > 0 && Math.abs(value) < 10 ? 1 : 0
-  return `${value.toFixed(digits)}%`
-}
-const sharePercentages = (data, keys) => {
-  const totals = keys.reduce((acc, key) => ({ ...acc, [key]: sumKey(data, key) }), {})
-  const total = Object.values(totals).reduce((acc, value) => acc + value, 0)
-  return keys.reduce((acc, key) => ({ ...acc, [key]: total > 0 ? (totals[key] / total) * 100 : 0 }), {})
-}
-const funnelPercentages = (data, keys, baseKey) => {
-  const base = sumKey(data, baseKey)
-  return keys.reduce((acc, key) => ({ ...acc, [key]: base > 0 ? (sumKey(data, key) / base) * 100 : 0 }), {})
-}
-
 const Trend = ({ val, prev }) => {
   if (prev === undefined || prev === null) return null
   const diff = val - prev
@@ -65,42 +41,6 @@ const Trend = ({ val, prev }) => {
   return diff > 0
     ? <span style={{color:C.green,fontSize:13}}> ↑ {Math.abs(diff).toFixed(1)}</span>
     : <span style={{color:C.bad,fontSize:13}}> ↓ {Math.abs(diff).toFixed(1)}</span>
-}
-
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{background:'var(--chart-tooltip-bg)',border:'1px solid var(--chart-tooltip-border)',borderRadius:8,padding:'10px 14px',boxShadow:'var(--chart-tooltip-shadow)',fontSize:12}}>
-      <p style={{fontWeight:700,color:C.text,marginBottom:6,fontFamily:'var(--font-mono)'}}>{label}</p>
-      {payload.map(p => (
-        <p key={p.name} style={{color:p.color,margin:'2px 0'}}>{p.name}: <strong>{typeof p.value === 'number' ? p.value.toFixed(1) : p.value}</strong></p>
-      ))}
-    </div>
-  )
-}
-
-const axisTick = { fontSize: 13, fill: C.dim, fontFamily: 'var(--font-mono)' }
-const legendStyle = { fontSize: 13, color: C.mut }
-
-const LegendWithPercent = ({ payload, percentages }) => {
-  if (!payload?.length) return null
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 6, color: 'var(--text-dim)', fontSize: 13 }}>
-      {payload.map((item) => {
-        const key = item.dataKey || item.payload?.dataKey || item.value
-        const color = item.color || item.payload?.fill || item.payload?.stroke || 'var(--text-dim)'
-        return (
-          <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: color, flexShrink: 0 }} />
-            <span>{item.value}</span>
-            {percentages?.[key] !== undefined && (
-              <span className="num" style={{ color: 'var(--text-muted)' }}>({pctLabel(percentages[key])})</span>
-            )}
-          </span>
-        )
-      })}
-    </div>
-  )
 }
 
 export default function HistorialPage() {
@@ -143,7 +83,7 @@ export default function HistorialPage() {
       const rawInicio = Number(r.ninos_inicio_mes) || 0
       const arrastrado = keyAnterior === key - 1 && cierreAnterior != null ? cierreAnterior : null
       const nI = inicioVisibleKpi({ estado: estadoMes, guardado: rawInicio, arrastrado })
-      const gA = valorHistorialMes({ estado: estadoMes, guardado: r.grupos_activos, cuadro, campo: 'gruposActivos' }) || 1
+      const gA = valorHistorialMes({ estado: estadoMes, guardado: r.grupos_activos, cuadro, campo: 'gruposActivos' })
       const nuevosSemanal = Number(semana?.nuevos_ingresos_venta) || 0
       const nuevosCuadro = Number(cuadro?.nuevos) || 0
       const nA = valorHistorialMes({ estado: estadoMes, guardado: r.nuevos_activos_mes, cuadro, campo: 'nuevos' })
@@ -175,17 +115,17 @@ export default function HistorialPage() {
         nuevos_activos: nA,
         nuevos_ingresos_venta: nuevosSemanal,
         meta_nuevos: r.meta_nuevos_mensual || 20,
-        cp_invitados: r.cp_invitados || 0,
-        cp_asistieron: r.cp_asistieron || 0,
-        cp_matriculados: r.cp_matriculados || 0,
-        mot_tecnica: r.mot_tecnica || 0,
-        mot_perdida_clase: r.mot_perdida_clase || 0,
-        mot_economico: r.mot_economico || 0,
-        mot_horario: r.mot_horario || 0,
-        orig_referido: r.orig_referido || 0,
-        orig_marketing: r.orig_marketing || 0,
-        orig_centro: r.orig_centro || 0,
-        orig_activaciones: r.orig_activaciones || 0,
+        cp_invitados: numeroRegistrado(r.cp_invitados),
+        cp_asistieron: numeroRegistrado(r.cp_asistieron),
+        cp_matriculados: numeroRegistrado(r.cp_matriculados),
+        mot_tecnica: numeroRegistrado(r.mot_tecnica),
+        mot_perdida_clase: numeroRegistrado(r.mot_perdida_clase),
+        mot_economico: numeroRegistrado(r.mot_economico),
+        mot_horario: numeroRegistrado(r.mot_horario),
+        orig_referido: numeroRegistrado(r.orig_referido),
+        orig_marketing: numeroRegistrado(r.orig_marketing),
+        orig_centro: numeroRegistrado(r.orig_centro),
+        orig_activaciones: numeroRegistrado(r.orig_activaciones),
         prom_grupo: parseFloat(promG.toFixed(2)),
         pcv: parseFloat(pcv.toFixed(1)),
         gpn: parseFloat(gpn.toFixed(2)),
@@ -198,7 +138,7 @@ export default function HistorialPage() {
         cuadro_aPagar: cuadro ? cuadro.aPagar : null,
         cuadro_nuevos: cuadro ? cuadro.nuevos : null,
         cuadro_retirados: cuadro ? cuadro.retirados : null,
-        cuadro_royalty: cuadro ? Number(cuadro.royalty) || 0 : null,
+        cuadro_royalty: numeroRegistrado(cuadro?.royalty),
       }
       cierreAnterior = ninosFinal
       keyAnterior = key
@@ -243,12 +183,8 @@ export default function HistorialPage() {
     </div>
   )
 
-  const chartData = visibleMeses.filter(m => m.ninos_final > 0 || m.ninos_inicio > 0)
   const last = visibleMeses[visibleMeses.length - 1]
   const prev = visibleMeses[visibleMeses.length - 2]
-  const originPct = sharePercentages(chartData, ['orig_referido', 'orig_marketing', 'orig_centro', 'orig_activaciones'])
-  const desertionPct = sharePercentages(chartData, ['mot_perdida_clase', 'mot_economico', 'mot_tecnica', 'mot_horario'])
-  const funnelPct = funnelPercentages(chartData, ['cp_invitados', 'cp_asistieron', 'cp_matriculados'], 'cp_invitados')
   const visibleRangeLabel = visibleMeses.length
     ? `${visibleMeses[0].mesLabel} - ${visibleMeses[visibleMeses.length - 1].mesLabel}`
     : 'Sin meses en este rango'
@@ -299,23 +235,6 @@ export default function HistorialPage() {
       </button>
     )
   }
-
-  // Wrapper para cada tarjeta de gráfica.
-  // minWidth:0 es imprescindible: como cada tarjeta es un ítem de un grid
-  // `1fr 1fr` (cuyo min-width por defecto es `auto`), sin esto el
-  // ResponsiveContainer de recharts mide ancho 0 y la gráfica sale en blanco.
-  const ChartCard = ({ title, sub, children, data, columns }) => (
-    <div className="card" style={{ padding: 20, minWidth: 0 }}>
-      <h3 className="panel__title" style={{ fontSize: 16, marginBottom: sub ? 4 : 16 }}>{title}</h3>
-      {sub && <p className="h-sub" style={{ marginTop: 0, marginBottom: 12 }}>{sub}</p>}
-      {children}
-      <details className="chart-data"><summary>Ver datos de {title}</summary>
-        <TableScroller label={'Datos: '+title} stickyFirstColumn><table className="table"><thead><tr><th scope="col">Mes</th>{columns.map(([key,label])=><th scope="col" key={key}>{label}</th>)}</tr></thead><tbody>
-          {data.map(row=><tr key={row.mes}><th scope="row">{row.mesLabel}</th>{columns.map(([key])=><td key={key}>{row[key]==null ? '—' : new Intl.NumberFormat('es-PA',{maximumFractionDigits:2}).format(row[key])}</td>)}</tr>)}
-        </tbody></table></TableScroller>
-      </details>
-    </div>
-  )
 
   return (
     <div className="shell">
@@ -425,67 +344,21 @@ export default function HistorialPage() {
               </div>
             </>}
 
-            {/* VISTA: COMPARATIVA */}
-            {vistaActiva === 'comparativa' && chartData.length > 0 && (
-              <div className="reports-grid">
-
-                {/* Origen de nuevos ingresos */}
-                <ChartCard title="Origen de Nuevos Ingresos por Mes" data={chartData} columns={[["orig_referido","Referido"],["orig_marketing","Marketing"],["orig_centro","Centro"],["orig_activaciones","Activaciones"]]}>
-<MeasuredChart label="Gráfico 5: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData} stackOffset="expand">
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint} tickFormatter={(value) => `${Math.round(value * 100)}%`}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend content={(props) => <LegendWithPercent {...props} percentages={originPct} />}/>
-                      <Bar dataKey="orig_referido" name="Referido" fill={C.green} stackId="a" radius={[0,0,0,0]}/>
-                      <Bar dataKey="orig_marketing" name="Marketing" fill={C.greenDeep} stackId="a"/>
-                      <Bar dataKey="orig_centro" name="Centro" fill={C.mut} stackId="a"/>
-                      <Bar dataKey="orig_activaciones" name="Activaciones" fill={C.dim} stackId="a" radius={[4,4,0,0]}/>
-                    </BarChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Motivos deserción */}
-                <ChartCard title="Motivos de Deserción por Mes" data={chartData} columns={[["mot_perdida_clase","Pérd. clase"],["mot_economico","Económico"],["mot_tecnica","Técnica"],["mot_horario","Horario"]]}>
-<MeasuredChart label="Gráfico 6: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend content={(props) => <LegendWithPercent {...props} percentages={desertionPct} />}/>
-                      <Bar dataKey="mot_perdida_clase" name="Pérd. clase" fill={C.bad} stackId="b"/>
-                      <Bar dataKey="mot_economico" name="Económico" fill={C.warn} stackId="b"/>
-                      <Bar dataKey="mot_tecnica" name="Técnica" fill={C.mut} stackId="b"/>
-                      <Bar dataKey="mot_horario" name="Horario" fill={C.dim} stackId="b" radius={[4,4,0,0]}/>
-                    </BarChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Clase de prueba */}
-                <ChartCard title="Clase de Prueba — Embudo" data={chartData} columns={[["cp_invitados","Invitados"],["cp_asistieron","Asistieron"],["cp_matriculados","Matriculados"]]}>
-<MeasuredChart label="Gráfico 7: serie mensual" minHeight={240}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Legend content={(props) => <LegendWithPercent {...props} percentages={funnelPct} />}/>
-                      <Bar dataKey="cp_invitados" name="Invitados" fill={C.track} radius={[4,4,0,0]}/>
-                      <Bar dataKey="cp_asistieron" name="Asistieron" fill={C.mut} radius={[4,4,0,0]}/>
-                      <Bar dataKey="cp_matriculados" name="Matriculados" fill={C.green} radius={[4,4,0,0]}/>
-                    </BarChart>}</MeasuredChart>
-                </ChartCard>
-
-                {/* Grupos activos */}
-                <ChartCard title="Grupos Activos por Mes" sub="Más grupos = mayor capacidad de ingresos" data={chartData} columns={[["grupos_activos","Grupos activos"]]}>
-<MeasuredChart label="Gráfico 8: serie mensual" minHeight={200}>{({width,height}) => <BarChart width={width} height={height} data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                      <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                      <YAxis tick={axisTick} stroke={C.faint}/>
-                      <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                      <Bar dataKey="grupos_activos" name="Grupos activos" fill={C.green} radius={[4,4,0,0]}/>
-                    </BarChart>}</MeasuredChart>
-                </ChartCard>
-
-              </div>
-            )}
+            {/* VISTA: COMPARATIVA — cada subproducto conserva su propia serie. */}
+            {vistaActiva === 'comparativa' && visibleMeses.length > 0 && <>
+              <p className="hca-history-guide">Lectura HCA · Una estadística por gráfica, periodos iguales y escala propia. Los retiros son inversos. Los totales incluyen el avance provisional de los meses abiertos.</p>
+              {COMPARATIVA_HCA.map(grupo => <section key={grupo.id} className="hca-history-group" aria-labelledby={`comparativa-${grupo.id}`}>
+                <h2 id={`comparativa-${grupo.id}`} className="panel__title">{grupo.titulo}</h2>
+                <p className="h-sub">{grupo.descripcion}</p>
+                <div className="reports-grid">{grupo.series.map(serie => {
+                  const resumen = resumenComparativo(visibleMeses, grupo, serie.campo)
+                  const total = resumen.total == null ? 'Sin dato' : new Intl.NumberFormat('es-PA', {maximumFractionDigits: 1}).format(resumen.total)
+                  const porcentaje = resumen.porcentaje == null ? '' : ` · ${resumen.porcentaje.toFixed(1)}% ${grupo.base ? 'respecto a invitados' : 'del total de esta categoría'}`
+                  return <GraficaMensualHca key={serie.campo} centroId={id} {...serie} rows={visibleMeses} todas={meses}
+                    descripcion={serie.contextual ? grupo.descripcion : `${resumen.completo ? 'Total' : 'Total parcial registrado'} del rango: ${total} ${serie.unidad}${porcentaje}.${resumen.completo ? '' : ' Hay meses sin cifra registrada.'}`}/>
+                })}</div>
+              </section>)}
+            </>}
 
             {/* VISTA: TABLA */}
             {vistaActiva === 'tabla' && (
@@ -566,7 +439,7 @@ export default function HistorialPage() {
 
             {/* VISTA: CUADRO DE NEGOCIO (fotos congeladas de meses cerrados) */}
             {vistaActiva === 'cuadro' && (() => {
-              const conCuadro = visibleMeses.filter(m => m.cuadro && !m.cuadro.vivo)
+              const conCuadro = mesesConCuadro(visibleMeses)
               if (conCuadro.length === 0) return (
                 <div className="alert" style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-line)', color: 'var(--warn-text)' }}>
                   Aún no hay meses cerrados con foto del cuadro. Al cerrar un mes en KPI Mensual, su Cuadro de Negocio queda congelado y aparece aquí como historial.
@@ -574,28 +447,10 @@ export default function HistorialPage() {
               )
               return (
                 <>
+                  <p className="hca-history-guide">Lectura HCA · Datos de las fotos congeladas del cuadro. Los retiros se leen en sentido inverso; los meses sin foto interrumpen el trazo.</p>
                   <div className="reports-grid" style={{marginBottom:20}}>
-                    <ChartCard title="Niños a pagar y movimientos" sub="Foto congelada al cierre de cada mes" data={conCuadro} columns={[["cuadro_nuevos","Nuevos activos"],["cuadro_retirados","Retirados"],["cuadro_aPagar","Niños a pagar"]]}>
-<MeasuredChart label="Gráfico 9: serie mensual" minHeight={220}>{({width,height}) => <ComposedChart width={width} height={height} data={conCuadro}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                          <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                          <YAxis tick={axisTick} stroke={C.faint}/>
-                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                          <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle}/>
-                          <Bar dataKey="cuadro_nuevos" name="Nuevos activos" fill={C.greenDeep} radius={[4,4,0,0]}/>
-                          <Bar dataKey="cuadro_retirados" name="Retirados" fill={C.bad} radius={[4,4,0,0]}/>
-                          <Line type="monotone" dataKey="cuadro_aPagar" name="Niños a pagar" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                        </ComposedChart>}</MeasuredChart>
-                    </ChartCard>
-                    <ChartCard title="Royalty mensual" sub={'Congelado con el cuadro de cada mes'} data={conCuadro} columns={[["cuadro_royalty","Royalty $"]]}>
-<MeasuredChart label="Gráfico 10: serie mensual" minHeight={220}>{({width,height}) => <LineChart width={width} height={height} data={conCuadro}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={GRID}/>
-                          <XAxis dataKey="mes" tick={axisTick} stroke={C.faint}/>
-                          <YAxis tick={axisTick} stroke={C.faint}/>
-                          <Tooltip content={<CustomTooltip/>} cursor={{ fill: C.cursor }}/>
-                          <Line type="monotone" dataKey="cuadro_royalty" name="Royalty $" stroke={C.green} strokeWidth={2.5} dot={{r:4}}/>
-                        </LineChart>}</MeasuredChart>
-                    </ChartCard>
+                    {CUADRO_HCA.map(serie => <GraficaMensualHca key={serie.campo} centroId={id} {...serie} rows={conCuadro} todas={mesesConCuadro(meses)}
+                      descripcion={serie.descripcion || 'Fuente: foto congelada del cuadro al cierre del mes.'}/>)}
                   </div>
                   <div className="panel">
                     <div className="panel__head">
@@ -621,7 +476,7 @@ export default function HistorialPage() {
                               <td className="num" style={{ textAlign: 'center', color: (m.cuadro.promedio ?? 0) >= 8 ? C.green : C.bad }}>
                                 {m.cuadro.promedio == null ? '—' : Number(m.cuadro.promedio).toFixed(1)}
                               </td>
-                              <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--ok-text)' }}>${Number(m.cuadro.royalty || 0).toFixed(2)}</td>
+                              <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--ok-text)' }}>{m.cuadro_royalty == null ? 'Sin dato' : `$${m.cuadro_royalty.toFixed(2)}`}</td>
                               <td className="num" style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-dim)' }}>
                                 {m.cuadro.cerrado_at ? String(m.cuadro.cerrado_at).slice(0, 10) : '—'}
                               </td>

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ReferenceLine, Legend } from 'recharts'
+import GraficaHca from '../GraficaHca'
+import { CAJA_HCA, puntosCaja } from '../../lib/caja/graficas-hca.mjs'
 import TableScroller from '../TableScroller'
 import { usd, fechaCorta, COLOR_SEMAFORO, TEXTO_SEMAFORO } from './formato'
 import { guardarAjusteSemana } from '../../app/actions/caja'
@@ -14,7 +15,6 @@ export function CurvaCaja({ empresa, curva, clases, onCambio }) {
   const [valor, setValor] = useState('')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
-  const datos = curva.semanas.map((s, i) => ({ nombre: `S${i + 1}`, ingresos: s.ingresos, egresos: -(s.egresoTotal + s.dueno), disponible: s.disponible }))
   const primeraAlerta = curva.semanas.findIndex((s) => s.semaforo !== 'verde')
   const editable = empresa !== 'consolidado'
 
@@ -41,20 +41,10 @@ export function CurvaCaja({ empresa, curva, clases, onCambio }) {
           : <>⚠️ Semana {primeraAlerta + 1} ({fechaCorta(curva.semanas[primeraAlerta].lunes)}) en {TEXTO_SEMAFORO[curva.semanas[primeraAlerta].semaforo]}: disponible {usd(curva.semanas[primeraAlerta].disponible)}.</>}
         {' '}Piso de seguridad (2 semanas de gasto): {usd(curva.piso)} · Línea disponible: {usd(curva.lineaDisponible)}.
       </p>
-      <div style={{ width: '100%', height: 280 }} aria-hidden="true">
-        <ResponsiveContainer>
-          <ComposedChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            <XAxis dataKey="nombre" tick={{ fontSize: 12 }} />
-            <YAxis width={44} tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
-            <Tooltip formatter={(v) => usd(v)} />
-            <Legend />
-            <ReferenceLine y={0} stroke="var(--bad, #C62828)" />
-            <ReferenceLine y={curva.piso} stroke="var(--warn, #B45309)" strokeDasharray="4 4" />
-            <Bar dataKey="ingresos" name="Ingresos" fill="var(--ok, #2F7A24)" />
-            <Bar dataKey="egresos" name="Egresos + dueño" fill="var(--text-faint, #94a3b8)" />
-            <Line dataKey="disponible" name="Disponible" stroke="var(--accent, #0284c7)" strokeWidth={2} />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <p className="hca-history-guide">Proyección de caja: cada línea muestra una sola estadística, con tramos rectos y escala propia. La primera semana solo incluye de mañana al domingo; las siguientes cubren la semana completa. No son resultados realizados ni asignan una condición.</p>
+      <div className="reports-grid">
+        {CAJA_HCA.map(serie => <GraficaHca key={serie.campo} {...serie} unidad="USD" puntos={puntosCaja(curva, serie.campo)}
+          storageKey={`aloha:escala-hca:caja:${empresa}:${serie.campo}`} proyeccion incluirCero={serie.campo === 'disponible'} referencia="Piso de seguridad"/>)}
       </div>
       {error && <p role="alert" className="alert alert--error">{error}</p>}
       <TableScroller label="Curva de 13 semanas por semana" stickyFirstColumn>

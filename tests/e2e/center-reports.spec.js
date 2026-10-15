@@ -28,7 +28,7 @@ test('Historial muestra doce gráficos y tablas equivalentes sin partir palabras
     }))
     expect(broken).toEqual([])
     let count=0
-    for(const [label,charts]of [['Tendencias',6],['Comparativa',4],['Cuadro de negocio',2],['Tabla detalle',0]]) {
+    for(const [label,charts]of [['Tendencias',6],['Comparativa',12],['Cuadro de negocio',4],['Tabla detalle',0]]) {
       await page.getByRole('group',{name:'Vistas del historial'}).getByRole('button',{name:label,exact:true}).click()
       await expect(page.locator('.measured-chart, .hca-monthly__svg')).toHaveCount(charts)
       for(const chart of await page.locator('.measured-chart').all())await expect(chart.locator('.recharts-wrapper > svg.recharts-surface')).toBeVisible()
@@ -40,7 +40,7 @@ test('Historial muestra doce gráficos y tablas equivalentes sin partir palabras
       }
       await geometry(page,testInfo,'historial-'+label)
     }
-    expect(count).toBe(12)
+    expect(count).toBe(22)
     expect(await r10Snapshot()).toEqual(before)
   }finally{await context.close()}
 })
