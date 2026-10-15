@@ -655,5 +655,12 @@
     "bytes": 141732,
     "segundos": 17.647166,
     "generadoAt": "2026-10-02T14:19:15.233Z"
+  },
+  "meta/meta-6": {
+    "hash": "3c393bf4ea57",
+    "file": "meta/meta-6.mp3",
+    "seg": 12,
+    "deshabilitado": true,
+    "motivo": "Gráfica retirada y resultados automáticos: pendiente regenerar; el recorrido escrito está actualizado."
   }
 }

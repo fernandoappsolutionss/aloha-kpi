@@ -1,4 +1,5 @@
 'use client'
+import { revelarDestino } from '../../lib/revelar-destino.mjs'
 // Motor del tour guiado. Lee ?tour=<modulo>&paso=<n> de la URL, busca el
 // elemento [data-tour="<target>"] del paso, lo resalta con un spotlight y
 // muestra la tarjeta con texto, audio y controles. No conoce el contenido:
@@ -135,6 +136,7 @@ function TourActivo({ tourId }) {
       if (el) {
         targetRef.current = el
         vistosRef.current.add(step.id)
+        revelarDestino(el)
         try { el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }) } catch {}
         medir()
         setEstado('listo')
