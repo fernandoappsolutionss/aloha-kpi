@@ -51,6 +51,7 @@ export default function KPIPage() {
   const [arrastrado, setArrastrado] = useState(null)
   // Motivos de deserción que vienen del módulo (retiros registrados).
   const [motivosAuto, setMotivosAuto] = useState(null)
+  const [cierreDocumental, setCierreDocumental] = useState(null)
   const [autoSync, setAutoSync] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
   // KPI sin manos (g1-16/g1-20): resultado discriminado del módulo. 'auto'
@@ -101,6 +102,7 @@ export default function KPIPage() {
     setKpiAuto(kAuto || null)
     setAutoSync(sync || null)
     setFinalGuardado(res?.ninos_final_mes ?? null)
+    setCierreDocumental(res?.conciliacion_cuadro || null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
     // anterior solo mientras esta abierto. Un cierre conserva su propia foto.
@@ -206,8 +208,8 @@ export default function KPIPage() {
   const gA = parseInt(config.grupos_activos)||1
   const totalDes = semanas.reduce((a,s) => a + s.des.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
-  const retiradosOperativos = motivosAuto ? motivosAuto.total : totalDes
-  const reincorporados = motivosAuto?.reincorporados || 0
+  const retiradosOperativos = cierreDocumental?.totales.retirados ?? (motivosAuto ? motivosAuto.total : totalDes)
+  const reincorporados = cierreDocumental?.totales.reincorporados ?? motivosAuto?.reincorporados ?? 0
   const ninosFinalCalculado = Math.max(0, ni + nA + reincorporados - retiradosOperativos)
   const ninosFinal = finalVisibleKpi({ estado: mesEstado, guardado: finalGuardado, calculado: ninosFinalCalculado })
   const ajusteHistorico = ajusteHistoricoKpi({ estado: mesEstado, inicioGuardado: ni, cierreAnterior: cierreAnterior?.valor })
@@ -329,6 +331,15 @@ export default function KPIPage() {
         {access.isReadonlyGlobal && !locked && (
           <div className="alert" style={{ marginBottom: 16 }}>
             Modo consulta global: puedes revisar el KPI y cambiar periodo, sin guardar ni cerrar el mes.
+          </div>
+        )}
+
+        {locked && cierreDocumental && (
+          <div className="alert" style={{ marginBottom: 16 }}>
+            <strong>Cierre conciliado con el cuadro de negocio.</strong> {ninosFinal} niños al cierre · {nA} nuevos activos · {reincorporados} reincorporados · {retiradosOperativos} retirados.
+            <div>Fuente: {cierreDocumental.archivo}</div>
+            {totalDes !== retiradosOperativos && <div>El detalle semanal guardado suma {totalDes} retiros; el cierre documental valida {retiradosOperativos}. El archivo no permite reasignar todos los retiros a un día concreto.</div>}
+            {cierreDocumental.ajusteInicio?.diferencia !== 0 && cierreDocumental.ajusteInicio && <div>Ajuste de apertura documentado: {cierreDocumental.ajusteInicio.diferencia > 0 ? '+' : ''}{cierreDocumental.ajusteInicio.diferencia} niños respecto al cierre anterior. Se conserva la captura histórica del mes anterior.</div>}
           </div>
         )}
 

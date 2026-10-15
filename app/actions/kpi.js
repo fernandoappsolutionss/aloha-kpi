@@ -13,6 +13,7 @@ import { calcularKpiAutoMes } from '../../lib/kpi-semanal-service'
 import { superponerSemanasAuto } from '../../lib/kpi-semanal-auto.mjs'
 import { CAMPOS_RESUMEN_AUTO, poblacionKpiAutomatica, usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
 import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
+import { conCierresDocumentales } from '../../lib/cierre-documental-server'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -71,6 +72,7 @@ export async function loadKpiMes(centroId, year, month) {
   `
   const cierreAnterior = await cierreMesAnterior(centroId, intOr(year), intOr(month))
   const estado = mes?.estado || 'abierto'
+  if (res && estado === 'cerrado') [res] = await conCierresDocumentales([res])
   let motivosAuto = estado === 'cerrado' ? null : await motivosDelModulo(centroId, intOr(year), intOr(month))
   // (g1-16) KPI sin manos: en mes ABIERTO >= gate las filas ing/des salen del
   // módulo, superpuestas sobre kpi_semanas. Un mes cerrado es histórico
