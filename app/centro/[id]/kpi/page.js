@@ -335,7 +335,7 @@ export default function KPIPage() {
         )}
 
         {locked && cierreDocumental && (
-          <div className="alert" style={{ marginBottom: 16 }}>
+          <div className="alert" style={{ display: 'block', marginBottom: 16, overflowWrap: 'anywhere' }}>
             <strong>Cierre conciliado con el cuadro de negocio.</strong> {ninosFinal} niños al cierre · {nA} nuevos activos · {reincorporados} reincorporados · {retiradosOperativos} retirados.
             <div>Fuente: {cierreDocumental.archivo}</div>
             {totalDes !== retiradosOperativos && <div>El detalle semanal guardado suma {totalDes} retiros; el cierre documental valida {retiradosOperativos}. El archivo no permite reasignar todos los retiros a un día concreto.</div>}
