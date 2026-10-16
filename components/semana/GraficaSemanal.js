@@ -7,7 +7,7 @@ export default function GraficaSemanal({ puntos = [], inversa = false, unidad = 
   const modelo = modeloGrafica({ puntos, inversa, ancho: compacta ? 160 : 640, alto: compacta ? 48 : 220, margen })
   if (modelo.vacia) return <p className="h-sub" role="status">Sin datos todavía</p>
   const etiqueta = `${titulo}. ${inversa ? 'Menos es mejor. ' : ''}${modelo.puntos.map((p) => `${p.semanaFin}: ${p.valor == null ? 'sin dato' : `${p.valor} ${unidad}`}${p.cuota == null ? '' : `; cuota ${p.cuota}`}`).join('; ')}`
-  return (
+  return (<>
     <svg viewBox={`0 0 ${modelo.ancho} ${modelo.alto}`} width="100%" role="img" aria-label={etiqueta} className="semana-grafica">
       {!compacta && modelo.ticks.map((tick, i) => <g key={i}>
         <line x1="44" x2={modelo.ancho - 16} y1={tick.y} y2={tick.y} stroke="var(--border)" />
@@ -20,5 +20,7 @@ export default function GraficaSemanal({ puntos = [], inversa = false, unidad = 
         {!compacta && p.semanaFin && <text x={p.x} y={modelo.alto - 5} textAnchor="middle" fill="var(--text-dim)" fontSize="10">{p.semanaFin.slice(8)}/{p.semanaFin.slice(5, 7)}</text>}
       </g>)}
     </svg>
+    {!compacta && <p className="h-sub">Escala {modelo.min.toLocaleString('es-PA')}–{modelo.max.toLocaleString('es-PA')} {unidad}. Compara valores y fechas; la inclinación visual cambia con la escala y no asigna una condición.</p>}
+    </>
   )
 }

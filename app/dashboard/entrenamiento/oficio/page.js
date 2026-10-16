@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
+import ReiniciarPuesto from '../../../../components/ReiniciarPuesto'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { matrizOficio } from '../../../actions/entrenamiento-oficio'
 import { listCentros } from '../../../actions/centros'
@@ -45,8 +46,12 @@ export default function EntrenamientoOficioAdminPage() {
   const [centroId, setCentroId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [recarga, setRecarga] = useState(0)
+  const [dialogo, setDialogo] = useState(null)
+  const [aviso, setAviso] = useState(null)
   const access = useCurrentAccess()
   const canView = access.canViewOficio
+  const canReset = access.isMaster
 
   useEffect(() => {
     if (!access.loaded || !canView) return
@@ -60,13 +65,15 @@ export default function EntrenamientoOficioAdminPage() {
       setData(null)
       return
     }
+    let vigente = true
     setLoading(true)
     setError(null)
     matrizOficio(centroId ? Number(centroId) : null)
-      .then((d) => { if (d?.error) { setError(d.error); setData(null) } else setData(d) })
-      .catch(() => { setError('No se pudo cargar el oficio. Recarga la página.'); setData(null) })
-      .finally(() => setLoading(false))
-  }, [centroId, access.loaded, canView])
+      .then((d) => { if (vigente) { if (d?.error) { setError(d.error); setData(null) } else setData(d) } })
+      .catch(() => { if (vigente) { setError('No se pudo cargar el oficio. Recarga la página.'); setData(null) } })
+      .finally(() => { if (vigente) setLoading(false) })
+    return () => { vigente = false }
+  }, [centroId, recarga, access.loaded, canView])
 
   // El plan se lee dentro de un centro (la ruta es /centro/<id>/…). Con un
   // filtro puesto se usa ese centro; sin filtro, el primero de la lista. Si
@@ -111,6 +118,7 @@ export default function EntrenamientoOficioAdminPage() {
           </select>
         </div>
 
+        {aviso && <div className="alert" role="status">{aviso}</div>}
         {loading ? <div className="h-sub" role="status">Cargando…</div> : error || !data ? (
           <div className="alert alert--error" role="alert">{error || 'No se pudo cargar el oficio. Recarga la página.'}</div>
         ) : (
@@ -147,6 +155,12 @@ export default function EntrenamientoOficioAdminPage() {
                       {u.centroFirma
                         ? <Link className="tour-card__link" href={`/centro/${u.centroFirma}/entrenamiento/firmas`}>Tomar maniobra <span aria-hidden="true">→</span></Link>
                         : <span style={{ color: 'var(--text-faint)' }}>sin centro</span>}
+                      {canReset && <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                        <button className="btn btn--ghost" type="button" aria-label={`Reiniciar puesto de ${u.nombre}`}
+                          onClick={() => setDialogo({ persona: u, modo: 'reinicio' })}>Reiniciar puesto</button>
+                        <button className="btn btn--ghost" type="button" aria-label={`Historial de reinicios de ${u.nombre}`}
+                          onClick={() => setDialogo({ persona: u, modo: 'historial' })}>Historial</button>
+                      </div>}
                     </td>
                     {data.cursos.map((c) => <Celda key={c.id} c={u.porCurso[c.id]} />)}
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: u.avance.pctEstudio === 100 ? 'var(--ok)' : 'var(--text)' }}>{u.avance.pctEstudio}%</td>
@@ -162,6 +176,12 @@ export default function EntrenamientoOficioAdminPage() {
           </div>
         )}
       </main>
+      {dialogo && canReset && <ReiniciarPuesto key={`${dialogo.persona.id}-${dialogo.modo}`} {...dialogo}
+        onClose={() => setDialogo(null)} onReiniciado={(u) => {
+          setDialogo(null)
+          setAviso(`Puesto de ${u.nombre} reiniciado. El avance anterior quedó guardado en el historial.`)
+          setRecarga((n) => n + 1)
+        }} />}
     </div>
   )
 }

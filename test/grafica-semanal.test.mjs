@@ -22,6 +22,13 @@ test('sin dato corta la línea, cuota amplía la escala', () => {
   assert.equal(m.puntos[1].y, null)
   assert.ok(modeloGrafica({ puntos: [{ valor: 10 }, { valor: 11, cuota: 20 }] }).max >= 20)
   assert.equal(modeloGrafica({ puntos: puntos([0, 1]) }).min, 0)
-  assert.deepEqual([modeloGrafica({ puntos: puntos([7, 7, 7]) }).min, modeloGrafica({ puntos: puntos([7, 7, 7]) }).max], [6, 8])
+  assert.deepEqual([modeloGrafica({ puntos: puntos([7, 7, 7]) }).min, modeloGrafica({ puntos: puntos([7, 7, 7]) }).max], [0, 8])
   assert.equal(modeloGrafica({ puntos: puntos([null, null]) }).vacia, true)
+})
+
+ test('una mejora pequeña no ocupa toda la altura ni imita una mucho mayor', () => {
+  const menor = modeloGrafica({puntos: puntos([100,104,108,112])})
+  const mayor = modeloGrafica({puntos: puntos([100,140,180,220])})
+  assert.equal(menor.min, 0)
+  assert.ok(Math.abs(menor.puntos[0].y-menor.puntos[3].y) < Math.abs(mayor.puntos[0].y-mayor.puntos[3].y)/3)
 })

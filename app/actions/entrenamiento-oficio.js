@@ -6,13 +6,14 @@
 // campo `modulo` es TEXT libre y los ids de oficio llevan prefijo `of-`.
 //
 // Como en entrenamiento.js: siempre escribe sobre el usuario de la sesión
-// (nunca sobre un id que venga del cliente, salvo la FIRMA, que es un tercero
-// autorizado y se verifica con puedeFirmar); las respuestas del quiz viven en
+// (salvo la FIRMA del jefe autorizado y el REINICIO exclusivo de Master);
+// las respuestas del quiz viven en
 // respuestas-oficio/ (solo servidor) y jamás llegan al cliente.
 import { sql, withTransaction } from '../../lib/db'
 import { requireCurrentOficio, requireCurrentMaster } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { isMaster } from '../../lib/current-user.mjs'
+import { bloquearOficio, archivarYReiniciar, validarReinicio } from '../../lib/entrenamiento/oficio/reinicios.mjs'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
 import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/todas'
@@ -72,8 +73,8 @@ function aCamel(row) {
 
 // Lanza si falla (el runAction de quien llama lo captura): nunca devuelve
 // { error } para que avanceOficio() no lo confunda con progreso.
-async function progresoDeUsuario(usuarioId) {
-  const rows = await sql`
+async function progresoDeUsuario(usuarioId, query = sql) {
+  const rows = await query`
     SELECT ep.*, f.nombre AS firmante_nombre
     FROM entrenamiento_progreso ep
     LEFT JOIN usuarios f ON f.id = ep.drill_firmado_por
@@ -296,12 +297,12 @@ export async function guardarConcepto(modulo, slug, texto) {
     if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
     const vivos = palabrasVivas(m)
     if (!vivos.includes(slug)) return { error: 'Esta palabra no pertenece a este módulo.' }
-    const previo = await progresoDeUsuario(u.id)
-    if (!gradienteAbierto(m, previo)) {
-      return { error: 'Antes de guardar conceptos de este módulo tienes que estudiar el anterior.' }
-    }
-
     return await withTransaction(async (query) => {
+      await bloquearOficio(query, u.id)
+      const previo = await progresoDeUsuario(u.id, query)
+      if (!gradienteAbierto(m, previo)) {
+        return { error: 'Antes de guardar conceptos de este módulo tienes que estudiar el anterior.' }
+      }
       await query`SELECT pg_advisory_xact_lock(hashtext('conceptos:' || ${u.id} || ':' || ${modulo}))`
       const otros = await query`
         SELECT ec.texto
@@ -340,35 +341,38 @@ export async function marcarEstudiado(modulo) {
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
-    // Mismo gradiente que el quiz, y por la misma razón: el checksheet promete
-    // "cada módulo abre con el anterior estudiado". Sin esta guarda se puede
-    // tildar la masa del último módulo el primer día y dejar checks verdes
-    // fuera de orden que contradicen esa promesa.
-    const previo = await progresoDeUsuario(u.id)
-    if (!gradienteAbierto(m, previo)) {
-      return { error: 'Antes de marcar este módulo tienes que estudiar el anterior.' }
-    }
-    if (previo[modulo]?.tourVistoAt) return { ok: true }
-    const vivos = palabrasVivas(m)
-    if (vivos.length > 0) {
-      const conteo = await sql`
-        SELECT COUNT(DISTINCT slug)::int AS n
-        FROM entrenamiento_conceptos
-        WHERE usuario_id = ${u.id} AND modulo = ${modulo} AND slug = ANY(${vivos})
-      `
-      const guardados = Number(conteo[0]?.n || 0)
-      const faltan = Math.max(0, vivos.length - guardados)
-      if (faltan > 0) {
-        return { error: `Antes de marcar este módulo escribe con tus palabras las ${faltan} palabras que faltan.` }
+    return await withTransaction(async (query) => {
+      await bloquearOficio(query, u.id)
+      // Mismo gradiente que el quiz, y por la misma razón: el checksheet promete
+      // "cada módulo abre con el anterior estudiado". Sin esta guarda se puede
+      // tildar la masa del último módulo el primer día y dejar checks verdes
+      // fuera de orden que contradicen esa promesa.
+      const previo = await progresoDeUsuario(u.id, query)
+      if (!gradienteAbierto(m, previo)) {
+        return { error: 'Antes de marcar este módulo tienes que estudiar el anterior.' }
       }
-    }
-    await sql`
-      INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
-      VALUES (${u.id}, ${modulo}, now(), now())
-      ON CONFLICT (usuario_id, modulo) DO UPDATE
-        SET tour_visto_at = COALESCE(entrenamiento_progreso.tour_visto_at, now()), updated_at = now()
-    `
-    return { ok: true }
+      if (previo[modulo]?.tourVistoAt) return { ok: true }
+      const vivos = palabrasVivas(m)
+      if (vivos.length > 0) {
+        const conteo = await query`
+          SELECT COUNT(DISTINCT slug)::int AS n
+          FROM entrenamiento_conceptos
+          WHERE usuario_id = ${u.id} AND modulo = ${modulo} AND slug = ANY(${vivos})
+        `
+        const guardados = Number(conteo[0]?.n || 0)
+        const faltan = Math.max(0, vivos.length - guardados)
+        if (faltan > 0) {
+          return { error: `Antes de marcar este módulo escribe con tus palabras las ${faltan} palabras que faltan.` }
+        }
+      }
+      await query`
+        INSERT INTO entrenamiento_progreso (usuario_id, modulo, tour_visto_at, updated_at)
+        VALUES (${u.id}, ${modulo}, now(), now())
+        ON CONFLICT (usuario_id, modulo) DO UPDATE
+          SET tour_visto_at = COALESCE(entrenamiento_progreso.tour_visto_at, now()), updated_at = now()
+      `
+      return { ok: true }
+    }, { isolationLevel: 'ReadCommitted' })
   })
 }
 
@@ -384,52 +388,55 @@ export async function responderQuizOficio(modulo, respuestas) {
     if (!Array.isArray(correctas) || correctas.length !== m.quiz.length) {
       return { error: 'Este módulo todavía no tiene sus preguntas cargadas.' }
     }
-    // El orden se comprueba en el SERVIDOR, ANTES de corregir. Desde 2026-09-06 la
-    // pantalla tampoco deja llegar aquí sin el anterior estudiado (la puerta "No
-    // te saltes el paso"), así que esta guarda es la red: la action es pública y
-    // hay un camino legítimo que la cruza —quien ya marcó el módulo puede releerlo
-    // aunque su anterior deje de estar estudiado— y ahí el quiz sí se rechaza.
-    const progreso = await progresoDeUsuario(u.id)
-    if (!gradienteAbierto(m, progreso)) {
-      return { error: 'Antes de responder este módulo tienes que estudiar el anterior.' }
-    }
-    if (!progreso[modulo]?.tourVistoAt) {
-      return { error: 'Antes de responder marca la lección como realizada.' }
-    }
-    // Forma estricta: tantos enteros como preguntas. Un payload malformado no
-    // cuenta como intento.
-    const r = Array.isArray(respuestas) ? respuestas : null
-    if (!r || r.length !== m.quiz.length || !r.every(Number.isInteger)) return { error: 'Respuestas inválidas.' }
-    const minimo = minimoAprobacion(m.quiz.length)
-    const res = corregirQuizOficio(r, correctas, minimo) // fuera de rango → incorrecta
-    // quiz_aprobado_at con el reloj de la BD (now()), no el del server de Next.
-    await sql`
-      INSERT INTO entrenamiento_progreso (usuario_id, modulo, intentos, ultimo_puntaje, quiz_aprobado_at, updated_at)
-      SELECT ${u.id}, ${modulo}, 1, ${res.puntaje}, CASE WHEN ${res.aprobado} THEN now() END, now()
-      ON CONFLICT (usuario_id, modulo) DO UPDATE SET
-        intentos = entrenamiento_progreso.intentos + 1,
-        ultimo_puntaje = EXCLUDED.ultimo_puntaje,
-        quiz_aprobado_at = COALESCE(entrenamiento_progreso.quiz_aprobado_at, EXCLUDED.quiz_aprobado_at),
-        updated_at = now()
-    `
-    return {
-      puntaje: res.puntaje,
-      minimo,
-      total: m.quiz.length,
-      correctas: res.correctas,
-      aprobado: res.aprobado,
-      explicaciones: m.quiz.map((q) => q.explicacion),
-      // El slug es la clave de máquina: al alumno se le muestra el término y se
-      // le enlaza su ancla dentro del glosario (GlosarioOficio pinta id="t-slug").
-      repasa: m.quiz.map((q) => (q.repasa || [])
-        .filter((slug) => GLOSARIO[slug])
-        .map((slug) => ({ slug, termino: GLOSARIO[slug].termino }))),
-    }
+    return await withTransaction(async (query) => {
+      await bloquearOficio(query, u.id)
+      // El orden se comprueba en el SERVIDOR, ANTES de corregir. Desde 2026-09-06 la
+      // pantalla tampoco deja llegar aquí sin el anterior estudiado (la puerta "No
+      // te saltes el paso"), así que esta guarda es la red: la action es pública y
+      // hay un camino legítimo que la cruza —quien ya marcó el módulo puede releerlo
+      // aunque su anterior deje de estar estudiado— y ahí el quiz sí se rechaza.
+      const progreso = await progresoDeUsuario(u.id, query)
+      if (!gradienteAbierto(m, progreso)) {
+        return { error: 'Antes de responder este módulo tienes que estudiar el anterior.' }
+      }
+      if (!progreso[modulo]?.tourVistoAt) {
+        return { error: 'Antes de responder marca la lección como realizada.' }
+      }
+      // Forma estricta: tantos enteros como preguntas. Un payload malformado no
+      // cuenta como intento.
+      const r = Array.isArray(respuestas) ? respuestas : null
+      if (!r || r.length !== m.quiz.length || !r.every(Number.isInteger)) return { error: 'Respuestas inválidas.' }
+      const minimo = minimoAprobacion(m.quiz.length)
+      const res = corregirQuizOficio(r, correctas, minimo) // fuera de rango → incorrecta
+      // quiz_aprobado_at con el reloj de la BD (now()), no el del server de Next.
+      await query`
+        INSERT INTO entrenamiento_progreso (usuario_id, modulo, intentos, ultimo_puntaje, quiz_aprobado_at, updated_at)
+        SELECT ${u.id}, ${modulo}, 1, ${res.puntaje}, CASE WHEN ${res.aprobado} THEN now() END, now()
+        ON CONFLICT (usuario_id, modulo) DO UPDATE SET
+          intentos = entrenamiento_progreso.intentos + 1,
+          ultimo_puntaje = EXCLUDED.ultimo_puntaje,
+          quiz_aprobado_at = COALESCE(entrenamiento_progreso.quiz_aprobado_at, EXCLUDED.quiz_aprobado_at),
+          updated_at = now()
+      `
+      return {
+        puntaje: res.puntaje,
+        minimo,
+        total: m.quiz.length,
+        correctas: res.correctas,
+        aprobado: res.aprobado,
+        explicaciones: m.quiz.map((q) => q.explicacion),
+        // El slug es la clave de máquina: al alumno se le muestra el término y se
+        // le enlaza su ancla dentro del glosario (GlosarioOficio pinta id="t-slug").
+        repasa: m.quiz.map((q) => (q.repasa || [])
+          .filter((slug) => GLOSARIO[slug])
+          .map((slug) => ({ slug, termino: GLOSARIO[slug].termino }))),
+      }
+    }, { isolationLevel: 'ReadCommitted' })
   })
 }
 
-async function alumnoDe(usuarioId) {
-  const rows = await sql`SELECT id, nombre, rol, centro_id FROM usuarios WHERE id = ${usuarioId}`
+async function alumnoDe(usuarioId, query = sql) {
+  const rows = await query`SELECT id, nombre, rol, centro_id FROM usuarios WHERE id = ${usuarioId}`
   const a = rows[0]
   return a ? { id: Number(a.id), nombre: a.nombre, rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) } : null
 }
@@ -453,29 +460,32 @@ export async function firmarDrill(usuarioId, modulo) {
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
     if ((m.drills || []).length === 0) return { error: 'Este módulo no tiene maniobra que firmar.' }
-    const alumno = await alumnoDe(usuarioId)
-    if (!alumno) return { error: 'Usuario inválido.' }
-    if (!m.roles.includes(alumno.rol)) return { error: 'Ese módulo no es del puesto de esa persona.' }
-    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
-    // Firmar lo que no se estudió deja el checksheet diciendo "Drill firmado"
-    // al lado de "Por estudiar". Por la UI no se llega, pero la action es
-    // pública y el estado resultante es incoherente.
-    const suyo = await progresoDeUsuario(alumno.id)
-    if (!estudiado(suyo[modulo])) return { error: 'Todavía no lo ha estudiado: no se le puede tomar la maniobra.' }
-    // Y TAMPOCO SE TOMA LO QUE UNO NO HA ESTUDIADO. Si el módulo está en el plan
-    // del propio firmante y la puerta se lo cierra, no puede firmarlo: la cola
-    // ya no le manda la maniobra, pero esta action es pública.
-    const mio = await progresoDeUsuario(firmante.id)
-    if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio), mio[modulo])) {
-      return { error: 'Ese módulo también es de tu puesto y todavía no lo has estudiado: estúdialo antes de tomárselo, o que se la tome el jefe entrenador de esa persona.' }
-    }
-    await sql`
-      INSERT INTO entrenamiento_progreso (usuario_id, modulo, drill_firmado_at, drill_firmado_por, updated_at)
-      VALUES (${alumno.id}, ${modulo}, now(), ${firmante.id}, now())
-      ON CONFLICT (usuario_id, modulo) DO UPDATE SET
-        drill_firmado_at = now(), drill_firmado_por = ${firmante.id}, updated_at = now()
-    `
-    return { ok: true }
+    return await withTransaction(async (query) => {
+      await bloquearOficio(query, usuarioId)
+      const alumno = await alumnoDe(usuarioId, query)
+      if (!alumno) return { error: 'Usuario inválido.' }
+      if (!m.roles.includes(alumno.rol)) return { error: 'Ese módulo no es del puesto de esa persona.' }
+      if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
+      // Firmar lo que no se estudió deja el checksheet diciendo "Drill firmado"
+      // al lado de "Por estudiar". Por la UI no se llega, pero la action es
+      // pública y el estado resultante es incoherente.
+      const suyo = await progresoDeUsuario(alumno.id, query)
+      if (!estudiado(suyo[modulo])) return { error: 'Todavía no lo ha estudiado: no se le puede tomar la maniobra.' }
+      // Y TAMPOCO SE TOMA LO QUE UNO NO HA ESTUDIADO. Si el módulo está en el plan
+      // del propio firmante y la puerta se lo cierra, no puede firmarlo: la cola
+      // ya no le manda la maniobra, pero esta action es pública.
+      const mio = await progresoDeUsuario(firmante.id, query)
+      if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio), mio[modulo])) {
+        return { error: 'Ese módulo también es de tu puesto y todavía no lo has estudiado: estúdialo antes de tomárselo, o que se la tome el jefe entrenador de esa persona.' }
+      }
+      await query`
+        INSERT INTO entrenamiento_progreso (usuario_id, modulo, drill_firmado_at, drill_firmado_por, updated_at)
+        VALUES (${alumno.id}, ${modulo}, now(), ${firmante.id}, now())
+        ON CONFLICT (usuario_id, modulo) DO UPDATE SET
+          drill_firmado_at = now(), drill_firmado_por = ${firmante.id}, updated_at = now()
+      `
+      return { ok: true }
+    }, { isolationLevel: 'ReadCommitted' })
   })
 }
 
@@ -485,15 +495,18 @@ export async function quitarFirmaDrill(usuarioId, modulo) {
     const firmante = await requireCurrentOficio()
     if (!Number.isInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
-    const alumno = await alumnoDe(usuarioId)
-    if (!alumno) return { error: 'Usuario inválido.' }
-    if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
-    await sql`
-      UPDATE entrenamiento_progreso
-      SET drill_firmado_at = NULL, drill_firmado_por = NULL, updated_at = now()
-      WHERE usuario_id = ${alumno.id} AND modulo = ${modulo}
-    `
-    return { ok: true }
+    return await withTransaction(async (query) => {
+      await bloquearOficio(query, usuarioId)
+      const alumno = await alumnoDe(usuarioId, query)
+      if (!alumno) return { error: 'Usuario inválido.' }
+      if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
+      await query`
+        UPDATE entrenamiento_progreso
+        SET drill_firmado_at = NULL, drill_firmado_por = NULL, updated_at = now()
+        WHERE usuario_id = ${alumno.id} AND modulo = ${modulo}
+      `
+      return { ok: true }
+    }, { isolationLevel: 'ReadCommitted' })
   })
 }
 
@@ -711,5 +724,35 @@ export async function matrizOficio(centroId = null) {
         }
       }),
     }
+  })
+}
+
+
+// Solo Master puede iniciar otro ciclo. El historial y el borrado del avance
+// comparten transacción y candado con estudio, conceptos y firmas.
+export async function reiniciarPuestoOficio(usuarioId, solicitud) {
+  return runAction('reiniciarPuestoOficio', async () => {
+    const actor = await requireCurrentMaster()
+    const error = validarReinicio(usuarioId, solicitud)
+    if (error) return { error }
+    return await withTransaction((query) => archivarYReiniciar(query, usuarioId, actor, solicitud), { isolationLevel: 'ReadCommitted' })
+  })
+}
+
+export async function historialReiniciosOficio(usuarioId) {
+  return runAction('historialReiniciosOficio', async () => {
+    await requireCurrentMaster()
+    if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) return { error: 'Usuario inválido.' }
+    const rows = await sql`
+      SELECT id, created_at, motivo, nota, persona, responsable,
+        (SELECT count(*)::int FROM jsonb_array_elements(progreso) p
+          WHERE p->>'tour_visto_at' IS NOT NULL AND p->>'quiz_aprobado_at' IS NOT NULL) AS estudiados,
+        (SELECT count(*)::int FROM jsonb_array_elements(progreso) p
+          WHERE p->>'drill_firmado_at' IS NOT NULL) AS firmados,
+        jsonb_array_length(conceptos) AS conceptos
+      FROM entrenamiento_oficio_reinicios WHERE usuario_id = ${usuarioId}
+      ORDER BY created_at DESC, id DESC LIMIT 20
+    `
+    return { reinicios: rows.map((r) => ({ ...r, created_at: new Date(r.created_at).toISOString() })) }
   })
 }

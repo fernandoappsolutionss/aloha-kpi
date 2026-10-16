@@ -5,7 +5,7 @@ import { lecturaCondicion, hayDiscrepancia } from '../lib/condiciones/lectura.mj
 const c = (serie) => lecturaCondicion(serie).condicion
 
 test('lectura por inclinación de la última semana', () => {
-  assert.equal(c([100, 101, 102]), 'inexistencia')      // menos de 4 semanas con dato
+  assert.equal(c([100, 101, 102]), null)      // menos de 4 semanas con dato
   assert.equal(c([100, 101, 102, 103]), 'normal')       // +0,98 %
   assert.equal(c([100, 101, 102, 105]), 'afluencia')    // +2,9 %
   assert.equal(c([100, 101, 102, 102]), 'emergencia')   // sin cambio
@@ -30,4 +30,16 @@ test('discrepancia solo cuando la asignada está por encima de la lectura', () =
   assert.equal(hayDiscrepancia('normal', 'normal'), false)
   assert.equal(hayDiscrepancia(null, 'normal'), false)
   assert.equal(hayDiscrepancia('normal', null), false)
+})
+
+ test('un rebote hasta el máximo previo requiere contexto y una caída no se disfraza de recuperación', () => {
+  for (const serie of [[100,95,90,94],[100,95,90,100]]) {
+    const r = lecturaCondicion(serie)
+    assert.equal(r.condicion, null)
+    assert.equal(r.estado, 'recuperacion')
+  }
+  assert.equal(c([100,95,90,101]), 'afluencia')
+  assert.equal(c([100,90,95,92]), 'peligro')
+  assert.equal(lecturaCondicion([100,null,101,102,103]).estado, 'historial_insuficiente')
+  assert.equal(c([100,101,102,NaN]), null)
 })

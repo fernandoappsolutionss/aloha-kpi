@@ -576,13 +576,13 @@
     "generadoAt": "2026-10-02T14:18:48.222Z"
   },
   "semana-graficas/sg-4": {
-    "file": "actualizaciones/semana-graficas/sg-4-631c10a72ddc.mp3",
-    "hash": "631c10a72ddc",
+    "file": "actualizaciones/semana-graficas/sg-4-f1513af33d9d.mp3",
+    "hash": "f1513af33d9d",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 137970,
-    "segundos": 17.182766,
-    "generadoAt": "2026-10-02T14:18:51.196Z"
+    "bytes": 190005,
+    "segundos": 23.684354,
+    "generadoAt": "2026-10-16T16:01:47.519Z"
   },
   "semana-graficas/sg-5": {
     "file": "actualizaciones/semana-graficas/sg-5-6c067c96c852.mp3",
@@ -621,31 +621,31 @@
     "generadoAt": "2026-10-02T14:19:03.465Z"
   },
   "semana-plan/sp-3": {
-    "file": "actualizaciones/semana-plan/sp-3-74b00f5d48e9.mp3",
-    "hash": "74b00f5d48e9",
+    "file": "actualizaciones/semana-plan/sp-3-103251f7853a.mp3",
+    "hash": "103251f7853a",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 152808,
-    "segundos": 19.040363,
-    "generadoAt": "2026-10-02T14:19:06.495Z"
+    "bytes": 190005,
+    "segundos": 23.684354,
+    "generadoAt": "2026-10-16T16:01:52.366Z"
   },
   "semana-plan/sp-4": {
-    "file": "actualizaciones/semana-plan/sp-4-4a3074e873b6.mp3",
-    "hash": "4a3074e873b6",
+    "file": "actualizaciones/semana-plan/sp-4-3d3fc8aa7ceb.mp3",
+    "hash": "3d3fc8aa7ceb",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 119789,
-    "segundos": 14.907211,
-    "generadoAt": "2026-10-02T14:19:09.178Z"
+    "bytes": 169525,
+    "segundos": 21.130159,
+    "generadoAt": "2026-10-16T16:01:56.805Z"
   },
   "semana-plan/sp-5": {
-    "file": "actualizaciones/semana-plan/sp-5-bbbe0ca94631.mp3",
-    "hash": "bbbe0ca94631",
+    "file": "actualizaciones/semana-plan/sp-5-e6b5ca6ccdf8.mp3",
+    "hash": "e6b5ca6ccdf8",
     "voiceId": "MUPKcfGINNwjsSaWv8yx",
     "modelId": "eleven_multilingual_v2",
-    "bytes": 130656,
-    "segundos": 16.253968,
-    "generadoAt": "2026-10-02T14:19:12.095Z"
+    "bytes": 220516,
+    "segundos": 27.492426,
+    "generadoAt": "2026-10-16T16:02:02.301Z"
   },
   "semana-plan/sp-6": {
     "file": "actualizaciones/semana-plan/sp-6-5692f5a2d998.mp3",
@@ -657,10 +657,12 @@
     "generadoAt": "2026-10-02T14:19:15.233Z"
   },
   "meta/meta-6": {
-    "hash": "3c393bf4ea57",
-    "file": "meta/meta-6.mp3",
-    "seg": 12,
-    "deshabilitado": true,
-    "motivo": "Gráfica retirada y resultados automáticos: pendiente regenerar; el recorrido escrito está actualizado."
+    "file": "actualizaciones/meta/meta-6-737236dad932.mp3",
+    "hash": "737236dad932",
+    "voiceId": "MUPKcfGINNwjsSaWv8yx",
+    "modelId": "eleven_multilingual_v2",
+    "bytes": 137551,
+    "segundos": 17.136327,
+    "generadoAt": "2026-10-16T16:01:42.142Z"
   }
 }
