@@ -490,6 +490,7 @@ export default function GruposPage() {
       id: g.id, numero: String(g.numero), itinerario: g.itinerario, es_online: !!g.es_online,
       coach_id: g.coach_id || '',
       fecha_inicio_clases: isoDia(g.fecha_inicio_clases),
+      inicio_pendiente: g.inicio_pendiente === true,
       notas: g.notas || '',
       horarios: (g.horarios || []).map((h) => ({ dia: h.dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || '' })),
     })
