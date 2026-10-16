@@ -803,3 +803,36 @@ test('no cuentan las matrículas anuladas ni los niños de otros grupos', () => 
   })
   assert.deepEqual(r.map((f) => f.estudianteId), [1])
 })
+
+
+test('inicio por confirmar excluye activos hasta fijar fecha sin borrar la venta', () => {
+  const g = grupo({ inicio_pendiente: true, fecha_inicio_clases: null })
+  const e = estudiante()
+  const ev = inscripcion()
+  assert.equal(grupoEntraAlCuadro(g, '2026-10-31'), false)
+  assert.equal(grupoEntraAlCuadro(g, '2027-10-31'), false)
+  assert.deepEqual(iniciosClaseMes([e], [g], [ev], 2026, 10), [])
+  assert.deepEqual(estudiantesConInicioAlCierre([e], [g], [ev], 2026, 10), [])
+  const confirmado = { ...g, inicio_pendiente: false, fecha_inicio_clases: '2026-10-24' }
+  assert.equal(iniciosClaseMes([e], [confirmado], [ev], 2026, 10).length, 1)
+  assert.equal(iniciosClaseMes([e], [confirmado], [ev], 2026, 11).length, 0)
+  assert.equal(iniciosClaseMes([e], [confirmado], [ev], 2026, 10)[0].fechaInscripcion, '2026-06-03')
+  assert.equal(grupoEntraAlCuadro({ ...g, inicio_pendiente: false }, '2026-10-31'), true)
+})
+
+test('reincorporación de ficha histórica no cuenta además como inicio nuevo', () => {
+  const e = estudiante({ origen: 'reincorporado', fecha_inscripcion: '2026-10-16' })
+  const vuelta = { id: 200, estudiante_id: 1, tipo: 'reincorporacion', fecha: '2026-10-16', year: 2026, month: 10, a_grupo_id: 10 }
+  assert.deepEqual(iniciosClaseMes([e], [grupo()], [vuelta], 2026, 10), [])
+  assert.equal(iniciosClaseMes([e], [grupo()], [inscripcion(), vuelta], 2026, 8).length, 1)
+})
+
+
+test('cambio de un grupo pendiente a uno iniciado usa la colocación real', () => {
+  const pendiente = grupo({ inicio_pendiente: true, fecha_inicio_clases: null })
+  const destino = grupo({ id: 11, fecha_inicio_clases: '2026-08-01' })
+  const e = estudiante({ grupo_id: 11 })
+  const cambio = { id: 201, estudiante_id: 1, tipo: 'cambio_grupo', fecha: '2026-10-16', a_grupo_id: 11 }
+  const inicio = iniciosClaseMes([e], [pendiente, destino], [inscripcion(), cambio], 2026, 10)
+  assert.deepEqual(inicio.map(x => [x.grupoId, x.fechaInicio]), [[11, '2026-10-16']])
+})

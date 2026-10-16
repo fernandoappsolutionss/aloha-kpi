@@ -37,7 +37,7 @@ export async function getHigienePendientes(centroId) {
 
   const [grupos, estudiantes, eventos, estadosMes] = await Promise.all([
     sql`
-      SELECT id, numero, estado, fecha_inicio_clases, itinerario_clases
+      SELECT id, numero, estado, fecha_inicio_clases, inicio_pendiente, itinerario_clases
       FROM grupos WHERE centro_id = ${id}
     `,
     sql`
@@ -81,7 +81,7 @@ export async function getHigienePendientes(centroId) {
     .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
 
   const gruposSinFecha = grupos
-    .filter((grupo) => grupo.estado === 'activo' && !grupo.fecha_inicio_clases)
+    .filter((grupo) => grupo.estado === 'activo' && !grupo.inicio_pendiente && !grupo.fecha_inicio_clases)
     .map((grupo) => ({ id: grupo.id, numero: grupo.numero }))
     .sort((a, b) => String(a.numero || '').localeCompare(String(b.numero || ''), 'es', { numeric: true }))
 

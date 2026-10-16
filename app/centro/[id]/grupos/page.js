@@ -2628,7 +2628,7 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
 function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
   const complete = useDialogCallback(onSaved, centroId)
   const isEdit = !!initial.id
-  const iniciado = isEdit && grupoIniciado(initial.fecha_inicio_clases || null, hoyISO())
+  const iniciado = isEdit && grupoIniciado(initial.fecha_inicio_clases || null, hoyISO(), initial.inicio_pendiente)
   // Reparación legacy (g1-2): un grupo veterano con fecha NULL cuenta como
   // iniciado (fail closed) pero SÍ puede registrar su fecha real de inicio
   // (pasada) — es el único campo estructural que el server acepta post-inicio
@@ -2745,6 +2745,7 @@ function GrupoModal({ centroId, coaches, salones, initial, onClose, onSaved }) {
         )}
         {!iniciado && (
           <>
+            {initial.inicio_pendiente && <p role="status" style={{ gridColumn: '1 / -1' }}>Inicio por confirmar. Las matrículas reservan cupo, pero todavía no cuentan como niños activos ni generan royalties. Registra la fecha cuando el inicio esté acordado.</p>}
             <Field label="Fecha de inicio de clases *" tour="aperturar.fecha-inicio">
               <input type="date" className="input" value={f.fecha_inicio_clases || ''}
                 onChange={(e) => { set('fecha_inicio_clases', e.target.value); setInicioTocado(true) }} />
@@ -2944,21 +2945,22 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
   const [confirmacion, setConfirmacion] = useState({ motivo: '', nota: '' })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo')
-  // Inscribir es siempre un niño NUEVO: el select deshabilita tanto la palanca
-  // cerrada como la ventana del manual vencida (el server valida igual).
+  // La ventana limita niños nuevos; una reincorporación conserva el gate
+  // de grupo activo y de cierre manual, igual que la Server Action.
+  const esReincorporacion = f.origen === 'reincorporado'
   const hoy = hoyISO()
   const ventanaPorId = new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoy)]))
 
   async function save(confirmarFichaNueva = false) {
     if (!f.nombre.trim()) { setErr('El nombre es requerido.'); return }
-    if (!f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
+    if (!esReincorporacion && !f.origen_venta) { setErr('Selecciona el origen del nuevo ingreso.'); return }
     if (confirmarFichaNueva && !confirmacion.motivo) { setErr('Elige por qué es otro niño.'); return }
     if (confirmarFichaNueva && confirmacion.motivo === 'otro' && !confirmacion.nota.trim()) { setErr('Escribe por qué es otro niño.'); return }
     setSaving(true); setErr('')
     try {
       const data = {
         nombre: f.nombre, itinerario: f.itinerario, nivel: parseInt(f.nivel) || 1, grupo_id: f.grupo_id || null,
-        origen: f.origen, origen_venta: f.origen_venta, fecha: f.fecha,
+        origen: f.origen, origen_venta: esReincorporacion ? null : f.origen_venta, fecha: f.fecha,
         representante: f.representante, correo: f.correo, telefono: f.telefono,
       }
       if (cierreTocado) data.fecha_cierre_nivel = f.fecha_cierre_nivel || null
@@ -2975,7 +2977,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
       }
       if (res.error) { setErr(res.error); return }
       const g = activos.find((x) => String(x.id) === String(f.grupo_id))
-      complete(`${f.nombre.trim()} inscrito${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
+      complete(`${f.nombre.trim()} ${esReincorporacion ? 'reincorporado' : 'inscrito'}${g ? ` en el grupo ${g.numero}` : ' (sin grupo asignado)'}.`)
     } catch (e) {
       setErr('Error inesperado del servidor: ' + (e?.message || e) + '. Intenta de nuevo o avisa al administrador.')
     } finally {
@@ -3035,11 +3037,12 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
         </Field>
         <Field label="Grupo" tour="inscribir.grupo">
           <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
-            <option value="">Sin grupo</option>
+            <option value="">{esReincorporacion ? 'Seleccionar grupo' : 'Sin grupo'}</option>
             {activos.map((g) => {
               const v = ventanaPorId.get(String(g.id))
-              const marca = v?.razon === 'palanca_cerrada' ? ' · 🔒 cerrado' : v?.razon === 'vencida' ? ' · ventana de nuevos vencida' : ''
-              return <option key={g.id} value={g.id} disabled={!v?.abierta}>Grupo {g.numero} · {g.itinerario}{marca}</option>
+              const permitido = esReincorporacion ? g.inscripcion_abierta !== false : v?.abierta
+              const marca = permitido ? '' : v?.razon === 'palanca_cerrada' ? ' · 🔒 cerrado' : v?.razon === 'vencida' ? ' · ventana de nuevos vencida' : ''
+              return <option key={g.id} value={g.id} disabled={!permitido}>Grupo {g.numero} · {g.itinerario}{marca}</option>
             })}
           </select>
         </Field>
@@ -3048,13 +3051,14 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
             {ORIGENES.map((o) => <option key={o} value={o}>{ORIGEN_LABELS[o] || o}</option>)}
           </select>
         </Field>
-        <Field label="Origen comercial *" tour="inscribir.origen-comercial">
+        {!esReincorporacion && <Field label="Origen comercial *" tour="inscribir.origen-comercial">
           <select name="origen_venta" className="input" value={f.origen_venta} onChange={(e) => set('origen_venta', e.target.value)}>
             <option value="">Seleccionar origen</option>
             {ORIGENES_VENTA.map((origen) => <option key={origen} value={origen}>{ORIGEN_VENTA_LABELS[origen]}</option>)}
           </select>
-        </Field>
-        <Field label="Fecha de inscripción" tour="inscribir.fecha"><input name="fecha" type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
+        </Field>}
+        {esReincorporacion && <p className="h-sub">Puede ingresar a un grupo activo aunque haya terminado la ventana para niños nuevos. Se registrará como reincorporación.</p>}
+        <Field label={esReincorporacion ? "Fecha de reincorporación" : "Fecha de inscripción"} tour="inscribir.fecha"><input name="fecha" type="date" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
         <Field label="Cierre de nivel (override)" tour="inscribir.cierre-override">
           <input name="fecha_cierre_nivel" type="date" className="input" value={f.fecha_cierre_nivel}
             onChange={(e) => { set('fecha_cierre_nivel', e.target.value); setCierreTocado(true) }} />

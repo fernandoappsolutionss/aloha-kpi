@@ -157,7 +157,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
   const nextMonth = monthActual === 12 ? 1 : monthActual + 1
   const finMesActual = `${yearActual}-${String(monthActual).padStart(2, '0')}-${String(new Date(yearActual, monthActual, 0).getDate()).padStart(2, '0')}`
   const gruposProyeccion = await sql`
-    SELECT id, estado, fecha_inicio_clases, itinerario_clases FROM grupos WHERE centro_id = ${centroId}
+    SELECT id, estado, fecha_inicio_clases, inicio_pendiente, itinerario_clases FROM grupos WHERE centro_id = ${centroId}
   `
   const estudiantesProyeccion = await sql`
     SELECT id, grupo_id, estado, fecha_inscripcion, ultima_asistencia FROM estudiantes WHERE centro_id = ${centroId}
@@ -174,7 +174,7 @@ export async function getCentroResumen(centroId, year, trimestre) {
     const grupo = estudiante.grupo_id == null ? null : gruposPorId.get(String(estudiante.grupo_id))
     // Sin grupo no hay población operativa: una venta sin colocar todavía no
     // es un niño activo.
-    if (!grupo) return false
+    if (!grupo || grupo.inicio_pendiente === true) return false
     // (R1, g1-1) La población operativa depende EXCLUSIVAMENTE de la fecha de
     // inicio de clases del grupo. Los grupos veteranos con fecha futura se
     // corrigen en los datos (preflight g1-1); mientras tanto los cubre la

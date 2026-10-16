@@ -18,12 +18,12 @@ const HOY = '2026-10-01'
 function acciones({ grupo, grupos = [grupo], estudiantes = [], eventos = [], errorMes = null }) {
   const consultas = []
   const escrituras = []
-  const llamadas = { meses: [], candado: 0 }
+  const llamadas = { meses: [], candado: 0, outbox: [] }
 
   const responder = (strings) => {
     const texto = strings.join('?').replace(/\s+/g, ' ').trim()
     consultas.push(texto)
-    if (/^UPDATE grupos/i.test(texto)) { escrituras.push(texto); return [] }
+    if (/^UPDATE (grupos|estudiantes)/i.test(texto)) { escrituras.push(texto); return [] }
     if (/FROM grupos WHERE id = \?/i.test(texto)) return [grupo]
     if (/FROM grupos/i.test(texto)) return grupos
     if (/FROM estudiantes/i.test(texto)) return estudiantes
@@ -44,6 +44,7 @@ function acciones({ grupo, grupos = [grupo], estudiantes = [], eventos = [], err
     ITINERARIOS,
     fechaIso10,
     hoyISO: () => HOY,
+    encolarSyncCrm: async (ids, motivo) => llamadas.outbox.push({ ids: [...ids], motivo }),
     grupoIniciado,
     clavesNoPermitidasPostInicio,
     periodosAfectadosCambioInicioGrupo,
@@ -181,4 +182,15 @@ test('app/actions/grupos.js importa el candado desde lib/inicios-clase.mjs', () 
     SOURCE,
     /import \{[^}]*\bninosReestrenadosPorFechaGrupo\b[^}]*\} from '\.\.\/\.\.\/lib\/inicios-clase\.mjs'/,
   )
+})
+
+
+test('confirmar inicio pendiente ancla las reservas y sincroniza sin reabrir septiembre', async () => {
+  const a = acciones({ grupo: grupoVeterano({ inicio_pendiente: true }), estudiantes: [nino(1)], eventos: [venta(1)] })
+  const r = await a.actualizarGrupo(1, 67, { fecha_inicio_clases: '2026-10-24' })
+  assert.equal(r.ok, true)
+  assert.deepEqual(JSON.parse(JSON.stringify(a.llamadas.meses)), [[{ year: 2026, month: 10 }]])
+  assert.ok(a.escrituras.some(q => /UPDATE estudiantes SET fecha_inicio_nivel/.test(q)))
+  assert.ok(a.escrituras.some(q => /inicio_pendiente = CASE/.test(q)))
+  assert.deepEqual(a.llamadas.outbox, [{ ids: [67], motivo: 'inicio_confirmado' }])
 })

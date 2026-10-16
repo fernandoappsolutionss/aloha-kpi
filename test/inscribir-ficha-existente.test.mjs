@@ -158,7 +158,7 @@ test('sin coincidencia crea normal: ficha, venta canónica y outbox', async () =
   assert.ok(ficha.values.includes('Luciano Andrés Acosta Sequera'))
   assert.ok(ficha.values.includes('reg-999'))
   const [venta] = insertsDe(escrituras, 'estudiante_eventos')
-  assert.match(venta.texto, /'inscripcion'/)
+  assert.equal(venta.values[2], 'inscripcion')
   assert.ok(venta.values.includes('2026-09-25'), 'la venta queda con la fecha del formulario (PR #150)')
   assert.equal(venta.values[venta.values.length - 1], null, 'sin rastro de confirmación')
   assert.deepEqual(llamadas.outbox, [{ ids: [136], motivo: 'inscripcion' }])
@@ -397,4 +397,29 @@ test('app/actions/estudiantes.js importa la búsqueda y la orquestación desde l
   assert.ok(cuerpo.indexOf('pg_advisory_xact_lock') >= 0 && cuerpo.indexOf('pg_advisory_xact_lock') < cuerpo.indexOf('fichaExistenteEn(sql,'))
   assert.ok(cuerpo.indexOf("SET LOCAL lock_timeout") >= 0 && cuerpo.indexOf("SET LOCAL lock_timeout") < cuerpo.indexOf('pg_advisory_xact_lock'))
   assert.doesNotMatch(cuerpo, /fichaExistenteEn\(query,/)
+})
+
+
+test('reincorporado sin ficha entra en grupo avanzado sin generar venta', async () => {
+  const avanzado = { ...GRUPO, fecha_inicio_clases: '2026-04-18', itinerario_clases: { nivel: 2 } }
+  const nuevo = acciones({ grupo: avanzado })
+  assert.match((await nuevo.inscribirEstudiante(5, ALTA)).error, /NUEVOS/)
+  const vuelta = acciones({ grupo: avanzado })
+  assert.equal((await vuelta.inscribirEstudiante(5, { ...ALTA, origen: 'reincorporado', origen_venta: null })).ok, true)
+  const [evento] = insertsDe(vuelta.escrituras, 'estudiante_eventos')
+  assert.equal(evento.values[2], 'reincorporacion')
+  assert.deepEqual(vuelta.llamadas.outbox, [{ ids: [136], motivo: 'reincorporacion' }])
+  for (const grupo of [{ ...avanzado, inscripcion_abierta: false }, { ...avanzado, estado: 'fusionado' }]) {
+    const bloqueada = acciones({ grupo })
+    assert.ok((await bloqueada.inscribirEstudiante(5, { ...ALTA, origen: 'reincorporado' })).error)
+    assert.equal(bloqueada.escrituras.length, 0)
+  }
+  const sinGrupo = acciones()
+  assert.match((await sinGrupo.inscribirEstudiante(5, { ...ALTA, origen: 'reincorporado', grupo_id: null })).error, /Selecciona el grupo/)
+})
+
+test('reservar un cupo pendiente no inicia el nivel del niño', async () => {
+  const a = acciones({ grupo: { ...GRUPO, inicio_pendiente: true, fecha_inicio_clases: null } })
+  assert.equal((await a.inscribirEstudiante(5, ALTA)).ok, true)
+  assert.equal(insertsDe(a.escrituras, 'estudiantes')[0].values[10], null)
 })
