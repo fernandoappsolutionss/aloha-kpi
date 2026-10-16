@@ -8,6 +8,7 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
   const error = serie.at(-1)?.detalle?.error
   const aviso = serie.at(-1)?.detalle?.aviso
   const reconstruida = serie.some(punto => punto.detalle?.reconstruida)
+  const pendientes = serie.filter(punto => punto.detalle?.conciliacionPendiente)
   const objetivo = cuota.cuota ?? cuota.propuesta
   return (
     <section className={`card semana-tarjeta${principal ? ' semana-tarjeta--principal' : ''}`}>
@@ -29,6 +30,13 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
       {error && <p role="status" className="alert alert--error">Sin dato: {error}</p>}
       {aviso && <p className="h-sub">{aviso}</p>}
       {reconstruida && <p className="h-sub">Los cierres que no tenían cifra se muestran calculados desde los registros; están pendientes de conciliación.</p>}
+      {pendientes.length > 0 && <details className="alert" open>
+        <summary>{pendientes.length} cierres pendientes de confirmar fecha</summary>
+        <p>Estos puntos quedan sin cifra exacta en la gráfica hasta confirmar los movimientos indicados. El rango muestra lo que respaldan los registros.</p>
+        <ul>{pendientes.map(punto => <li key={punto.semanaFin}>
+          <strong>{punto.semanaFin}</strong>: {mostrar(punto.detalle.rango?.minimo)}–{mostrar(punto.detalle.rango?.maximo)} {meta.unidad}. {punto.detalle.error}
+        </li>)}</ul>
+      </details>}
       <GraficaSemanal puntos={serie} inversa={meta.inversa} unidad={meta.unidad} titulo={meta.nombre} />
       <p className="h-sub semana-tarjeta__fuente">Fuente: {meta.fuente}</p>
     </section>

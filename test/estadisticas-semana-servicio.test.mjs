@@ -96,6 +96,18 @@ test('las cinco filas de la foto se guardan juntas en producción', () => {
   assert.match(source, /withTransaction\(/)
 })
 
+test('recalcular no sustituye un cierre conciliado que espera una fecha ni guarda filas parciales', async () => {
+  let escrituras = 0
+  const query = consulta((sql) => {
+    if (sql.includes('SELECT codigo FROM estadisticas_semana')) return [{ codigo: 'ninos_activos' }]
+    if (sql.includes('INSERT')) escrituras++
+    return []
+  })
+  await assert.rejects(guardarSemanaCentro(3, '2026-09-24', { ninos_activos: { valor: 148 } },
+    { query, forzar: true, estado: 'cerrada' }), /Confirma las fechas pendientes/)
+  assert.equal(escrituras, 0)
+})
+
 test('cron cierra la semana pasada y deja abierta la actual', async () => {
   const guardadas = []
   const query = consulta((sql, values) => {
