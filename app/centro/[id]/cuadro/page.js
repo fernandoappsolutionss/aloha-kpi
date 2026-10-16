@@ -206,6 +206,19 @@ export default function CuadroPage() {
 
         {data && (
           <>
+            {!congelado && data.balance && (
+              <section className="panel" aria-label="Continuidad del cierre mensual" style={{ marginBottom: 20, padding: 20 }}>
+                <h2 className="panel__title">Continuidad del mes</h2>
+                <p>Inicio: <strong>{data.balance.inicio}</strong> niños · cierre de {data.balance.periodoAnterior}.</p>
+                <p>+ {data.balance.nuevos} nuevos activos + {data.balance.reincorporados} reincorporados − {data.balance.retirados} retirados = <strong>{data.balance.final} niños previstos al cierre</strong>.</p>
+                <p>Los movimientos se leen del registro al abrir o actualizar la página. Los inicios programados dentro del mes están incluidos.</p>
+                {data.balance.diferencia !== 0 ? (
+                  <div className="alert alert--error" role="status" style={{ display: 'block' }}>
+                    El padrón del cuadro contiene {data.balance.padron} niños: diferencia de {data.balance.diferencia > 0 ? '+' : ''}{data.balance.diferencia} respecto al balance del KPI. Revisa las fechas de inicio, retiros y alumnos del cierre anterior antes de cerrar este mes.
+                  </div>
+                ) : <p>El padrón del cuadro coincide con el balance del KPI.</p>}
+              </section>
+            )}
             {/* KPI cards del mes */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
               {CARDS.map((c) => (
@@ -237,7 +250,7 @@ export default function CuadroPage() {
                       {compCols.map((c) => <td key={c.l} className="num" style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text)' }}>{c.cuadro}</td>)}
                     </tr>
                     <tr style={{ cursor: 'default' }}>
-                      <td style={{ fontWeight: 600, color: 'var(--text)' }}>KPI capturado</td>
+                      <td style={{ fontWeight: 600, color: 'var(--text)' }}>{data.kpiComparacion.automatico ? 'KPI automático' : 'KPI capturado'}</td>
                       {compCols.map((c) => (
                         <td key={c.l} style={{ textAlign: 'center' }}>
                           {c.kpi == null ? (
