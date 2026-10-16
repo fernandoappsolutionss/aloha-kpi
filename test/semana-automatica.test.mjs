@@ -88,6 +88,16 @@ test('el resumen del mes usa el calendario, no semanas que cruzan septiembre', a
   assert.equal(result.resultadosMes.facturas_vencidas.valor, 23)
 })
 
+test('un cierre sin fecha confirmada conserva su rango y no se rellena como un hueco', async () => {
+  const { query } = fuente()
+  const pendiente = { codigo: 'ninos_activos', semana_fin: '2026-10-01', valor: null, estado: 'cerrada',
+    detalle: { conciliacionPendiente: { referencia: 'revision-documental' }, rango: { minimo: 78, maximo: 79 } } }
+  const result = await completarSerieCentro(10, ['2026-10-01', '2026-10-08', '2026-10-15'], [pendiente], { query, now })
+  assert.deepEqual(result.filas.find(f => f.semana_fin === '2026-10-01'), pendiente)
+  assert.equal(result.filas.find(f => f.semana_fin === '2026-10-08' && f.codigo === 'ninos_activos').valor, 80)
+  assert.equal(result.filas.find(f => f.semana_fin === '2026-10-15' && f.codigo === 'ninos_activos').valor, 80)
+})
+
 test('la falta de Zoho no borra población ni transforma un fallo en cero', async () => {
   const { query } = fuente({ fallo: true })
   const r = await calcularSemanaCentro(10, '2026-10-15', { query, now })
