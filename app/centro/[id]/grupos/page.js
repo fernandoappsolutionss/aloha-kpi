@@ -1197,9 +1197,11 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWri
             <p className="h-sub" style={{ marginTop: 5 }}>
               {g.coach ? `Coach: ${g.coach.nombre}` : 'Sin coach asignado'} · {horarioTexto(g.horarios)}
               {fechaPublicacion(g.created_at) ? ` · Publicado el ${fechaPublicacion(g.created_at)}` : ''}
-              {g.fecha_inicio_clases
-                ? ` · Inicia clases ${fmtDia(g.fecha_inicio_clases)} (entra al cuadro ese mes)`
-                : ' · Sin fecha de inicio (legacy: cuenta como iniciado)'}
+              {g.inicio_pendiente
+                ? ' · Inicio por confirmar: sus matrículas reservan cupo y aún no cuentan como niños activos'
+                : g.fecha_inicio_clases
+                  ? ` · Inicia clases ${fmtDia(g.fecha_inicio_clases)} (entra al cuadro ese mes)`
+                  : ' · Fecha histórica no registrada; cuenta como iniciado'}
             </p>
           </div>
           <button ref={closeRef} className={`btn${sheet ? ' mobile-sheet__close' : ''}`} style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }}
