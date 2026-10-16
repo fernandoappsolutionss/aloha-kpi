@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pendientesDesde, estadoPlan, primerPasoSinObjetivo, objetivosAlCambiarCondicion, enriquecerTableroConPlanes, SECCIONES } from '../lib/plan-semana.mjs'
+import { pendientesDesde, estadoPlan, primerPasoSinObjetivo, objetivosAlCambiarCondicion, enriquecerTableroConPlanes, pasoPrevioPendiente, origenFormula, SECCIONES } from '../lib/plan-semana.mjs'
 
 test('secciones del plan', () => {
   assert.deepEqual(SECCIONES, ['formula', 'urgente', 'pendiente', 'orden', 'estrategico'])
@@ -19,7 +19,6 @@ test('pendientes: lo no hecho y los pasos de fórmula sin ningún objetivo hecho
   assert.deepEqual(nuevos.map((o) => o.texto), [
     'Nuevo horario sábado',
     'Llamar a 5 padres',
-    'Terminar el paso 2 de Emergencia: Cambie su forma de actuar.',
     'Terminar el paso 3 de Emergencia: Economice.',
     'Terminar el paso 4 de Emergencia: Entonces prepárese para dar el servicio.',
     'Terminar el paso 5 de Emergencia: Haga más estricta la disciplina.',
@@ -57,4 +56,19 @@ test('tablero calcula estado y discrepancia sobre la última semana cerrada', ()
   assert.equal(out[0].plazoVencido, true)
   assert.equal(out[0].discrepancia, true)
   assert.equal('lectura' in out[0], false)
+})
+
+ test('la secuencia exige todas las acciones previas con evidencia y conserva el orden tras cambiar condición', () => {
+  const plan={id:8, semana_fin:'2026-10-01', condicion:'emergencia'}
+  const a={id:1,seccion:'formula',paso:0,hecho:true,evidencia_resultado:'Registro'}
+  const b={id:2,seccion:'formula',paso:1,hecho:false}
+  assert.equal(pasoPrevioPendiente(b,[a,b],plan),null)
+  assert.equal(pasoPrevioPendiente(b,[{...a,evidencia_resultado:null},b],plan),1)
+  assert.equal(pasoPrevioPendiente(b,[a,{...a,id:3,hecho:false},b],plan),1)
+  const cambios=objetivosAlCambiarCondicion([a,b],plan)
+  assert.equal(cambios[1].origen_formula.paso,1)
+  assert.equal(cambios[1].origen_formula.nombre,'Emergencia')
+  const pendientes=[{...a,...cambios[0],hecho:false},{...b,...cambios[1]}]
+  assert.equal(pasoPrevioPendiente(pendientes[1],pendientes,plan),1)
+  assert.deepEqual(origenFormula(plan,1),cambios[1].origen_formula)
 })

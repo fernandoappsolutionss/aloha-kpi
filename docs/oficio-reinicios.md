@@ -15,7 +15,7 @@ El historial muestra los últimos 20 reinicios y el resumen de lo archivado. Los
 
 ## Verificación
 
-- `npm test`: 1.453 pruebas aprobadas.
+- `npm test`: 1.457 pruebas aprobadas (incluye la alineación semanal).
 - `npm run build`: correcto.
 - `ALOHA_REINICIOS_TEST_DATABASE_URL=postgresql://.../aloha_reinicio_test npm run test:oficio:db`: 9 pruebas sobre PostgreSQL local exclusivo. Incluyen permisos, validación, aislamiento, snapshots, idempotencia, rollback, concurrencia y completar un nuevo ciclo.
 - Navegador contra la aplicación compilada y PostgreSQL local: cancelación sin cambios, motivo y confirmación requeridos, reinicio real vía Server Action, historial, conservación de plataforma, escritorio 1440px y móvil 390px. Sin errores JavaScript.

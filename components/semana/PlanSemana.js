@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CONDICIONES, colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.mjs'
 import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo } from '../../app/actions/semana'
+import LecturaCondicion from './LecturaCondicion'
+import { pasoPrevioPendiente, formulaAnteriorPendiente } from '../../lib/plan-semana.mjs'
 import { updateGrowthRecommendation } from '../../app/actions/growth'
 
 const fechaInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''
@@ -23,7 +25,7 @@ function FormularioObjetivo({ centroId, semanaFin, seccion, paso = null, ejecuta
   </form>
 }
 
-function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar, ocupado }) {
+function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar, ocupado, bloqueo = null, anterior = null }) {
   const [editando, setEditando] = useState(false)
   async function guardar(event) {
     event.preventDefault()
@@ -37,10 +39,13 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
     </div>
     {(objetivo.responsable || objetivo.fecha) && <p className="h-sub">{objetivo.responsable || 'Sin responsable'}{objetivo.fecha ? ` · ${fechaInput(objetivo.fecha)}` : ''}</p>}
     {objetivo.seccion !== 'orden' && <p className="h-sub">Evidencia esperada: {objetivo.evidencia_esperada || 'Pendiente de completar'} · {objetivo.verificado_at ? 'Verificada por coordinación' : objetivo.hecho ? 'Realizada · pendiente de verificación' : 'Pendiente'}</p>}
+    {objetivo.origen_formula && <p className="h-sub">Origen: {objetivo.origen_formula.nombre} · cierre {objetivo.origen_formula.semanaFin} · paso {objetivo.origen_formula.paso + 1}: {objetivo.origen_formula.textoPaso}</p>}
+    {bloqueo != null && !objetivo.hecho && <p className="h-sub">Completa con evidencia el paso {bloqueo} antes de realizar esta acción.</p>}
+    {anterior && !objetivo.hecho && <p className="h-sub">Primero termina la fórmula anterior de {anterior.nombre}, desde el paso {anterior.paso + 1}, en Urgentes o Pendientes.</p>}
     {objetivo.evidencia_resultado && <p><strong>Resultado:</strong> {objetivo.evidencia_resultado}</p>}
     {puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={event => { event.preventDefault(); const evidencia = new FormData(event.currentTarget).get('evidencia'); ejecutar(() => marcarObjetivo(centroId, objetivo.id, true, evidencia)) }}>
       <label className="field"><span>Evidencia del resultado</span><textarea name="evidencia" className="input" maxLength={2000} required placeholder="Qué se logró, dato obtenido y referencia para comprobarlo" /></label>
-      <button className="btn" type="submit" disabled={ocupado}>Registrar acción realizada</button>
+      <button className="btn" type="submit" disabled={ocupado || bloqueo != null || Boolean(anterior)}>Registrar acción realizada</button>
     </form>}
     {puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id, { hechoAt: objetivo.hecho_at, evidencia: objetivo.evidencia_resultado }))}>Verificar evidencia</button>}
     {puedeEscribir && objetivo.seccion !== 'orden' && <div className="semana-objetivo__acciones">
@@ -106,7 +111,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {error && <p role="alert" className="alert alert--error">{error}</p>}
     {mensaje && <p role="status" className="alert">{mensaje}</p>}
     {ajustes}
-    {'lectura' in datos && <p className="h-sub">Lectura automática de la gráfica: {datos.lectura.condicion ? nombreCondicion(datos.lectura.condicion) : 'Sin dato'} ({datos.lectura.motivo})</p>}
+    {'lectura' in datos && <LecturaCondicion lectura={datos.lectura} />}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
 
     <div data-tour="semana.condicion">
@@ -127,14 +132,14 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     </div>
     <div data-tour="semana.formula">
     {sinCondicion && <p className="h-sub">La fórmula y sus objetivos aparecerán al asignar la condición.</p>}
-    {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula</h3><ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><p>{texto}</p>
-      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
+    {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula</h3><p className="h-sub">Prepara las acciones de todos los pasos. Ejecútalas en orden: completa las del paso anterior con evidencia antes de registrar las del siguiente. Coordinación verifica después el resultado.</p><ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><p>{texto}</p>
+      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion="formula" paso={paso} ejecutar={ejecutar} ocupado={ocupado} />}
     </li>)}</ol></section>}
 
     </div>
     {[['urgente', 'Urgentes'], ['pendiente', 'Pendientes'], ['orden', 'Órdenes del coordinador']].map(([seccion, titulo]) => <section className="semana-plan__seccion" key={seccion}><h3>{titulo}</h3>
-      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
+      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && seccion !== 'orden' && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion={seccion} ejecutar={ejecutar} ocupado={ocupado} />}
     </section>)}
     {prioridades || <section className="semana-plan__seccion" aria-labelledby="plan-estrategico-title"><h3 id="plan-estrategico-title">Plan estratégico · Ruta de Nivel</h3><p className="h-sub">Estas son las mismas acciones de Ruta al próximo nivel. Lo que registres aquí también se actualiza allá. · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta y su historial</Link></p>

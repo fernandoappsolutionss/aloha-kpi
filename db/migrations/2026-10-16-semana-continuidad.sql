@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE semana_planes ADD COLUMN IF NOT EXISTS arrastre_version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE semana_objetivos ADD COLUMN IF NOT EXISTS origen_formula JSONB;
+COMMIT;
