@@ -52,6 +52,7 @@ export default function KPIPage() {
   // Motivos de deserción que vienen del módulo (retiros registrados).
   const [motivosAuto, setMotivosAuto] = useState(null)
   const [cierreDocumental, setCierreDocumental] = useState(null)
+  const [movimientosCierre, setMovimientosCierre] = useState(null)
   const [autoSync, setAutoSync] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
   // KPI sin manos (g1-16/g1-20): resultado discriminado del módulo. 'auto'
@@ -103,6 +104,7 @@ export default function KPIPage() {
     setAutoSync(sync || null)
     setFinalGuardado(res?.ninos_final_mes ?? null)
     setCierreDocumental(res?.conciliacion_cuadro || null)
+    setMovimientosCierre(datos.movimientosCierre || null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
     // anterior solo mientras esta abierto. Un cierre conserva su propia foto.
@@ -208,8 +210,9 @@ export default function KPIPage() {
   const gA = parseInt(config.grupos_activos)||1
   const totalDes = semanas.reduce((a,s) => a + s.des.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
   const totalIng = semanas.reduce((a,s) => a + s.ing.reduce((b,v) => b+(parseInt(v)||0), 0), 0)
-  const retiradosOperativos = cierreDocumental?.totales.retirados ?? (motivosAuto ? motivosAuto.total : totalDes)
-  const reincorporados = cierreDocumental?.totales.reincorporados ?? motivosAuto?.reincorporados ?? 0
+  const retiradosOperativos = movimientosCierre?.retirados ?? cierreDocumental?.totales.retirados ?? (motivosAuto ? motivosAuto.total : totalDes)
+  const reincorporados = movimientosCierre?.reincorporados ?? cierreDocumental?.totales.reincorporados ?? motivosAuto?.reincorporados ?? 0
+  const activados = nA + reincorporados
   const ninosFinalCalculado = Math.max(0, ni + nA + reincorporados - retiradosOperativos)
   const ninosFinal = finalVisibleKpi({ estado: mesEstado, guardado: finalGuardado, calculado: ninosFinalCalculado })
   const ajusteHistorico = ajusteHistoricoKpi({ estado: mesEstado, inicioGuardado: ni, cierreAnterior: cierreAnterior?.valor })
@@ -418,9 +421,9 @@ export default function KPIPage() {
               <input id="kpi-total-ing" name="totals.ing" inputMode="numeric" min="0" type="number" value={totalIng} disabled className="input num" style={{ width: '100%', padding: '10px 12px', opacity: 0.75, background: 'var(--surface-3)' }} />
             </div>
             <div className="field">
-              <label htmlFor="kpi-config-nuevos_activos_mes" className="label">Nuevos activos del mes</label>
+              <label htmlFor="kpi-config-nuevos_activos_mes" className="label">Primeros inicios de clase</label>
               {cfgInput('nuevos_activos_mes', true, autoPeriod || !!motivosAuto)}
-              {motivosAuto && <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{nA} inicio{nA === 1 ? '' : 's'} de clase declarado{nA === 1 ? '' : 's'} en Cuadro de Negocio</span>}
+              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Niños nuevos que empiezan clases este mes. La venta puede ser de un mes anterior.</span>
             </div>
           </div>
         </div>
@@ -433,14 +436,16 @@ export default function KPIPage() {
             // (g1-17) Traslados aparte: entran al centro pero NO son venta
             // nueva, por eso jamás suman en ing_* ni en la meta comercial.
             ...(autoIngDes ? [{l:'Traslados (fuera de venta)', v:kpiAuto.traslados, c:'var(--text-dim)'}] : []),
-            {l:'Nuevos activos del mes', v:nA, c:'var(--ok)'},
+            {l:'Activados en el mes', v:activados, c:'var(--ok)', detalle:`${nA} primeros inicios + ${reincorporados} reincorporados`},
+            {l:'Reincorporados del mes', v:reincorporados, c:'var(--ok)', detalle:'Incluidos en activados; no son ventas nuevas.'},
             {l:'Niños Final Mes', v:ninosFinal, c:'var(--text)'},
             {l:'Prom. Niños/Grupo', v:promG.toFixed(2), c:promG>=8?'var(--ok)':'var(--bad)', m:'≥ 8', ok:promG>=8},
             {l:'%CV', v:pcv.toFixed(1)+'%', c:'var(--text)'},
-          ].map(({l,v,c,m,ok}) => (
+          ].map(({l,v,c,m,ok,detalle}) => (
             <div key={l} className="kpi" style={{ padding: '16px 16px 14px' }}>
               <div className="kpi__top"><span className="label">{l}</span></div>
               <div className="kpi__value num" style={{ fontSize: 28, color: c }}>{v}</div>
+              {detalle && <div className="kpi__sub">{detalle}</div>}
               {m && <div className="kpi__sub" style={{ color: ok ? 'var(--ok)' : 'var(--bad)' }}>{ok ? '✓ meta '+m : '✗ meta '+m}</div>}
             </div>
           ))}
