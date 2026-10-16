@@ -384,12 +384,14 @@ export default function GruposPage() {
   const retiradosFiltrados = filtrarRetirados(data?.retirados || [], retiradosQuery)
   const retiradosPaginados = paginarRetirados(retiradosFiltrados, retiradosPagina, retiradosPorPagina)
   const activos = grupos.filter((g) => g.estado === 'activo')
-  const bajoMetaN = activos.filter((g) => underMeta(g, metas.gpnMin)).length
-  const prom = promedios(grupos, metas.gpnMin)
   const hoy = hoyISO()
-  const ninosActivos = activos
-    .filter((g) => !g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= hoy)
-    .reduce((s, g) => s + g.estudiantes.length, 0)
+  const iniciados = activos.filter((g) => !g.inicio_pendiente &&
+    (!g.fecha_inicio_clases || fechaIso10(g.fecha_inicio_clases) <= hoy))
+  const pendientesInicio = activos.filter((g) => !iniciados.includes(g))
+  const bajoMetaN = iniciados.filter((g) => underMeta(g, metas.gpnMin)).length
+  const prom = promedios(iniciados, metas.gpnMin)
+  const ninosActivos = iniciados.reduce((s, g) => s + g.estudiantes.length, 0)
+  const reservasInicio = pendientesInicio.reduce((s, g) => s + g.estudiantes.length, 0)
   const pasaFiltro = (g, f) => {
     const st = groupStatus(g, metas.gpnMin)
     if (f === 'todos') return g.estado === 'activo'
@@ -488,6 +490,7 @@ export default function GruposPage() {
       id: g.id, numero: String(g.numero), itinerario: g.itinerario, es_online: !!g.es_online,
       coach_id: g.coach_id || '',
       fecha_inicio_clases: isoDia(g.fecha_inicio_clases),
+      inicio_pendiente: g.inicio_pendiente === true,
       notas: g.notas || '',
       horarios: (g.horarios || []).map((h) => ({ dia: h.dia, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, salon_id: h.salon_id || '' })),
     })
@@ -645,9 +648,9 @@ export default function GruposPage() {
   const CARDS = [
     { l: 'Prom. niños/grupo (sin Kinder)', v: prom.sinK.toFixed(1), c: okProm ? 'var(--ok)' : 'var(--bad)', s: `${Math.round(prom.pctMeta)}% de la meta (${metas.gpnMin})`, sc: okProm ? 'var(--ok)' : 'var(--bad)' },
     { l: 'Prom. con Kinder', v: prom.conK.toFixed(1), c: 'var(--text)' },
-    { l: 'Grupos activos', v: activos.length, c: 'var(--text)' },
+    { l: 'Grupos iniciados', v: iniciados.length, c: 'var(--text)', s: pendientesInicio.length ? `${pendientesInicio.length} pendiente(s) de iniciar` : undefined },
     { l: 'Grupos bajo meta', v: bajoMetaN, c: bajoMetaN > 0 ? 'var(--bad)' : 'var(--ok)' },
-    { l: 'Niños activos', v: ninosActivos, c: 'var(--text)' },
+    { l: 'Niños activos', v: ninosActivos, c: 'var(--text)', s: reservasInicio ? `${reservasInicio} reservas pendientes de inicio` : undefined },
   ]
   const TABS = [['grupos', 'Grupos'], ['fusiones', 'Fusiones'], ['horarios', 'Horarios'], ['coaches', 'Coaches y salones'], ['alumnos', 'Sin grupo y retirados'], ['anuladas', 'Matrículas anuladas']]
   const FILTROS = [['todos', 'Todos'], ['bajo', 'Bajo meta'], ['estables', 'Estables'], ['kinder', 'Kinder'], ['cerradosNuevos', 'Cerrados a nuevos'], ['cerrados', 'Cerrados']]
