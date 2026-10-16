@@ -420,7 +420,8 @@ export async function actualizarGrupo(centroId, grupoId, data) {
       FOR UPDATE
     `
     if (!grupoBloqueado) return { error: 'El grupo no pertenece a este centro.' }
-    if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
+    if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases) ||
+        Boolean(grupoBloqueado.inicio_pendiente) !== Boolean(g.inicio_pendiente)) {
       return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
     }
     // (g1-5) El candado se decide con hoy Panamá RECALCULADO tras el lock,
@@ -428,7 +429,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
     // medianoche ya cuenta como post-inicio (la UI solo anticipa). Fecha NULL
     // legacy = INICIADO (fail closed, R1): nunca abre la edición completa.
     const hoyPanama = hoyISO()
-    const iniciado = grupoIniciado(grupoBloqueado.fecha_inicio_clases, hoyPanama)
+    const iniciado = grupoIniciado(grupoBloqueado.fecha_inicio_clases, hoyPanama, grupoBloqueado.inicio_pendiente)
     const itVigente = itinerarioVigenteDe(grupoBloqueado.itinerario_clases)
 
     if (iniciado) {
@@ -463,7 +464,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         // que necesita lo mismo que el Cuadro: todos los grupos, la última
         // asistencia y los eventos inscripcion, cambio_grupo y retiro.
         const grupos = await query`
-          SELECT id, numero, estado, fecha_inicio_clases, itinerario_clases
+          SELECT id, numero, estado, fecha_inicio_clases, inicio_pendiente, itinerario_clases
           FROM grupos WHERE centro_id = ${centroId}
         `
         const estudiantes = await query`
@@ -595,6 +596,7 @@ export async function actualizarGrupo(centroId, grupoId, data) {
         coach_id = ${coachId},
         fecha_inicio_clases = CASE WHEN ${inicioEditado}::boolean
           THEN ${inicioEditado ? fechaInicio : null}::date ELSE fecha_inicio_clases END,
+        inicio_pendiente = CASE WHEN ${inicioEditado}::boolean THEN false ELSE inicio_pendiente END,
         notas = ${notas}, updated_at = ${now}
       WHERE id = ${grupoId}
     `
@@ -606,6 +608,16 @@ export async function actualizarGrupo(centroId, grupoId, data) {
           VALUES (${grupoId}, ${h.dia}, ${h.hora_inicio}, ${h.hora_fin}, ${h.salon_id})
         `
       }
+    }
+    // Confirmar el primer inicio ancla solo las fichas que todavía no tienen
+    // inicio propio. Ventas y meses cerrados permanecen intactos.
+    if (grupoBloqueado.inicio_pendiente && inicioEditado) {
+      await query`
+        UPDATE estudiantes SET fecha_inicio_nivel = GREATEST(fecha_inscripcion, ${fechaInicio}::date), updated_at = ${now}
+        WHERE grupo_id = ${grupoId} AND centro_id = ${centroId}
+          AND estado IN ('activo', 'baja_potencial') AND fecha_inicio_nivel IS NULL
+      `
+      await encolarSyncCrm([grupoId], 'inicio_confirmado', query)
     }
     // R2b (g1-7): PRE-INICIO la regeneración es completa, como siempre (el
     // primer plan se ancla en fecha_inicio_clases); nivel y excepciones
@@ -639,6 +651,7 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
   await requireCurrentWriteCentro(centroId)
   const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g) return { error: 'El grupo no pertenece a este centro.' }
+  if (g.inicio_pendiente) return { error: 'Primero confirma la fecha de inicio en Editar grupo.' }
 
   const nivel = intOr(data?.nivel, g.itinerario_clases?.nivel || 1)
   const topeNivel = NIVEL_MAX[g.itinerario] || 10
@@ -661,6 +674,7 @@ export async function ajustarItinerarioGrupo(centroId, grupoId, data) {
       FOR UPDATE
     `
     if (!grupoBloqueado) return { error: 'El grupo no pertenece a este centro.' }
+    if (grupoBloqueado.inicio_pendiente) return { error: 'Primero confirma la fecha de inicio en Editar grupo.' }
     if (fechaIso10(grupoBloqueado.fecha_inicio_clases) !== fechaIso10(g.fecha_inicio_clases)) {
       return { error: 'La fecha de inicio cambió mientras editabas. Recarga el grupo antes de continuar.' }
     }

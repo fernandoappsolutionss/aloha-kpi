@@ -201,6 +201,8 @@ export async function inscribirEstudiante(centroId, data) {
   const origen = data?.origen || 'directo'
   if (!ORIGENES.includes(origen)) return { error: 'Origen inválido.' }
   const grupoId = data?.grupo_id || null
+  const esReincorporacion = origen === 'reincorporado'
+  if (esReincorporacion && !grupoId) return { error: 'Selecciona el grupo al que se reincorpora el niño.' }
   const hoy = hoyISO()
   const crmId = data?.crm_registration_id?.trim() || null
   const confirmacion = leerConfirmacionFichaNueva(data?.ficha_nueva)
@@ -223,7 +225,7 @@ export async function inscribirEstudiante(centroId, data) {
     // Prechequeo con mensaje amable; la garantía real la da el gate atómico
     // de abajo, que relee el MISMO grupo con FOR UPDATE dentro de la
     // transacción (incluido el override llenado_extendido_hasta).
-    const err = grupoAceptaNinosNuevos(g, hoy)
+    const err = esReincorporacion ? grupoAceptaMovimientos(g) : grupoAceptaNinosNuevos(g, hoy)
     if (err) return { error: err }
     // (Defecto 10) Matriz de colocación: la misma regla que frena una fusión
     // frena la colocación del niño nuevo (réplica de lib/fusiones.js:130-148
@@ -235,9 +237,9 @@ export async function inscribirEstudiante(centroId, data) {
   const fecha = data?.fecha || hoy
   if (!FECHA_RE.test(fecha)) return { error: 'Fecha de inscripción inválida (AAAA-MM-DD).' }
   if (fecha > hoy) return { error: 'La fecha de inscripción no puede ser futura.' }
-  const origenVenta = data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
+  const origenVenta = !esReincorporacion && data?.origen_venta ? String(data.origen_venta).trim().toLowerCase() : null
   if (origenVenta && !esOrigenVenta(origenVenta)) return { error: 'Origen comercial inválido.' }
-  if (!origenVenta && requiereOrigenVenta(fecha)) return { error: 'Selecciona el origen comercial de la venta.' }
+  if (!esReincorporacion && !origenVenta && requiereOrigenVenta(fecha)) return { error: 'Selecciona el origen comercial de la venta.' }
   const { year, month } = ym(fecha)
   // (g1-11) fecha_cierre_nivel = OVERRIDE MANUAL: solo se escribe si el form
   // la trajo; el cierre derivado se calcula al vuelo y jamás se persiste.
@@ -282,14 +284,14 @@ export async function inscribirEstudiante(centroId, data) {
           if (!g) return { error: 'El grupo no pertenece a este centro.' }
           // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
           // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
-          const errorGrupo = grupoAceptaNinosNuevos(g, hoy)
+          const errorGrupo = esReincorporacion ? grupoAceptaMovimientos(g) : grupoAceptaNinosNuevos(g, hoy)
           if (errorGrupo) return { error: errorGrupo }
           const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
           if (errorColocacion) return { error: errorColocacion }
         }
         // (g1-8) Ancla por niño: con grupo, max(fecha_inscripcion,
         // fecha_inicio_clases del grupo BLOQUEADO); sin grupo, NULL (pendiente).
-        const ancla = grupoId ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
+        const ancla = grupoId && !g.inicio_pendiente ? anclaDeAlta(fecha, g.fecha_inicio_clases) : null
         const crmAlta = existente.soltarRegistro ? null : crmId
         const [e] = await query`
           INSERT INTO estudiantes (centro_id, grupo_id, nombre, itinerario, nivel, estado, status_plataforma, origen,
@@ -311,12 +313,13 @@ export async function inscribirEstudiante(centroId, data) {
               },
             })
             : null
+          const tipoAlta = esReincorporacion ? 'reincorporacion' : 'inscripcion'
           await query`
             INSERT INTO estudiante_eventos (estudiante_id, centro_id, tipo, year, month, fecha, a_grupo_id, a_nivel, origen, detalle)
-            VALUES (${e.id}, ${centroId}, 'inscripcion', ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen}, ${detalleVenta})
+            VALUES (${e.id}, ${centroId}, ${tipoAlta}, ${year}, ${month}, ${fecha}, ${grupoId}, ${nivel}, ${origen}, ${detalleVenta})
           `
-          // Cupos al CRM vía outbox, en la MISMA transacción que el alta.
-          await encolarSyncCrm([grupoId], 'inscripcion', query)
+          // Una reincorporación ocupa cupo pero no genera una venta nueva.
+          await encolarSyncCrm([grupoId], tipoAlta, query)
         }
         return { ok: true, estudianteId: e.id, pendiente: !grupoId }
       })
@@ -593,9 +596,9 @@ export async function actualizarEstudiante(centroId, id, data) {
       `
       if (!transicion) {
         const [gIns] = eventoCanonico.a_grupo_id
-          ? await query`SELECT fecha_inicio_clases FROM grupos WHERE id = ${eventoCanonico.a_grupo_id}`
+          ? await query`SELECT fecha_inicio_clases, inicio_pendiente FROM grupos WHERE id = ${eventoCanonico.a_grupo_id}`
           : [null]
-        ancla = anclaDeAlta(fechaInscripcionNueva, gIns?.fecha_inicio_clases)
+        ancla = gIns?.inicio_pendiente ? null : anclaDeAlta(fechaInscripcionNueva, gIns?.fecha_inicio_clases)
       }
     }
 
@@ -649,7 +652,7 @@ export async function actualizarEstudiante(centroId, id, data) {
             de_grupo_id: est.grupo_id, a_grupo_id: grupoId,
           })
         }
-        ancla = anclaDeAlta(hoy, destino.fecha_inicio_clases)
+        ancla = destino.inicio_pendiente ? null : anclaDeAlta(hoy, destino.fecha_inicio_clases)
       } else if (grupoId && !nivelCambia) {
         // (g1-9) TRASLADO: se conserva la posición semántica en el calendario
         // del destino — misma semana (mismo índice), ancla más cercana, empate
