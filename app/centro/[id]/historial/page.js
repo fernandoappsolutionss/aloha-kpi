@@ -113,6 +113,8 @@ export default function HistorialPage() {
         ninos_final: ninosFinal,
         grupos_activos: gA,
         nuevos_activos: nA,
+        activados: nA + reincorporados,
+        reincorporados,
         nuevos_ingresos_venta: nuevosSemanal,
         meta_nuevos: r.meta_nuevos_mensual || 20,
         cp_invitados: numeroRegistrado(r.cp_invitados),
@@ -317,7 +319,8 @@ export default function HistorialPage() {
                   <StatCard label="%CV" val={last.pcv} prev={prev?.pcv} unit="%" color="var(--text)" invertTrend/>
                   <StatCard label="GPN" val={last.gpn} prev={prev?.gpn} unit="" color={last.gpn>=0?C.green:C.bad}/>
                   <StatCard label="Nuevos Ingresos Venta" val={last.nuevos_ingresos_venta} prev={prev?.nuevos_ingresos_venta} color={C.green} meta={last.meta_nuevos} metaOp="≥"/>
-                  <StatCard label="Nuevos Activos del Mes" val={last.nuevos_activos} prev={prev?.nuevos_activos} color={C.mut}/>
+                  <StatCard label="Activados en el mes" val={last.activados} prev={prev?.activados} color={C.mut}/>
+                  <StatCard label="Reincorporados" val={last.reincorporados} prev={prev?.reincorporados} color={C.mut}/>
                   <StatCard label="Grupos Activos" val={last.grupos_activos} prev={prev?.grupos_activos} color="var(--text)"/>
                 </div>
               </div>
@@ -337,7 +340,7 @@ export default function HistorialPage() {
               <div className="reports-grid">
                 <GraficaMensualHca centroId={id} titulo="Niños al cierre del mes" campo="ninos_final" unidad="niños" rows={visibleMeses} todas={meses} descripcion="El cierre del mes abierto incluye los inicios y retiros programados; todavía no es un cierre confirmado."/>
                 <GraficaMensualHca centroId={id} titulo="Nuevos ingresos por venta" campo="nuevos_ingresos_venta" unidad="inscritos" rows={visibleMeses} todas={meses} meta="meta_nuevos"/>
-                <GraficaMensualHca centroId={id} titulo="Nuevos activos del mes" campo="nuevos_activos" unidad="niños" rows={visibleMeses} todas={meses} descripcion="Niños que comienzan clases en el mes; su fecha de venta puede ser anterior."/>
+                <GraficaMensualHca centroId={id} titulo="Activados en el mes" campo="activados" unidad="niños" rows={visibleMeses} todas={meses} descripcion="Primeros inicios de clase más reincorporaciones. La fecha de venta puede ser de otro mes; las reincorporaciones no son ventas nuevas."/>
                 <GraficaMensualHca centroId={id} titulo="Promedio de niños por grupo" campo="prom_grupo" unidad="niños/grupo" rows={visibleMeses} todas={meses} meta={8}/>
                 <GraficaMensualHca centroId={id} titulo="Costo variable (%CV)" campo="pcv" unidad="%" rows={visibleMeses} todas={meses} inversa descripcion="Eje inverso: los valores menores se ubican arriba. Reducir el costo variable es mejorar."/>
                 <GraficaMensualHca centroId={id} titulo="Ganancia por niño (GPN)" campo="gpn" unidad="$ por niño" rows={visibleMeses} todas={meses}/>
@@ -367,7 +370,7 @@ export default function HistorialPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Ingresos Venta','Nuevos Activos','Meta Venta','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
+                        {['Mes','Estado','Niños Inicio','Niños Final','Grupos','Ingresos Venta','Primeros inicios','Meta Venta','Prom/Grupo','%CV','GPN $','Cob.','Deser.'].map(h => (
                           <th key={h} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -460,7 +463,7 @@ export default function HistorialPage() {
                     <TableScroller label="Historial mensual" stickyFirstColumn>
                       <table className="table">
                         <thead>
-                          <tr>{['Mes','A pagar','Nuevos activos','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
+                          <tr>{['Mes','A pagar','Primeros inicios','Reinc.','Retirados','Grupos','Prom/grupo','Royalty','Congelado el'].map((h,i) => (
                             <th key={h} style={i > 0 ? { textAlign: 'center', whiteSpace: 'nowrap' } : undefined}>{h}</th>
                           ))}</tr>
                         </thead>

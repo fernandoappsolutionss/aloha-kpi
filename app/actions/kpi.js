@@ -14,6 +14,7 @@ import { superponerSemanasAuto } from '../../lib/kpi-semanal-auto.mjs'
 import { CAMPOS_RESUMEN_AUTO, poblacionKpiAutomatica, usaKpiAutomatico } from '../../lib/kpi-auto.mjs'
 import { fotoKpiAutomatica, mezclarResumenAutomatico } from '../../lib/kpi-auto-server'
 import { conCierresDocumentales } from '../../lib/cierre-documental-server'
+import { movimientosCierreKpi } from '../../lib/activaciones-mes.mjs'
 
 const SEMANAS = [1, 2, 3, 4, 5]
 const intOr = (v, d = 0) => {
@@ -73,6 +74,14 @@ export async function loadKpiMes(centroId, year, month) {
   const cierreAnterior = await cierreMesAnterior(centroId, intOr(year), intOr(month))
   const estado = mes?.estado || 'abierto'
   if (res && estado === 'cerrado') [res] = await conCierresDocumentales([res])
+  let movimientosCierre = null
+  if (estado === 'cerrado') {
+    const [foto] = await sql`
+      SELECT datos->'totales' AS totales FROM cuadro_mensual
+      WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}
+    `
+    movimientosCierre = movimientosCierreKpi({ estado, resumen: res, snapshot: foto })
+  }
   let motivosAuto = estado === 'cerrado' ? null : await motivosDelModulo(centroId, intOr(year), intOr(month))
   // (g1-16) KPI sin manos: en mes ABIERTO >= gate las filas ing/des salen del
   // módulo, superpuestas sobre kpi_semanas. Un mes cerrado es histórico
@@ -125,6 +134,7 @@ export async function loadKpiMes(centroId, year, month) {
     cierreAnterior,
     inicioArrastrado: estado === 'cerrado' ? null : cierreAnterior,
     motivosAuto,
+    movimientosCierre,
     // Resultado discriminado (g1-20) para la UI: 'auto' bloquea ing/des (el
     // cero también), 'fallo' las desbloquea con advertencia visible.
     kpiAuto,
