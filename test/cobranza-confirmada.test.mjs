@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ORGS_ZOHO, clasificarFactura, contarVencidasHoy } from '../lib/zoho-cobranza.mjs'
+import { ORGS_ZOHO, clasificarFactura, contarVencidasHoy, listarFacturas } from '../lib/zoho-cobranza.mjs'
 import { cobranzaDeclarada } from '../lib/marcadores.mjs'
 import { cobranzaAlCorte } from '../lib/estadisticas-semana/calculo.mjs'
 import { sincronizarCobranza } from '../lib/cobranza-sync.js'
@@ -77,4 +77,23 @@ test('fallo al guardar el diario aborta antes de actualizar las casillas', async
     if (sql.includes('INSERT INTO cobranza_diaria')) throw new Error('DB caída')
     throw new Error('No debe seguir')
   }) })), /DB caída/)
+})
+
+
+test('seguro entre empresas no se confunde con mensualidad del centro', () => {
+  const r = clasificarFactura(ORGS_ZOHO[0], factura({ line_items: [{ name: 'Afiliación Seguro de accidente opción 1  y 2 Centros Externos' }] }), '2026-10-17')
+  assert.equal(r.estado, 'excluida')
+})
+test('paginación incompleta no puede producir un conteo certificado', async () => {
+  await assert.rejects(listarFacturas('org', {}, 'test', async () => ({ invoices: [] })), /paginación sin confirmar/)
+  const llamadas = []
+  const r = await listarFacturas('org', {}, 'test', async (_org, _path, filtros) => {
+    llamadas.push(filtros.page)
+    return { invoices: [{ invoice_id: filtros.page }], page_context: { has_more_page: filtros.page === '1' } }
+  })
+  assert.deepEqual(llamadas, ['1', '2']); assert.equal(r.length, 2)
+})
+test('una respuesta sin saldo no se transforma silenciosamente en cero', async () => {
+  await assert.rejects(contarVencidasHoy('test', { hoy: '2026-10-17',
+    listar: async () => [factura({ balance: undefined })] }), /saldo o vencimiento sin confirmar/)
 })
