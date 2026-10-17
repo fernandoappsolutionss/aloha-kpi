@@ -15,7 +15,7 @@ const consolidada=centros[0].serie.map((p,j)=>{const values=centros.map(c=>c.ser
 const payload={centros,consolidada,ultimaCerrada:'2026-10-15',semanaAbierta:'2026-10-22'}
 const mensual=centros.map((c,i)=>({id:c.id,nombre:c.nombre,admin:'QA',ninos:[128,209,147,null,90,174,95][i],ninosDisponible:i!==3,ninosPeriodoFin:i===3?null:'2026-09-30',ninosFuente:'Dato mensual anterior al período',nuevos:0,nuevosDisponible:false,meta:60,desercion:0,grupos:i===3?0:20,ninosGrupo:7,metaGpn:8,cumpl:null,estado:'Parcial'}))
 // Fixtures para agenda, comparación histórica, cero real y fallo CRM.
-const evento=(id,total,attended,start_date)=>({id,start_date,status:'published',stats:{total,attended,not_attended:total-attended,pending:0,paid:0,won:0,total_revenue:0}})
+const evento=(id,total,attended,start_date)=>({id,start_date,status:'published',stats:{total,attended,not_attended:total-attended,pending:0,paid:0,won:Math.floor(attended/2),attended_won:Math.floor(attended/2),total_revenue:0}})
 centros.forEach((c,i)=>{c.clasesPrueba=i===4?{error:'CRM no disponible'}:resumenClasesPrueba({
   semanaAbierta:c.semanaAbierta,now:new Date('2026-10-17T18:00:00Z'),timeZone:c.zonaHoraria,
   clases:i===3?[]:[

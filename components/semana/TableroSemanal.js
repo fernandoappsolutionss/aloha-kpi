@@ -104,7 +104,7 @@ export default function TableroSemanal() {
           </table>
         </TableScroller>
         {datos.centros.length > 0 && <p className="h-sub">Facturas vencidas: solo mensualidades con saldo vencido. La fecha corresponde al último conteo disponible; la carga automática corre de lunes a viernes a las 7 p. m. de Panamá.</p>}
-        {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: agendados incluye los registros de todas las próximas clases. Invitados y asistentes comparan las mismas clases ya iniciadas; asistencia = asistentes ÷ invitados. Las 6 semanas incluyen la actual, que es parcial. El mes en curso llega hasta hoy y es independiente del período del panel inferior. Borradores y clases canceladas quedan fuera. Un guion indica que no hay invitados para calcular el porcentaje.</p>}
+        {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: agendados incluye los registros de todas las próximas clases. Invitados y asistentes comparan las mismas clases ya iniciadas; asistencia = asistentes ÷ invitados. Matriculados cuenta asistentes con negocio ganado en el CRM; conversión = matriculados ÷ asistentes. Las 6 semanas incluyen la actual, que es parcial. El mes en curso llega hasta hoy y es independiente del período del panel inferior. Borradores y clases canceladas quedan fuera. Un guion indica que faltan datos o no hay invitados/asistentes para calcular la tasa.</p>}
       </>}
     </div>
   </section>
