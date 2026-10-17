@@ -1577,6 +1577,20 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__contenido { padding: 16px; min-width: 0; }
 .semana-tablero__tabla { min-width: 900px; }
 .semana-tablero__mini { width: 160px; }
+.semana-tablero__tendencia { min-width: 364px; width: 364px; }
+.semana-tablero__condicion { min-width: 215px; max-width: 260px; }
+.semana-tablero__tabla th[scope="row"] { min-width: 180px; max-width: 230px; white-space: normal; }
+.semana-resumen-grafica { margin: 0; width: 340px; text-align: left; }
+.semana-resumen-grafica svg { display: block; overflow: visible; }
+.semana-resumen-grafica__eje { fill: var(--text-dim); font-size: 12px; }
+.semana-resumen-grafica__valor { fill: var(--text); font-size: 12px; font-weight: 700; paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; stroke-linejoin: round; }
+.semana-resumen-grafica figcaption { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+.semana-tablero__referencia { color: var(--text-muted); font-size: 12px; line-height: 1.5; white-space: normal; }
+.semana-tablero__referencia p { margin: 4px 0; }
+.semana-tablero__leyenda { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12px; color: var(--text-muted); margin: 12px 0; }
+.semana-tablero__cobertura { padding: 12px 16px; margin: 16px 0; border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: var(--r-sm); background: var(--surface-1); font-size: 13px; line-height: 1.5; }
+.semana-tablero__cobertura p { margin: 6px 0; }
+.semana-tablero__cobertura summary { cursor: pointer; min-height: 32px; padding: 6px 0; font-weight: 600; }
 .semana-condicion { display: inline-block; padding: 4px 9px; border: 1px solid var(--condicion-color); border-radius: var(--r-pill); color: var(--condicion-color); font-weight: 700; white-space: nowrap; }
 .semana-discrepancia,.semana-plan--vencido { color: var(--bad-text); font-weight: 700; }
 .semana-discrepancia { display: block; margin-top: 4px; }
@@ -1635,6 +1649,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   z-index: 2;
   background: var(--surface-1);
   box-shadow: 1px 0 0 var(--border);
+}
+@media (max-width: 600px) {
+  .semana-tablero .table-scroller--sticky th:first-child,
+  .semana-tablero .table-scroller--sticky td:first-child { position: static; }
 }
 .measured-chart { width: 100%; max-width: 100%; min-width: 0; }
 .reports-page :is(.card,.panel,.main__head > div,.peticiones-request-row > div,.peticiones-request-row > div > div) { min-width: 0; }
