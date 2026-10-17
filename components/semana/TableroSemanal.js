@@ -93,13 +93,17 @@ export default function TableroSemanal() {
               <td><Link className="operations-link" href="/dashboard/ranking">{centro.cuotasCumplidas == null ? 'Sin evaluar' : `${centro.cuotasCumplidas}%`}</Link></td>
               <td>{mostrarActual(centro, 'nuevos_inscritos')}</td>
               <td>{mostrarActual(centro, 'retiros')}</td>
-              <td>{mostrarActual(centro, 'facturas_vencidas')}</td>
+              <td>{mostrarActual(centro, 'facturas_vencidas')}
+                {centro.cobranza?.detalle?.fecha && <div className="h-sub">Último conteo: {fecha(centro.cobranza.detalle.fecha)}</div>}
+                {centro.cobranza?.detalle?.anterior && <div className="h-sub">Dato anterior · pendiente de actualización</div>}
+              </td>
               <td><ResumenClasesPrueba datos={centro.clasesPrueba} centroId={centro.id} centroNombre={centro.nombre} /></td>
             </tr>)}
               {!datos.centros.length && <tr><td colSpan={11}>No hay centros en tu alcance.</td></tr>}
             </tbody>
           </table>
         </TableScroller>
+        {datos.centros.length > 0 && <p className="h-sub">Facturas vencidas: solo mensualidades con saldo vencido. La fecha corresponde al último conteo disponible; la carga automática corre de lunes a viernes a las 7 p. m. de Panamá.</p>}
         {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: agendados incluye los registros de todas las próximas clases. Invitados y asistentes comparan las mismas clases ya iniciadas; asistencia = asistentes ÷ invitados. Las 6 semanas incluyen la actual, que es parcial. El mes en curso llega hasta hoy y es independiente del período del panel inferior. Borradores y clases canceladas quedan fuera. Un guion indica que no hay invitados para calcular el porcentaje.</p>}
       </>}
     </div>
