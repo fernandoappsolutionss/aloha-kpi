@@ -233,7 +233,7 @@ test('guía hablada: el cierre manda maniobra cuando toca y deriva el siguiente 
     const cierreNormalizado = norm(cierre)
     if ((m.drills || []).length > 0) {
       assert.match(cierre, /maniobra/i, `${m.id}: tiene maniobra y el cierre no la manda`)
-      const jefes = new Set(m.roles.map(jefeEsperado))
+      const jefes = new Set(m.asignacion === 'direccion-caja' ? ['Fernando'] : m.roles.map(jefeEsperado))
       if (m.roles.length === 1) {
         const [jefe] = [...jefes]
         assert.match(cierreNormalizado, new RegExp(`\\b${norm(jefe).split(' ')[0]}\\b`), `${m.id}: no nombra al jefe entrenador esperado (${jefe})`)

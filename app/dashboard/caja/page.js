@@ -7,6 +7,7 @@ import { CurvaCaja } from '../../../components/caja/CurvaCaja'
 import { ImportarExtracto } from '../../../components/caja/ImportarExtracto'
 import { BandejaClasificar } from '../../../components/caja/BandejaClasificar'
 import { Compromisos } from '../../../components/caja/Compromisos'
+import { DireccionCaja } from '../../../components/caja/DireccionCaja'
 import { usd, fechaCorta, EMPRESAS } from '../../../components/caja/formato'
 import { diasEntre } from '../../../lib/caja/semanas.mjs'
 
@@ -100,6 +101,7 @@ export default function CajaPage() {
             </TableScroller>
           </section>
 
+          {empresa !== 'consolidado' && <DireccionCaja key={`direccion-${empresa}`} empresa={empresa} datos={datos} onCambio={cargar} />}
           <CurvaCaja key={`curva-${empresa}`} empresa={empresa} curva={datos.curvas[empresa]} clases={datos.clases} onCambio={cargar} />
           <ImportarExtracto onCambio={cargar} />
           <BandejaClasificar pendientes={datos.pendientes.filter((p) => empresa === 'consolidado' || p.empresa === empresa)} clases={datos.clases} onCambio={cargar} />

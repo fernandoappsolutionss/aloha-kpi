@@ -667,7 +667,7 @@ test('marcarEstudiado: solo ids de oficio y solo módulos del puesto de quien es
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'marcarEstudiado')
   assert.match(body, /requireCurrentOficio\(\)/)
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
-  assert.match(body, /esDelPlan\(m, u\.rol, u\.centro_id\)/)
+  assert.match(body, /esDelPlan\(m, u\.rol, u\.centro_id, asignacionesOficio\(u\)\)/)
   assert.match(body, /INSERT INTO entrenamiento_progreso/)
 })
 

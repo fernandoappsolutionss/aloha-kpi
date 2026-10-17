@@ -45,11 +45,12 @@ export function Compromisos({ empresa, compromisos, clases, onCambio }) {
     <section className="card" style={{ padding: 20, marginBottom: 16 }} aria-labelledby="caja-compromisos">
       <h2 id="caja-compromisos" style={{ marginTop: 0 }}>Pagos programados</h2>
       <p className="h-sub">Lo que la curva descuenta en el futuro. Los marcados &quot;(estimado)&quot; salen de Zoho: corrígelos con el monto real. La parte del dueño no va aquí: la separan los baldes.</p>
+      <p className="h-sub">Programar una salida permite preverla; no la autoriza ni ejecuta. Registra pagos fuera de presupuesto, nuevos compromisos y uso de crédito en el plan de Dirección Operativa para decisión de Master.</p>
       {error && <p role="alert" className="alert alert--error">{error}</p>}
       {lista.length === 0 ? <p>Todavía no hay pagos programados para esta empresa.</p> : (
         <TableScroller label="Pagos programados">
           <table className="table">
-            <thead><tr><th>Concepto</th><th>Clase</th><th>Monto</th><th>Cuándo</th><th><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead><tr><th>Concepto</th><th>Clase</th><th>Monto</th><th>Cuándo</th><th style={{ position: 'relative' }}><span className="sr-only">Acciones</span></th></tr></thead>
             <tbody>
               {lista.map((c) => (
                 <tr key={c.id}>

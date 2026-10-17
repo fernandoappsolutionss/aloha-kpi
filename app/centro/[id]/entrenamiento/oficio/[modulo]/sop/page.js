@@ -74,7 +74,7 @@ export default async function SopPage({ params, searchParams }) {
   // Quién se la toma a la persona de aseo: el primer rol de rolesDelPapel() es
   // el dueño del paquete (la Asistente), no uno de sus jefes.
   const tomador = papel ? (rolesDelPapel(m, MODULOS_OFICIO)[0] || '') : ''
-  const esMio = !papel && esDelPlan(m, rol, oficio.centroId)
+  const esMio = !papel && esDelPlan(m, rol, oficio.centroId, oficio.asignaciones)
   const puedeVerla = papel
     ? puedeImprimirPapel(rol, m, MODULOS_OFICIO)
     // alcanzaCentro: un módulo con `centros` (materia fiscal) no se lee desde otro centro.
