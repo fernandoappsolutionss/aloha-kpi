@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usaKpiAutomatico } from '../../../../lib/kpi-auto.mjs'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import TableScroller from '../../../../components/TableScroller'
+import RevisionHistorica from '../../../../components/RevisionHistorica'
 import OperationalCard from '../../../../components/OperationalCard'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
 import { useParams } from 'next/navigation'
@@ -53,6 +54,7 @@ export default function KPIPage() {
   const [motivosAuto, setMotivosAuto] = useState(null)
   const [cierreDocumental, setCierreDocumental] = useState(null)
   const [movimientosCierre, setMovimientosCierre] = useState(null)
+  const [revisionHistorica, setRevisionHistorica] = useState(null)
   const [autoSync, setAutoSync] = useState(null)
   const [gruposModulo, setGruposModulo] = useState(null) // conteo del módulo de grupos
   // KPI sin manos (g1-16/g1-20): resultado discriminado del módulo. 'auto'
@@ -105,6 +107,7 @@ export default function KPIPage() {
     setFinalGuardado(res?.ninos_final_mes ?? null)
     setCierreDocumental(res?.conciliacion_cuadro || null)
     setMovimientosCierre(datos.movimientosCierre || null)
+    setRevisionHistorica(datos.revisionHistorica || null)
 
     // Resumen del mes. El "niños inicio" se arrastra del cierre del mes
     // anterior solo mientras esta abierto. Un cierre conserva su propia foto.
@@ -342,9 +345,11 @@ export default function KPIPage() {
             <strong>Cierre conciliado con el cuadro de negocio.</strong> {ninosFinal} niños al cierre · {nA} nuevos activos · {reincorporados} reincorporados · {retiradosOperativos} retirados.
             <div>Fuente: {cierreDocumental.archivo}</div>
             {totalDes !== retiradosOperativos && <div>El detalle semanal guardado suma {totalDes} retiros; el cierre documental valida {retiradosOperativos}. El archivo no permite reasignar todos los retiros a un día concreto.</div>}
-            {cierreDocumental.ajusteInicio?.diferencia !== 0 && cierreDocumental.ajusteInicio && <div>Ajuste de apertura documentado: {cierreDocumental.ajusteInicio.diferencia > 0 ? '+' : ''}{cierreDocumental.ajusteInicio.diferencia} niños respecto al cierre anterior. Se conserva la captura histórica del mes anterior.</div>}
+            {cierreDocumental.ajusteInicio?.diferencia !== 0 && cierreDocumental.ajusteInicio && <div>Ajuste de apertura documentado: {cierreDocumental.ajusteInicio.diferencia > 0 ? '+' : ''}{cierreDocumental.ajusteInicio.diferencia} niños respecto al cierre anterior. {revisionHistorica ? 'El origen de la diferencia se explica en la revisión del cierre histórico.' : 'Se conserva la captura histórica del mes anterior.'}</div>}
           </div>
         )}
+
+        {locked && <RevisionHistorica revision={revisionHistorica} />}
 
         {!locked && automatic && (
           <div className="alert" style={{ marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok)' }}>
