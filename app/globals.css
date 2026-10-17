@@ -1614,6 +1614,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .semana-cp-totales__selector .select { font-size: 16px; }
 }
 .semana-tablero__cp { width: 355px; white-space: normal; }
+.semana-tablero__cp-resumen { cursor: pointer; min-height: 44px; padding: 10px 0; white-space: nowrap; font-size: 13px; }
+.semana-tablero__cp-resumen strong { font-weight: 600; }
+.semana-tablero__cp-resumen span { margin-left: 12px; color: var(--text-muted); font-size: 12px; }
+.semana-tablero__cp-resumen:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; border-radius: var(--r-sm); }
+.semana-tablero__cp[open] > .semana-tablero__cp-resumen .semana-tablero__cp-abrir,
+.semana-tablero__cp:not([open]) > .semana-tablero__cp-resumen .semana-tablero__cp-cerrar { display: none; }
+.semana-tablero__cp-contenido { padding: 8px 0; }
 .semana-tablero__cp-centro { display: none; }
 .semana-tablero__cp-agenda { display: flex; align-items: center; gap: 10px; font-weight: 600; }
 .semana-tablero__cp-agenda strong { font-size: 26px; line-height: 1.2; color: var(--text); }
@@ -1624,7 +1631,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__cp-periodo { padding: 5px 0; border-bottom: 1px solid var(--border); }
 .semana-tablero__cp-periodo dt { font-size: 12px; font-weight: 600; }
 .semana-tablero__cp-periodo dt span { display: block; font-weight: 400; font-size: 12px; color: var(--text-muted); }
-.semana-tablero__cp .semana-tablero__cp-periodo dd { margin: 0; font-size: 14px !important; font-weight: 600; text-align: right; }
+.semana-tablero__cp .semana-tablero__cp-periodo dd { margin: 0; font-size: 14px !important; font-weight: 600; text-align: right; white-space: nowrap; }
 .semana-tablero__cp .semana-tablero__cp-periodo .semana-tablero__cp-conversion { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 12px !important; font-weight: 400; text-align: left; padding-bottom: 4px; }
 .semana-tablero__cp-detalle { font-size: 12px; }
 .semana-tablero__cp-detalle summary { cursor: pointer; padding: 8px 0; min-height: 32px; }
