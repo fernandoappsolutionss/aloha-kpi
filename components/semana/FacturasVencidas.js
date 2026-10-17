@@ -7,13 +7,21 @@ import { getFacturasVencidas } from '../../app/actions/cobranza'
 const fechaVisible = valor => valor?.split('-').reverse().join('/') || '—'
 const saldoVisible = factura => `${Number(factura.saldo).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${factura.moneda}`
 
+function SaldoTotal({ saldos, destacado = false }) {
+  return <div className={destacado ? 'cobranza-detalle__total' : 'cobranza-detalle__saldo'} aria-label="Saldo total vencido">
+    <span className="h-sub">Saldo total vencido</span>
+    {saldos == null ? <span className="h-sub">No disponible</span> : saldos.length === 0
+      ? <strong>0.00</strong> : saldos.map(saldo => <strong key={saldo.moneda}>{saldoVisible(saldo)}</strong>)}
+  </div>
+}
+
 export default function FacturasVencidas({ centro, sinDato }) {
   const [abierto, setAbierto] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [intento, setIntento] = useState(0)
   const botonRef = useRef(null)
   const total = centro.abierta.facturas_vencidas
-  const { fecha, registradoAt, anterior } = centro.cobranza?.detalle || {}
+  const { fecha, registradoAt, anterior, saldos } = centro.cobranza?.detalle || {}
   useEffect(() => {
     if (!abierto) return undefined
     let activo = true
@@ -28,6 +36,7 @@ export default function FacturasVencidas({ centro, sinDato }) {
     {total == null ? sinDato : <button ref={botonRef} type="button" className="operations-link cobranza-detalle__boton"
       aria-label={`Ver ${total} facturas vencidas de ${centro.nombre}`} aria-haspopup="dialog"
       onClick={() => { setResultado(null); setAbierto(true) }}>{Number(total).toLocaleString('es-PA')}<span className="h-sub">Ver detalle</span></button>}
+    {total != null && <SaldoTotal saldos={saldos} />}
     {fecha && <div className="h-sub">Último conteo: {fechaVisible(fecha)}</div>}
     {anterior && <div className="h-sub">Dato anterior · pendiente de actualización</div>}
     <Dialog open={abierto} title={`Facturas vencidas · ${centro.nombre}`} width={900}
@@ -36,6 +45,7 @@ export default function FacturasVencidas({ centro, sinDato }) {
       {!resultado && <p role="status">Cargando facturas…</p>}
       {resultado?.error && <div role="alert" className="alert alert--error">{resultado.error} <button type="button" className="btn" onClick={() => setIntento(n => n + 1)}>Reintentar</button></div>}
       {resultado?.facturas && <>
+        <SaldoTotal saldos={resultado.saldos} destacado />
         <p className="h-sub">Saldos al momento del conteo. Los pagos posteriores aparecerán en la próxima actualización.</p>
         {resultado.facturas.length === 0 ? <p role="status">Este centro no tiene mensualidades vencidas en este conteo.</p> :
           <TableScroller label={`Detalle de facturas vencidas de ${centro.nombre}`}>
