@@ -26,6 +26,7 @@ centros.forEach((c,i)=>{c.clasesPrueba=i===4?{error:'CRM no disponible'}:resumen
     ...(i===1?[evento('siguiente',4,0,'2026-10-24T18:00:00Z')]:[]),
   ]})})
 const stubs={
+  cobranza:`export async function getFacturasVencidas(){return {facturas:[],total:0};}`,
   link:`import React from 'react';export default function Link(props){return React.createElement('a',props)}`,
   sidebar:`import React from 'react';export default function Sidebar(){return <aside className="sb" style={{padding:20}}>ALOHA · QA local · Sin conexión a producción</aside>}`,
   mensual:`export async function getCentrosKpiRango(){let datos=${JSON.stringify(mensual)};const scenario=new URLSearchParams(location.search).get('scenario');if(scenario==='empty')return [];if(scenario==='complete')return datos.filter(c=>c.ninosDisponible);if(scenario==='zero')return datos.map(c=>({...c,ninos:c.ninosDisponible?0:null}));if(scenario==='no-data')return datos.map(c=>({...c,ninos:null,ninosDisponible:false}));return datos;}`,
@@ -35,7 +36,7 @@ await build({
   stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Page from './app/dashboard/page';createRoot(document.getElementById('root')).render(<Page/>);`,resolveDir:root,loader:'jsx'},
   outfile:resolve(out,'app.js'),bundle:true,loader:{'.js':'jsx'},jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},
   plugins:[{name:'qa',setup(b){
-    b.onResolve({filter:/next\/link|components\/Sidebar|actions\/(semana|dashboard)$/},a=>({path:a.path==='next/link'?'link':a.path.includes('Sidebar')?'sidebar':a.path.endsWith('/dashboard')?'mensual':'action',namespace:'qa'}));
+    b.onResolve({filter:/next\/link|components\/Sidebar|actions\/(semana|dashboard|cobranza)$/},a=>({path:a.path==='next/link'?'link':a.path.includes('Sidebar')?'sidebar':a.path.endsWith('/dashboard')?'mensual':a.path.endsWith('/cobranza')?'cobranza':'action',namespace:'qa'}));
     b.onLoad({filter:/.*/,namespace:'qa'},a=>({contents:stubs[a.path],loader:'jsx',resolveDir:root}));
   }}]
 })
