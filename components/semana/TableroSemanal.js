@@ -92,13 +92,13 @@ export default function TableroSemanal() {
               <td>{mostrarActual(centro, 'nuevos_inscritos')}</td>
               <td>{mostrarActual(centro, 'retiros')}</td>
               <td>{mostrarActual(centro, 'facturas_vencidas')}</td>
-              <td><ResumenClasesPrueba datos={centro.clasesPrueba} /></td>
+              <td><ResumenClasesPrueba datos={centro.clasesPrueba} centroId={centro.id} centroNombre={centro.nombre} /></td>
             </tr>)}
               {!datos.centros.length && <tr><td colSpan={11}>No hay centros en tu alcance.</td></tr>}
             </tbody>
           </table>
         </TableScroller>
-        {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: invitados son las personas registradas en las clases que ya comenzaron esta semana. Asistencia = asistentes ÷ invitados. Las clases futuras se incluyen cuando comienzan.</p>}
+        {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: agendados incluye los registros de todas las próximas clases. Invitados y asistentes comparan las mismas clases ya iniciadas; asistencia = asistentes ÷ invitados. Las 6 semanas incluyen la actual, que es parcial. El mes en curso llega hasta hoy y es independiente del período del panel inferior. Borradores y clases canceladas quedan fuera. Un guion indica que no hay invitados para calcular el porcentaje.</p>}
       </>}
     </div>
   </section>

@@ -1593,13 +1593,27 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__total h3 { margin: 0; }
 .semana-tablero__total-valor { margin: 6px 0; font-size: 32px; font-weight: 700; color: var(--text); }
 .semana-tablero__total .h-sub { margin: 4px 0; }
-.semana-tablero__cp { min-width: 190px; white-space: normal; }
-.semana-tablero__cp-cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 8px; }
-.semana-tablero__cp-cifras dt { color: var(--text-muted); font-size: 12px; }
-.semana-tablero__cp .semana-tablero__cp-cifras dd { margin: 2px 0 0; font-size: 22px !important; font-weight: 700; color: var(--text); }
-.semana-tablero__cp-tasa { font-weight: 600; }
+.semana-tablero__cp { width: 355px; white-space: normal; }
+.semana-tablero__cp-centro { display: none; }
+.semana-tablero__cp-agenda { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.semana-tablero__cp-agenda strong { font-size: 26px; line-height: 1.2; color: var(--text); }
+.semana-tablero__cp-encabezado, .semana-tablero__cp-periodo { display: grid; grid-template-columns: minmax(0, 1fr) 60px 66px 55px; gap: 6px; align-items: center; }
+.semana-tablero__cp-encabezado { margin-top: 12px; padding: 7px 0; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+.semana-tablero__cp-encabezado span:not(:first-child) { text-align: right; }
+.semana-tablero__cp-periodos { margin: 0; }
+.semana-tablero__cp-periodo { padding: 5px 0; border-bottom: 1px solid var(--border); }
+.semana-tablero__cp-periodo dt { font-size: 12px; font-weight: 600; }
+.semana-tablero__cp-periodo dt span { display: block; font-weight: 400; font-size: 12px; color: var(--text-muted); }
+.semana-tablero__cp .semana-tablero__cp-periodo dd { margin: 0; font-size: 14px !important; font-weight: 600; text-align: right; }
+.semana-tablero__cp-detalle { font-size: 12px; }
+.semana-tablero__cp-detalle summary { cursor: pointer; padding: 8px 0; min-height: 32px; }
+.semana-tablero__cp-detalle ul { margin: 0 0 8px; padding-left: 20px; }
 @media (max-width: 520px) {
   .semana-tablero__totales { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .semana-tablero__cp { width: clamp(230px, calc(100vw - 120px), 300px); }
+  .semana-tablero__cp-centro { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .semana-tablero__cp-encabezado, .semana-tablero__cp-periodo { grid-template-columns: minmax(0, 1fr) 55px 60px 45px; gap: 4px; }
+  .semana-tablero__cp-encabezado { font-size: 12px; }
 }
 .semana-tablero__cobertura { padding: 8px 16px; margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-1); font-size: 13px; line-height: 1.5; }
 .semana-tablero__cobertura p { margin: 6px 0; }

@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { createServer } from 'node:http'
 import { build } from 'esbuild'
 import { sumarDias } from '../../lib/semana-cierre.mjs'
+import { resumenClasesPrueba } from '../../lib/estadisticas-semana/resumen-clases-prueba.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
 const root=resolve('.'), out=resolve('.scratch/tablero')
 await mkdir(out,{recursive:true})
@@ -13,16 +14,17 @@ const centros=seeds.map(([nombre,vs],i)=>({id:i+1,nombre,serie:vs.map((valor,j)=
 const consolidada=centros[0].serie.map((p,j)=>{const values=centros.map(c=>c.serie[j].valor).filter(v=>v!=null);return {semanaFin:p.semanaFin,valor:values.length===centros.length?values.reduce((a,b)=>a+b,0):null,subtotal:values.length?values.reduce((a,b)=>a+b,0):null,total:centros.length,disponibles:values.length,incompleta:values.length!==centros.length}})
 const payload={centros,consolidada,ultimaCerrada:'2026-10-15',semanaAbierta:'2026-10-22'}
 const mensual=centros.map((c,i)=>({id:c.id,nombre:c.nombre,admin:'QA',ninos:[128,209,147,null,90,174,95][i],ninosDisponible:i!==3,ninosPeriodoFin:i===3?null:'2026-09-30',ninosFuente:'Dato mensual anterior al período',nuevos:0,nuevosDisponible:false,meta:60,desercion:0,grupos:i===3?0:20,ninosGrupo:7,metaGpn:8,cumpl:null,estado:'Parcial'}))
-// Escenarios visibles: conversión parcial, cero asistentes, 100%, sin clases y fallo.
-centros.forEach((c,i)=>{c.clasesPrueba=[
-  {invitados:10,asistentes:5,porcentaje:50,clases:1},
-  {invitados:8,asistentes:0,porcentaje:0,clases:1},
-  {invitados:4,asistentes:4,porcentaje:100,clases:1},
-  {invitados:0,asistentes:0,porcentaje:null,clases:0},
-  {invitados:null,asistentes:null,porcentaje:null,clases:null,error:'CRM no disponible'},
-  {invitados:3,asistentes:1,porcentaje:100/3,clases:1},
-  {invitados:1,asistentes:1,porcentaje:100,clases:1},
-][i]})
+// Fixtures para agenda, comparación histórica, cero real y fallo CRM.
+const evento=(id,total,attended,start_date)=>({id,start_date,status:'published',stats:{total,attended,not_attended:total-attended,pending:0,paid:0,won:0,total_revenue:0}})
+centros.forEach((c,i)=>{c.clasesPrueba=i===4?{error:'CRM no disponible'}:resumenClasesPrueba({
+  semanaAbierta:c.semanaAbierta,now:new Date('2026-10-17T18:00:00Z'),timeZone:c.zonaHoraria,
+  clases:i===3?[]:[
+    evento('septiembre',10,5,'2026-09-20T18:00:00Z'),
+    evento('anterior',i===0?24:8,i===0?6:i===1?0:8,'2026-10-14T18:00:00Z'),
+    ...(i===6?[evento('actual',3,1,'2026-10-17T16:00:00Z')]:[]),
+    evento('proxima',i===0?2:i===1?12:3,0,'2026-10-22T18:00:00Z'),
+    ...(i===1?[evento('siguiente',4,0,'2026-10-24T18:00:00Z')]:[]),
+  ]})})
 const stubs={
   link:`import React from 'react';export default function Link(props){return React.createElement('a',props)}`,
   sidebar:`import React from 'react';export default function Sidebar(){return <aside className="sb" style={{padding:20}}>ALOHA · QA local · Sin conexión a producción</aside>}`,
