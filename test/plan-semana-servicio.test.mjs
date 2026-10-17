@@ -51,12 +51,15 @@ test('abrir dos veces copia pendientes una sola vez', async () => {
   assert.ok(db.consultas.some((sql) => sql.includes('FOR UPDATE')))
 })
 
-test('la administradora y asistente no reciben lectura ni discrepancia del servidor', async () => {
+test('la referencia orienta a quien asigna la condición; el asistente no recibe la lectura', async () => {
   const db = memoria()
-  for (const rol of ['administradora', 'asistente']) {
+  for (const rol of ['administradora', 'asistente', 'coordinador']) {
     const result = await cargarPlan(7, FIN, { ...db, sesion: { rol }, now: HOY })
-    assert.equal('lectura' in result, false)
-    assert.equal('discrepancia' in result, false)
+    assert.equal('lectura' in result, rol !== 'asistente')
+    assert.equal('discrepancia' in result, rol !== 'asistente')
+    assert.equal(result.preparacion, true)
+    assert.equal(result.plazoVencido, false)
+    assert.equal(result.plan.condicion, null)
     assert.equal('lectura_auto' in result.plan, false)
     assert.equal('lectura_motivo' in result.plan, false)
     assert.equal(JSON.stringify(result).includes('Caída'), false)

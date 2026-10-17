@@ -113,8 +113,8 @@ await check('Pendientes: 8 aperturas concurrentes copian una sola vez',async()=>
   for(const v of vistas){assert.equal(v.objetivos.length,esperados);assert(v.objetivos.every(o=>o.seccion==='pendiente'))}
   return {aperturas:8,pendientes:esperados}
 })
-await check('Lectura automática ausente para administradora/asistente, visible para gerencia',async()=>{
-  for(const id of [4,5]){const v=await cargarPlan(1,'2026-09-24',{sesion:sesiones[id],now});assert(!('lectura' in v));assert(!('discrepancia' in v));assert(!('lectura_auto' in v.plan));assert(!('lectura_motivo' in v.plan))}
+await check('Referencia visible para administradora y gerencia, ausente para asistente',async()=>{
+  for(const id of [4,5]){const v=await cargarPlan(1,'2026-09-24',{sesion:sesiones[id],now});assert.equal('lectura' in v,id===4);assert.equal('discrepancia' in v,id===4);assert(!('lectura_auto' in v.plan));assert(!('lectura_motivo' in v.plan))}
   const v=await cargarPlan(1,'2026-09-24',options);assert(v.lectura);assert('discrepancia' in v)
 })
 await check('Cuotas: propuesta, aprobación, cambio revoca aprobación y rechazo inválidos',async()=>{

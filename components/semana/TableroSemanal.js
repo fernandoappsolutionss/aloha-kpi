@@ -4,7 +4,8 @@ import Link from 'next/link'
 import TableScroller from '../TableScroller'
 import GraficaSemanal from './GraficaSemanal'
 import { getTableroSemanal } from '../../app/actions/semana'
-import { colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.mjs'
+import CondicionSemanal from './CondicionSemanal'
+import ArranqueSemanal from './ArranqueSemanal'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
 const actual = (centro, codigo) => centro.abierta[codigo]
@@ -16,7 +17,7 @@ const mostrarActual = (centro, codigo) => {
   const error = codigo === 'ninos_activos' ? centro.serie.at(-1)?.detalle?.error : null
   return error === 'Falta el cierre del mes anterior.' ? error : 'Sin dato del cálculo'
 }
-const estado = { sin_condicion: 'Pendiente de asignar condición', incompleto: 'Plan incompleto', completo: 'Plan completo' }
+const estado = { sin_condicion: 'Preparar condición y plan en la reunión', incompleto: 'Plan incompleto', completo: 'Plan preparado' }
 
 export default function TableroSemanal() {
   const [datos, setDatos] = useState(null)
@@ -35,7 +36,9 @@ export default function TableroSemanal() {
       {error && <p role="alert" className="alert alert--error">{error} <button className="btn" type="button" onClick={() => setRecarga((n) => n + 1)}>Reintentar</button></p>}
       {!datos && !error && <p role="status">Cargando semana…</p>}
       {datos && <>
+        <ArranqueSemanal ultimaCerrada={datos.centros.map(c => c.ultimaCerrada).sort()[0]} />
         <p className="h-sub">Cada centro usa su jueves de cierre local. La gráfica compara fechas de cierre iguales; solo dibuja el total cuando hay datos de todos los centros visibles. El período mensual o trimestral elegido aplica al panel inferior.</p>
+        <p className="h-sub">La condición de referencia se actualiza con los cierres. La administradora la revisa y confirma al preparar su plan. <Link className="operations-link" href="/dashboard/reunion-semanal">Preparar la reunión semanal</Link></p>
         {datos.centros.some((centro) => centro.semanaAbierta !== datos.semanaAbierta) && <p role="status" className="h-sub">Por la diferencia horaria entre Caracas y Panamá, algunos centros ya están en la semana siguiente.</p>}
         {datos.consolidada.some((p) => p.incompleta) && <details open><summary>Consolidado con cobertura incompleta</summary><ul>
           {datos.consolidada.filter((p) => p.incompleta).map((p) => <li key={p.semanaFin}>Cierre {fecha(p.semanaFin)}: total sin dato · subtotal disponible {mostrar(p.subtotal)} · {p.disponibles}/{p.total} centros</li>)}
@@ -50,8 +53,8 @@ export default function TableroSemanal() {
               <td>{mostrarActual(centro, 'ninos_activos')}</td>
               <td>{centro.delta == null ? 'Sin dato' : `${centro.delta > 0 ? '+' : ''}${centro.delta}`}<div className="h-sub">{actual(centro, 'ninos_activos') == null ? 'entre semanas cerradas' : 'abierta vs. última cerrada'}</div></td>
               <td className="semana-tablero__mini"><GraficaSemanal puntos={centro.serie} titulo={`Niños activos de ${centro.nombre}`} compacta /></td>
-              <td>{centro.condicion ? <span className="semana-condicion" style={{ '--condicion-color': colorCondicion(centro.condicion) }}>{nombreCondicion(centro.condicion)}</span> : 'Sin condición'}{centro.discrepancia && <span className="semana-discrepancia" role="img" aria-label="Discrepancia"> ⚠ Discrepancia</span>}</td>
-              <td className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>{estado[centro.estadoPlan] || 'Pendiente'}</td>
+              <td><CondicionSemanal condicion={centro.condicion} lectura={centro.lectura} />{centro.discrepancia && <span className="semana-discrepancia" role="img" aria-label="Discrepancia"> ⚠ Discrepancia</span>}</td>
+              <td className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>{centro.preparacion && <p className="h-sub">Preparación</p>}{estado[centro.estadoPlan] || 'Pendiente'}</td>
               <td><Link className="operations-link" href="/dashboard/ranking">{centro.cuotasCumplidas == null ? 'Sin evaluar' : `${centro.cuotasCumplidas}%`}</Link></td>
               <td>{mostrarActual(centro, 'nuevos_inscritos')}</td>
               <td>{mostrarActual(centro, 'retiros')}</td>

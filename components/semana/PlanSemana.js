@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { CONDICIONES, colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.mjs'
 import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo } from '../../app/actions/semana'
 import LecturaCondicion from './LecturaCondicion'
+import ArranqueSemanal from './ArranqueSemanal'
+import { calendarioPlan } from '../../lib/reunion-semanal.mjs'
 import { pasoPrevioPendiente, formulaAnteriorPendiente } from '../../lib/plan-semana.mjs'
 import { updateGrowthRecommendation } from '../../app/actions/growth'
 
@@ -101,17 +103,20 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   const estado = datos.estado === 'completo' ? 'Plan preparado' : datos.estado === 'sin_condicion' ? 'Pendiente de asignar condición' : `Completa acción, responsable, fecha y evidencia en el paso ${datos.pasoFaltante}`
   const objetivos = datos.objetivos || []
   const sinCondicion = !datos.plan.condicion
+  const calendario = calendarioPlan(semanaFin)
   const estrategico = datos.estrategico.map((item) => ({ ...item, ...accionesGuardadas[item.id] })).filter((item) => !['completed', 'dismissed'].includes(item.status))
   return <section data-tour="semana.plan" id="plan-batalla" className="panel semana-plan" aria-labelledby="semana-plan-title">
-    <div className="panel__head semana-plan__head"><div><p className="label">Plan de batalla</p><h2 id="semana-plan-title" className="panel__title">Condición y plan — semana que cerró el {semanaFin}</h2></div>
-      <div className={datos.plazoVencido && datos.estado !== 'completo' ? 'semana-plan--vencido' : ''}><strong>{estado}</strong><p className="h-sub">Plazo: viernes 10:00</p></div>
+    <div className="panel__head semana-plan__head"><div><p className="label">Plan de batalla</p><h2 id="semana-plan-title" className="panel__title">Plan del {calendario.desde} al {calendario.hasta}</h2><p className="h-sub">Condición basada en la semana que cerró el {semanaFin}.</p></div>
+      <div className={datos.plazoVencido && datos.estado !== 'completo' ? 'semana-plan--vencido' : ''}><strong>{estado}</strong><p className="h-sub">{datos.preparacion ? 'Preparación · sin plazo vencido' : `Plazo: viernes 10:00 · ${calendario.reunion}, hora del centro`}</p></div>
     </div>
+    <ArranqueSemanal ultimaCerrada={semanaFin} />
     <p className="h-sub">{datos.ejecucion?.realizadas || 0} de {datos.ejecucion?.total || 0} acciones realizadas · {datos.ejecucion?.verificadas || 0} verificadas. Preparar la fórmula no equivale a haberla ejecutado.</p>
     {datos.plan.fundamento && <p><strong>Fundamento de la condición:</strong> {datos.plan.fundamento}</p>}
     {error && <p role="alert" className="alert alert--error">{error}</p>}
     {mensaje && <p role="status" className="alert">{mensaje}</p>}
     {ajustes}
     {'lectura' in datos && <LecturaCondicion lectura={datos.lectura} />}
+    {sinCondicion && <p className="h-sub">En la reunión: revisa la gráfica, confirma la condición con su fundamento, acuerda las cuotas y escribe las acciones con responsable, fecha y evidencia. Los resultados llegan del sistema; las decisiones del plan las guardas aquí.</p>}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
 
     <div data-tour="semana.condicion">
