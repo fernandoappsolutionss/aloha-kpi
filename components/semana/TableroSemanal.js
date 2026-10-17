@@ -7,6 +7,7 @@ import { getTableroSemanal } from '../../app/actions/semana'
 import CondicionSemanal from './CondicionSemanal'
 import ArranqueSemanal from './ArranqueSemanal'
 import GraficaResumenSemanal from './GraficaResumenSemanal'
+import ResumenClasesPrueba from './ResumenClasesPrueba'
 import { comparacionCierres, coberturaResumen } from '../../lib/resumen-tablero-semanal.mjs'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
@@ -91,12 +92,13 @@ export default function TableroSemanal() {
               <td>{mostrarActual(centro, 'nuevos_inscritos')}</td>
               <td>{mostrarActual(centro, 'retiros')}</td>
               <td>{mostrarActual(centro, 'facturas_vencidas')}</td>
-              <td>{mostrarActual(centro, 'cp_asistidas')}</td>
+              <td><ResumenClasesPrueba datos={centro.clasesPrueba} /></td>
             </tr>)}
               {!datos.centros.length && <tr><td colSpan={11}>No hay centros en tu alcance.</td></tr>}
             </tbody>
           </table>
         </TableScroller>
+        {datos.centros.length > 0 && <p className="h-sub">Clases de prueba: invitados son las personas registradas en las clases que ya comenzaron esta semana. Asistencia = asistentes ÷ invitados. Las clases futuras se incluyen cuando comienzan.</p>}
       </>}
     </div>
   </section>

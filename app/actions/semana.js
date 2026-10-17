@@ -12,6 +12,7 @@ import { enriquecerTableroConPlanes } from '../../lib/plan-semana.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
 import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro } from '../../lib/cuotas-semana.mjs'
 import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn, leerCompromiso, guardarCompromisoEn } from '../../lib/cuotas-semana-servicio.js'
+import { cargarClasesPruebaTablero } from '../../lib/estadisticas-semana/clases-prueba-tablero.js'
 
 async function vistaCentro(centroId, session) {
   const [centro] = await sql`SELECT id, nombre, pais FROM centros WHERE id = ${centroId}`
@@ -79,7 +80,7 @@ export async function recalcularSemanaCentro(centroId, semanaFin) {
   return await vistaCentro(centroId, session)
 }
 
-async function cargarTablero() {
+async function cargarTablero({ incluirClasesPrueba = false } = {}) {
   const { centros, sesion } = await alcancePanel()
   const now = new Date()
   const abierta = semanaAbierta(now, 'America/Panama')
@@ -89,12 +90,13 @@ async function cargarTablero() {
   const cierres = [...new Set(Object.values(periodos).map((periodo) => periodo.ultimaCerrada))]
   const abiertas = [...new Set(Object.values(periodos).map((periodo) => periodo.semanaAbierta))]
   const ids = centros.map((centro) => centro.id)
-  const [filas, filasCuotas, metasEntradas, planes, compromisos] = await Promise.all([
+  const [filas, filasCuotas, metasEntradas, planes, compromisos, clasesPrueba] = await Promise.all([
     leerSerieCentros(ids, todasSemanas),
     leerCuotasCentros(ids, todasSemanas),
     Promise.all(abiertas.map(async (semana) => [semana, await metasDeSemana(semana)])),
     ids.length ? sql`SELECT * FROM semana_planes WHERE centro_id = ANY(${ids}::int[]) AND semana_fin = ANY(${cierres}::date[])` : [],
     ids.length ? sql`SELECT * FROM ruta_compromisos_mes WHERE centro_id=ANY(${ids}::int[]) AND periodo=ANY(${abiertas.map(fin => fin.slice(0, 7))}::text[])` : [],
+    incluirClasesPrueba ? cargarClasesPruebaTablero(centros, periodos, { now }) : {},
   ])
   const metasPorSemana = new Map(metasEntradas)
   const tablero = armarTablero(centros, semanas, filas)
@@ -113,7 +115,7 @@ async function cargarTablero() {
     const cuotaVista = prepararCuotas({ compromiso, catalogo: ESTADISTICAS_CENTRO, series, resumen, filasCuotas: cuotasCentro, metas: metasPorSemana.get(periodo.semanaAbierta), semanaAbierta: periodo.semanaAbierta, hoy: periodo.hoy })
     const evaluacionCuotas = evaluarCuotasCerradas({ catalogo: ESTADISTICAS_CENTRO, series, filasCuotas: cuotasCentro, semanaFin: periodo.ultimaCerrada })
     return { ...conPlan, zonaHoraria: zonaHorariaCentro(centro), semanaAbierta: periodo.semanaAbierta, ultimaCerrada: periodo.ultimaCerrada, serie: cuotaVista.series.ninos_activos, cuotas: cuotaVista.cuotas,
-      cuotasCumplidas: evaluacionCuotas.porcentaje, evaluacionCuotas,
+      cuotasCumplidas: evaluacionCuotas.porcentaje, evaluacionCuotas, clasesPrueba: clasesPrueba[centro.id],
       puedeAprobar: esAdminDe(sesion, centro.id),
       lectura: lecturaCondicion(base.serie.filter((punto) => punto.semanaFin <= periodo.ultimaCerrada).map((punto) => punto.valor)) }
   })
@@ -121,7 +123,7 @@ async function cargarTablero() {
 }
 
 export async function getTableroSemanal() {
-  return await cargarTablero()
+  return await cargarTablero({ incluirClasesPrueba: true })
 }
 
 export async function getReunionSemanal() {
