@@ -98,7 +98,7 @@ export default function AlertaHigieneDatos({ centroId, growth = null }) {
 
   const higiene = higieneDeDatos({ growth, centroId, ...pendientes })
   const capacidad = higiene.capacidadRegistrada
-  if (!higiene.hay && !capacidad) return null
+  if (!higiene.hay && !capacidad && !higiene.antecedentes.length) return null
 
   // Cuando lo único que queda es trabajo de Dirección, la sección se calma:
   // mismo contenido, sin borde de aviso y sin píldora de alarma.
@@ -165,6 +165,20 @@ export default function AlertaHigieneDatos({ centroId, growth = null }) {
             Esta lista no se cierra a mano: cada punto desaparece solo cuando el dato queda cargado.
           </p>
         </section>
+      )}
+      {higiene.antecedentes.length > 0 && (
+        <details className="higiene higiene--sereno">
+          <summary>Antecedentes de grupos · no afectan los saldos actuales</summary>
+          <p className="higiene__accion">Las fechas de reincorporación y los movimientos registrados ya se usan en el cálculo. La apertura original de un grupo es un dato histórico distinto; complétala solo si tienes evidencia.</p>
+          {higiene.antecedentes.map(punto => (
+            <div key={punto.clave}>
+              <h4 className="higiene__titulo">{punto.titulo}</h4>
+              <Items punto={punto} />
+              <p className="higiene__accion">{punto.gananciaTexto}</p>
+              {punto.donde && <Link className="higiene__ir" href={punto.donde.href}>{punto.donde.texto} →</Link>}
+            </div>
+          ))}
+        </details>
       )}
       {capacidad && (
         <aside className="capacidad-registrada" aria-labelledby="capacidad-registrada-titulo">
