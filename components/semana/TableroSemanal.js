@@ -8,6 +8,7 @@ import CondicionSemanal from './CondicionSemanal'
 import ArranqueSemanal from './ArranqueSemanal'
 import GraficaResumenSemanal from './GraficaResumenSemanal'
 import ResumenClasesPrueba from './ResumenClasesPrueba'
+import TotalesClasesPrueba from './TotalesClasesPrueba'
 import { comparacionCierres, coberturaResumen } from '../../lib/resumen-tablero-semanal.mjs'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
@@ -66,6 +67,7 @@ export default function TableroSemanal() {
             <p className="h-sub">Cierre {fecha(datos.ultimaCerrada)}</p>
           </div>
         </div>}
+        {datos.centros.length > 0 && <TotalesClasesPrueba centros={datos.centros} />}
         <ArranqueSemanal ultimaCerrada={datos.centros.map(c => c.ultimaCerrada).sort()[0]} />
         <p className="h-sub">Últimas 6 semanas, incluida la abierta. Cada centro usa su jueves de cierre local. La condición corresponde al último cierre; el dato abierto es provisional. El período mensual o trimestral elegido aplica al panel inferior.</p>
         <p className="h-sub">La escala usa el historial de 12 semanas y las cuotas de cada centro. Compara los valores; la inclinación depende de la escala. La administradora confirma la condición al preparar su plan. <Link className="operations-link" href="/dashboard/reunion-semanal">Preparar la reunión semanal</Link></p>
