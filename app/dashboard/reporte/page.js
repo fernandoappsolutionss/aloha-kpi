@@ -6,9 +6,10 @@ import PeriodSelector from '../../../components/PeriodSelector'
 import TableScroller from '../../../components/TableScroller'
 import OperationalCard from '../../../components/OperationalCard'
 import { getCentrosKpi } from '../../actions/dashboard'
+import { promedioDisciplina, porcentajeDisciplina } from '../../../lib/panel-metricas.mjs'
 import { getCurrentPeriod, readStoredPeriod, writeStoredPeriod, periodLabel } from '../../../lib/period'
 
-const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+const cumplColor = (v) => v == null ? 'var(--text-dim)' : v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 
 export default function ReportePage() {
   const [centros, setCentros] = useState([])
@@ -30,11 +31,12 @@ export default function ReportePage() {
   }, [period])
 
   const tot = centros.reduce((a, c) => ({ ninos: a.ninos + c.ninos, nuevos: a.nuevos + c.nuevos, desercion: a.desercion + c.desercion }), { ninos: 0, nuevos: 0, desercion: 0 })
-  const promCumpl = centros.length ? Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / centros.length) : 0
+  const disciplina = promedioDisciplina(centros)
+  const promCumpl = disciplina.valor
 
   function exportCSV() {
     const rows = [['Centro','Niños Activos','Nuevos Ingresos','Deserción','Estado','Crecimiento niños/mes','% Disciplina'],
-      ...centros.map(c=>[c.nombre,c.ninos,c.nuevos,c.desercion,c.semaforo?.estado||'—',c.netMensual??'sin dato',c.cumpl+'%']),
+      ...centros.map(c=>[c.nombre,c.ninos,c.nuevos,c.desercion,c.semaforo?.estado||'—',c.netMensual??'sin dato',porcentajeDisciplina(c.cumpl)]),
       ['TOTAL',tot.ninos,tot.nuevos,tot.desercion,'']
     ]
     const csv = rows.map(r=>r.join(',')).join('\n')
@@ -71,11 +73,12 @@ export default function ReportePage() {
         ) : (
           <>
             <div className="responsive-grid operations-grid--four">
-              {[{l:'Total niños activos',v:tot.ninos.toLocaleString()},{l:'Nuevos ingresos',v:tot.nuevos,color:'var(--ts-green)'},{l:'Deserción total',v:tot.desercion},{l:'Prom. disciplina',v:promCumpl+'%',color:cumplColor(promCumpl)}]
+              {[{l:'Total niños activos',v:tot.ninos.toLocaleString()},{l:'Nuevos ingresos',v:tot.nuevos,color:'var(--ts-green)'},{l:'Deserción total',v:tot.desercion},{l:'Prom. disciplina',v:porcentajeDisciplina(promCumpl),color:cumplColor(promCumpl),sub:`${disciplina.conDatos}/${disciplina.total} centros con datos`}]
                 .map((m,i)=>(
                   <div key={i} className="kpi" style={{ animationDelay: `${i * 0.06}s`, ['--accent']: m.color || 'var(--ts-green)' }}>
                     <div className="kpi__top"><span className="label">{m.l}</span></div>
                     <div className="kpi__value" style={m.color ? { color: m.color } : undefined}>{m.v}</div>
+                    {m.sub && <div className="kpi__sub">{m.sub}</div>}
                   </div>
                 ))}
             </div>
@@ -112,8 +115,8 @@ export default function ReportePage() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{c.cumpl}%</span>
-                            <div className="bar"><div className="bar__fill" style={{ width: c.cumpl+'%', background: cumplColor(c.cumpl) }}/></div>
+                            <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{porcentajeDisciplina(c.cumpl)}</span>
+                            {c.cumpl != null && <div className="bar"><div className="bar__fill" style={{ width: porcentajeDisciplina(c.cumpl), background: cumplColor(c.cumpl) }}/></div>}
                           </div>
                         </td>
                       </tr>
@@ -128,7 +131,7 @@ export default function ReportePage() {
                         <td className="num" style={{ fontWeight: 700, color: 'var(--text)' }}>
                           {centros.filter(c => c.semaforo?.color === 'rojo').length} en rojo
                         </td>
-                        <td className="num" style={{ fontWeight: 700, color: 'var(--ts-green)' }}>{promCumpl}%</td>
+                        <td className="num" style={{ fontWeight: 700, color: 'var(--ts-green)' }}>{porcentajeDisciplina(promCumpl)}</td>
                       </tr>
                     )}
                   </tbody>
@@ -140,11 +143,11 @@ export default function ReportePage() {
                   fields={[
                     { label: 'Niños activos', value: c.ninos }, { label: 'Nuevos ingresos', value: c.nuevos },
                     { label: 'Meta', value: c.nuevos >= c.meta ? 'Meta cumplida' : 'No cumplida' },
-                    { label: 'Deserción', value: c.desercion }, { label: 'Estado', value: c.semaforo?.estado || '—' }, { label: 'Disciplina', value: `${c.cumpl}%` },
+                    { label: 'Deserción', value: c.desercion }, { label: 'Estado', value: c.semaforo?.estado || '—' }, { label: 'Disciplina', value: porcentajeDisciplina(c.cumpl) },
                   ]} />)}
                 {centros.length > 0 ? <OperationalCard headingLevel={3} title="TOTALES" fields={[
                   { label: 'Niños activos', value: tot.ninos }, { label: 'Nuevos ingresos', value: tot.nuevos },
-                  { label: 'Deserción', value: tot.desercion }, { label: 'Disciplina promedio', value: `${promCumpl}%` },
+                  { label: 'Deserción', value: tot.desercion }, { label: 'Disciplina promedio', value: porcentajeDisciplina(promCumpl) },
                 ]} /> : <p>No hay centros para este período.</p>}
               </div>
             </div>
