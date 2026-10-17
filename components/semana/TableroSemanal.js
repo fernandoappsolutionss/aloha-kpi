@@ -9,6 +9,7 @@ import ArranqueSemanal from './ArranqueSemanal'
 import GraficaResumenSemanal from './GraficaResumenSemanal'
 import ResumenClasesPrueba from './ResumenClasesPrueba'
 import TotalesClasesPrueba from './TotalesClasesPrueba'
+import FacturasVencidas from './FacturasVencidas'
 import { comparacionCierres, coberturaResumen } from '../../lib/resumen-tablero-semanal.mjs'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
@@ -93,10 +94,7 @@ export default function TableroSemanal() {
               <td><Link className="operations-link" href="/dashboard/ranking">{centro.cuotasCumplidas == null ? 'Sin evaluar' : `${centro.cuotasCumplidas}%`}</Link></td>
               <td>{mostrarActual(centro, 'nuevos_inscritos')}</td>
               <td>{mostrarActual(centro, 'retiros')}</td>
-              <td>{mostrarActual(centro, 'facturas_vencidas')}
-                {centro.cobranza?.detalle?.fecha && <div className="h-sub">Último conteo: {fecha(centro.cobranza.detalle.fecha)}</div>}
-                {centro.cobranza?.detalle?.anterior && <div className="h-sub">Dato anterior · pendiente de actualización</div>}
-              </td>
+              <td><FacturasVencidas centro={centro} sinDato={mostrarActual(centro, 'facturas_vencidas')} /></td>
               <td><ResumenClasesPrueba datos={centro.clasesPrueba} centroId={centro.id} centroNombre={centro.nombre} /></td>
             </tr>)}
               {!datos.centros.length && <tr><td colSpan={11}>No hay centros en tu alcance.</td></tr>}
