@@ -16,13 +16,7 @@
 // componente le pasa el payload que ya tiene a la función pura.
 import { requireCentroAccess } from '../../lib/auth'
 import { sql } from '../../lib/db'
-import { iniciosClase, INICIOS_CLASE_DESDE_FECHA } from '../../lib/inicios-clase.mjs'
-
-// Mismos estados que descarta lib/growth/source.mjs para la población
-// elegible: un niño colgado de un grupo cerrado o fusionado no es una fecha que
-// falte, es una ficha que hay que reasignar (y esa sí la reporta el motor con
-// su propia issue).
-const GRUPOS_BLOQUEADOS = new Set(['cerrado', 'fusionado'])
+import { buildGrowthRoster } from '../../lib/growth/roster.mjs'
 
 const iso10 = (valor) => {
   if (!valor) return null
@@ -54,23 +48,11 @@ export async function getHigienePendientes(centroId) {
     sql`SELECT year, month, estado FROM mes_kpi WHERE centro_id = ${id}`,
   ])
 
-  // El inicio operativo se calcula con el MISMO helper que usa el motor
-  // (lib/inicios-clase.mjs): quien no aparece en su salida es exactamente
-  // quien el motor cuenta como "sin fecha". Reimplementar la regla aquí sería
-  // la forma más rápida de que la alerta pida cargar algo que ya está cargado.
-  const conInicio = new Set(iniciosClase(estudiantes, grupos, eventos).map((fila) => String(fila.estudianteId)))
+  // Motor y lista de pendientes comparten la misma elegibilidad y presencia.
+  const roster = buildGrowthRoster({ students: estudiantes, groups: grupos, events: eventos })
   const gruposPorId = new Map(grupos.map((grupo) => [String(grupo.id), grupo]))
 
-  const alumnosSinInicio = estudiantes
-    .filter((alumno) => {
-      if (conInicio.has(String(alumno.id))) return false
-      const grupo = alumno.grupo_id == null ? null : gruposPorId.get(String(alumno.grupo_id))
-      if (grupo && GRUPOS_BLOQUEADOS.has(grupo.estado)) return false
-      // Mismo corte del motor: sólo las fichas creadas desde que existe el
-      // registro de inicios de clase. Antes de esa fecha no había dónde
-      // cargarlo y pedirlo sería reclamar por un dato que nunca se pidió.
-      return (iso10(alumno.created_at) || '') >= INICIOS_CLASE_DESDE_FECHA
-    })
+  const alumnosSinInicio = roster.undatedStudents
     .map((alumno) => ({
       id: alumno.id,
       nombre: alumno.nombre,

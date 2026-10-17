@@ -25,7 +25,7 @@ const growth = ({ confidence = {}, window: ventana = {}, issues = [], months = [
 })
 
 const claves = (resultado) => resultado.puntos.map((punto) => punto.clave)
-const punto = (resultado, clave) => resultado.puntos.find((item) => item.clave === clave)
+const punto = (resultado, clave) => [...resultado.puntos, ...resultado.antecedentes].find((item) => item.clave === clave)
 
 test('enrollment warning distinguishes individual linkage from the monthly acquisition channel', () => {
   const resultado = higieneDeDatos({ centroId: 6, growth: growth({ issues: [{
@@ -49,14 +49,14 @@ test('un centro con todo cargado no dibuja nada', () => {
   assert.match(resultado.cierre, /completos para proyectar/)
 })
 
-test('sin payload del motor todavía se reclama lo que se puede ver en la base', () => {
+test('sin payload del motor se conservan los antecedentes consultables', () => {
   const resultado = higieneDeDatos({
     growth: null,
     centroId: 10,
     gruposSinFecha: [{ id: 1, numero: '4' }],
   })
-  assert.equal(resultado.hay, true)
-  assert.deepEqual(claves(resultado), ['grupos-sin-fecha'])
+  assert.equal(resultado.hay, false)
+  assert.deepEqual(resultado.antecedentes.map(p => p.clave), ['grupos-sin-fecha'])
   assert.equal(resultado.confianza.techo, 'high', 'sin issue de capacidad no se puede afirmar el techo medio')
 })
 
@@ -104,7 +104,6 @@ test('lo que bloquea va primero, y dentro de eso lo más corto', () => {
     'issue:stock_balance',       // bloquea, 2 mensajes
     'alumnos-sin-inicio',        // 10 puntos
     'cierres',                   // 7 puntos
-    'grupos-sin-fecha',          // preventivo, 0 puntos
     'capacidad',                 // de Dirección: siempre al final
   ])
   assert.equal(resultado.bloqueantes, 2)
@@ -209,7 +208,7 @@ test('el resumen accesible cuenta lo que hay sin depender del color', () => {
     growth: growth({ issues: [{ code: 'invalid_funnel', severity: 'error', message: 'embudo imposible.' }] }),
     gruposSinFecha: [{ id: 1, numero: '9' }],
   })
-  assert.equal(resultado.resumen, 'Higiene de datos: 2 puntos por cargar en este centro, de los cuales 1 mantiene la confianza en baja.')
+  assert.equal(resultado.resumen, 'Higiene de datos: 1 punto por cargar en este centro, de los cuales 1 mantiene la confianza en baja.')
 })
 
 test('los tres detectores de continuidad son UN punto, no tres tarjetas', () => {
@@ -270,7 +269,7 @@ test('CONDADO: cuando nada baja la confianza, no se promete recuperar cero', () 
   })
   assert.equal(resultado.bloqueantes, 0)
   assert.equal(resultado.recuperable, 0)
-  assert.equal(resultado.cierre, 'Nada de esto baja la confianza hoy: son los datos que evitan que vuelva a bajar el mes que viene.')
+  assert.equal(resultado.cierre, 'Los datos de este centro están completos para proyectar.')
   assert.equal(resultado.confianza.texto, 'MEDIA')
 })
 
@@ -361,7 +360,7 @@ test('cuando sólo queda trabajo de Dirección, la sección se calma y no se con
   assert.equal(resultado.cierre, 'Lo que queda no lo resuelve el centro.')
   assert.equal(resultado.confianza.techo, 'medium')
 
-  // Con trabajo del centro pendiente NO se calma: ahí sí hay algo que hacer.
+  // Una apertura histórica faltante queda aparte; no cambia el estado actual.
   const conPendiente = higieneDeDatos({
     centroId: 6,
     gruposSinFecha: [{ id: 1, numero: '4' }],
@@ -369,8 +368,9 @@ test('cuando sólo queda trabajo de Dirección, la sección se calma y no se con
       issues: [{ code: 'capacity_unverified', severity: 'warning', message: 'capacidad sin verificar.' }],
     }),
   })
-  assert.equal(conPendiente.soloDireccion, false)
-  assert.match(conPendiente.resumen, /^Higiene de datos: 1 punto por cargar en este centro\.$/)
+  assert.equal(conPendiente.soloDireccion, true)
+  assert.equal(conPendiente.antecedentes.length, 1)
+  assert.match(conPendiente.resumen, /1 punto depende de Dirección/)
   // Y sin nada de nada, ni siquiera capacidad, tampoco es "soloDireccion".
   assert.equal(higieneDeDatos({ growth: growth(), centroId: 6 }).soloDireccion, false)
 })
