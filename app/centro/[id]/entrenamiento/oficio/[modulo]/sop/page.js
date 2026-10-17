@@ -13,7 +13,7 @@ import { derivarSop } from '../../../../../../../components/entrenamiento/sop-de
 import { getCentroNombre } from '../../../../../../actions/centros'
 import { cargarOficio } from '../../../../../../actions/entrenamiento-oficio'
 import { CURSOS, MODULOS_OFICIO, moduloOficio } from '../../../../../../../lib/entrenamiento/oficio/catalogo'
-import { rolesQueFirma, esDelPlan, alcanzaCentro, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../../../lib/entrenamiento/oficio/progreso'
+import { rolesQueFirma, esDelPlan, alcanzaCentro, nombreDeRol, esDePapel, rolesDelPapel, puedeImprimirPapel, gradienteAbierto, estudiado } from '../../../../../../../lib/entrenamiento/oficio/progreso'
 import { puertaCerrada } from '../../../../../../../lib/entrenamiento/oficio/guia-pasos'
 
 // Mismo permiso que el módulo: quien lo estudia y quien lo FIRMA. La
@@ -100,8 +100,9 @@ export default async function SopPage({ params, searchParams }) {
   // contenido. Sin esta guarda, el orden se salta escribiendo /sop en la barra
   // de direcciones. `esMio` ya significa "está en mi plan" y ningún ?revisar= lo
   // apaga, que es justo el hueco por el que se colaba el módulo compartido.
-  if (puertaCerrada(!papel && esMio, gradienteAbierto(m, progreso), progreso[m.id])) {
-    const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
+  if (puertaCerrada(!papel && esMio, gradienteAbierto(m, progreso, rol), progreso[m.id])) {
+    const pendiente = [...(m.requiere || []), ...(m.requierePorRol?.[rol] || [])].find((id) => !estudiado(progreso[id]))
+    const anterior = pendiente ? moduloOficio(pendiente) : null
     return shell('bloqueado', <>
       <Link className="tour-card__link" href={base}>← Volver a mi puesto</Link>
       <div className="main__head"><div>

@@ -300,7 +300,7 @@ export async function guardarConcepto(modulo, slug, texto) {
     return await withTransaction(async (query) => {
       await bloquearOficio(query, u.id)
       const previo = await progresoDeUsuario(u.id, query)
-      if (!gradienteAbierto(m, previo)) {
+      if (!gradienteAbierto(m, previo, u.rol)) {
         return { error: 'Antes de guardar conceptos de este módulo tienes que estudiar el anterior.' }
       }
       await query`SELECT pg_advisory_xact_lock(hashtext('conceptos:' || ${u.id} || ':' || ${modulo}))`
@@ -348,7 +348,7 @@ export async function marcarEstudiado(modulo) {
       // tildar la masa del último módulo el primer día y dejar checks verdes
       // fuera de orden que contradicen esa promesa.
       const previo = await progresoDeUsuario(u.id, query)
-      if (!gradienteAbierto(m, previo)) {
+      if (!gradienteAbierto(m, previo, u.rol)) {
         return { error: 'Antes de marcar este módulo tienes que estudiar el anterior.' }
       }
       if (previo[modulo]?.tourVistoAt) return { ok: true }
@@ -396,7 +396,7 @@ export async function responderQuizOficio(modulo, respuestas) {
       // hay un camino legítimo que la cruza —quien ya marcó el módulo puede releerlo
       // aunque su anterior deje de estar estudiado— y ahí el quiz sí se rechaza.
       const progreso = await progresoDeUsuario(u.id, query)
-      if (!gradienteAbierto(m, progreso)) {
+      if (!gradienteAbierto(m, progreso, u.rol)) {
         return { error: 'Antes de responder este módulo tienes que estudiar el anterior.' }
       }
       if (!progreso[modulo]?.tourVistoAt) {
@@ -475,7 +475,7 @@ export async function firmarDrill(usuarioId, modulo) {
       // del propio firmante y la puerta se lo cierra, no puede firmarlo: la cola
       // ya no le manda la maniobra, pero esta action es pública.
       const mio = await progresoDeUsuario(firmante.id, query)
-      if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio), mio[modulo])) {
+      if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio, firmante.rol), mio[modulo])) {
         return { error: 'Ese módulo también es de tu puesto y todavía no lo has estudiado: estúdialo antes de tomárselo, o que se la tome el jefe entrenador de esa persona.' }
       }
       await query`
@@ -557,8 +557,9 @@ export async function colaFirmas(centroId = null) {
           const desde = r.quiz_aprobado_at ? new Date(r.quiz_aprobado_at) : null
           // ¿Este módulo está en MI plan y todavía no lo he estudiado? Misma
           // regla y mismos datos que la puerta de la página del módulo.
-          const cerradoParaMi = puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, suyo), suyo[m.id])
-          const meFalta = cerradoParaMi && (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
+          const cerradoParaMi = puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, suyo, firmante.rol), suyo[m.id])
+          const pendiente = [...(m.requiere || []), ...(m.requierePorRol?.[firmante.rol] || [])].find((id) => !estudiado(suyo[id]))
+          const meFalta = cerradoParaMi && pendiente ? moduloOficio(pendiente) : null
           return {
             id: m.id,
             titulo: m.titulo,

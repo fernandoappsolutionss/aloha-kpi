@@ -9,7 +9,7 @@ import { modeloGrafica } from '../lib/grafica-semanal.mjs'
 import { GLOSARIO } from '../lib/entrenamiento/oficio/glosario.js'
 import { GUIA } from '../lib/entrenamiento/oficio/guia.js'
 
-const nuevos = MODULOS_OFICIO.filter((m) => m.curso === 'semana')
+const nuevos = MODULOS_OFICIO.filter((m) => ['of-sem-1', 'of-sem-2', 'of-sem-adm', 'of-sem-asi', 'of-sem-coa', 'of-sem-cop'].includes(m.id))
 const roles = { administradora: 'adm', asistente: 'asi', coach: 'coa', coordinador: 'cop' }
 const firma = { tourVistoAt: '2026-09-01', quizAprobadoAt: '2026-09-01', drillFirmadoAt: '2026-09-02' }
 const lee = (ruta) => readFileSync(new URL(`../${ruta}`, import.meta.url), 'utf8')
@@ -19,12 +19,12 @@ test('la actualización tiene seis IDs: dos comunes y una práctica de cada pues
   assert.deepEqual(CURSOS.semana.roles.slice().sort(), Object.keys(roles).sort())
   for (const [rol, sufijo] of Object.entries(roles)) {
     const plan = planDeRol(rol, MODULOS_OFICIO, 10)
-    assert.deepEqual(plan.filter((m) => m.curso === 'semana').map((m) => m.id), ['of-sem-1', 'of-sem-2', `of-sem-${sufijo}`])
+    assert.deepEqual(plan.filter((m) => m.curso === 'semana').map((m) => m.id), ['of-sem-1', 'of-sem-2', `of-sem-${sufijo}`, 'of-sem-3', ...(['administradora', 'coordinador'].includes(rol) ? ['of-sem-4', 'of-sem-5', 'of-sem-6'] : [])])
     const previo = plan.filter((m) => m.curso !== 'semana')
     const progreso = Object.fromEntries(previo.map((m) => [m.id, { ...firma }]))
     const copia = structuredClone(progreso)
     assert.equal(avanceOficio(previo, progreso).pctHat, 100)
-    assert.equal(avanceOficio(plan, progreso).total - avanceOficio(plan, progreso).hatted, 3)
+    assert.equal(avanceOficio(plan, progreso).total - avanceOficio(plan, progreso).hatted, ['administradora', 'coordinador'].includes(rol) ? 7 : 4)
     assert.equal(siguienteOficio(plan, progreso).id, 'of-sem-1')
     assert.equal(gradienteAbierto(nuevos[0], progreso), true)
     assert.equal(gradienteAbierto(nuevos[1], progreso), false)

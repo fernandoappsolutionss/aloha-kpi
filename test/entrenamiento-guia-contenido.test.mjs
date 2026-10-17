@@ -247,7 +247,7 @@ test('guía hablada: el cierre manda maniobra cuando toca y deriva el siguiente 
     }
     const titulos = siguientes.get(m.id) || new Set()
     if (titulos.size > 1) {
-      for (const titulo of titulos) {
+      for (const titulo of [...titulos].filter(Boolean)) {
         const esperado = tituloParaAudio(titulo).slice(0, 18)
         assert.equal(cierreNormalizado.includes(esperado), false, `${m.id}: cierre escoge un siguiente de un solo rol ("${titulo}")`)
       }

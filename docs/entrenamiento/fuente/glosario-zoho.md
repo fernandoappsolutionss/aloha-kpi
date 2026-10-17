@@ -283,13 +283,11 @@ Es el bloque de niveles que el niño contrata y cursa. El catálogo tiene un art
 
 ### Primer ciclo
 
-Es el ciclo de entrada al programa, el del niño nuevo. Su matrícula es la más completa porque incluye el kit inicial entero.
+**Qué es.** En el Programa, es el 1er Ciclo o Ciclo Básico: niveles 1 y 2, donde se terminan de ver las 34 fórmulas del Programa ALOHA. En Zoho, "1er ciclo Matrícula" también aparece como nombre de artículo de entrada para un niño nuevo; ahí hay que leer el número de niveles del artículo.
 
-**Ejemplo:** El artículo «1er ciclo Matricula Kinder Calle 50 2 nivles» incluye suéter, ábaco, libro de clases, lápiz y mochila.
+**Ejemplo.** El artículo "1er ciclo Matricula Kinder Calle 50 2 nivles" incluye suéter, ábaco, libro de clases, lápiz y mochila.
 
-**No lo confundas con:** el **Ciclo 1** del Programa. «1er ciclo» es el nombre del artículo de matrícula del niño nuevo, y trae 1, 2 o 3 niveles según lo que contrató; el Ciclo 1 son siempre los niveles 1 al 4 del itinerario.
-
-**Ojo:** Cada matrícula de primer ciclo facturada debe corresponder a un niño nuevo del mes y a un kit pedido. Los tres números se cuadran al cierre.
+**No lo confundas con.** la etiqueta de facturación. "1er ciclo" en un artículo de Zoho nombra la matrícula del niño nuevo; el Manual pedagógico nombra el Ciclo Básico de niveles 1 y 2.
 
 ### Nivel
 

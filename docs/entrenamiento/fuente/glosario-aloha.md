@@ -285,19 +285,19 @@ cambio, no un descuido.
 
 ### Ciclo
 
-**Qué es.** Una de las dos etapas en que está dividido cada itinerario del Programa. Ciclo 1: los niveles 1 al 4, igual en Tiny Tots y en Kids; ahí el niño aprende los fundamentos del cálculo con ábaco y de la aritmética mental. Ciclo 2: los niveles 5 al 10 en Tiny Tots y los niveles 5 al 8 en Kids; ahí se potencia la aritmética mental y se busca la estimulación máxima de las capacidades intelectuales. Por eso Tiny Tots tiene 10 niveles en total y Kids tiene 8. Fuente: la web oficial de la empresa, alohapanama.com/program.
+**Qué es.** La unidad pedagógica del Programa ALOHA. Según el Manual vigente, cada ciclo está comprendido por 2 niveles. El 1er Ciclo del Programa, llamado Ciclo Básico, cubre los niveles 1 y 2 y completa las 34 fórmulas del Programa. El Programa Básico comprende 2 ciclos, es decir, 4 niveles. El Programa PRO comprende 2 ciclos en Kids y 3 ciclos en Tiny Tots.
 
-**Ejemplo.** Un niño de Kids que va en el nivel 6 está en el Ciclo 2 y le faltan dos niveles para terminar su itinerario; uno de Tiny Tots en el nivel 6 también está en el Ciclo 2, pero le faltan cuatro.
+**Ejemplo.** Cuando un padre pregunta por el Ciclo Básico, la respuesta del Manual es concreta: niveles 1 y 2, donde se terminan de ver las 34 fórmulas.
 
-**No lo confundas con** el **ciclo de matrícula**: el Ciclo 1 y el Ciclo 2 son etapas del aprendizaje y no cambian nunca; el ciclo de matrícula es el paquete de niveles que el padre pagó, y puede ser de 1, 2 o 3 niveles según lo que contrató (el Manual describe el caso de dos).
+**No lo confundas con.** el **ciclo de matrícula** o el nombre del artículo de Zoho: el ciclo del Programa describe aprendizaje; el artículo de matrícula describe lo que se le factura a ese padre.
 
 ### Ciclo de matrícula
 
-**Qué es.** El paquete de niveles que el representante compra y que su matrícula cubre. El Manual describe el caso normal: una matrícula anual que comprende 2 niveles, de unos 5 meses cada uno (19 a 22 semanas de clases). De ahí sale la regla del calendario: dentro del ciclo de matrícula no se deja semana de vacaciones, y al terminarlo y pasar al siguiente sí se deja una. En el catálogo de Zoho el paquete no siempre son dos niveles: hay artículos de "1er ciclo Matrícula" de 1, 2 y 3 niveles, y las matrículas se numeran por ciclo (1er ciclo, 2do Ciclo, 3er Ciclo, 4to, 5to y Ciclo Especial), según lo que se le vendió al padre.
+**Qué es.** El paquete de niveles que el representante compra y que su matrícula cubre. El Manual describe ciclos de 2 niveles; en Zoho existen artículos reales que nombran "1er ciclo Matrícula" y especifican 1, 2 o 3 niveles. Se factura el artículo autorizado que corresponde a lo contratado, sin reinterpretarlo a mano.
 
-**Ejemplo.** No hay vacaciones entre el nivel 1 y el 2 del mismo ciclo de matrícula; al cerrar el 2 y pasar al 3 sí se programa una semana libre. Y antes de facturar, confirma cuántos niveles contrató: el artículo de 2 niveles y el de 3 se ven casi iguales en la lista y tienen precios distintos.
+**Ejemplo.** No hay vacaciones entre el nivel 1 y el 2 del mismo bloque de calendario; al cerrar el 2 y pasar al 3 sí se programa una semana libre. Antes de facturar, lee el artículo completo: el de 2 niveles y el de 3 se ven casi iguales en la lista y tienen precios distintos.
 
-**No lo confundas con** el **Ciclo** del Programa: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 va del 5 al 10 en Tiny Tots y del 5 al 8 en Kids, en todos los niños por igual. El ciclo de matrícula es lo que este padre pagó, y puede ser de 1, 2 o 3 niveles.
+**No lo confundas con.** el **Ciclo** del Programa: el Manual define cada ciclo pedagógico como 2 niveles, y el Programa PRO tiene distinta cantidad de ciclos según el itinerario. El ciclo de matrícula es lo que este padre pagó y lo que Zoho permite facturar.
 
 ### Cierre de nivel
 
@@ -821,11 +821,11 @@ cambio, no un descuido.
 
 ### Itinerario
 
-**Qué es.** La ruta que sigue un niño dentro del programa según su edad. Hay tres: Kinder, Tiny Tots y Kids. El itinerario define qué libros, qué kit y cuántos niveles le corresponden: Tiny Tots tiene 10 niveles y Kids tiene 8, y los dos están divididos en Ciclo 1 (niveles 1 al 4) y Ciclo 2 (del 5 al 10 en Tiny Tots, del 5 al 8 en Kids), según la web oficial de la empresa. Kinder es preescolar y no lleva esa numeración de ciclos.
+**Qué es.** La ruta que sigue un niño dentro del programa según su edad. Hay tres: Kinder Tiny Tots, Tiny Tots y Kids. El Manual ubica Kinder Tiny Tots en niños de 3 a 4 años; Tiny Tots tiene 10 niveles, Kids tiene 8, el Programa Básico cubre 4 niveles y el Programa PRO comprende 2 ciclos en Kids y 3 ciclos en Tiny Tots.
 
 **Ejemplo.** En toda constancia escolar hay que escribir el itinerario asignado (Kinder / Tiny / Kids) y el nivel actual del estudiante.
 
-**No lo confundas con** el **nivel**: el itinerario es el camino completo, el nivel es el escalón en el que va el niño hoy.
+**No lo confundas con.** el **nivel**: el itinerario es el camino completo, el nivel es el escalón en el que va el niño hoy.
 
 ## J
 
@@ -849,19 +849,19 @@ cambio, no un descuido.
 
 ### Kids
 
-**Qué es.** El itinerario de los niños más grandes, de 8 a 13 años. Tiene 8 niveles, repartidos en dos ciclos: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 los niveles 5 al 8 (fuente: la web oficial de la empresa, alohapanama.com/program). Un grupo Kids solo admite niños nuevos hasta la semana 2 del libro, así que la ventana para inscribir es mucho más corta que en Tiny. El mínimo de apertura del Manual se escribe en una sola regla para los dos itinerarios: una cifra para el nivel 1 y otra para los niveles 2 al 10.
+**Qué es.** El itinerario de los niños más grandes, de 8 a 13 años. Tiene 8 niveles: los 4 del Programa Básico y 4 niveles de PRO, organizados como 2 ciclos en la etapa PRO según el Manual. Un grupo Kids solo admite niños nuevos hasta la semana 2 del libro, así que la ventana para inscribir es mucho más corta que en Tiny. El mínimo de apertura del Manual se escribe en una sola regla para los dos itinerarios: una cifra para el nivel 1 y otra para los niveles 2 al 10.
 
 **Ejemplo.** Todo niño que se gradúa de Tiny Tots 10 y quiere seguir entra en Kids nivel 5; no empieza en Kids 1.
 
-**No lo confundas con** **Tiny Tots**: Kids trabaja además el cálculo con las manos y avanza más rápido; los contenidos no son equivalentes nivel por nivel.
+**No lo confundas con.** **Tiny Tots**: Kids trabaja además el cálculo con las manos y avanza más rápido; los contenidos no son equivalentes nivel por nivel.
 
 ### Kinder
 
-**Qué es.** El itinerario de los más pequeñitos, alrededor de los 4 años; el Manual lo llama Kinder Tiny Tots y prepara al niño para entrar después a Tiny Tots. Cuántos niveles tiene no está fijado: el Manual solo menciona la existencia de un "Kinder 3", y la web oficial divide en Ciclo 1 y Ciclo 2 los itinerarios Tiny Tots y Kids, pero a Kinder no le asigna esa numeración. Así que no le atribuyas un Ciclo 1 ni un Ciclo 2, y confirma el número de niveles con el corporativo antes de usarlo con un padre.
+**Qué es.** El itinerario de los más pequeñitos; el Manual lo llama Kinder Tiny Tots y lo dirige a niños de 3 a 4 años en edad preescolar. Prepara al alumno para obtener los beneficios de ALOHA Tiny Tots, con tres herramientas clave: ábaco, inteligencias múltiples y matemáticas.
 
 **Ejemplo.** Los grupos Kinder van normalmente martes y jueves en el bloque de la tarde temprano, nunca en sábado ni en horario caliente.
 
-**No lo confundas con** **Tiny Tots**: un niño de 4 años y medio con habilidades sólidas puede entrar directo a Tiny 1 en lugar de Kinder 3, pero eso es un caso especial de ingreso y lo aprueba el corporativo.
+**No lo confundas con.** **Tiny Tots**: un niño de 4 años y medio con habilidades sólidas puede entrar directo a Tiny 1 en lugar de Kinder 3, pero eso es un caso especial de ingreso y lo aprueba el corporativo.
 
 ### Kit
 
@@ -955,11 +955,11 @@ cambio, no un descuido.
 
 ### Matrícula
 
-**Qué es.** El pago anual de inscripción, que cubre el ciclo de matrícula contratado —el Manual describe dos niveles y el catálogo de Zoho vende artículos de 1, 2 y 3— e incluye seguro estudiantil, mochila, suéter, ábaco, lápiz y los libros de esos niveles.
+**Qué es.** El pago anual de inscripción, que cubre el ciclo de matrícula contratado e incluye seguro estudiantil, mochila, suéter, ábaco, lápiz y los libros de esos niveles. El Manual describe ciclos de 2 niveles; el catálogo de Zoho conserva artículos operativos de 1, 2 y 3 niveles que se facturan según lo vendido.
 
 **Ejemplo.** La matrícula se paga una vez al año; reponer un material perdido tiene costo adicional.
 
-**No lo confundas con** la **mensualidad**: la matrícula se paga una vez y trae los materiales; la mensualidad se paga todos los meses y paga las clases.
+**No lo confundas con.** la **mensualidad**: la matrícula se paga una vez y trae los materiales; la mensualidad se paga todos los meses y paga las clases.
 
 ### Memorando
 
@@ -1003,11 +1003,11 @@ cambio, no un descuido.
 
 ### Nivel
 
-**Qué es.** Cada tramo del programa. Dura unos 5 meses (entre 19 y 22 semanas de clases), tiene su propio libro y termina con examen y cierre de nivel.
+**Qué es.** Cada tramo del programa. Dura unos 5 meses (entre 19 y 22 semanas de clases), tiene valor de referencia B/.600,00 en el Manual, se divide en 5 mensualidades, tiene su propio libro y termina con examen y cierre de nivel.
 
 **Ejemplo.** El calendario del grupo se arma de modo que el nivel siguiente arranque el mismo mes en que termina el actual, para no cortarle el flujo de caja al centro.
 
-**No lo confundas con** el **ciclo de matrícula**, que son los niveles que el padre pagó de una vez (dos, según el Manual), ni con el **Ciclo** del Programa, que es la etapa del aprendizaje: Ciclo 1 los niveles 1 al 4, Ciclo 2 del 5 al 10 en Tiny Tots y del 5 al 8 en Kids.
+**No lo confundas con.** el **ciclo de matrícula**, que son los niveles que el padre pagó de una vez, ni con el **Ciclo** del Programa, que el Manual define como una unidad de 2 niveles.
 
 ### Nivel del centro
 
@@ -1189,7 +1189,7 @@ cambio, no un descuido.
 
 **Qué es.** La empresa externa que le vende bienes o servicios al centro (mantenimiento, mobiliario, suministros). Están preestablecidos, y el criterio del centro debe ser de prevención, no de corrección.
 
-**Ejemplo.** Antes de contratar se comparan al menos tres proveedores por precio, garantía y calidad, y se deja la observación de cuál se recomienda y por qué.
+**Ejemplo.** Si no hay proveedor establecido para un trabajo adicional, se comparan tres proveedores por precio, garantía y calidad, y se deja la observación de cuál se recomienda y por qué.
 
 ### Proyección de necesidades
 
@@ -1349,7 +1349,7 @@ cambio, no un descuido.
 
 ### Tienda ALOHA
 
-**Qué es.** La tienda de premios del centro, la tiendita. Se abre una vez por nivel, en el segundo Mental Day, y los niños compran con sus ALOHA Dólares.
+**Qué es.** La tienda de premios del centro, la tiendita. La regla operativa enseñada sigue siendo una vez por nivel, en el segundo Mental Day, y los niños compran con sus ALOHA Dólares. El Manual vigente tiene una contradicción interna sobre la frecuencia; hasta que la Junta Directiva la resuelva, no se cambia la regla operativa por cuenta propia.
 
 **Ejemplo.** El presupuesto para surtirla depende del nivel del centro: B/.100 en centro nivel 0, B/.130 en nivel 1 y B/.160 en nivel 2, cada dos meses.
 
@@ -1357,11 +1357,11 @@ cambio, no un descuido.
 
 ### Tiny Tots
 
-**Qué es.** El itinerario de los niños pequeños, de 5 a 7 años. Tiene 10 niveles y va del 1 al 10, repartidos en dos ciclos: el Ciclo 1 son los niveles 1 al 4 y el Ciclo 2 los niveles 5 al 10 (fuente: la web oficial de la empresa, alohapanama.com/program). El nivel 10 es la graduación. Un grupo Tiny puede recibir niños nuevos hasta la semana 4 del libro.
+**Qué es.** El itinerario de los niños pequeños, de 5 a 7 años. Tiene 10 niveles: los 4 del Programa Básico y 6 niveles de PRO, organizados como 3 ciclos en la etapa PRO según el Manual. Un grupo Tiny puede recibir niños nuevos hasta la semana 4 del libro.
 
 **Ejemplo.** El grupo BG-T-03 está en Tiny nivel 6, o sea que le faltan cuatro niveles para graduarse.
 
-**No lo confundas con** **Kinder**: Kinder es la entrada de los más chiquitos; Tiny Tots es el itinerario largo, cuyo nivel 10 es la graduación.
+**No lo confundas con.** **Kinder**: Kinder es la entrada de los más chiquitos; Tiny Tots es el itinerario largo, cuyo nivel 10 es la graduación.
 
 ### Tolerancia
 
@@ -1456,7 +1456,7 @@ cambio, no un descuido.
 
 **Qué es.** Los objetivos para actuar durante la semana: fórmula de la condición, urgentes, pendientes, órdenes del coordinador y plan estratégico.
 
-**Ejemplo.** Antes del viernes a las 10:00, cada paso de la fórmula debe tener un objetivo con responsable y fecha.
+**Ejemplo.** Antes del viernes a las 10:00, cada paso de la fórmula debe tener un objetivo con responsable, fecha y evidencia esperada.
 
 ## Los pares que más se confunden
 
@@ -1502,3 +1502,86 @@ Repásalos antes de operar: casi todos los errores de un colaborador nuevo salen
    (y verifica que el filtro *Auto-enlace de glosario* esté activo en el sitio). Ahí es donde
    las palabras del curso empiezan a enlazarse solas: es la pieza que hace el trabajo.
 4. Colócalo como **primer recurso del curso**, antes del módulo 1. No es un anexo del final.
+
+
+## Planificación operativa ALOHA · ampliación 2026-10-17
+
+### Estrategia operativa
+
+**Qué es.** Dirección elegida para pasar de una situación comprobada al resultado buscado, respetando políticas y recursos. Sirve para decidir qué trabajo tiene prioridad.
+
+**Ejemplo.** Recuperar seguimiento comercial y asegurar entrega para pasar de 100 a 108 activos en cuatro semanas.
+
+**No lo confundas con.** una lista de tareas: la estrategia explica por qué se elige ese camino.
+
+### Programa operativo
+
+**Qué es.** Secuencia coordinada de acciones y proyectos para ejecutar una estrategia. Sirve para ordenar responsables, recursos y resultados parciales.
+
+**Ejemplo.** Recuperar entradas y continuidad: verificar capacidad, seguir oportunidades, realizar pruebas e inicios y revisar retención.
+
+**No lo confundas con.** el Programa académico ALOHA: aquí hablamos de organización del trabajo del centro.
+
+### Proyecto
+
+**Qué es.** Conjunto concreto de objetivos que produce una parte definida de un programa, con responsable y plazo. Sirve para convertir la dirección general en trabajo verificable.
+
+**Ejemplo.** Proyecto de la semana: conseguir diez asistentes y tres inscritos con inicio efectivo en cupos comprobados.
+
+**No lo confundas con.** la meta general: el proyecto organiza cómo producir una parte de ella.
+
+### Escena actual e ideal
+
+**Qué es.** La escena actual describe la situación observada con fuente y fecha; la ideal describe la situación que se necesita alcanzar. Compararlas permite definir la brecha de trabajo.
+
+**Ejemplo.** Actual: 100 activos al corte. Ideal: servicio continuo y capacidad para sostener 108 dentro de cuatro semanas.
+
+**No lo confundas con.** un deseo sin evidencia: la escena actual no se inventa para justificar un plan.
+
+### Dependencia
+
+**Qué es.** Recurso, decisión o resultado previo que una acción necesita para poder ejecutarse. Sirve para ordenar el plan y detectar bloqueos antes de comprometer fechas.
+
+**Ejemplo.** El inicio de tres niños depende de grupo, horario, coach y materiales disponibles.
+
+**No lo confundas con.** una excusa sin responsable: un bloqueo se registra con quién lo resuelve y cuándo.
+
+### Tipos de objetivo
+
+**Qué es.** Funciones distintas de los objetivos de un programa: mayor define el resultado, primario organiza, vital asegura lo indispensable, condicional verifica, operativo ordena una acción y de producción fija cantidad y plazo. Sirven para detectar qué falta en el plan.
+
+**Ejemplo.** Verificar tres cupos es condicional; confirmar una cita es operativo; lograr diez asistentes en la semana es de producción.
+
+**No lo confundas con.** seis nombres intercambiables: cada tipo resuelve una necesidad distinta.
+
+### Capacidad operativa
+
+**Qué es.** Cantidad de servicio que puede entregarse de verdad con los grupos, horarios, personas habilitadas y materiales disponibles en un período. Sirve para comprobar si una promesa es viable.
+
+**Ejemplo.** Hay dos cupos con coach y materiales esta semana; el tercer niño solo puede iniciar el 2 de noviembre.
+
+**No lo confundas con.** la cantidad que se quiere vender: una venta no crea por sí sola un cupo.
+
+### Alineamiento comercial
+
+**Qué es.** Relación verificable de oportunidades, contactos, citas, asistencias e inscripciones, con responsables y fechas por etapa. Sirve para planificar acciones y estimar resultados sin contar una etapa como otra.
+
+**Ejemplo.** De 26 oportunidades se ensayan 13 citas, diez asistentes y tres inscripciones; las tasas siguen siendo hipótesis hasta contrastarlas.
+
+**No lo confundas con.** efectivo recibido: una oportunidad o una venta no prueba un cobro.
+
+### Acta operativa
+
+**Qué es.** Registro de una reunión con datos consultados, decisiones, acciones, responsables, fechas, aprobaciones pendientes y verificadores. Sirve para que todos sepan qué se acordó y cómo se comprobará.
+
+**Ejemplo.** El acta del viernes deja tres cupos por preparar, Marta responsable, fecha 26-oct y Elena como verificadora.
+
+**No lo confundas con.** una aprobación automática: escribir una propuesta no cambia su estado en KPI.
+
+### Control diario
+
+**Qué es.** Revisión de acciones previstas al iniciar la jornada y de resultados, evidencia y bloqueos al terminarla. Sirve para corregir a tiempo y conservar el origen de pendientes.
+
+**Ejemplo.** Ana registra dos compromisos comprobados y uno bloqueado; Luis obtiene el soporte faltante al día siguiente.
+
+**No lo confundas con.** una automatización: este curso enseña la rutina, no programa mensajes ni recordatorios.
