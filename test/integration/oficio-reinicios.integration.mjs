@@ -207,3 +207,37 @@ test('puede estudiar, aprobar y recibir una firma nueva después del reinicio', 
   assert.equal(historial[0].firmados, 1)
   assert.equal(historial[1].estudiados, 2)
 })
+
+test('planificación: guarda y evalúa solo después de la práctica del rol; la firma previa se conserva', async () => {
+  const m = catalogo.moduloOficio('of-sem-6')
+  const original = (await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id=${alumno.id} AND modulo='of-met-3'`)[0]
+  await pool.query(`INSERT INTO entrenamiento_progreso (usuario_id,modulo,tour_visto_at,quiz_aprobado_at)
+    VALUES ($1,'of-sem-5',now(),now()),($1,'of-sem-cop',now(),now())`,[alumno.id])
+  actor=alumno
+  const texto = 'Para mi trabajo este concepto ordena las decisiones del centro y permite comprobar el resultado con fecha y soporte.'
+  assert.ok((await actions.guardarConcepto(m.id,m.palabras[0],texto)).error)
+  assert.ok((await actions.marcarEstudiado(m.id)).error)
+  assert.ok((await actions.responderQuizOficio(m.id,RESPUESTAS_OFICIO[m.id])).error)
+  await pool.query(`INSERT INTO entrenamiento_progreso (usuario_id,modulo,tour_visto_at,quiz_aprobado_at)
+    VALUES ($1,'of-sem-adm',now(),now())`,[alumno.id])
+  // Sembrar conceptos ficticios permite concentrar esta prueba en el gradiente y el guardado.
+  for(const slug of m.palabras) await pool.query('INSERT INTO entrenamiento_conceptos(usuario_id,modulo,slug,texto) VALUES($1,$2,$3,$4)',[alumno.id,m.id,slug,texto+' '+slug])
+  assert.deepEqual(await actions.marcarEstudiado(m.id),{ok:true})
+  const key=RESPUESTAS_OFICIO[m.id]
+  assert.equal((await actions.responderQuizOficio(m.id,key.map((v,i)=>i<2?(v+1)%3:v))).aprobado,false)
+  actor=master
+  assert.ok((await actions.firmarDrill(alumno.id,m.id)).error,'no firma con tres de cinco')
+  actor=alumno
+  const aprobado=await actions.responderQuizOficio(m.id,key.map((v,i)=>i===0?(v+1)%3:v))
+  assert.equal(aprobado.aprobado,true); assert.equal(aprobado.minimo,4)
+  actor=master
+  assert.deepEqual(await actions.firmarDrill(alumno.id,m.id),{ok:true})
+  assert.deepEqual((await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id=${alumno.id} AND modulo='of-met-3'`)[0],original)
+  // Cambiar al rol coordinador: la práctica de Administradora no sirve como sustituto.
+  await pool.query("UPDATE usuarios SET rol='coordinador',centro_id=NULL WHERE id=$1",[alumno.id])
+  await pool.query("DELETE FROM entrenamiento_progreso WHERE usuario_id=$1 AND modulo='of-sem-cop'",[alumno.id])
+  actor={...alumno,rol:'coordinador',centro_id:null,centros:[1]}
+  assert.ok((await actions.responderQuizOficio(m.id,key)).error)
+  await pool.query("INSERT INTO entrenamiento_progreso(usuario_id,modulo,tour_visto_at,quiz_aprobado_at) VALUES($1,'of-sem-cop',now(),now())",[alumno.id])
+  assert.equal((await actions.responderQuizOficio(m.id,key)).aprobado,true)
+})

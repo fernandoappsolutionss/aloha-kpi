@@ -1120,9 +1120,9 @@
     "seg": 28
   },
   "guia/of-sem-adm/cierre": {
-    "hash": "f1b224e7f4e4",
+    "hash": "c289d078ac76",
     "file": "guia/of-sem-adm/cierre.mp3",
-    "seg": 27
+    "seg": 26
   },
   "guia/of-sem-asi/vista": {
     "hash": "322dea0fdb11",
@@ -1135,7 +1135,7 @@
     "seg": 26
   },
   "guia/of-sem-asi/cierre": {
-    "hash": "03309aa986b3",
+    "hash": "0a21dcc97da6",
     "file": "guia/of-sem-asi/cierre.mp3",
     "seg": 29
   },
@@ -1150,9 +1150,9 @@
     "seg": 27
   },
   "guia/of-sem-coa/cierre": {
-    "hash": "20f1923bdb01",
+    "hash": "b3ec8e58234a",
     "file": "guia/of-sem-coa/cierre.mp3",
-    "seg": 28
+    "seg": 30
   },
   "guia/of-sem-cop/vista": {
     "hash": "3cde4a313158",
@@ -1165,8 +1165,68 @@
     "seg": 29
   },
   "guia/of-sem-cop/cierre": {
-    "hash": "261d73917a9f",
+    "hash": "587ef7120d06",
     "file": "guia/of-sem-cop/cierre.mp3",
     "seg": 27
+  },
+  "guia/of-sem-3/vista": {
+    "hash": "58d8bfdb45ca",
+    "file": "guia/of-sem-3/vista.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-3/palabras": {
+    "hash": "4ba975fdcc50",
+    "file": "guia/of-sem-3/palabras.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-3/cierre": {
+    "hash": "b0009557232a",
+    "file": "guia/of-sem-3/cierre.mp3",
+    "seg": 26
+  },
+  "guia/of-sem-4/vista": {
+    "hash": "830e01c0cc9f",
+    "file": "guia/of-sem-4/vista.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-4/palabras": {
+    "hash": "82937dbe976b",
+    "file": "guia/of-sem-4/palabras.mp3",
+    "seg": 27
+  },
+  "guia/of-sem-4/cierre": {
+    "hash": "1dc9825db6bc",
+    "file": "guia/of-sem-4/cierre.mp3",
+    "seg": 25
+  },
+  "guia/of-sem-5/vista": {
+    "hash": "e930aa381720",
+    "file": "guia/of-sem-5/vista.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-5/palabras": {
+    "hash": "1722a2f8d708",
+    "file": "guia/of-sem-5/palabras.mp3",
+    "seg": 28
+  },
+  "guia/of-sem-6/vista": {
+    "hash": "c22ccdd961e5",
+    "file": "guia/of-sem-6/vista.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-5/cierre": {
+    "hash": "b5dd0cf882fe",
+    "file": "guia/of-sem-5/cierre.mp3",
+    "seg": 24
+  },
+  "guia/of-sem-6/palabras": {
+    "hash": "e33e32bff8c7",
+    "file": "guia/of-sem-6/palabras.mp3",
+    "seg": 26
+  },
+  "guia/of-sem-6/cierre": {
+    "hash": "4a523caf5e68",
+    "file": "guia/of-sem-6/cierre.mp3",
+    "seg": 25
   }
 }

@@ -179,7 +179,7 @@ test('recorriendo cada plan en orden, ningún módulo queda encerrado', async ()
     const progreso = {}
     for (const m of plan) {
       assert.equal(
-        gradienteAbierto(m, progreso), true,
+        gradienteAbierto(m, progreso, rol), true,
         `${rol}: "${m.titulo}" (${m.id}) no abre ni estudiando todo lo anterior de su plan. ` +
         `Requiere ${JSON.stringify(m.requiere)}, que no está antes en este plan: con el candado duro es una pared.`,
       )

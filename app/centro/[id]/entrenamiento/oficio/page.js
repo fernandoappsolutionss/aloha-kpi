@@ -317,7 +317,7 @@ export default async function OficioPage({ params, searchParams }) {
   // empieza está cerrado. Prometerle ahí su producto y un botón "Estudiar mi
   // puesto" que solo lleva a la puerta es enseñar el final y cerrar la puerta en
   // la misma pantalla. Mientras esté cerrado se dice qué falta y se manda ahí.
-  const hatBloqueado = hat ? puertaCerrada(true, gradienteAbierto(hat, progreso), progreso[hat.id]) : false
+  const hatBloqueado = hat ? puertaCerrada(true, gradienteAbierto(hat, progreso, rol), progreso[hat.id]) : false
 
   // EL TAMAÑO DEL PLAN, DICHO DE FRENTE. El total en horas SOLO lo veía el
   // revisor; al alumno se le daban los minutos módulo a módulo y nunca la
@@ -334,7 +334,7 @@ export default async function OficioPage({ params, searchParams }) {
 
     {semanales.length > 0 && <section id="actualizacion-semanal" className="card" aria-labelledby="actualizacion-semanal-title" style={{ scrollMarginTop: 24 }}>
       <h2 id="actualizacion-semanal-title">Actualización semanal {pendientesSemana.length ? 'pendiente' : 'completada'}</h2>
-      <p>Dos lecciones comunes y una práctica de tu puesto. {pendientesSemana.length} de {semanales.length} módulos pendientes de estudio o maniobra firmada. Tu formación anterior conserva su progreso.</p>
+      <p>Lectura de estadísticas, condición, práctica de tu puesto y planificación de metas, programas y acciones. {pendientesSemana.length} de {semanales.length} módulos pendientes de estudio o maniobra firmada. Tu formación anterior conserva su progreso.</p>
       <ul>{semanales.map((m) => <li key={m.id}><Link href={`${base}/${m.id}`}>{m.titulo}</Link></li>)}</ul>
       {recorridosSemana.length > 0 && <p>Recorridos de pantalla: {recorridosSemana.map((m, i) => <span key={m.id}>{i > 0 && ' · '}<Link href={`/centro/${id}/entrenamiento/${m.id}`}>{m.titulo}</Link></span>)}</p>}
     </section>}
@@ -418,7 +418,7 @@ export default async function OficioPage({ params, searchParams }) {
                 // gradienteAbierto. La fila bloqueada SIGUE siendo enlace a
                 // propósito: quien pulse tiene que encontrarse la razón, no un
                 // clic muerto que parezca que el sistema se rompió.
-                const bloqueado = puertaCerrada(true, gradienteAbierto(m, progreso), p)
+                const bloqueado = puertaCerrada(true, gradienteAbierto(m, progreso, rol), p)
                 return (
                   <li key={m.id}>
                     <Link className={`ofi-fila${bloqueado ? ' ofi-fila--bloqueada' : ''}${m.id === siguiente?.id ? ' ofi-fila--siguiente' : ''}`} href={`${base}/${m.id}`}>

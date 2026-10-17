@@ -127,11 +127,12 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   // le toca estudiarlo igual, y en orden.
   const esSuyo = esDelPlan(m, oficio.rol, oficio.centroId)
   const propio = progreso?.[m.id] || {}
-  const abiertoParaMi = gradienteAbierto(m, progreso || {})
+  const abiertoParaMi = gradienteAbierto(m, progreso || {}, oficio.rol)
   const p = esAlumno ? propio : null
   const yaEstudiado = esAlumno ? estudiado(p) : false
   const abierto = esAlumno && abiertoParaMi
-  const anterior = (m.requiere || [])[0] ? moduloOficio(m.requiere[0]) : null
+  const pendiente = [...(m.requiere || []), ...(m.requierePorRol?.[oficio.rol] || [])].find((id) => !estudiado(progreso?.[id]))
+  const anterior = pendiente ? moduloOficio(pendiente) : null
   const rolPlan = esAlumno ? oficio.rol : (revisionSolicitada || revisionDisponible).rol
   const plan = planDeRol(rolPlan, MODULOS_OFICIO, esAlumno ? oficio.centroId : undefined)
   const idx = plan.findIndex((x) => x.id === m.id)

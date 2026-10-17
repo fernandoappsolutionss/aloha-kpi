@@ -189,8 +189,8 @@ test('la restricción que pinta la portada es la que el servidor aplica', () => 
   const actions = sinComentarios(lee('../app/actions/entrenamiento-oficio.js'))
   assert.match(portada, /No disponible hasta que:/)
   // Lección y Cuestionario: el gradiente.
-  assert.match(actions, /export async function marcarEstudiado[\s\S]*?gradienteAbierto\(m, previo\)/)
-  assert.match(actions, /export async function responderQuizOficio[\s\S]*?gradienteAbierto\(m, progreso\)/)
+  assert.match(actions, /export async function marcarEstudiado[\s\S]*?gradienteAbierto\(m, previo, u\.rol\)/)
+  assert.match(actions, /export async function responderQuizOficio[\s\S]*?gradienteAbierto\(m, progreso, u\.rol\)/)
   // Cuestionario: además exige que la lección esté marcada en este mismo módulo.
   assert.match(actions, /export async function responderQuizOficio[\s\S]*?tourVistoAt[\s\S]*?Antes de responder marca la lección como realizada\./)
   assert.match(portada, /RESTRICCION_QUIZ = 'la Lección esté marcada como realizada\.'/)

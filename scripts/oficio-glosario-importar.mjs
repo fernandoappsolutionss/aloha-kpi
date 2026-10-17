@@ -148,6 +148,10 @@ const PREFERENCIA = {
 // Plural español por defecto. Los préstamos del inglés hacen el plural en -s y
 // el genérico les pondría "-es", así que van a mano.
 const PLURAL_A_MANO = {
+  // Conservar las variantes que ya enlaza la formación semanal publicada.
+  'estadistica-semanal': ['estadísticas semanales'],
+  'cuota-semanal': ['cuotas semanales'],
+  'formula-de-la-condicion': ['fórmula de condición'],
   // Préstamos del inglés: plural en -s.
   kit: ['kits'], 'kit-de-reserva': ['kits de reserva'],
   coach: ['coaches'], 'coach-auxiliar': ['coaches auxiliares'],

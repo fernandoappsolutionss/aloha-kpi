@@ -32,9 +32,9 @@ test('Online conserva su secuencia histórica antes de la actualización semanal
     .filter((m) => m.roles.includes('coach'))
     .sort((a, b) => a.orden - b.orden)
     .map((m) => m.id)
-  const semanales = new Set(['of-sem-1', 'of-sem-2', 'of-sem-adm', 'of-sem-asi', 'of-sem-coa', 'of-sem-cop'])
+  const semanales = new Set(MODULOS_OFICIO.filter((m) => m.curso === 'semana').map((m) => m.id))
   assert.deepEqual(planCoach.filter(id => !semanales.has(id)).slice(-4), ['of-coa-11', 'of-coa-12', 'of-coa-13', 'of-coa-14'])
-  assert.deepEqual(planCoach.slice(-3), ['of-sem-1', 'of-sem-2', 'of-sem-coa'])
+  assert.deepEqual(planCoach.filter((id) => semanales.has(id)), ['of-sem-1', 'of-sem-2', 'of-sem-coa', 'of-sem-3'])
 })
 
 test('Online conserva las reglas exactas auditadas del Manual', () => {

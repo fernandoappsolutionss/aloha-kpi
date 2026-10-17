@@ -11,3 +11,6 @@ La semana va de **viernes a jueves** y se identifica por el jueves de cierre. El
 5. Revisa la propuesta de **cuota semanal** para cada estadística de la semana que empieza, ajústala si hace falta y guárdala. El coordinador aprueba las cuotas en la Reunión semanal; propuesta y aprobación son estados distintos.
 
 El producto es: **plan de la semana completo antes del viernes 10:00**. La Asistente sigue confeccionando el cuadro de negocio en la última semana del mes, como pide el Manual. Sus datos también ayudan a revisar el plan semanal, pero la Asistente no asigna la condición ni aprueba cuotas.
+
+
+Ampliación 2026-10-17: cada objetivo incluye evidencia esperada y evidencia del resultado; coordinación verifica la ejecución. El primer cierre de referencia es el 22-oct-2026, con reunión el 23 y ejecución 23–29. El plan conserva el cierre observado; las cuotas corresponden al cierre de ejecución. Antes del primer corte se prepara el trabajo. Viernes 10:00 es el plazo local del plan, no una hora de reunión confirmada. Ver planificacion-aloha.md para programa, proyecto, acta y control diario.
