@@ -9,10 +9,20 @@ import OperationalCard from '../../components/OperationalCard'
 import TableroSemanal from '../../components/semana/TableroSemanal'
 import { getCentrosKpiRango } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
+import { promedioDisciplina, porcentajeDisciplina, variacionDisciplina, variacionPorcentual, tendenciaIngresos } from '../../lib/panel-metricas.mjs'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
-const cumplColor = (v) => v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
+const cumplColor = (v) => v == null ? 'var(--text-dim)' : v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
 const fechaDato = (centro) => centro.ninosPeriodoFin ? `${centro.ninosFuente} · período hasta ${centro.ninosPeriodoFin.split('-').reverse().join('/')}` : 'Sin dato mensual declarado'
+
+function TendenciaCentro({ actual, anterior, periodo }) {
+  const tendencia = tendenciaIngresos(actual, anterior)
+  return <div style={{ color: tendencia.color }}>
+    <span>{tendencia.label}</span>
+    {tendencia.diferencia != null && <div className="h-sub">{tendencia.diferencia > 0 ? '+' : ''}{tendencia.diferencia} ingresos · {actual.nuevos} vs {anterior.nuevos}</div>}
+    <div className="h-sub">vs {periodo}</div>
+  </div>
+}
 
 /* tiny dim icons for KPI cards */
 const ic = {
@@ -53,7 +63,6 @@ export default function DashboardPage() {
   const label = range.label
   function changeFilter(f) { writePanelFilter(f); setFilter(f) }
 
-  const n = centros.length || 1
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
   const centrosConNinos = centros.filter(c => c.ninosDisponible).length
   const fechasNinos = new Set(centros.map(c => c.ninosPeriodoFin).filter(Boolean))
@@ -62,30 +71,30 @@ export default function DashboardPage() {
   const totDes = centros.reduce((a, c) => a + c.desercion, 0)
   const totGrad = centros.reduce((a, c) => a + (c.graduados || 0), 0)
   const totDesReal = centros.reduce((a, c) => a + (c.desercionReal ?? c.desercion), 0)
-  const promCumpl = Math.round(centros.reduce((a, c) => a + c.cumpl, 0) / n)
+  const disciplina = promedioDisciplina(centros)
+  const promCumpl = disciplina.valor
+  const prevPorId = new Map(prev.map(c => [String(c.id), c]))
   const enMeta = centros.filter(c => c.nuevos >= c.meta).length
   const totGrupos = centros.reduce((a, c) => a + (c.grupos || 0), 0)
   const ninosGrupoProm = totGrupos > 0 ? (totNinos / totGrupos) : 0
   const metaGpn = centros[0]?.metaGpn || 8
   const centrosBajoGpn = centros.filter(c => c.gpnBajo).length
 
-  // Comparativa vs mismo trimestre del año anterior.
+  // Comparativa con el período equivalente inmediatamente anterior.
   const pTotNinos = prev.reduce((a, c) => a + c.ninos, 0)
   const pTotNuevos = prev.reduce((a, c) => a + c.nuevos, 0)
-  const pTotDes = prev.reduce((a, c) => a + c.desercion, 0)
   const pTotDesReal = prev.reduce((a, c) => a + (c.desercionReal ?? c.desercion), 0)
-  const pPromCumpl = prev.length ? Math.round(prev.reduce((a, c) => a + c.cumpl, 0) / prev.length) : 0
-  const delta = (cur, prv) => (prv > 0 ? Math.round(((cur - prv) / prv) * 100) : null)
+  const delta = variacionPorcentual
   const prevLabel = range.prevLabel
 
   const cards = [
     { label: 'Niños · último dato mensual declarado', value: centrosConNinos === centros.length && centros.length ? totNinos.toLocaleString() : 'Sin total', icon: ic.ninos,
       sub: `${centrosConNinos}/${centros.length} centros · ${fechasNinos.size > 1 || fuentesNinos.size > 1 ? 'fuentes o fechas distintas; ver detalle por centro' : fechasNinos.size ? `${[...fuentesNinos][0]} · período hasta ${[...fechasNinos][0].split('-').reverse().join('/')}` : 'sin dato mensual disponible'}`,
       yoy: centrosConNinos === centros.length && prev.every(c => c.ninosDisponible) ? { delta: delta(totNinos, pTotNinos), upGood: true } : null },
-    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: { delta: delta(totNuevos, pTotNuevos), upGood: true } },
+    { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: centros.length && centros.every(c => c.nuevosDisponible && prevPorId.get(String(c.id))?.nuevosDisponible) ? { delta: delta(totNuevos, pTotNuevos), upGood: true } : null },
     { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el período', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },
     { label: 'Centros en meta', value: `${enMeta}/${centros.length}`, icon: ic.meta, sub: 'meta de ingresos' },
-    { label: 'Disciplina prom.', value: `${isNaN(promCumpl) ? 0 : promCumpl}%`, icon: ic.gauge, sub: 'checklist, no el producto', color: cumplColor(promCumpl), yoy: { delta: delta(promCumpl, pPromCumpl), upGood: true } },
+    { label: 'Disciplina prom.', value: porcentajeDisciplina(promCumpl), icon: ic.gauge, sub: `${disciplina.conDatos}/${disciplina.total} centros con datos · checklist`, color: cumplColor(promCumpl), yoy: { delta: variacionDisciplina(centros, prev), upGood: true } },
     { label: 'Niños por grupo', value: totGrupos > 0 ? ninosGrupoProm.toFixed(1) : '—', icon: ic.grupo, sub: `meta ≥ ${metaGpn} · clave de rentabilidad`, color: totGrupos > 0 ? (ninosGrupoProm >= metaGpn ? 'var(--ok)' : 'var(--bad)') : undefined },
   ]
 
@@ -166,13 +175,14 @@ export default function DashboardPage() {
             <span className="label">{label}</span>
           </div>
           <p className="h-sub">Período seleccionado: {label}. Niños muestra el último dato mensual declarado de cada centro dentro del período; si no lo hay, usa el dato del mes anterior. La proyección viva del mes abierto no reemplaza ese dato.</p>
+          <p className="h-sub">Tendencia de ingresos: {label} vs {prevLabel}. Se compara cuando ambos rangos tienen datos de todos sus meses. Los períodos en curso son provisionales. Disciplina excluye centros sin registros; un 0% registrado sí cuenta.</p>
           <div className="desktop-only operational-table">
           <TableScroller label="Estado de todos los centros" stickyFirstColumn>
             <table className="table operations-table--dashboard">
               <caption className="sr-only">Estado de todos los centros · {label}</caption>
               <thead>
                 <tr>
-                  {['Centro', 'Administradora', 'Niños · último declarado', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Cumpl.', 'Tend.', 'Estado', 'Nivel'].map(h =>
+                  {['Centro', 'Administradora', 'Niños · último declarado', 'N/grupo', 'Nuevos', 'Deserción', 'Cobranza', 'Disciplina', 'Tendencia de ingresos', 'Estado', 'Nivel'].map(h =>
                     <th key={h}>{h}</th>)}
                 </tr>
               </thead>
@@ -192,15 +202,12 @@ export default function DashboardPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{c.cumpl}%</span>
-                        <div className="bar"><div className="bar__fill" style={{ width: c.cumpl + '%', background: cumplColor(c.cumpl) }} /></div>
+                        <span className="num" style={{ fontWeight: 600, color: cumplColor(c.cumpl), minWidth: 34 }}>{porcentajeDisciplina(c.cumpl)}</span>
+                        {c.cumpl != null && <div className="bar"><div className="bar__fill" style={{ width: c.cumpl + '%', background: cumplColor(c.cumpl) }} /></div>}
                       </div>
                     </td>
-                    <td style={{ textAlign: 'center', color: c.nuevos >= c.meta ? 'var(--ok)' : 'var(--bad)' }}>
-                      <span>{c.nuevos >= c.meta ? 'Al alza' : 'A la baja'}</span>
-                      {c.nuevos >= c.meta
-                        ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
-                        : <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline' }}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="18 13 12 19 6 13" /></svg>}
+                    <td style={{ textAlign: 'center' }}>
+                      <TendenciaCentro actual={c} anterior={prevPorId.get(String(c.id))} periodo={prevLabel} />
                     </td>
                     <td>
                       <span className={`pill ${ESTADO_PILL[c.estado] || 'pill--warn'}`}>
@@ -227,8 +234,8 @@ export default function DashboardPage() {
                 { label: 'Nuevos', value: `${c.nuevos} / ${c.meta}` },
                 { label: 'Deserción', value: c.desercion },
                 { label: 'Cobranza', value: c.cobranza },
-                { label: 'Disciplina', value: `${c.disciplina ?? c.cumpl}%` },
-                { label: 'Tendencia', value: c.nuevos >= c.meta ? 'Al alza' : 'A la baja' },
+                { label: 'Disciplina', value: porcentajeDisciplina(c.cumpl) },
+                { label: 'Tendencia de ingresos', value: <TendenciaCentro actual={c} anterior={prevPorId.get(String(c.id))} periodo={prevLabel} /> },
                 { label: 'Nivel', value: <NivelBadge nivel={c.nivel} /> },
               ]} actions={<Link className="btn" href="/dashboard/ranking" aria-label={`Ver ranking de ${c.nombre}`}>Ver ranking</Link>} />)}
             {centros.length === 0 && <p>No hay centros para este período.</p>}

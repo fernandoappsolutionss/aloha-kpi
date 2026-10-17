@@ -12,6 +12,7 @@ import { superponerKpiAbiertos } from '../../lib/kpi-semanal-service'
 import { cobranzaDeclarada, evaluarProducto, semaforo, verdictoCrecimiento } from '../../lib/marcadores.mjs'
 import { calculateCentroGrowth } from '../../lib/growth/server'
 import { conCierresDocumentales } from '../../lib/cierre-documental-server'
+import { coberturaIngresos } from '../../lib/panel-metricas.mjs'
 
 const Q_MONTHS = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] }
 
@@ -133,9 +134,12 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
   const [metas] = await sql`SELECT * FROM metas WHERE anio = ${toY} AND trimestre = ${toQ}`
   let rs = await sql`SELECT * FROM resumen_mes WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
   let ks = await sql`SELECT * FROM kpi_semanas WHERE (year * 100 + month) BETWEEN ${lo} AND ${hi}`
+  const resumenesRegistrados = rs
+  const semanasRegistradas = ks
+  let autos
   // (g1-16) Superposición en vivo: en meses abiertos >= gate las ventas y
   // retiros del panel salen del módulo, con el mismo helper que KPI Semanal.
-  ;({ filas: ks } = await superponerKpiAbiertos({
+  ;({ filas: ks, autos } = await superponerKpiAbiertos({
     filas: ks,
     centroIds: centros.map((centro) => centro.id),
     desde: lo,
@@ -263,11 +267,16 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
     const ninos = datoNinos.valor
     // % de cumplimiento = checklist real de los Excel (no el cálculo de metas).
     const metasCumpl = Math.round((months.filter((m) => m.ok).length / nMeses) * 100)
-    // DISCIPLINA, no "cumplimiento". Se conserva el número del checklist, pero
-    // deja de decidir el estado del centro: es soporte, no el producto. Un
-    // centro sin filas registradas no tiene porcentaje; se muestra 0 porque el
-    // panel promedia esta columna y un null la volvería NaN.
-    const cumpl = disciplinaPct(cumpFilas[c.id] || []).pct ?? 0
+    // Sin checklist registrado se conserva null; un 0% declarado sí cuenta.
+    const cumpl = disciplinaPct(cumpFilas[c.id] || []).pct
+    const [anioActual, mesActual] = hoyISO().split('-').map(Number)
+    const coberturaNuevos = coberturaIngresos({
+      meses: mlist, centroId: c.id, autos,
+      resumenes: resumenesRegistrados.filter(r => r.centro_id === c.id),
+      semanas: semanasRegistradas.filter(r => r.centro_id === c.id),
+      inicioAnterior: prev?.ninos_final_mes,
+      periodoActual: anioActual * 100 + mesActual,
+    })
 
     // ── EL ESTADO LO PINTA PRODUCTO, igual que en la pantalla del centro ─────
     // Aquí seguía intacto el bug original: `estado` salía de promediar los 33
@@ -321,6 +330,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       id: c.id, nombre: c.nombre, admin, ninos,
       ninosDisponible: datoNinos.disponible, ninosPeriodoFin: datoNinos.periodoFin, ninosFuente: datoNinos.fuente,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
+      nuevosDisponible: coberturaNuevos.disponible, coberturaNuevos,
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,
       semaforo: semaforoCentro,
