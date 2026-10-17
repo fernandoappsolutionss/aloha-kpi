@@ -21,7 +21,7 @@ const mesMalo = (centroId, year, month) => ({
     centro_id: centroId, year, month,
     ing_d1: 0, ing_d2: 0, ing_d3: 0, ing_d4: 0, ing_d5: 0,
     des_d1: 0, des_d2: 0, des_d3: 0, des_d4: 0, des_d5: 0,
-    cob_d1: 9, cob_d2: 0, cob_d3: 0, cob_d4: 0, cob_d5: 0,
+    cob_d1: 9, cob_d2: null, cob_d3: null, cob_d4: null, cob_d5: null,
   },
 })
 
