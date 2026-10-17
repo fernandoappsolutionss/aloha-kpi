@@ -1620,6 +1620,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__cp-resumen { cursor: pointer; min-height: 44px; padding: 10px 0; white-space: nowrap; font-size: 13px; }
 .semana-tablero__cp-resumen strong { font-weight: 600; }
 .semana-tablero__cp-resumen span { margin-left: 12px; color: var(--text-muted); font-size: 12px; }
+.semana-tablero__cp-resumen-centro { display: none; }
 .semana-tablero__cp-resumen:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; border-radius: var(--r-sm); }
 .semana-tablero__cp[open] > .semana-tablero__cp-resumen .semana-tablero__cp-abrir,
 .semana-tablero__cp:not([open]) > .semana-tablero__cp-resumen .semana-tablero__cp-cerrar { display: none; }
@@ -1642,6 +1643,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 @media (max-width: 520px) {
   .semana-tablero__totales { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .semana-tablero__cp { width: clamp(230px, calc(100vw - 120px), 300px); }
+  .semana-tablero__cp-resumen .semana-tablero__cp-resumen-centro { display: inline-block; max-width: calc(100% - 110px); overflow: hidden; text-overflow: ellipsis; vertical-align: middle; margin: 0 6px 0 0; color: var(--text); }
+  .semana-tablero__cp-resumen .semana-tablero__cp-abrir,
+  .semana-tablero__cp-resumen .semana-tablero__cp-cerrar { display: none; }
   .semana-tablero__cp-centro { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
   .semana-tablero__cp-encabezado, .semana-tablero__cp-periodo { grid-template-columns: minmax(0, 1fr) 55px 60px 45px; gap: 4px; }
   .semana-tablero__cp-encabezado { font-size: 12px; }
