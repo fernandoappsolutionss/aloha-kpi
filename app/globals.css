@@ -1453,6 +1453,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .operations-table--report { min-width: 720px; }
 .operations-table--centers { min-width: 900px; }
 .operations-link { display: inline-flex; align-items: center; min-height: 44px; padding: 4px; color: var(--text); text-decoration: underline; }
+.cobranza-detalle__boton { flex-direction: column; align-items: flex-start; justify-content: center; background: transparent; border: 0; font: inherit; cursor: pointer; }
+.cobranza-detalle__boton:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.cobranza-detalle__tabla { min-width: 600px; }
+.cobranza-detalle__tabla th[scope="row"] { min-width: 180px; white-space: normal; }
 .operations-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 26px; }
 .operations-grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 26px; }
 .operations-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 22px; }
