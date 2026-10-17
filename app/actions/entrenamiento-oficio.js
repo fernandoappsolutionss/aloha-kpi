@@ -13,6 +13,7 @@ import { sql, withTransaction } from '../../lib/db'
 import { requireCurrentOficio, requireCurrentMaster } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
 import { isMaster } from '../../lib/current-user.mjs'
+import { asignacionesOficio } from '../../lib/caja/direccion.mjs'
 import { bloquearOficio, archivarYReiniciar, validarReinicio } from '../../lib/entrenamiento/oficio/reinicios.mjs'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario'
@@ -141,7 +142,7 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
   const puede = new Set(rolesQueRevisa(rol, MODULOS_OFICIO))
   // ROLES_ALUMNO manda el orden: la administradora primero, que es el hat mayor.
   return ROLES_ALUMNO.filter((r) => puede.has(r)).map((r) => {
-    const plan = planDeRol(r, MODULOS_OFICIO)
+    const plan = planDeRol(r, MODULOS_OFICIO, undefined, ['direccion-caja'])
     const cursos = cursosConModulos()
       .map((c) => ({ ...c, total: plan.filter((m) => m.curso === c.id).length }))
       .filter((c) => c.total > 0)
@@ -172,7 +173,7 @@ function planesDeRevision(rol, { conPlan = false } = {}) {
 export async function cargarOficio() {
   return runAction('cargarOficio', async () => {
     const u = await requireCurrentOficio()
-    const plan = planDeRol(u.rol, MODULOS_OFICIO, u.centro_id)
+    const plan = planDeRol(u.rol, MODULOS_OFICIO, u.centro_id, asignacionesOficio(u))
     // `conPlan` agrega los metadatos módulo a módulo: es lo que la pantalla de
     // revisión pinta como checksheet del plan ajeno.
     const revision = planesDeRevision(u.rol, { conPlan: true })
@@ -185,6 +186,7 @@ export async function cargarOficio() {
       // El centro propio decide los módulos con `centros` (la página los filtra igual).
       centroId: u.centro_id == null ? null : Number(u.centro_id),
       veMatriz: isMaster(u),
+      asignaciones: asignacionesOficio(u),
       puedeFirmarA: rolesQueFirma(u.rol),
       revision,
     }
@@ -232,7 +234,7 @@ export async function cargarOficio() {
 export async function resumenOficio() {
   return runAction('resumenOficio', async () => {
     const s = await requireCurrentOficio()
-    const plan = planDeRol(s.rol, MODULOS_OFICIO, s.centro_id)
+    const plan = planDeRol(s.rol, MODULOS_OFICIO, s.centro_id, asignacionesOficio(s))
     const revision = planesDeRevision(s.rol)
     // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
     // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
@@ -275,7 +277,7 @@ export async function cargarConceptos(modulo) {
     const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
-    if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
+    if (!esDelPlan(m, u.rol, u.centro_id, asignacionesOficio(u))) return { error: 'Este módulo no es de tu puesto.' }
     const vivos = palabrasVivas(m)
     if (vivos.length === 0) return { conceptos: {} }
     const rows = await sql`
@@ -294,7 +296,7 @@ export async function guardarConcepto(modulo, slug, texto) {
     const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
-    if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
+    if (!esDelPlan(m, u.rol, u.centro_id, asignacionesOficio(u))) return { error: 'Este módulo no es de tu puesto.' }
     const vivos = palabrasVivas(m)
     if (!vivos.includes(slug)) return { error: 'Esta palabra no pertenece a este módulo.' }
     return await withTransaction(async (query) => {
@@ -340,7 +342,7 @@ export async function marcarEstudiado(modulo) {
     const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
-    if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
+    if (!esDelPlan(m, u.rol, u.centro_id, asignacionesOficio(u))) return { error: 'Este módulo no es de tu puesto.' }
     return await withTransaction(async (query) => {
       await bloquearOficio(query, u.id)
       // Mismo gradiente que el quiz, y por la misma razón: el checksheet promete
@@ -383,7 +385,7 @@ export async function responderQuizOficio(modulo, respuestas) {
     const u = await requireCurrentOficio()
     if (!MODULO_IDS_OFICIO.has(modulo)) return { error: 'Módulo desconocido.' }
     const m = moduloOficio(modulo)
-    if (!esDelPlan(m, u.rol, u.centro_id)) return { error: 'Este módulo no es de tu puesto.' }
+    if (!esDelPlan(m, u.rol, u.centro_id, asignacionesOficio(u))) return { error: 'Este módulo no es de tu puesto.' }
     const correctas = RESPUESTAS_OFICIO[modulo]
     if (!Array.isArray(correctas) || correctas.length !== m.quiz.length) {
       return { error: 'Este módulo todavía no tiene sus preguntas cargadas.' }
@@ -436,9 +438,9 @@ export async function responderQuizOficio(modulo, respuestas) {
 }
 
 async function alumnoDe(usuarioId, query = sql) {
-  const rows = await query`SELECT id, nombre, rol, centro_id FROM usuarios WHERE id = ${usuarioId}`
+  const rows = await query`SELECT id, nombre, email, rol, centro_id FROM usuarios WHERE id = ${usuarioId}`
   const a = rows[0]
-  return a ? { id: Number(a.id), nombre: a.nombre, rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) } : null
+  return a ? { id: Number(a.id), nombre: a.nombre, email: a.email, rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) } : null
 }
 
 function comoFirmante(u) {
@@ -464,7 +466,7 @@ export async function firmarDrill(usuarioId, modulo) {
       await bloquearOficio(query, usuarioId)
       const alumno = await alumnoDe(usuarioId, query)
       if (!alumno) return { error: 'Usuario inválido.' }
-      if (!m.roles.includes(alumno.rol)) return { error: 'Ese módulo no es del puesto de esa persona.' }
+      if (!esDelPlan(m, alumno.rol, alumno.centroId, asignacionesOficio(alumno))) return { error: 'Ese módulo no es del puesto de esa persona.' }
       if (!puedeFirmar(comoFirmante(firmante), alumno)) return { error: 'No eres el jefe entrenador de esa persona.' }
       // Firmar lo que no se estudió deja el checksheet diciendo "Drill firmado"
       // al lado de "Por estudiar". Por la UI no se llega, pero la action es
@@ -475,7 +477,7 @@ export async function firmarDrill(usuarioId, modulo) {
       // del propio firmante y la puerta se lo cierra, no puede firmarlo: la cola
       // ya no le manda la maniobra, pero esta action es pública.
       const mio = await progresoDeUsuario(firmante.id, query)
-      if (puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, mio, firmante.rol), mio[modulo])) {
+      if (puertaCerrada(esDelPlan(m, firmante.rol, firmante.centro_id, asignacionesOficio(firmante)), gradienteAbierto(m, mio, firmante.rol), mio[modulo])) {
         return { error: 'Ese módulo también es de tu puesto y todavía no lo has estudiado: estúdialo antes de tomárselo, o que se la tome el jefe entrenador de esa persona.' }
       }
       await query`
@@ -553,11 +555,11 @@ export async function colaFirmas(centroId = null) {
       const pendientes = (porUsuario[a.id] || [])
         .map((r) => {
           const m = moduloOficio(r.modulo)
-          if (!m || (m.drills || []).length === 0) return null
+          if (!m || (m.drills || []).length === 0 || !esDelPlan(m, a.rol, a.centro_id, asignacionesOficio(a))) return null
           const desde = r.quiz_aprobado_at ? new Date(r.quiz_aprobado_at) : null
           // ¿Este módulo está en MI plan y todavía no lo he estudiado? Misma
           // regla y mismos datos que la puerta de la página del módulo.
-          const cerradoParaMi = puertaCerrada(m.roles.includes(firmante.rol), gradienteAbierto(m, suyo, firmante.rol), suyo[m.id])
+          const cerradoParaMi = puertaCerrada(esDelPlan(m, firmante.rol, firmante.centro_id, asignacionesOficio(firmante)), gradienteAbierto(m, suyo, firmante.rol), suyo[m.id])
           const pendiente = [...(m.requiere || []), ...(m.requierePorRol?.[firmante.rol] || [])].find((id) => !estudiado(suyo[id]))
           const meFalta = cerradoParaMi && pendiente ? moduloOficio(pendiente) : null
           return {
@@ -690,14 +692,14 @@ export async function matrizOficio(centroId = null) {
     // Los planes que se pueden abrir en lectura, con su nombre de puesto: la
     // pantalla enlazaba dos escritos a mano y hoy son cuatro.
     const planes = ROLES_ALUMNO
-      .filter((r) => planDeRol(r, MODULOS_OFICIO).length > 0)
+      .filter((r) => planDeRol(r, MODULOS_OFICIO, undefined, ['direccion-caja']).length > 0)
       .map((r) => ({ rol: r, rolNombre: NOMBRE_ROL[r] || r }))
     return {
       cursos,
       planes,
       usuarios: usuarios.map((u) => {
         const progreso = porUsuario[u.id] || {}
-        const plan = planDeRol(u.rol, MODULOS_OFICIO, u.centro_id)
+        const plan = planDeRol(u.rol, MODULOS_OFICIO, u.centro_id, asignacionesOficio(u))
         const porCurso = {}
         for (const c of cursos) {
           const suyos = plan.filter((m) => m.curso === c.id)

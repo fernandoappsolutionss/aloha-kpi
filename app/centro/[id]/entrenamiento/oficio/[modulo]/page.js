@@ -103,7 +103,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const revisionDisponible = (oficio.revision || []).find((r) =>
     (r.plan || []).some((x) => x.id === m.id))
   const modoRevision = Boolean(revisionSolicitada)
-  const esAlumno = !modoRevision && esDelPlan(m, oficio.rol, oficio.centroId)
+  const esAlumno = !modoRevision && esDelPlan(m, oficio.rol, oficio.centroId, oficio.asignaciones)
   const esOficial = Boolean(revisionSolicitada || revisionDisponible)
 
   if (!esAlumno && !esOficial) {
@@ -125,7 +125,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   // eso la Administradora se abría un módulo compartido con la Asistente que
   // ella todavía no puede estudiar. Leerlo como jefa entrenadora no la exime:
   // le toca estudiarlo igual, y en orden.
-  const esSuyo = esDelPlan(m, oficio.rol, oficio.centroId)
+  const esSuyo = esDelPlan(m, oficio.rol, oficio.centroId, oficio.asignaciones)
   const propio = progreso?.[m.id] || {}
   const abiertoParaMi = gradienteAbierto(m, progreso || {}, oficio.rol)
   const p = esAlumno ? propio : null
@@ -134,7 +134,7 @@ export default async function ModuloOficioPage({ params, searchParams }) {
   const pendiente = [...(m.requiere || []), ...(m.requierePorRol?.[oficio.rol] || [])].find((id) => !estudiado(progreso?.[id]))
   const anterior = pendiente ? moduloOficio(pendiente) : null
   const rolPlan = esAlumno ? oficio.rol : (revisionSolicitada || revisionDisponible).rol
-  const plan = planDeRol(rolPlan, MODULOS_OFICIO, esAlumno ? oficio.centroId : undefined)
+  const plan = planDeRol(rolPlan, MODULOS_OFICIO, esAlumno ? oficio.centroId : undefined, esAlumno ? oficio.asignaciones : ['direccion-caja'])
   const idx = plan.findIndex((x) => x.id === m.id)
   const siguiente = idx >= 0 ? plan[idx + 1] : null
   const cola = esAlumno ? '' : `?revisar=${rolPlan}`

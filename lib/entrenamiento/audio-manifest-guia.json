@@ -1228,5 +1228,65 @@
     "hash": "4a523caf5e68",
     "file": "guia/of-sem-6/cierre.mp3",
     "seg": 25
+  },
+  "guia/of-caj-1/palabras": {
+    "hash": "361a53291cab",
+    "file": "guia/of-caj-1/palabras.mp3",
+    "seg": 24
+  },
+  "guia/of-caj-1/vista": {
+    "hash": "e1f5d02dc3db",
+    "file": "guia/of-caj-1/vista.mp3",
+    "seg": 32
+  },
+  "guia/of-caj-1/cierre": {
+    "hash": "98f2424a7610",
+    "file": "guia/of-caj-1/cierre.mp3",
+    "seg": 30
+  },
+  "guia/of-caj-2/cierre": {
+    "hash": "af3cdb8bf457",
+    "file": "guia/of-caj-2/cierre.mp3",
+    "seg": 28
+  },
+  "guia/of-caj-2/palabras": {
+    "hash": "c4d6c5412db7",
+    "file": "guia/of-caj-2/palabras.mp3",
+    "seg": 27
+  },
+  "guia/of-caj-2/vista": {
+    "hash": "e1f5d02dc3db",
+    "file": "guia/of-caj-2/vista.mp3",
+    "seg": 31
+  },
+  "guia/of-caj-3/cierre": {
+    "hash": "b3116cc67ec0",
+    "file": "guia/of-caj-3/cierre.mp3",
+    "seg": 30
+  },
+  "guia/of-caj-3/palabras": {
+    "hash": "39cd8c182a85",
+    "file": "guia/of-caj-3/palabras.mp3",
+    "seg": 25
+  },
+  "guia/of-caj-3/vista": {
+    "hash": "e1f5d02dc3db",
+    "file": "guia/of-caj-3/vista.mp3",
+    "seg": 32
+  },
+  "guia/of-caj-4/palabras": {
+    "hash": "1830185938cd",
+    "file": "guia/of-caj-4/palabras.mp3",
+    "seg": 24
+  },
+  "guia/of-caj-4/cierre": {
+    "hash": "84481e5b1dc1",
+    "file": "guia/of-caj-4/cierre.mp3",
+    "seg": 27
+  },
+  "guia/of-caj-4/vista": {
+    "hash": "e1f5d02dc3db",
+    "file": "guia/of-caj-4/vista.mp3",
+    "seg": 31
   }
 }

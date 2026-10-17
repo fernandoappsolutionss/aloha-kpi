@@ -403,5 +403,25 @@
     "hash": "695678f6815a",
     "file": "oficio/of-sem-6.mp3",
     "seg": 38
+  },
+  "oficio/of-caj-2": {
+    "hash": "baa06a631a9d",
+    "file": "oficio/of-caj-2.mp3",
+    "seg": 28
+  },
+  "oficio/of-caj-1": {
+    "hash": "d3bdb94007e1",
+    "file": "oficio/of-caj-1.mp3",
+    "seg": 30
+  },
+  "oficio/of-caj-3": {
+    "hash": "dc9120519ec1",
+    "file": "oficio/of-caj-3.mp3",
+    "seg": 29
+  },
+  "oficio/of-caj-4": {
+    "hash": "21699af3ea7f",
+    "file": "oficio/of-caj-4.mp3",
+    "seg": 27
   }
 }
