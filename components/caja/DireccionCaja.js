@@ -60,15 +60,15 @@ export function DireccionCaja({ empresa, datos, onCambio }) {
     <h2>Viernes: cerrar y planificar. Lunes: decidir y dar seguimiento.</h2>
     <p>El viernes deja saldos, pagos y soportes completos y prepara tu plan de batalla. El lunes revisa los puntos rojos, autoriza dentro de tus facultades y escala las excepciones a Fernando. La semana de la curva va de lunes a domingo; este ritual no cambia el cierre estadístico de los centros.</p>
     {estado?.formacion && <Link className="btn btn--primary" href={`/centro/${estado.centroFormacion}/entrenamiento/oficio/of-caj-1${estado.master?'?revisar=coordinador':''}`}>Abrir entrenamiento de Dirección Operativa</Link>}
-    {calidad && <div role={calidad.confiable?'status':'alert'} className={`alert ${calidad.confiable?'':'alert--error'}`} style={{marginTop:16}}>
+    {calidad && <div role={calidad.confiable?'status':'alert'} className={`alert ${calidad.confiable?'':'alert--error'}`} style={{marginTop:16,display:'block'}}>
       <strong>{calidad.confiable?'Saldos recientes y movimientos clasificados':'Datos pendientes: comprueba la caja antes de decidir'}</strong>
       {calidad.problemas.length>0 && <ul>{calidad.problemas.map(p=><li key={p}>{p}</li>)}</ul>}
       <p>Una previsión verde no acredita Normal o Afluencia. La condición se fundamenta con estadísticas reales comparables. Los ingresos estimados y las acciones propuestas todavía no son dinero cobrado.</p>
     </div>}
     <details open><summary><strong>Semanas en riesgo o en caída</strong></summary>
       <p>Rojo: disponible negativo. Ámbar: debajo del piso de dos semanas de gasto. Caída: menos disponible que la semana proyectada anterior. Son señales operativas, no condiciones HCA automáticas.</p>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10}}>
-        {riesgos.filter(s=>s.semaforo!=='verde'||s.caida).map(s=><div key={s.semana} className="alert" style={{border:'1px solid var(--line)',padding:12}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,320px),1fr))',gap:12}}>
+        {riesgos.filter(s=>s.semaforo!=='verde'||s.caida).map(s=><div key={s.semana} className="alert" style={{display:'grid',gridTemplateRows:'auto 1fr auto',alignItems:'start',minWidth:0,border:`1px solid var(${s.semaforo==='rojo'?'--bad-line':s.semaforo==='ambar'?'--warn-line':'--border'})`,background:`var(${s.semaforo==='rojo'?'--bad-bg':s.semaforo==='ambar'?'--warn-bg':'--surface-2'})`,padding:16}}>
           <strong>{fechaCorta(s.semana)} · {s.semaforo==='rojo'?'Riesgo de faltante':s.semaforo==='ambar'?'Bajo el piso':'Sobre el piso'}{s.caida?' · En caída':''}</strong>
           <p>Disponible {usd(s.disponible)}. Faltan {usd(s.faltaParaPiso)} para el piso.{s.variacion!==null?` Variación ${usd(s.variacion)}.`:''}{s.excedeLinea?' El faltante excede la línea disponible.':''}</p>
           {estado?.puedeEditar && <button className="btn" type="button" onClick={()=>editar('acciones',[...doc.acciones,{id:crypto.randomUUID(),tipo:'cobro',objetivo:'',responsable:'Carmen',fecha:s.semana,semana:s.semana,monto:0,paso:0,estado:'pendiente',evidencia:'',aprobacion:'facultad_actual'}])}>Planificar esta semana</button>}
