@@ -13,6 +13,16 @@ const centros=seeds.map(([nombre,vs],i)=>({id:i+1,nombre,serie:vs.map((valor,j)=
 const consolidada=centros[0].serie.map((p,j)=>{const values=centros.map(c=>c.serie[j].valor).filter(v=>v!=null);return {semanaFin:p.semanaFin,valor:values.length===centros.length?values.reduce((a,b)=>a+b,0):null,subtotal:values.length?values.reduce((a,b)=>a+b,0):null,total:centros.length,disponibles:values.length,incompleta:values.length!==centros.length}})
 const payload={centros,consolidada,ultimaCerrada:'2026-10-15',semanaAbierta:'2026-10-22'}
 const mensual=centros.map((c,i)=>({id:c.id,nombre:c.nombre,admin:'QA',ninos:[128,209,147,null,90,174,95][i],ninosDisponible:i!==3,ninosPeriodoFin:i===3?null:'2026-09-30',ninosFuente:'Dato mensual anterior al período',nuevos:0,nuevosDisponible:false,meta:60,desercion:0,grupos:i===3?0:20,ninosGrupo:7,metaGpn:8,cumpl:null,estado:'Parcial'}))
+// Escenarios visibles: conversión parcial, cero asistentes, 100%, sin clases y fallo.
+centros.forEach((c,i)=>{c.clasesPrueba=[
+  {invitados:10,asistentes:5,porcentaje:50,clases:1},
+  {invitados:8,asistentes:0,porcentaje:0,clases:1},
+  {invitados:4,asistentes:4,porcentaje:100,clases:1},
+  {invitados:0,asistentes:0,porcentaje:null,clases:0},
+  {invitados:null,asistentes:null,porcentaje:null,clases:null,error:'CRM no disponible'},
+  {invitados:3,asistentes:1,porcentaje:100/3,clases:1},
+  {invitados:1,asistentes:1,porcentaje:100,clases:1},
+][i]})
 const stubs={
   link:`import React from 'react';export default function Link(props){return React.createElement('a',props)}`,
   sidebar:`import React from 'react';export default function Sidebar(){return <aside className="sb" style={{padding:20}}>ALOHA · QA local · Sin conexión a producción</aside>}`,

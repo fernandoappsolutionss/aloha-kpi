@@ -1593,6 +1593,11 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__total h3 { margin: 0; }
 .semana-tablero__total-valor { margin: 6px 0; font-size: 32px; font-weight: 700; color: var(--text); }
 .semana-tablero__total .h-sub { margin: 4px 0; }
+.semana-tablero__cp { min-width: 190px; white-space: normal; }
+.semana-tablero__cp-cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 8px; }
+.semana-tablero__cp-cifras dt { color: var(--text-muted); font-size: 12px; }
+.semana-tablero__cp .semana-tablero__cp-cifras dd { margin: 2px 0 0; font-size: 22px !important; font-weight: 700; color: var(--text); }
+.semana-tablero__cp-tasa { font-weight: 600; }
 @media (max-width: 520px) {
   .semana-tablero__totales { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
