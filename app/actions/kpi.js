@@ -75,12 +75,14 @@ export async function loadKpiMes(centroId, year, month) {
   const estado = mes?.estado || 'abierto'
   if (res && estado === 'cerrado') [res] = await conCierresDocumentales([res])
   let movimientosCierre = null
+  let revisionHistorica = null
   if (estado === 'cerrado') {
     const [foto] = await sql`
-      SELECT datos->'totales' AS totales FROM cuadro_mensual
+      SELECT datos->'totales' AS totales, datos->'revisionHistorica' AS revision FROM cuadro_mensual
       WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}
     `
     movimientosCierre = movimientosCierreKpi({ estado, resumen: res, snapshot: foto })
+    revisionHistorica = foto?.revision || null
   }
   let motivosAuto = estado === 'cerrado' ? null : await motivosDelModulo(centroId, intOr(year), intOr(month))
   // (g1-16) KPI sin manos: en mes ABIERTO >= gate las filas ing/des salen del
@@ -135,6 +137,7 @@ export async function loadKpiMes(centroId, year, month) {
     inicioArrastrado: estado === 'cerrado' ? null : cierreAnterior,
     motivosAuto,
     movimientosCierre,
+    revisionHistorica,
     // Resultado discriminado (g1-20) para la UI: 'auto' bloquea ing/des (el
     // cero también), 'fallo' las desbloquea con advertencia visible.
     kpiAuto,

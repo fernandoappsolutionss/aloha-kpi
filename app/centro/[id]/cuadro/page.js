@@ -8,6 +8,7 @@ import { listarGruposActivos } from '../../../actions/grupos'
 import { retirarEstudiante, reincorporarEstudiante } from '../../../actions/estudiantes'
 import { ITINERARIOS, MOTIVOS_RETIRO, MOTIVOS_RETIRO_LABELS, PRODUCTOS_MATERIAL, hoyISO } from '../../../../lib/operaciones'
 import TableScroller from '../../../../components/TableScroller'
+import RevisionHistorica from '../../../../components/RevisionHistorica'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 
 const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -272,6 +273,7 @@ export default function CuadroPage() {
             </div>
 
             {/* Royalties por nivel */}
+            {congelado && <RevisionHistorica revision={data.revisionHistorica} />}
             {congelado && data.conciliacion?.tipo === 'cuadro_negocio_documental' && (
               <div className="alert" style={{ display: 'block', marginBottom: 20, overflowWrap: 'anywhere' }}>
                 <strong>Cuadro conciliado con el documento de {NOMBRES_MES[month - 1]} {year}.</strong>
