@@ -20,6 +20,7 @@ export default function ResumenClasesPrueba({ datos, centroId, centroNombre }) {
   </div>
   return <details className="semana-tablero__cp">
     <summary className="semana-tablero__cp-resumen" aria-label={`Clases de prueba de ${centroNombre}: ${numero(datos.proximas.invitados)} agendados`}>
+      <span className="semana-tablero__cp-resumen-centro">{centroNombre}</span>
       <strong>{numero(datos.proximas.invitados)} agendados</strong>
       <span className="semana-tablero__cp-abrir">Ver detalle</span>
       <span className="semana-tablero__cp-cerrar">Ocultar detalle</span>
