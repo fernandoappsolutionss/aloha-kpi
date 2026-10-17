@@ -9,7 +9,7 @@ import OperationalCard from '../../components/OperationalCard'
 import TableroSemanal from '../../components/semana/TableroSemanal'
 import { getCentrosKpiRango } from '../actions/dashboard'
 import { resolvePanelRange, readPanelFilter, writePanelFilter } from '../../lib/period'
-import { promedioDisciplina, porcentajeDisciplina, variacionDisciplina, variacionPorcentual, tendenciaIngresos } from '../../lib/panel-metricas.mjs'
+import { promedioDisciplina, porcentajeDisciplina, variacionDisciplina, variacionPorcentual, tendenciaIngresos, totalNinosDeclarados } from '../../lib/panel-metricas.mjs'
 
 const ESTADO_PILL = { Cumplido: 'pill--ok', Parcial: 'pill--warn', Crítico: 'pill--bad' }
 const cumplColor = (v) => v == null ? 'var(--text-dim)' : v >= 85 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'
@@ -64,7 +64,8 @@ export default function DashboardPage() {
   function changeFilter(f) { writePanelFilter(f); setFilter(f) }
 
   const totNinos = centros.reduce((a, c) => a + c.ninos, 0)
-  const centrosConNinos = centros.filter(c => c.ninosDisponible).length
+  const ninosDeclarados = totalNinosDeclarados(centros)
+  const centrosConNinos = ninosDeclarados.conDatos
   const fechasNinos = new Set(centros.map(c => c.ninosPeriodoFin).filter(Boolean))
   const fuentesNinos = new Set(centros.map(c => c.ninosFuente).filter(Boolean))
   const totNuevos = centros.reduce((a, c) => a + c.nuevos, 0)
@@ -88,8 +89,8 @@ export default function DashboardPage() {
   const prevLabel = range.prevLabel
 
   const cards = [
-    { label: 'Niños · último dato mensual declarado', value: centrosConNinos === centros.length && centros.length ? totNinos.toLocaleString() : 'Sin total', icon: ic.ninos,
-      sub: `${centrosConNinos}/${centros.length} centros · ${fechasNinos.size > 1 || fuentesNinos.size > 1 ? 'fuentes o fechas distintas; ver detalle por centro' : fechasNinos.size ? `${[...fuentesNinos][0]} · período hasta ${[...fechasNinos][0].split('-').reverse().join('/')}` : 'sin dato mensual disponible'}`,
+    { label: 'Niños · último dato mensual declarado', value: ninosDeclarados.valor == null ? 'Sin dato' : ninosDeclarados.valor.toLocaleString('es-PA'), icon: ic.ninos,
+      sub: `Suma de ${centrosConNinos}/${centros.length} centros con datos · ${fechasNinos.size > 1 || fuentesNinos.size > 1 ? 'fuentes o fechas distintas; ver detalle por centro' : fechasNinos.size ? `${[...fuentesNinos][0]} · período hasta ${[...fechasNinos][0].split('-').reverse().join('/')}` : 'sin dato mensual disponible'}`,
       yoy: centrosConNinos === centros.length && prev.every(c => c.ninosDisponible) ? { delta: delta(totNinos, pTotNinos), upGood: true } : null },
     { label: 'Nuevos ingresos', value: totNuevos, icon: ic.nuevos, sub: label, color: 'var(--ts-green)', yoy: centros.length && centros.every(c => c.nuevosDisponible && prevPorId.get(String(c.id))?.nuevosDisponible) ? { delta: delta(totNuevos, pTotNuevos), upGood: true } : null },
     { label: 'Deserción real', value: totDesReal, icon: ic.des, sub: totGrad > 0 ? `${totDes} bajas · 🎓 ${totGrad} graduados` : 'en el período', yoy: { delta: delta(totDesReal, pTotDesReal), upGood: false } },

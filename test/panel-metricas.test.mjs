@@ -2,7 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resolvePanelRange } from '../lib/period.js'
 import { disciplinaPct, DISCIPLINA_KEYS } from '../lib/checklist.js'
-import { promedioDisciplina, porcentajeDisciplina, variacionDisciplina, tendenciaIngresos, coberturaIngresos } from '../lib/panel-metricas.mjs'
+import { promedioDisciplina, porcentajeDisciplina, variacionDisciplina, tendenciaIngresos, coberturaIngresos, totalNinosDeclarados } from '../lib/panel-metricas.mjs'
+
+test('la tarjeta mensual muestra 843 niños declarados aunque un séptimo centro siga sin datos', () => {
+  const centros = [128, 209, 147, null, 90, 174, 95].map(ninos => ({ ninos, ninosDisponible: ninos != null }))
+  assert.deepEqual(totalNinosDeclarados(centros), { valor: 843, conDatos: 6, total: 7 })
+  assert.deepEqual(totalNinosDeclarados(centros.filter(c => c.ninosDisponible)), { valor: 843, conDatos: 6, total: 6 })
+})
+
+test('la suma mensual conserva cero declarado y no suma cifras sin declaración o inválidas', () => {
+  assert.deepEqual(totalNinosDeclarados([{ ninos: 0, ninosDisponible: true }, { ninos: 99, ninosDisponible: false }, { ninos: NaN, ninosDisponible: true }]), { valor: 0, conDatos: 1, total: 3 })
+})
+
+test('sin ningún centro con dato la tarjeta conserva ausencia, nunca inventa cero', () => {
+  assert.deepEqual(totalNinosDeclarados([{ ninos: 0, ninosDisponible: false }]), { valor: null, conDatos: 0, total: 1 })
+  assert.deepEqual(totalNinosDeclarados([]), { valor: null, conDatos: 0, total: 0 })
+})
 
 test('Q3 compara con Q2 y Q1 cruza al Q4 del año anterior', () => {
   const q3 = resolvePanelRange({ mode: 'trimestre', year: 2026, quarter: 3 })
