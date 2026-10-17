@@ -4,11 +4,12 @@ import Link from 'next/link'
 import Sidebar from '../../../components/Sidebar'
 import LecturaCondicion from '../../../components/semana/LecturaCondicion'
 import GraficaSemanal from '../../../components/semana/GraficaSemanal'
-import { colorCondicion, nombreCondicion } from '../../../lib/condiciones/formulas.mjs'
+import CondicionSemanal from '../../../components/semana/CondicionSemanal'
+import ArranqueSemanal from '../../../components/semana/ArranqueSemanal'
 import { getReunionSemanal, aprobarCuotas, agregarOrden } from '../../actions/semana'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
-const estados = { sin_condicion: 'Pendiente de asignar condición', incompleto: 'Plan incompleto', completo: 'Plan preparado' }
+const estados = { sin_condicion: 'Preparar condición y plan en la reunión', incompleto: 'Plan incompleto', completo: 'Plan preparado' }
 
 export default function ReunionSemanalPage() {
   const [datos, setDatos] = useState(null)
@@ -55,12 +56,14 @@ export default function ReunionSemanalPage() {
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {mensaje && <p role="status" className="alert">{mensaje}</p>}
       {datos && !cargando && <div className="semana-reunion__lista">
+        <ArranqueSemanal ultimaCerrada={datos.centros.map(c => c.ultimaCerrada).sort()[0]} />
         {datos.centros.map((centro) => <section className="panel semana-reunion__centro" key={centro.id} aria-labelledby={`reunion-centro-${centro.id}`}>
           <div className="panel__head semana-reunion__head"><div><h2 className="panel__title" id={`reunion-centro-${centro.id}`}>{centro.nombre}</h2><p className="h-sub">Niños activos: {mostrar(centro.cerrada.ninos_activos)} · Δ última cerrada: {centro.deltaCerrada == null ? 'Sin dato' : `${centro.deltaCerrada > 0 ? '+' : ''}${centro.deltaCerrada}`}</p></div><Link className="btn" href={`/centro/${centro.id}/semana`}>Abrir Semana</Link></div>
           <GraficaSemanal puntos={centro.serie} titulo={`Niños activos de ${centro.nombre}`} unidad="niños" compacta />
-          <div className="semana-reunion__estado"><span>Condición asignada: {centro.condicion ? <span className="semana-condicion" style={{ '--condicion-color': colorCondicion(centro.condicion) }}>{nombreCondicion(centro.condicion)}</span> : 'Sin asignar'}</span><span className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>Estado del plan: {estados[centro.estadoPlan] || 'Pendiente'}{centro.plazoVencido && centro.estadoPlan !== 'completo' ? ' · Plazo vencido' : ''}</span></div><LecturaCondicion lectura={centro.lectura} />
+          <p className="h-sub">Cierre observado: {centro.ultimaCerrada} · Plan: {centro.desde} al {centro.hasta}{centro.preparacion ? ' · Preparación' : ''}</p>
+          <div className="semana-reunion__estado"><CondicionSemanal condicion={centro.condicion} lectura={centro.lectura} /><span className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>Estado del plan: {estados[centro.estadoPlan] || 'Pendiente'}{centro.plazoVencido && centro.estadoPlan !== 'completo' ? ' · Plazo vencido' : ''}</span></div><LecturaCondicion lectura={centro.lectura} />
           {centro.discrepancia && <p role="alert" className="alert alert--error">La condición asignada está por encima de la referencia automática. Revisa los datos y el fundamento antes de decidir.</p>}
-          <h3>Cuotas de la semana abierta</h3>
+          <h3>Cuotas de la semana abierta · cierre {centro.semanaAbierta}</h3>
           <ul className="semana-reunion__cuotas">{datos.catalogo.map((meta) => <li key={meta.codigo}><span>{meta.nombre}</span><strong>{mostrar(centro.cuotas[meta.codigo]?.cuota ?? centro.cuotas[meta.codigo]?.propuesta)}</strong><span className="label">{centro.cuotas[meta.codigo]?.estado === 'aprobada' ? 'Aprobada' : centro.cuotas[meta.codigo]?.cuota != null ? 'Propuesta' : 'Sugerida'}</span></li>)}</ul>
           {centro.puedeAprobar && <div className="semana-reunion__acciones"><button className="btn btn--primary" type="button" disabled={ocupado || !datos.catalogo.some((meta) => centro.cuotas[meta.codigo]?.cuota != null || centro.cuotas[meta.codigo]?.propuesta != null)} onClick={() => aprobar(centro)}>Aprobar cuotas</button></div>}
           {centro.puedeAprobar && <form className="semana-reunion__orden" onSubmit={(event) => dejarOrden(event, centro)}><h3>Dejar una orden</h3><label className="field"><span>Texto</span><input className="input" name="texto" maxLength={500} required /></label><label className="field"><span>Fecha</span><input className="input" type="date" name="fecha" /></label><button className="btn" type="submit" disabled={ocupado}>Guardar orden</button></form>}
