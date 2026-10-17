@@ -7,6 +7,10 @@ function Periodo({ titulo, datos }) {
     <dd aria-label="Invitados">{numero(datos.invitados)}</dd>
     <dd aria-label="Asistieron">{numero(datos.asistentes)}</dd>
     <dd aria-label="Porcentaje de asistencia">{datos.porcentaje == null ? '—' : `${numero(datos.porcentaje)}%`}</dd>
+    <dd className="semana-tablero__cp-conversion" aria-label="Matrículas y conversión">
+      <span>Matriculados: <b>{datos.matriculados == null ? 'Sin dato' : numero(datos.matriculados)}</b></span>
+      <span>Conversión: <b>{datos.conversion == null ? '—' : `${numero(datos.conversion)}%`}</b></span>
+    </dd>
   </div>
 }
 

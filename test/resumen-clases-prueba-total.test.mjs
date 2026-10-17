@@ -52,3 +52,27 @@ test('conteos incompletos o inválidos no contaminan sumas ni tasas', () => {
     assert.equal(resultado.disponibles, 0); assert.equal(resultado.invitados, null)
   }
 })
+
+test('conversión consolida matrículas sobre asistentes de la misma cohorte, sin promediar tasas', () => {
+  const a = centro('A', 10, 2, 4), b = centro('B', 90, 18, 12)
+  a.clasesPrueba.mes.matriculados = 2
+  b.clasesPrueba.mes.matriculados = 3
+  const total = totalClasesPrueba([a, b])
+  assert.equal(total.matriculados, 5); assert.equal(total.asistentesConversion, 20)
+  assert.equal(total.conversion, 25); assert.equal(total.conversionDisponibles, 2)
+})
+
+test('matrícula desconocida conserva los otros indicadores y usa cobertura propia', () => {
+  const a = centro('A', 10, 2, 4), b = centro('B', 90, 18, 12)
+  a.clasesPrueba.mes.matriculados = 1
+  const total = totalClasesPrueba([a, b])
+  assert.equal(total.asistentes, 20); assert.equal(total.matriculados, 1)
+  assert.equal(total.asistentesConversion, 2); assert.equal(total.conversion, 50)
+  assert.deepEqual(total.conversionFaltantes, ['B'])
+  assert.equal(totalClasesPrueba([b]).matriculados, null)
+  b.clasesPrueba.mes.matriculados = 19
+  assert.equal(totalClasesPrueba([b]).matriculados, null)
+  b.clasesPrueba.mes.asistentes = 0; b.clasesPrueba.mes.matriculados = 0
+  assert.equal(totalClasesPrueba([b]).matriculados, 0)
+  assert.equal(totalClasesPrueba([b]).conversion, null)
+})

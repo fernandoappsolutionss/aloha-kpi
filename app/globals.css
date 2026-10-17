@@ -1602,7 +1602,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-cp-totales__cabecera h3 { margin: 0; }
 .semana-cp-totales__selector { display: grid; gap: 4px; font-size: 12px; max-width: 100%; }
 .semana-cp-totales__selector .select { min-width: 0; width: 100%; }
-.semana-cp-totales__tarjetas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.semana-cp-totales__tarjetas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .semana-cp-totales__tarjetas h4 { margin: 0; }
 @media (max-width: 1000px) {
   .semana-cp-totales__tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1625,6 +1625,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-tablero__cp-periodo dt { font-size: 12px; font-weight: 600; }
 .semana-tablero__cp-periodo dt span { display: block; font-weight: 400; font-size: 12px; color: var(--text-muted); }
 .semana-tablero__cp .semana-tablero__cp-periodo dd { margin: 0; font-size: 14px !important; font-weight: 600; text-align: right; }
+.semana-tablero__cp .semana-tablero__cp-periodo .semana-tablero__cp-conversion { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 12px !important; font-weight: 400; text-align: left; padding-bottom: 4px; }
 .semana-tablero__cp-detalle { font-size: 12px; }
 .semana-tablero__cp-detalle summary { cursor: pointer; padding: 8px 0; min-height: 32px; }
 .semana-tablero__cp-detalle ul { margin: 0 0 8px; padding-left: 20px; }
