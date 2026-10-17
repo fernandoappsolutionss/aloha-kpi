@@ -1,4 +1,5 @@
 'use server'
+import { normalizarCobranza } from '../../lib/cobranza-datos.mjs'
 import { sql, upsertWith, withTransaction } from '../../lib/db'
 import { requireCentroAccess, requireCurrentPuedeCerrarMes, requireCurrentWriteCentro } from '../../lib/auth'
 import { calcularCuadro } from '../../lib/cuadro-snapshot'
@@ -129,7 +130,7 @@ export async function loadKpiMes(centroId, year, month) {
     centroNombre: c?.nombre || '',
     estado,
     resumen: res || null,
-    semanas,
+    semanas: semanas.map(normalizarCobranza),
     historial,
     // Un cierre es una fotografia: no se reencadena ni se vuelve a leer del
     // modulo vivo cuando alguien consulta el historial.
@@ -235,7 +236,8 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
     const desSemana = esAuto ? kpiAuto.des[i] : null
     await upsertWith(query, 'kpi_semanas', {
       centro_id: centroId, year, month, semana: i + 1,
-      cob_d1: intOr(w.cob?.[0]), cob_d2: intOr(w.cob?.[1]), cob_d3: intOr(w.cob?.[2]), cob_d4: intOr(w.cob?.[3]), cob_d5: intOr(w.cob?.[4]),
+      cob_nullable: true,
+      cob_d1: intOr(w.cob?.[0], null), cob_d2: intOr(w.cob?.[1], null), cob_d3: intOr(w.cob?.[2], null), cob_d4: intOr(w.cob?.[3], null), cob_d5: intOr(w.cob?.[4], null),
       des_d1: intOr(desSemana ? desSemana[0] : w.des?.[0]), des_d2: intOr(desSemana ? desSemana[1] : w.des?.[1]), des_d3: intOr(desSemana ? desSemana[2] : w.des?.[2]), des_d4: intOr(desSemana ? desSemana[3] : w.des?.[3]), des_d5: intOr(desSemana ? desSemana[4] : w.des?.[4]),
       ing_d1: intOr(ingSemana ? ingSemana[0] : w.ing?.[0]), ing_d2: intOr(ingSemana ? ingSemana[1] : w.ing?.[1]), ing_d3: intOr(ingSemana ? ingSemana[2] : w.ing?.[2]), ing_d4: intOr(ingSemana ? ingSemana[3] : w.ing?.[3]), ing_d5: intOr(ingSemana ? ingSemana[4] : w.ing?.[4]),
       updated_at: now,

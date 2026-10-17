@@ -17,6 +17,8 @@ const ERRORES = {
 const fecha = (ts) => ts ? new Date(ts).toLocaleDateString('es-PA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Panama' }) : ''
 
 export default function ZohoPage() {
+  const [sincronizando, setSincronizando] = useState(false)
+  const [resultado, setResultado] = useState(null)
   const [estado, setEstado] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -46,6 +48,21 @@ export default function ZohoPage() {
     return () => { active = false }
   }, [access.loaded, access.canViewZoho])
 
+  async function sincronizar() {
+    setSincronizando(true)
+    setAviso(null)
+    try {
+      const response = await fetch('/api/zoho/cobranza', { method: 'POST' })
+      const r = await response.json()
+      if (!response.ok || r.error) throw new Error(r.error || 'No se pudo completar la sincronización.')
+      setResultado(r)
+      setAviso({ tipo: r.guardado ? 'ok' : 'error', texto: r.guardado
+        ? 'Conteo conciliado con Zoho y actualizado en el KPI.'
+        : 'Hay facturas que requieren revisión. El KPI conserva el último conteo confirmado.' })
+    } catch (e) { setAviso({ tipo: 'error', texto: e.message }) }
+    finally { setSincronizando(false) }
+  }
+  const informe = resultado || estado?.ultimaConciliacion
   const conexion = estado?.conexion
 
   return (
@@ -92,6 +109,10 @@ export default function ZohoPage() {
                 Solo hace falta reconectar si Zoho revoca el acceso.
               </p>
               <a className="btn" href="/api/zoho/connect">Reconectar</a>
+              <button className="btn btn--primary" onClick={sincronizar} disabled={sincronizando} style={{ marginLeft: 12 }}>
+                {sincronizando ? 'Consultando facturas de Zoho…' : 'Verificar y actualizar conteo'}
+              </button>
+              <p className="h-sub">Revisa los artículos y el saldo de cada factura. Puede tardar hasta unos minutos; no cierres esta página durante la consulta.</p>
             </>
           ) : (
             <>
@@ -106,6 +127,21 @@ export default function ZohoPage() {
             </>
           )}
         </div>
+        {informe && <section className="card" aria-label="Conciliación de facturas vencidas" style={{ padding: 24, marginTop: 20 }}>
+          <h2>Última conciliación de cobranza</h2>
+          <p>{informe.guardado ? 'Conteo guardado' : 'Revisión pendiente · conteo anterior conservado'} · {new Date(informe.fin).toLocaleString('es-PA', { timeZone: 'America/Panama' })} (Panamá)</p>
+          <p>{informe.revisados} facturas revisadas · {informe.incluidos} mensualidades vencidas · {informe.excluidos} excluidas · {informe.pendientes.length} por revisar.</p>
+          <details><summary>Ver conciliación por factura</summary>
+            {informe.organizaciones.map(org => <div key={org.orgId}>
+              <h3>{org.nombre}</h3>
+              <div style={{ overflowX: 'auto' }}><table className="table"><thead><tr><th>Factura</th><th>Artículos</th><th>Resultado</th><th>Centro</th></tr></thead>
+                <tbody>{org.facturas.map(f => <tr key={f.facturaId}>
+                  <td>{f.numero}</td><td>{f.articulos.map(a => a.nombre).join(' · ')}</td>
+                  <td>{f.estado === 'incluida' ? 'Mensualidad vencida' : f.motivo}</td><td>{({ 1: 'Brisas del Golf', 2: 'Anclas Mall', 3: 'Calle 50', 5: 'David', 6: 'Condado del Rey', 10: 'Los Naranjos' })[f.centroId] || '—'}</td>
+                </tr>)}</tbody></table></div>
+            </div>)}
+          </details>
+        </section>}
         </>}
       </main>
     </div>
