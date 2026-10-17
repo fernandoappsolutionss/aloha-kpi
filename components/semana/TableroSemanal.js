@@ -42,8 +42,8 @@ export default function TableroSemanal() {
     return () => { active = false }
   }, [recarga])
   const cobertura = datos ? coberturaResumen(datos) : []
+  const actualCobertura = cobertura.find(p => p.semanaFin === datos?.semanaAbierta)
   const cierreCobertura = cobertura.find(p => p.semanaFin === datos?.ultimaCerrada)
-  const incompletas = cobertura.filter(p => p.incompleta)
 
   return <section className="panel semana-tablero">
     <div className="panel__head"><h2 className="panel__title">Semana operativa por centro</h2><span className="label">Niños activos · últimas 6 semanas</span></div>
@@ -51,19 +51,30 @@ export default function TableroSemanal() {
       {error && <p role="alert" className="alert alert--error">{error} <button className="btn" type="button" onClick={() => setRecarga((n) => n + 1)}>Reintentar</button></p>}
       {!datos && !error && <p role="status">Cargando semana…</p>}
       {datos && <>
+        {datos.centros.length > 0 && <div className="semana-tablero__totales" role="region" aria-label="Resumen de niños activos">
+          <div className="semana-tablero__total">
+            <h3 className="label">Niños activos · semana en curso</h3>
+            <div className="semana-tablero__total-valor">{mostrar(actualCobertura?.subtotal)}</div>
+            <p className="h-sub">Suma de {actualCobertura?.disponibles ?? 0}/{datos.centros.length} centros con datos</p>
+            <p className="h-sub">Semana que cierra el {fecha(datos.semanaAbierta)} · provisional</p>
+          </div>
+          <div className="semana-tablero__total">
+            <h3 className="label">Niños activos · último cierre</h3>
+            <div className="semana-tablero__total-valor">{mostrar(cierreCobertura?.subtotal)}</div>
+            <p className="h-sub">Suma de {cierreCobertura?.disponibles ?? 0}/{datos.centros.length} centros con datos</p>
+            <p className="h-sub">Cierre {fecha(datos.ultimaCerrada)}</p>
+          </div>
+        </div>}
         <ArranqueSemanal ultimaCerrada={datos.centros.map(c => c.ultimaCerrada).sort()[0]} />
         <p className="h-sub">Últimas 6 semanas, incluida la abierta. Cada centro usa su jueves de cierre local. La condición corresponde al último cierre; el dato abierto es provisional. El período mensual o trimestral elegido aplica al panel inferior.</p>
         <p className="h-sub">La escala usa el historial de 12 semanas y las cuotas de cada centro. Compara los valores; la inclinación depende de la escala. La administradora confirma la condición al preparar su plan. <Link className="operations-link" href="/dashboard/reunion-semanal">Preparar la reunión semanal</Link></p>
         <p className="semana-tablero__leyenda"><span className="hca-mejora">━ Azul: sube</span><span className="hca-empeora">━ Rojo: baja</span><span>━ Gris: sin cambio</span><span>┄ Abierta: provisional</span><span>┄ Ámbar: cuota</span></p>
         {datos.centros.some((centro) => centro.semanaAbierta !== datos.semanaAbierta) && <p role="status" className="h-sub">Por la diferencia horaria entre Caracas y Panamá, algunos centros ya están en la semana siguiente.</p>}
-        {incompletas.length > 0 && <div className="semana-tablero__cobertura">
-          <strong>{cierreCobertura?.incompleta ? 'Faltan datos para el total de centros' : 'Hay semanas sin datos de todos los centros'}</strong>
-          {cierreCobertura?.incompleta && <p>Cierre {fecha(cierreCobertura.semanaFin)}: {cierreCobertura.disponibles} de {cierreCobertura.total} centros con datos{cierreCobertura.subtotal != null ? ` · subtotal: ${mostrar(cierreCobertura.subtotal)} niños` : ''}. Falta: {cierreCobertura.faltantes.join(', ')}.</p>}
-          <p>El total suma los niños activos de todos los centros visibles en la misma fecha. Si falta un centro, se muestra solo el subtotal disponible y se deja un hueco en la gráfica del total.</p>
-          <details><summary>Ver cobertura de las últimas 6 semanas</summary><ul>
-            {cobertura.map(p => <li key={p.semanaFin}>{fecha(p.semanaFin)}{p.semanaFin > datos.ultimaCerrada ? ' (abierta)' : ''}: {p.incompleta ? 'subtotal' : 'total'} {mostrar(p.subtotal)} · {p.disponibles}/{p.total} centros{p.incompleta && ` · falta: ${p.faltantes.join(', ')}`}</li>)}
-          </ul></details>
-        </div>}
+        {datos.centros.length > 0 && cobertura.length > 0 && <details className="semana-tablero__cobertura">
+          <summary>Ver cobertura de las últimas 6 semanas</summary>
+          <p>Las cifras suman los centros con datos en cada fecha. Los centros sin datos no se cuentan como cero ni impiden ver la suma disponible. La gráfica conjunta solo une fechas con datos de todos los centros.</p>
+          <ul>{cobertura.map(p => <li key={p.semanaFin}>{fecha(p.semanaFin)}{p.semanaFin > datos.ultimaCerrada ? ' (abierta)' : ''}: {p.incompleta ? 'suma disponible' : 'total'} {mostrar(p.subtotal)} · {p.disponibles}/{p.total} centros{p.incompleta && ` · sin datos: ${p.faltantes.join(', ')}`}</li>)}</ul>
+        </details>}
         {cobertura.some(p => p.valor != null) && <GraficaSemanal puntos={cobertura} titulo="Total de niños activos de todos los centros con cobertura completa" unidad="niños" />}
         <TableScroller label="Estadísticas semanales por centro" stickyFirstColumn>
           <table className="table semana-tablero__tabla">
