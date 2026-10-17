@@ -24,7 +24,7 @@ test('con apply ejecuta las migraciones F2, F3 y F4 completas y en orden', async
 })
 
 test('cron registra cobranza diaria antes de saltar el KPI mensual cerrado', () => {
-  const source = readFileSync(new URL('../app/api/cron/cobranza-zoho/route.js', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../lib/cobranza-sync.js', import.meta.url), 'utf8')
   assert.ok(source.indexOf('INSERT INTO cobranza_diaria') > 0)
-  assert.ok(source.indexOf('INSERT INTO cobranza_diaria') < source.indexOf("if (mes?.estado === 'cerrado')"))
+  assert.ok(source.indexOf('INSERT INTO cobranza_diaria') < source.indexOf("if (mes?.estado !== 'abierto')"))
 })

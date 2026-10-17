@@ -207,7 +207,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
 
   const metaNuevosMes = metas?.meta_nuevos_ingresos_mes || 20
   const metaDesMes = Number(metas?.meta_desercion_mes || 8) // % máximo de deserción mensual
-  const metaCobMes = metas?.meta_cobranza_max || 1
+  const metaCobMes = metas?.meta_cobranza_max ?? 1
 
   return centros.map((c) => {
     const crs = rs.filter((r) => r.centro_id === c.id)
@@ -331,6 +331,7 @@ export async function getCentrosKpiRango(fromY, fromM, toY, toM) {
       ninosDisponible: datoNinos.disponible, ninosPeriodoFin: datoNinos.periodoFin, ninosFuente: datoNinos.fuente,
       nuevos: totNuevos, meta: metaNuevosMes * nMeses, desercion: totDes, graduados, desercionReal,
       nuevosDisponible: coberturaNuevos.disponible, coberturaNuevos,
+      metaCobranza: Number(metaCobMes),
       cobranza: producto.P3 === true ? 'Sí' : producto.P3 === false ? 'No' : '—',
       cumpl, disciplina: cumpl, metasCumpl, estado, trend,
       semaforo: semaforoCentro,

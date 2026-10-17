@@ -13,6 +13,8 @@
 // cerrados (mes_kpi.estado = 'cerrado').
 import { neon } from '@neondatabase/serverless'
 import { ORGS_ZOHO, clasificarCentro, semanaDiaKpi, vencidaElDia, listarFacturas, esMensualidad } from '../lib/zoho-cobranza.mjs'
+throw new Error('Backfill histórico retirado: las referencias no prueban mensualidades ni saldos pasados. Usa cobranza_diaria o una conciliación documentada.')
+
 
 const [year, month] = [Number(process.argv[2]), Number(process.argv[3])]
 const dry = process.argv.includes('--dry')
