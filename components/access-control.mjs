@@ -61,8 +61,8 @@ export function resolveAccess(context = {}) {
   const viewZoho = booleanCapability(capabilities, ['viewZoho', 'canViewZoho', 'manageZoho'], isMaster) && !isReadonlyGlobal
   // Sin `&& !isReadonlyGlobal`: Frederick (admin_general) opera la caja.
   const viewCaja = booleanCapability(capabilities, ['viewCaja'], false)
-  const viewAdminTraining = booleanCapability(capabilities, ['viewAdminTraining', 'canViewAdminTraining'], isMaster) && !isReadonlyGlobal
-  const viewOficio = booleanCapability(capabilities, ['viewOficio', 'canViewOficio', 'viewAdminTraining'], isMaster) && !isReadonlyGlobal
+  const viewAdminTraining = booleanCapability(capabilities, ['viewAdminTraining', 'canViewAdminTraining'], isMaster || isCoordinator) && !isReadonlyGlobal
+  const viewOficio = booleanCapability(capabilities, ['viewOficio', 'canViewOficio', 'viewAdminTraining'], isMaster || isCoordinator) && !isReadonlyGlobal
 
   return {
     actor,

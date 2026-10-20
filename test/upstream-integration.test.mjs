@@ -11,6 +11,7 @@ import {
   isMaster,
   puedeGestionarUsuarios,
   puedeVerUsuarios,
+  puedeVerEntrenamientoEquipo,
 } from '../lib/current-user.mjs'
 import { puedeVerCaja } from '../lib/caja/acceso.mjs'
 
@@ -28,10 +29,11 @@ test('navigation grants Zoho only to current Master, never stale role or panel c
     const { getNavigationContext } = serverModule('../app/actions/navigation.js', {
       requireCurrentUser: async () => ({ id: 7, rol, email: rol === 'admin_master' ? 'fperez@teamsolutionss.com' : `${rol}@example.invalid`, centros: [10], centro_id: 10 }),
       sql: async () => [{ id: 10, nombre: 'Centro local' }],
-      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerCaja,
+      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerEntrenamientoEquipo, puedeVerCaja,
     }, ['getNavigationContext'])
     const context = await getNavigationContext()
     assert.equal(context.capabilities.viewZoho, expected, rol)
+    assert.equal(context.capabilities.viewAdminTraining, ['admin_master', 'coordinador'].includes(rol), `entrenamiento ${rol}`)
     // Caja va por correo: solo el Master de esta lista está en la allowlist.
     assert.equal(context.capabilities.viewCaja, expected, `caja ${rol}`)
     assert.equal(context.actor.role, rol)
@@ -72,7 +74,7 @@ test('navigation grants caja by allowlisted email, not by role', async () => {
     const { getNavigationContext } = serverModule('../app/actions/navigation.js', {
       requireCurrentUser: async () => ({ id: 7, rol, email, centros: [10], centro_id: 10 }),
       sql: async () => [{ id: 10, nombre: 'Centro local' }],
-      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerCaja,
+      centrosDe, esGerencia, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerEntrenamientoEquipo, puedeVerCaja,
     }, ['getNavigationContext'])
     const context = await getNavigationContext()
     assert.equal(context.capabilities.viewCaja, expected, email)

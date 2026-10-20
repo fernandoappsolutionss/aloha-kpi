@@ -11,7 +11,9 @@ import * as progreso from '../../lib/entrenamiento/oficio/progreso.js'
 import * as guia from '../../lib/entrenamiento/oficio/guia-pasos.js'
 import { GLOSARIO } from '../../lib/entrenamiento/oficio/glosario.js'
 import { RESPUESTAS_OFICIO } from '../../lib/entrenamiento/respuestas-oficio/todas.js'
-import { assertMaster, assertOficio, isMaster } from '../../lib/current-user.mjs'
+import { assertMaster, assertOficio, isMaster, puedeVerEntrenamientoEquipo, centrosEntrenamiento } from '../../lib/current-user.mjs'
+
+import { asignacionesOficio } from '../../lib/caja/direccion.mjs'
 
 const url = process.env.ALOHA_REINICIOS_TEST_DATABASE_URL
 if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)
@@ -39,7 +41,7 @@ const source = readFileSync(new URL('../../app/actions/entrenamiento-oficio.js',
   .replace(/import[\s\S]*?from ['"][^'"]+['"]\n/g, '')
   .replace(/export async function /g, 'async function ')
 const deps = {
-  sql, withTransaction, ...reinicios, ...catalogo, ...progreso, ...guia, GLOSARIO, RESPUESTAS_OFICIO, isMaster,
+  sql, withTransaction, ...reinicios, ...catalogo, ...progreso, ...guia, GLOSARIO, RESPUESTAS_OFICIO, isMaster, puedeVerEntrenamientoEquipo, centrosEntrenamiento, asignacionesOficio,
   requireCurrentMaster: async () => assertMaster(actor), requireCurrentOficio: async () => assertOficio(actor),
   fallo: (_name, e) => ({ error: e.message }),
 }

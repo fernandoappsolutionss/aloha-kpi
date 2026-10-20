@@ -9,6 +9,7 @@ import { fallo } from '../../lib/errores'
 import { modulosDeRol, MODULOS } from '../../lib/entrenamiento/modulos'
 import { RESPUESTAS } from '../../lib/entrenamiento/respuestas'
 import { corregirQuiz, porcentaje } from '../../lib/entrenamiento/progreso'
+import { centrosEntrenamiento } from '../../lib/current-user.mjs'
 
 const MODULO_IDS = new Set(MODULOS.map((m) => m.id))
 
@@ -104,17 +105,17 @@ export async function responderQuiz(modulo, respuestas) {
   })
 }
 
-// Gerencia: administradoras y asistentes (+centro) × módulos. requireCurrentMaster
-// relee el rol desde la BD (como peticiones.js y deleteCentro): un JWT de 7
-// días de alguien degradado o borrado no debe leer nombres/emails/progreso.
+// Master ve la red; coordinación solo sus centros, con identidad vigente.
 // → { modulos:[{id,titulo}], usuarios:[{ id, nombre, email, rol, centro, centroId, progreso:{[modulo]:{…}}, completados, pct }] }
 export async function matrizProgreso(centroId = null) {
   return runAction('matrizProgreso', async () => {
-    await requireCurrentMaster()
-    const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
-    const usuarios = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol IN ('administradora', 'asistente') AND u.centro_id = ${cid} ORDER BY c.nombre, u.nombre`
-      : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol IN ('administradora', 'asistente') ORDER BY c.nombre, u.nombre`
+    const centros = centrosEntrenamiento(await requireCurrentUser(), centroId)
+    const usuarios = await sql`
+      SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro
+      FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id
+      WHERE u.rol IN ('administradora', 'asistente')
+        AND (${centros}::int[] IS NULL OR u.centro_id = ANY(${centros}::int[]))
+      ORDER BY c.nombre, u.nombre`
     const ids = usuarios.map((x) => x.id)
     const rows = ids.length ? await sql`SELECT * FROM entrenamiento_progreso WHERE usuario_id = ANY(${ids})` : []
     const porUsuario = {}

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import Sidebar from '../../../components/Sidebar'
 import TableScroller from '../../../components/TableScroller'
 import { useCurrentAccess } from '../../../components/useCurrentAccess'
@@ -58,13 +59,19 @@ export default function EntrenamientoAdminPage() {
       <main id="main-content" data-page-state={loading ? 'loading' : error || !data ? 'error' : 'ready'} className="main comparisons-page training-admin-page">
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento</div>
-            <h1 className="h-title">Quién completó el entrenamiento</h1>
+            <div className="label" style={{ marginBottom: 10 }}>{access.isCoordinator ? 'Coordinación · Entrenamiento' : 'Gerencia · Entrenamiento'}</div>
+            <h1 className="h-title">{access.isCoordinator ? 'Entrenamiento de mis centros' : 'Quién completó el entrenamiento'}</h1>
             <p className="h-sub">Plataforma · Administradoras y asistentes administrativos. Por usuario y módulo. ✓ = recorrido visto y quiz 3/3 · <span style={{ color: 'var(--warn)' }}>tour</span> = vio el recorrido, falta el quiz · <span style={{ color: 'var(--warn)' }}>quiz</span> = aprobó sin ver el recorrido</p>
+            <p className="h-sub">
+              <Link className="tour-card__link" href="/dashboard/entrenamiento/oficio">Ver puestos y maniobras del equipo</Link>
+              {access.isCoordinator && access.centers[0] && <>
+                {' · '}<Link className="tour-card__link" href={`/centro/${access.centers[0].id}/entrenamiento`}>Mi entrenamiento</Link>
+              </>}
+            </p>
           </div>
           <label className="training-filter" htmlFor="training-center">Filtrar por centro
           <select id="training-center" name="centro" autoComplete="off" className="input" value={centroId} onChange={(e) => setCentroId(e.target.value)}>
-            <option value="">Todos los centros</option>
+            <option value="">{access.isCoordinator ? 'Todos mis centros' : 'Todos los centros'}</option>
             {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
           </label>

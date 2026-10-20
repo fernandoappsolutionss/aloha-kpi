@@ -1,7 +1,7 @@
 'use server'
 import { sql } from '../../lib/db'
 import { requireCurrentUser } from '../../lib/auth'
-import { centrosDe, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios } from '../../lib/current-user.mjs'
+import { centrosDe, esSoloLectura, isMaster, puedeGestionarUsuarios, puedeVerUsuarios, puedeVerEntrenamientoEquipo } from '../../lib/current-user.mjs'
 import { puedeVerCaja } from '../../lib/caja/acceso.mjs'
 
 export async function getNavigationContext() {
@@ -19,7 +19,7 @@ export async function getNavigationContext() {
       viewUsers: puedeVerUsuarios(user),
       manageUsers: puedeGestionarUsuarios(user),
       viewCenters: isMaster(user) || esSoloLectura(user),
-      viewAdminTraining: isMaster(user),
+      viewAdminTraining: puedeVerEntrenamientoEquipo(user),
       viewMetas: isMaster(user) || esSoloLectura(user),
       viewZoho: isMaster(user),
       viewCaja: puedeVerCaja(user),

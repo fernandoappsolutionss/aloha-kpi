@@ -10,6 +10,7 @@ import {
   esSoloLectura,
   isMaster,
   puedeVerOficio,
+  puedeVerEntrenamientoEquipo,
   puedeVerUsuarios,
   usuarioBloqueado,
   vePanelGerencia,
@@ -139,10 +140,12 @@ function rutaOficioCentro(pathname, centroId) {
 }
 
 function rutaDashboardMaster(pathname) {
-  return pathname === '/dashboard/entrenamiento'
-    || pathname.startsWith('/dashboard/entrenamiento/')
-    || pathname === '/dashboard/zoho'
+  return pathname === '/dashboard/zoho'
     || pathname.startsWith('/dashboard/zoho/')
+}
+
+function rutaDashboardEntrenamiento(pathname) {
+  return pathname === '/dashboard/entrenamiento' || pathname.startsWith('/dashboard/entrenamiento/')
 }
 
 function rutaDashboardLecturaGlobal(pathname) {
@@ -186,6 +189,7 @@ export async function middleware(req) {
     if (rutaDashboardUsuarios(pathname) && !puedeVerUsuarios(user)) return deny(req, user)
     if (rutaDashboardCaja(pathname) && !puedeVerCaja(user)) return deny(req, user)
     if (rutaDashboardMaster(pathname) && !isMaster(user)) return deny(req, user)
+    if (rutaDashboardEntrenamiento(pathname) && !puedeVerEntrenamientoEquipo(user)) return deny(req, user)
     if (rutaDashboardLecturaGlobal(pathname) && !(isMaster(user) || esSoloLectura(user))) return deny(req, user)
   }
 

@@ -12,7 +12,7 @@
 import { sql, withTransaction } from '../../lib/db'
 import { requireCurrentOficio, requireCurrentMaster } from '../../lib/auth'
 import { fallo } from '../../lib/errores'
-import { isMaster } from '../../lib/current-user.mjs'
+import { isMaster, puedeVerEntrenamientoEquipo, centrosEntrenamiento } from '../../lib/current-user.mjs'
 import { asignacionesOficio } from '../../lib/caja/direccion.mjs'
 import { bloquearOficio, archivarYReiniciar, validarReinicio } from '../../lib/entrenamiento/oficio/reinicios.mjs'
 import { MODULOS_OFICIO, CURSOS, MODULO_IDS_OFICIO, moduloOficio, metadatosOficio } from '../../lib/entrenamiento/oficio/catalogo'
@@ -185,7 +185,7 @@ export async function cargarOficio() {
       rolNombre: NOMBRE_ROL[u.rol] || u.rol,
       // El centro propio decide los módulos con `centros` (la página los filtra igual).
       centroId: u.centro_id == null ? null : Number(u.centro_id),
-      veMatriz: isMaster(u),
+      veMatriz: puedeVerEntrenamientoEquipo(u),
       asignaciones: asignacionesOficio(u),
       puedeFirmarA: rolesQueFirma(u.rol),
       revision,
@@ -236,11 +236,7 @@ export async function resumenOficio() {
     const s = await requireCurrentOficio()
     const plan = planDeRol(s.rol, MODULOS_OFICIO, s.centro_id, asignacionesOficio(s))
     const revision = planesDeRevision(s.rol)
-    // veMatriz: /dashboard/entrenamiento/oficio (quién tiene su hat) es de
-    // gerencia — a un coordinador el layout lo devuelve a /dashboard. El
-    // enlace se decide con isAdminRole, la misma fuente que ese layout, no
-    // comparando nombres de rol en el navegador.
-    const veMatriz = isMaster(s)
+    const veMatriz = puedeVerEntrenamientoEquipo(s)
     if (plan.length === 0) {
       if (revision.length === 0) return null
       return { modo: 'revision', rol: s.rol, rolNombre: NOMBRE_ROL[s.rol] || s.rol, veMatriz, revision }
@@ -627,27 +623,12 @@ export async function contadorFirmas(centroId = null) {
   })
 }
 
-// Gerencia: matriz del oficio. A diferencia de matrizProgreso (que filtra
-// rol='administradora' y dejaría fuera justo a las asistentes), aquí entran
-// los CUATRO puestos que se entrenan, cada uno con SU plan.
-// → { cursos:[{id,titulo,bloque}], usuarios:[{…, porCurso, avance}] }
-//
-// POR QUÉ EL COORDINADOR OPERATIVO NO ENTRA AQUÍ, teniendo como tiene firma
-// sobre los otros tres puestos (OFICIAL_DE). Es una decisión, no un olvido:
-// esta consulta, sin `centroId`, devuelve a TODA la gente de TODOS los centros,
-// y el alcance del Coordinador son los suyos (usuario_centros). Abrirle la
-// pantalla sin filtrar sería darle la red completa; abrírsela filtrada es otra
-// pantalla —capacidad propia en navigation.js, layout propio bajo
-// /dashboard/entrenamiento/oficio y un WHERE por sus centros en las dos ramas
-// de abajo— y eso no entra en este paquete.
-// Lo que su puesto sí alcanza hoy, y no está en duda: la cola de firmas de cada
-// centro que coordina (/centro/<id>/entrenamiento/firmas) y la lectura de los
-// tres planes que le firma, en el carril "Los planes que tú firmas". El día que
-// haga falta la vista de red, el cambio es el de arriba, no un `||` aquí.
+// Master ve todos los puestos; coordinación solo el equipo de sus centros.
 export async function matrizOficio(centroId = null) {
   return runAction('matrizOficio', async () => {
-    await requireCurrentMaster()
-    const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
+    const actor = await requireCurrentOficio()
+    const alcance = centrosEntrenamiento(actor, centroId)
+    const cid = centroId
     // Los centros de usuario_centros VIAJAN, no solo filtran. Para el
     // Coordinador Operativo `usuarios.centro_id` es NULL —manda en varios
     // centros a la vez— así que sin esto su fila salía con el centro en "—" y
@@ -658,7 +639,14 @@ export async function matrizOficio(centroId = null) {
     // los NOMBRES como una sola cadena con STRING_AGG, no como un segundo
     // array: así no hay dos agregados que tengan que quedar alineados índice a
     // índice, y el texto es literalmente lo que se pinta en la columna.
-    const usuarios = cid
+    const usuarios = !isMaster(actor)
+      ? await sql`
+          SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro,
+                 '{}'::int[] AS centro_ids, NULL::text AS centros_texto
+          FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id
+          WHERE u.rol = ANY(${rolesQueFirma(actor.rol)}) AND u.centro_id = ANY(${alcance}::int[])
+          ORDER BY c.nombre, u.rol, u.nombre`
+      : cid
       ? await sql`
           SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro,
                  COALESCE(ARRAY_AGG(uc.centro_id ORDER BY cm.nombre, uc.centro_id) FILTER (WHERE uc.centro_id IS NOT NULL), '{}') AS centro_ids,
@@ -692,6 +680,7 @@ export async function matrizOficio(centroId = null) {
     // Los planes que se pueden abrir en lectura, con su nombre de puesto: la
     // pantalla enlazaba dos escritos a mano y hoy son cuatro.
     const planes = ROLES_ALUMNO
+      .filter((r) => rolesQueRevisa(actor.rol, MODULOS_OFICIO).includes(r))
       .filter((r) => planDeRol(r, MODULOS_OFICIO, undefined, ['direccion-caja']).length > 0)
       .map((r) => ({ rol: r, rolNombre: NOMBRE_ROL[r] || r }))
     return {

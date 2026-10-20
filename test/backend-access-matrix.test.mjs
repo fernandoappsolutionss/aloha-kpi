@@ -104,3 +104,16 @@ test('acciones de caja releen la allowlist en cada llamada', async () => {
     assert.match(functionSource(file, name), /requireCurrentCaja\(/, `${key} debe llamar requireCurrentCaja`)
   }
 })
+
+test('matrices de entrenamiento validan identidad vigente y alcance antes de leer usuarios', async () => {
+  const { ACTION_ACCESS_MATRIX, ACCESS_KINDS } = await import('../lib/access-matrix.mjs')
+  for (const [file, name, guard] of [
+    ['app/actions/entrenamiento.js', 'matrizProgreso', 'requireCurrentUser'],
+    ['app/actions/entrenamiento-oficio.js', 'matrizOficio', 'requireCurrentOficio'],
+  ]) {
+    assert.equal(ACTION_ACCESS_MATRIX[`${file}#${name}`], ACCESS_KINDS.teamTraining)
+    const body = functionSource(file, name)
+    assert.ok(body.indexOf(`${guard}()`) < body.indexOf('const usuarios'))
+    assert.ok(body.indexOf('centrosEntrenamiento(') < body.indexOf('const usuarios'))
+  }
+})
