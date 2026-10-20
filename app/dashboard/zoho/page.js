@@ -146,15 +146,15 @@ export default function ZohoPage() {
           <button className="btn btn--primary" onClick={sincronizarVentas} disabled={sincronizandoVentas}>
             {sincronizandoVentas ? 'Comprobando pagos…' : 'Actualizar aprendizaje de ventas'}
           </button>
-          <p className="h-sub">Cada consulta retoma el historial pendiente. Las facturas sin contacto identificado no cuentan como ventas atribuidas a campañas.</p>
+          <p className="h-sub">Cada consulta revisa cambios recientes, comprueba ventas vinculadas y retoma el historial pendiente. Las facturas sin contacto identificado no cuentan como ventas atribuidas a campañas.</p>
           {ventas && <div role={ventas.ok ? 'status' : 'alert'}>
             <p>{ventas.ok ? 'Consulta completada. El historial puede requerir más lotes.' : ventas.error || 'Consulta parcial: el avance confirmado se conserva para reintentar.'}</p>
             {ventas.organizations && <div style={{ overflowX: 'auto' }}><table className="table">
-              <thead><tr><th>Organización</th><th>Facturas revisadas</th><th>Con contacto CRM</th><th>Con pago comprobado</th><th>Avance</th></tr></thead>
+              <thead><tr><th>Organización</th><th>Facturas revisadas</th><th>Con correo</th><th>Pagadas en Zoho</th><th>Con contacto CRM</th><th>Ventas vinculadas</th><th>Avance</th></tr></thead>
               <tbody>{ventas.organizations.map(org => <tr key={org.organization_id}>
                 <td>{({ 667522360: 'F&F Soluciones · Panamá', 903355420: 'Altavia · Panamá', 886209250: 'V&A · Panamá', 854270088: 'FF Soluciones 2024 · Venezuela' })[org.organization_id]}</td>
-                <td>{org.documents ?? 0}</td><td>{org.linked ?? 0}</td><td>{org.paid ?? 0}</td>
-                <td>{org.error || (org.deferred ? 'Pendiente de consulta' : org.cycle_complete ? 'Recorrido completo' : `Lote ${org.page} completado`)}</td>
+                <td>{org.documents ?? 0}</td><td>{org.with_email ?? 0}</td><td>{org.settled ?? 0}</td><td>{org.linked ?? 0}</td><td>{org.paid ?? 0}</td>
+                <td>{org.error || (org.cycle_complete ? 'Histórico recorrido' : `Histórico: lote ${org.page}`)} · {org.recent_complete ? 'Cambios al día' : 'Cambios pendientes'}</td>
               </tr>)}</tbody>
             </table></div>}
           </div>}
