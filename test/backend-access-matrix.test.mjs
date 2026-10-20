@@ -67,7 +67,7 @@ test('aprobar cuotas y dejar órdenes exigen coordinación vigente', async () =>
 test('acciones Master no quedan detras de General ni de claims del JWT', async () => {
   const { ACTION_ACCESS_MATRIX, API_ACCESS_MATRIX, ACCESS_KINDS } = await import('../lib/access-matrix.mjs')
   for (const [key, kind] of Object.entries({ ...ACTION_ACCESS_MATRIX, ...API_ACCESS_MATRIX })) {
-    if (kind !== ACCESS_KINDS.master) continue
+    if (![ACCESS_KINDS.master, ACCESS_KINDS.serviceOrMaster].includes(kind)) continue
     const [file, name] = key.split('#')
     const body = functionSource(file, name)
     assert.match(body, /requireCurrentMaster\(/, `${key} debe releer Master vigente`)

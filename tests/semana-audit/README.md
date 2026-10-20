@@ -55,3 +55,16 @@ node tests/semana-audit/browser.mjs
 ```
 
 El navegador usa por defecto `http://localhost:4577` para conservar el origen de las redirecciones de Next. `SEMANA_QA_URL` permite otro origen local; `SEMANA_QA_CREDENTIALS` cambia el archivo privado de credenciales. Crea objetivos y órdenes ficticios en el centro 1 y comprueba guardado, recarga, cuotas, permisos de servidor y móvil de 390 px. Evidencia y capturas en `.scratch/semana-audit/`; no guarda contraseñas ni cookies. El coach no opera Semana: la redirección a sus grupos es el resultado esperado.
+
+## Recorrido real de la administradora
+
+En un checkout aislado sin `.env`, con dependencias instaladas, Chrome y PostgreSQL local (por defecto Homebrew 17; `PG_BIN` permite indicar su carpeta):
+
+1. Ejecutar `node tests/semana-audit/administradora-runtime.mjs`.
+2. Esperar `QA_RUNTIME_READY` y ejecutar en otra terminal `node tests/semana-audit/administradora-e2e.mjs`.
+3. Repetir con `node tests/semana-audit/administradora-e2e.mjs 390` para hacer también las escrituras desde móvil.
+4. Terminar el runtime con Ctrl+C. Su `finally` detiene Next y PostgreSQL, elimina la base temporal y retira su caché de Next. El test cierra y comprueba sus propios contextos de navegador también si falla.
+
+La prueba usa login, cookies, Server Actions, autorizaciones y PostgreSQL reales. Crea una base exclusiva `administradora_test`; nunca lee credenciales ni datos de producción. El adaptador HTTP/WebSocket solo transporta SQL a esa base. El CRM externo tiene una respuesta local vacía; Zoho y una impresora física no intervienen.
+
+Cada ejecución reinicia exclusivamente los planes, cuotas y juegos de esa base desechable. Comprueba cuotas diarias, cuatro pasos de fórmula, ejecución con evidencia, persistencia tras recarga, propuesta por administradora, aprobación por coordinador, informe actual/histórico, evento de impresión nativa, PDF y aislamiento del centro. Evidencia en `.scratch/administradora-e2e/`.
