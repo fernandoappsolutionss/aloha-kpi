@@ -14,6 +14,15 @@ test('missing payment array is an incomplete read, never an empty successful pay
   assert.throws(() => invoiceEvidence('667522360', invoice, undefined))
   assert.throws(() => invoiceEvidence('667522360', invoice, [{ amount: 100 }]))
 })
+test('reads the documented Zoho v3 associated contact and rejects multiple recipients', () => {
+  const one = { ...invoice, email: undefined, contact_persons_associated: [
+    { contact_person_email: 'buyer@example.com', first_name: 'private', phone: 'private' },
+  ] }
+  assert.deepEqual(invoiceEvidence('667522360', one, payments).emails, ['buyer@example.com'])
+  assert.deepEqual(invoiceEvidence('667522360', { ...one, contact_persons_associated: [
+    ...one.contact_persons_associated, { contact_person_email: 'other@example.com' },
+  ] }, payments).emails, [])
+})
 test('resume retries the same page when CRM rejects a row', async () => {
   const actions = []
   const result = await syncCerebroSales('offline', {
