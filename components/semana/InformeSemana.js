@@ -6,6 +6,7 @@ import { rangoSemana } from '../../lib/semana-cierre.mjs'
 import { nombreCondicion } from '../../lib/condiciones/formulas.mjs'
 import { cuotaCumplida } from '../../lib/cuotas-semana.mjs'
 import { mostrarNumero as numero } from '../../lib/avance-semana.mjs'
+import { METRICAS_ALINEAMIENTO, PARTIDAS_ALINEAMIENTO, totalesAlineamiento } from '../../lib/alineamiento-semana.mjs'
 import TableScroller from '../TableScroller'
 
 export default function InformeSemana({ centroId, datos }) {
@@ -40,7 +41,17 @@ export default function InformeSemana({ centroId, datos }) {
       {(informe.pasos || []).length > 0 && <ol>{informe.pasos.map((paso, i) => <li key={i}>{paso}</li>)}</ol>}
       {!informe.objetivos.length && <p>No hay acciones registradas para esta semana.</p>}
       {informe.objetivos.map((o, i) => <section className="semana-informe__accion" key={o.id || i}><h4>{o.seccion === 'formula' ? `Fórmula · paso ${Number(o.paso) + 1}` : o.seccion === 'urgente' ? 'Urgente' : o.seccion === 'orden' ? 'Orden del coordinador' : 'Pendiente'} · {o.texto}</h4><p>{o.responsable || 'Sin responsable'} · {o.fecha ? (o.fecha instanceof Date ? o.fecha.toISOString() : String(o.fecha)).slice(0, 10) : 'Sin fecha'} · {o.verificado_at ? 'Verificada' : o.hecho ? 'Realizada, por verificar' : 'Pendiente'}</p><p><strong>Evidencia esperada:</strong> {o.evidencia_esperada || 'Sin completar'}</p><p><strong>Resultado:</strong> {o.evidencia_resultado || 'Sin evidencia registrada'}</p></section>)}
-      <h3>4. Preparar la siguiente semana</h3><ol><li>Revisa las acciones pendientes y termina la fórmula anterior.</li><li>Analiza los nuevos cierres y fundamenta la condición.</li><li>Prepara objetivos con responsable, fecha y evidencia; acuerda las cinco cuotas con coordinación.</li></ol><p className="h-sub">Los pendientes se trasladan al abrir el siguiente plan, conservando su origen. El informe muestra las acciones y evidencias guardadas al consultar; no sustituye la revisión del coordinador.</p>
+      <h3>4. Alineamiento de la semana</h3>
+      {Object.entries(METRICAS_ALINEAMIENTO).map(([codigo, nombre]) => {
+        const items = (informe.plan.alineamiento || []).filter(item => item.codigo === codigo)
+        if (!items.length) return null
+        const total = totalesAlineamiento(items, codigo)
+        const cuota = informe.estadisticas.find(m => m.codigo === codigo)?.cuota
+        return <section key={codigo}><h4>{nombre}</h4><p>Cuota: {numero(cuota)} · Alineado: {total.alineado} · Hecho: {total.hecho}</p>{items.map(item => <div className="semana-informe__accion" key={item.id}><p>{PARTIDAS_ALINEAMIENTO[item.partida]} · {item.nombre} · {item.cantidad} · {item.hecho ? 'Hecho' : 'Pendiente'}</p>{item.evidencia && <p>Evidencia: {item.evidencia}</p>}</div>)}</section>
+      })}
+      {!(informe.plan.alineamiento || []).length && <p>No se registraron partidas.</p>}
+      <p className="h-sub">Las partidas son seguimiento del equipo; no sustituyen los resultados automáticos ni se suman de nuevo a ellos.</p>
+      <h3>5. Preparar la siguiente semana</h3><ol><li>Revisa las acciones pendientes y termina la fórmula anterior.</li><li>Analiza los nuevos cierres y fundamenta la condición.</li><li>Prepara objetivos con responsable, fecha y evidencia; acuerda las cinco cuotas con coordinación.</li></ol><p className="h-sub">Los pendientes se trasladan al abrir el siguiente plan, conservando su origen. El informe muestra las acciones y evidencias guardadas al consultar; no sustituye la revisión del coordinador.</p>
       <div className="semana-informe__firmas"><p>Administradora: ____________________</p><p>Coordinación: ____________________</p><p>Fecha de revisión: ____________________</p></div>
     </article>}
   </section>

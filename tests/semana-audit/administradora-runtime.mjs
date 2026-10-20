@@ -41,7 +41,7 @@ try {
   pgRun('createdb', ['-h', '127.0.0.1', '-p', String(port), '-U', 'qa', 'administradora_test'])
   const database = `postgresql://qa@127.0.0.1:${port}/administradora_test`
   pool = new pg.Pool({ connectionString: database })
-  for (const file of ['schema.sql', 'migrations/2026-09-03-entrenamiento-oficio.sql', 'migrations/2026-10-01-estadisticas-semana.sql', 'migrations/2026-10-01-plan-semana.sql', 'migrations/2026-10-01-cuotas-semana.sql', 'migrations/2026-10-02-ruta-plan-integrado.sql', 'migrations/2026-10-16-semana-continuidad.sql', 'migrations/2026-10-16-grupos-inicio-pendiente.sql', 'migrations/2026-10-20-semana-juegos.sql']) {
+  for (const file of ['schema.sql', 'migrations/2026-09-03-entrenamiento-oficio.sql', 'migrations/2026-10-01-estadisticas-semana.sql', 'migrations/2026-10-01-plan-semana.sql', 'migrations/2026-10-01-cuotas-semana.sql', 'migrations/2026-10-02-ruta-plan-integrado.sql', 'migrations/2026-10-16-semana-continuidad.sql', 'migrations/2026-10-16-grupos-inicio-pendiente.sql', 'migrations/2026-10-20-semana-juegos.sql', 'migrations/2026-10-20-semana-alineamiento.sql']) {
     await pool.query(await readFile(resolve('db', file), 'utf8'))
   }
   const hoy = fechaCivil(), fin = semanaAbierta(), referencia = sumarDias(fin, -7)

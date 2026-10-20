@@ -24,7 +24,7 @@ export default function TrabajoSemanal({ centroId, datos, siguienteNivel, growth
     window.addEventListener('hashchange', abrirDestino)
     return () => window.removeEventListener('hashchange', abrirDestino)
   }, [centroId])
-  const planProps = { centroId, semanaFin: datos.ultimaCerrada, datos: datos.plan, puedeEscribir: datos.puedeEscribir, puedeAsignar: datos.puedeAsignar, puedeVerificar: datos.puedeAprobar, onRefresh }
+  const planProps = { centroId, semanaFin: datos.ultimaCerrada, datos: datos.plan, cuotas: datos.cuotas, puedeEscribir: datos.puedeEscribir, puedeAsignar: datos.puedeAsignar, puedeVerificar: datos.puedeAprobar, onRefresh }
   if (seccion === 'cumplimiento') return <InformeSemana centroId={centroId} datos={datos} />
   if (seccion === 'juegos') return <JuegosSemana centroId={centroId} datos={datos} />
   if (seccion === 'condicion') return <><div className="semana-intro"><div><p className="label">02 · Entiende y prepara</p><h2>De los datos a un plan de batalla</h2><p>Revisa la tendencia, fundamenta tu condición y convierte cada paso de su fórmula en acciones concretas.</p></div></div><details className="panel semana-historico"><summary>Consultar gráficas antes de decidir</summary><div data-tour="semana.graficas" className="semana-grid">{datos.catalogo.map(meta => <TarjetaEstadistica key={meta.codigo} meta={meta} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div></details><PlanSemana {...planProps} vista="condicion" /></>
@@ -38,7 +38,7 @@ export default function TrabajoSemanal({ centroId, datos, siguienteNivel, growth
   return <div className="semana-page" id="trabajo-semanal">
     <ResumenAutomatico datos={datos} />
     <div className="semana-grid" data-tour="semana.graficas">{datos.catalogo.map(meta => <TarjetaEstadistica key={meta.codigo} meta={meta} principal={meta.principal} serie={datos.series[meta.codigo]} resumen={datos.resumen[meta.codigo]} cuota={datos.cuotas[meta.codigo]} />)}</div>
-    <PlanSemana centroId={centroId} semanaFin={datos.ultimaCerrada} datos={datos.plan} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} puedeVerificar={datos.puedeAprobar} onRefresh={onRefresh}
+    <PlanSemana centroId={centroId} semanaFin={datos.ultimaCerrada} datos={datos.plan} cuotas={datos.cuotas} puedeEscribir={datos.puedeEscribir} puedeAsignar={datos.puedeAsignar} puedeVerificar={datos.puedeAprobar} onRefresh={onRefresh}
       prioridades={growth ? <PrioridadesPlan centroId={centroId} recommendations={growth.recommendations} historial={growth.recommendationHistory} puedeEscribir={datos.puedeEscribir} onRefresh={onRefresh} /> : null}
       ajustes={<details className="semana-plan__seccion semana-ajustes"><summary><strong>Metas y cuotas · edición opcional</strong></summary>
         <p className="h-sub">Los resultados se actualizan desde el sistema. Aquí solo acuerdas objetivos; no necesitas volver a registrar inscritos, retiros ni asistencias.</p>
