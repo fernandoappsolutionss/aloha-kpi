@@ -2,11 +2,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import pg from 'pg'
-import { agregarObjetivoEn, cargarPlan } from '../../lib/plan-semana-servicio.js'
+import { agregarObjetivoEn, cargarPlan, programarObjetivoHoyEn, marcarObjetivoEn } from '../../lib/plan-semana-servicio.js'
 import { cambiarAlineamientoEn } from '../../lib/alineamiento-semana-servicio.js'
 import { leerInformeSemana } from '../../lib/informe-semana-servicio.js'
 import { assertWriteCentro } from '../../lib/current-user.mjs'
 import { runMigration } from '../../scripts/migrate-semana-alineamiento.mjs'
+import { runMigration as migrateHoy } from '../../scripts/migrate-semana-hoy.mjs'
 import { sumarDias } from '../../lib/semana-cierre.mjs'
 
 const runtime = JSON.parse(await readFile('.scratch/administradora-e2e/runtime.json', 'utf8'))
@@ -57,6 +58,34 @@ try {
   await cambiarAlineamientoEn(id, fin, { accion: 'eliminar', id: item.id }, opts)
   plan = await cargarPlan(id, fin, opts)
   assert.equal(plan.plan.alineamiento.length, 1)
+  await migrateHoy(pool, { apply: true }); await migrateHoy(pool, { apply: true })
+  assert.equal((await migrateHoy(pool)).length, 2)
+  const hoy = runtime.hoy
+  const task = await agregarObjetivoEn(id, fin, { seccion: 'pendiente', hoy: true, fechaVista: hoy, hora: '09:30', texto: 'Tarea directa Hoy QA', evidencia_esperada: 'Registro de llamadas' }, opts)
+  assert.equal(task.responsable, opts.sesion.nombre); assert.equal(task.fecha_hoy, hoy)
+  const count = (await snapshot()).objetivos
+  await Promise.all([1, 2].map(() => programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: false, hora: '10:30' }, opts)))
+  assert.equal((await snapshot()).objetivos, count, 'Enviar repetidamente a Hoy no duplica la tarea')
+  await assert.rejects(programarObjetivoHoyEn(3, task.id, { fechaVista: hoy, quitar: true }, opts), /No autorizado/)
+  await assert.rejects(programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: false, hora: '25:60' }, opts), /Hora inválida/)
+  await assert.rejects(programarObjetivoHoyEn(id, task.id, { fechaVista: sumarDias(hoy, -1), quitar: false }, opts), /Cambió el día/)
+  await assert.rejects(programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: 'false' }, opts), /inválida/)
+  await assert.rejects(agregarObjetivoEn(id, fin, { seccion: 'formula', hoy: true, fechaVista: hoy, texto: 'Inválida' }, opts), /Pendientes/)
+  await assert.rejects(agregarObjetivoEn(id, fin, { seccion: 'pendiente', hoy: true, fechaVista: sumarDias(hoy, -1), texto: 'Día vencido' }, opts), /Cambió el día/)
+  await marcarObjetivoEn(id, task.id, true, { ...opts, evidencia: 'Llamadas QA comprobadas' })
+  await programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: true }, opts)
+  const preserved = (await query`SELECT * FROM semana_objetivos WHERE id=${task.id}`)[0]
+  assert.equal(preserved.fecha_hoy, null); assert.equal(preserved.hora_hoy, null)
+  assert.equal(preserved.hecho, true); assert.equal(preserved.evidencia_resultado, 'Llamadas QA comprobadas')
+  await programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: false }, opts)
+  const nextDay = await cargarPlan(id, fin, { ...opts, now: new Date(`${sumarDias(hoy, 1)}T17:00:00Z`) })
+  assert.equal(nextDay.hoy, sumarDias(hoy, 1)); assert.ok(nextDay.objetivos.some(o => o.id === task.id))
+  assert.equal(nextDay.objetivos.filter(o => o.fecha_hoy?.toISOString().slice(0, 10) === nextDay.hoy).length, 0)
+  await assert.rejects(programarObjetivoHoyEn(id, task.id, { fechaVista: hoy, quitar: true }, { ...opts, now: new Date(`${sumarDias(runtime.fin, 8)}T17:00:00Z`) }), /semana actual/)
+  const finalReport = await leerInformeSemana(id, runtime.fin, { query, now: new Date(`${sumarDias(runtime.fin, 8)}T17:00:00Z`) })
+  assert.equal(finalReport.objetivos.filter(o => o.texto === task.texto).length, 1)
+  assert.equal(finalReport.objetivos.find(o => o.texto === task.texto).evidencia_resultado, 'Llamadas QA comprobadas')
+  console.log('PASS Hoy: alta directa, flecha idempotente concurrente, quitar sin perder resultado, cambio de día, permisos, hora e informe sin duplicados')
   console.log('PASS Alineamiento concurrente sin pérdidas, alcance de centro, reapertura, eliminación e informe histórico')
 } finally {
   await pool.query('DELETE FROM centros WHERE id=$1', [id]); await pool.end()
