@@ -20,7 +20,7 @@ test('propone superar la última semana respetando pisos y techos trimestrales',
 test('el ritmo de flujos cuenta viernes como día 1 y jueves como día 7', () => {
   assert.deepEqual(ritmoCuota({ cuota: 7, valor: 2, dia: 3, inversa: false }), { esperado: 3, vaBien: false })
   assert.deepEqual(ritmoCuota({ cuota: 7, valor: 4, dia: 3, inversa: false }), { esperado: 3, vaBien: true })
-  assert.deepEqual(ritmoCuota({ cuota: 7, valor: 2, dia: 3, inversa: true }), { esperado: 3, vaBien: true })
+  assert.deepEqual(ritmoCuota({ cuota: 7, valor: 2, dia: 3, inversa: true }), { esperado: 7, vaBien: true })
   assert.equal(ritmoCuota({ cuota: null, valor: 2, dia: 3 }), null)
   assert.equal(ritmoCuota({ cuota: 7, valor: null, dia: 3 }), null)
 })

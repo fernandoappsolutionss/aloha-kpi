@@ -1,16 +1,18 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import TrabajoSemanal from '../../../../components/semana/TrabajoSemanal'
 import GuiaRutaPlan from '../../../../components/semana/GuiaRutaPlan'
+import NavegacionSemana from '../../../../components/semana/NavegacionSemana'
 import { getSemanaCentro, actualizarSemanaCentro } from '../../../actions/semana'
 import { rangoSemana } from '../../../../lib/semana-cierre.mjs'
 
-export default function SemanaPage() {
+export default function SemanaPage({ seccion = 'avance' }) {
   const { id } = useParams()
+  const router = useRouter()
   const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [actualizando, setActualizando] = useState(false)
@@ -28,8 +30,9 @@ export default function SemanaPage() {
   useEffect(() => {
     // Ambos destinos aparecen después de la carga asíncrona.
     const anchor = window.location.hash.slice(1)
-    if (!cargando && ['plan-batalla', 'semana-cuotas-title'].includes(anchor)) document.getElementById(anchor)?.scrollIntoView({ block: 'start' })
-  }, [cargando])
+    if (!cargando && anchor === 'plan-batalla' && seccion === 'avance') router.replace(`/centro/${id}/semana/condicion#plan-batalla`)
+    else if (!cargando && ['plan-batalla', 'semana-cuotas-title'].includes(anchor)) document.getElementById(anchor)?.scrollIntoView({ block: 'start' })
+  }, [cargando, id, seccion, router])
 
   async function actualizar() {
     const turno = ++solicitud.current
@@ -40,17 +43,18 @@ export default function SemanaPage() {
   }
 
   async function refrescarPlan() {
+    const turno = ++solicitud.current
     const result = await getSemanaCentro(id)
-    setDatos(result)
+    if (turno === solicitud.current) setDatos(result)
   }
 
   const rango = datos ? rangoSemana(datos.semanaAbierta) : null
   return <div className="shell">
     <Sidebar rol="usuario" centroNombre={datos?.centro?.nombre} centroId={id} />
-    <main id="main-content" data-page-state={cargando ? 'loading' : error && !datos ? 'error' : 'ready'} className="main reports-page semana-page">
+    <main id="main-content" data-page-state={cargando ? 'loading' : error && !datos ? 'error' : 'ready'} className={`main reports-page semana-page${seccion === 'cumplimiento' ? ' semana-imprimible' : ''}`}>
       <CentroNavigation centroId={id} />
       <div className="main__head" data-tour="semana.periodo">
-        <div><div className="label" style={{ marginBottom: 10 }}>Mi centro · Semana de cierre</div><h1 className="h-title">Semana</h1>
+        <div><div className="label" style={{ marginBottom: 10 }}>Mi centro · Semana de cierre</div><h1 className="h-title">Mi semana</h1>
           {rango && <p className="h-sub">Semana del {rango.desde} al {rango.hasta} · {datos.centro.nombre}</p>}
           {datos?.ultimoCalculo && <p className="h-sub">Último cálculo: {new Date(datos.ultimoCalculo).toLocaleString('es-PA', { timeZone: datos.centro.zonaHoraria })}</p>}
         </div>
@@ -59,13 +63,10 @@ export default function SemanaPage() {
       {cargando && <p role="status">Cargando semana…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {datos && !cargando && <>
+        <NavegacionSemana centroId={id} seccion={seccion} />
         <p data-tour="semana.formacion"><Link className="btn" href={`/centro/${id}/entrenamiento/oficio#actualizacion-semanal`}>Actualización semanal · gráficas, condiciones y práctica de tu puesto →</Link></p>
-        <nav aria-label="Secciones de la semana" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-          <a className="btn" href="#semana-cuotas-title">Ir a cuotas semanales</a>
-          <a className="btn btn--primary" href="#plan-batalla">Ir al plan de batalla</a>
-        </nav>
-        <GuiaRutaPlan centroId={id} />
-        <TrabajoSemanal centroId={id} datos={datos} onRefresh={refrescarPlan} />
+        {seccion === 'avance' && <GuiaRutaPlan centroId={id} />}
+        <TrabajoSemanal key={`${id}:${seccion}`} centroId={id} datos={datos} seccion={seccion} onRefresh={refrescarPlan} />
       </>}
     </main>
   </div>

@@ -1,8 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CONDICIONES, colorCondicion, nombreCondicion } from '../../lib/condiciones/formulas.mjs'
+import { CONDICIONES, colorCondicion, nombreCondicion, claveFormula } from '../../lib/condiciones/formulas.mjs'
 import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo } from '../../app/actions/semana'
+import AyudaCondicion from './AyudaCondicion'
+import { ejemplosFormula } from '../../lib/condiciones/ayuda.mjs'
 import LecturaCondicion from './LecturaCondicion'
 import ArranqueSemanal from './ArranqueSemanal'
 import { calendarioPlan } from '../../lib/reunion-semanal.mjs'
@@ -19,15 +21,15 @@ function FormularioObjetivo({ centroId, semanaFin, seccion, paso = null, ejecuta
     if (await ejecutar(() => agregarObjetivo(centroId, semanaFin, { seccion, paso, ...datos }))) form.reset()
   }
   return <form className="semana-objetivo-form" onSubmit={enviar}>
-    <label className="field"><span className="sr-only">Objetivo</span><input name="texto" className="input" placeholder="Escribe un objetivo" maxLength={500} required /></label>
-    <label className="field"><span className="sr-only">Responsable</span><input name="responsable" className="input" placeholder="Responsable" maxLength={120} required /></label>
-    <label className="field"><span className="sr-only">Fecha</span><input name="fecha" className="input" type="date" required /></label>
+    <label className="field"><span>Acción concreta</span><input name="texto" className="input" placeholder="Escribe un objetivo" maxLength={500} required /></label>
+    <label className="field"><span>Responsable</span><input name="responsable" className="input" placeholder="Responsable" maxLength={120} required /></label>
+    <label className="field"><span>Fecha</span><input name="fecha" className="input" type="date" required /></label>
     <label className="field"><span>Evidencia esperada</span><input name="evidencia_esperada" className="input" placeholder="Qué resultado demostrarás y dónde se comprueba" maxLength={1000} required /></label>
     <button type="submit" className="btn" disabled={ocupado}>Agregar objetivo</button>
   </form>
 }
 
-function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar, ocupado, bloqueo = null, anterior = null }) {
+function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar, ocupado, bloqueo = null, anterior = null, preparar = false }) {
   const [editando, setEditando] = useState(false)
   async function guardar(event) {
     event.preventDefault()
@@ -45,20 +47,20 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
     {bloqueo != null && !objetivo.hecho && <p className="h-sub">Completa con evidencia el paso {bloqueo} antes de realizar esta acción.</p>}
     {anterior && !objetivo.hecho && <p className="h-sub">Primero termina la fórmula anterior de {anterior.nombre}, desde el paso {anterior.paso + 1}, en Urgentes o Pendientes.</p>}
     {objetivo.evidencia_resultado && <p><strong>Resultado:</strong> {objetivo.evidencia_resultado}</p>}
-    {puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={event => { event.preventDefault(); const evidencia = new FormData(event.currentTarget).get('evidencia'); ejecutar(() => marcarObjetivo(centroId, objetivo.id, true, evidencia)) }}>
+    {!preparar && puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={event => { event.preventDefault(); const evidencia = new FormData(event.currentTarget).get('evidencia'); ejecutar(() => marcarObjetivo(centroId, objetivo.id, true, evidencia)) }}>
       <label className="field"><span>Evidencia del resultado</span><textarea name="evidencia" className="input" maxLength={2000} required placeholder="Qué se logró, dato obtenido y referencia para comprobarlo" /></label>
       <button className="btn" type="submit" disabled={ocupado || bloqueo != null || Boolean(anterior)}>Registrar acción realizada</button>
     </form>}
-    {puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id, { hechoAt: objetivo.hecho_at, evidencia: objetivo.evidencia_resultado }))}>Verificar evidencia</button>}
+    {!preparar && puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id, { hechoAt: objetivo.hecho_at, evidencia: objetivo.evidencia_resultado }))}>Verificar evidencia</button>}
     {puedeEscribir && objetivo.seccion !== 'orden' && <div className="semana-objetivo__acciones">
-      {objetivo.hecho && <button className="btn" disabled={ocupado} onClick={() => ejecutar(() => marcarObjetivo(centroId, objetivo.id, false))}>Reabrir acción</button>}
+      {!preparar && objetivo.hecho && <button className="btn" disabled={ocupado} onClick={() => ejecutar(() => marcarObjetivo(centroId, objetivo.id, false))}>Reabrir acción</button>}
       <button type="button" className="btn" disabled={ocupado} onClick={() => setEditando((v) => !v)}>{editando ? 'Cancelar' : 'Editar'}</button>
       <button type="button" className="btn" disabled={ocupado} onClick={() => { if (window.confirm('¿Eliminar este objetivo?')) ejecutar(() => eliminarObjetivo(centroId, objetivo.id)) }}>Eliminar</button>
     </div>}
     {editando && <form className="semana-objetivo-form" onSubmit={guardar}>
       <label className="field"><span className="sr-only">Texto del objetivo</span><input name="texto" className="input" defaultValue={objetivo.texto} maxLength={500} required /></label>
-      <label className="field"><span className="sr-only">Responsable</span><input name="responsable" className="input" defaultValue={objetivo.responsable || ''} maxLength={120} required /></label>
-      <label className="field"><span className="sr-only">Fecha</span><input name="fecha" className="input" type="date" defaultValue={fechaInput(objetivo.fecha)} required /></label>
+      <label className="field"><span>Responsable</span><input name="responsable" className="input" defaultValue={objetivo.responsable || ''} maxLength={120} required /></label>
+      <label className="field"><span>Fecha</span><input name="fecha" className="input" type="date" defaultValue={fechaInput(objetivo.fecha)} required /></label>
       <label className="field"><span>Evidencia esperada</span><input name="evidencia_esperada" className="input" defaultValue={objetivo.evidencia_esperada || ''} maxLength={1000} required /></label>
       <p className="h-sub">Editar reabre la acción y exige comprobar de nuevo el resultado.</p>
       <button type="submit" className="btn btn--primary" disabled={ocupado}>Guardar cambios</button>
@@ -66,7 +68,7 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
   </li>
 }
 
-export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh, prioridades, ajustes }) {
+export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh, prioridades, ajustes, vista = 'todo' }) {
   const [seleccion, setSeleccion] = useState(datos.plan.condicion || '')
   const [alcance, setAlcance] = useState(datos.plan.alcance_peligro || 'personal')
   const [variante, setVariante] = useState(datos.plan.variante_afluencia || 'accion')
@@ -100,6 +102,8 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     })
   }
 
+  const preparar = vista === 'condicion'
+  const ejemplo = ejemplosFormula[claveFormula({ condicion: datos.plan.condicion, alcancePeligro: datos.plan.alcance_peligro, varianteAfluencia: datos.plan.variante_afluencia })]
   const estado = datos.estado === 'completo' ? 'Plan preparado' : datos.estado === 'sin_condicion' ? 'Pendiente de asignar condición' : `Completa acción, responsable, fecha y evidencia en el paso ${datos.pasoFaltante}`
   const objetivos = datos.objetivos || []
   const sinCondicion = !datos.plan.condicion
@@ -115,6 +119,8 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {error && <p role="alert" className="alert alert--error">{error}</p>}
     {mensaje && <p role="status" className="alert">{mensaje}</p>}
     {ajustes}
+    {vista !== 'acciones' && <>
+    <AyudaCondicion condicion={seleccion} centroId={centroId} />
     {'lectura' in datos && <LecturaCondicion lectura={datos.lectura} />}
     {sinCondicion && <p className="h-sub">En la reunión: revisa la gráfica, confirma la condición con su fundamento, acuerda las cuotas y escribe las acciones con responsable, fecha y evidencia. Los resultados llegan del sistema; las decisiones del plan las guardas aquí.</p>}
     {datos.discrepancia && <p className="alert alert--error" role="alert">La condición asignada está por encima de lo que muestra la gráfica</p>}
@@ -135,16 +141,18 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     </div> : <p className="h-sub">{puedeEscribir ? 'La condición la asigna la administradora' : 'Condición pendiente de asignación.'}</p>)}
 
     </div>
+    </>}
     <div data-tour="semana.formula">
     {sinCondicion && <p className="h-sub">La fórmula y sus objetivos aparecerán al asignar la condición.</p>}
-    {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula</h3><p className="h-sub">Prepara las acciones de todos los pasos. Ejecútalas en orden: completa las del paso anterior con evidencia antes de registrar las del siguiente. Coordinación verifica después el resultado.</p><ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><p>{texto}</p>
-      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
-      {puedeEscribir && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion="formula" paso={paso} ejecutar={ejecutar} ocupado={ocupado} />}
+    {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula de {nombreCondicion(datos.plan.condicion)}{datos.plan.condicion === 'peligro' ? ` · ${datos.plan.alcance_peligro === 'superior' ? 'para el superior' : 'personal'}` : datos.plan.condicion === 'afluencia' ? ` · ${datos.plan.variante_afluencia === 'financiera' ? 'financiera' : 'de acción'}` : ''}</h3><p className="h-sub">Prepara las acciones de todos los pasos. Ejecútalas en orden: completa las del paso anterior con evidencia antes de registrar las del siguiente. Coordinación verifica después el resultado.</p>{ejemplo && <details className="semana-ayuda"><summary>Ver un ejemplo: del paso a una acción comprobable</summary><p><strong>Paso:</strong> {ejemplo[0]}</p><p><strong>Acción:</strong> {ejemplo[1]}</p><p><strong>Responsable:</strong> {ejemplo[2]} · <strong>Fecha:</strong> acuerda un día de esta semana.</p><p><strong>Evidencia:</strong> {ejemplo[4]}</p><p className="h-sub">Ejemplo de entrenamiento. No se guarda como una acción ni cuenta como realizado.</p></details>}<ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><h4>Paso {paso + 1}</h4><p>{texto}</p><p className="h-sub">{objetivos.filter(o => o.seccion === 'formula' && Number(o.paso) === paso && o.hecho).length} de {objetivos.filter(o => o.seccion === 'formula' && Number(o.paso) === paso).length} acciones realizadas</p>
+      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} preparar={preparar} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
+      {vista !== 'acciones' && puedeEscribir && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion="formula" paso={paso} ejecutar={ejecutar} ocupado={ocupado} />}
     </li>)}</ol></section>}
 
     </div>
+    {!preparar && <>
     {[['urgente', 'Urgentes'], ['pendiente', 'Pendientes'], ['orden', 'Órdenes del coordinador']].map(([seccion, titulo]) => <section className="semana-plan__seccion" key={seccion}><h3>{titulo}</h3>
-      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
+      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} preparar={preparar} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
       {puedeEscribir && seccion !== 'orden' && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion={seccion} ejecutar={ejecutar} ocupado={ocupado} />}
     </section>)}
     {prioridades || <section className="semana-plan__seccion" aria-labelledby="plan-estrategico-title"><h3 id="plan-estrategico-title">Plan estratégico · Ruta de Nivel</h3><p className="h-sub">Estas son las mismas acciones de Ruta al próximo nivel. Lo que registres aquí también se actualiza allá. · <Link href={`/centro/${centroId}/ruta-nivel`}>Abrir la ruta y su historial</Link></p>
@@ -157,5 +165,6 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
         </div>}
       </li>)}</ul>
     </section>}
+    </>}
   </section>
 }

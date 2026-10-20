@@ -2317,6 +2317,67 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .sop-nota-movil { display: block; }
 }
 
+/* Semana guiada: cada pantalla conserva una tarea principal. */
+.semana-navegacion { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 20px 0; }
+.semana-navegacion a { display: flex; gap: 10px; align-items: center; padding: 14px 12px; border: 1px solid var(--border); border-radius: 14px; color: var(--text); text-decoration: none; background: var(--surface); }
+.semana-navegacion a[aria-current="page"] { border-color: var(--text); background: var(--surface-2); box-shadow: inset 0 -3px 0 var(--text); }
+.semana-navegacion small { display: block; color: var(--text-dim); margin-top: 4px; font-size: 12px; }
+.semana-navegacion__numero { display: grid; place-items: center; min-width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); font-weight: 700; }
+.semana-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 28px 0 20px; }
+.semana-intro h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 8px 0; }
+.semana-intro p { max-width: 76ch; line-height: 1.6; }
+.semana-marcadores { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
+.semana-marcador { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 18px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.semana-marcador > span:first-child { min-height: 44px; font-weight: 600; }
+.semana-marcador strong { font-size: 32px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.semana-marcador small { color: var(--text-dim); line-height: 1.5; }
+.semana-marcador--activo { border-color: var(--text); box-shadow: inset 0 4px 0 var(--text); background: var(--surface-2); }
+.semana-diaria, .semana-historico, .semana-juego, .semana-juego-form, .semana-informe { padding: 24px; margin: 18px 0; }
+.semana-historico > summary, .semana-ayuda > summary { font-weight: 600; cursor: pointer; padding: 8px 0; min-height: 44px; }
+.semana-diaria__tabla th, .semana-diaria__tabla td { white-space: normal; min-width: 110px; }
+.semana-diaria--hoy { background: var(--surface-2); font-weight: 600; }
+.semana-ayuda { border-left: 4px solid var(--text-dim); padding: 16px 20px; margin: 16px 0 24px; background: var(--surface-2); border-radius: 0 14px 14px 0; line-height: 1.65; }
+.semana-ayuda h3 { margin-top: 0; }
+.semana-ayuda li { margin: 8px 0; }
+.semana-informe__controles { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+.semana-informe h3 { margin-top: 28px; }
+.semana-informe p, .semana-informe li { line-height: 1.65; overflow-wrap: anywhere; }
+.semana-informe__accion { border-top: 1px solid var(--border); padding: 12px 0; break-inside: avoid; }
+.semana-informe__firmas { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 40px; }
+.semana-juego-form { display: grid; gap: 16px; max-width: 860px; }
+.semana-juego-form__meta { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.semana-juego__resultado strong { font-size: 36px; }
+.semana-juego dt { font-weight: 700; margin-top: 16px; }
+.semana-juego dd { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .semana-navegacion { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .semana-marcadores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .semana-navegacion, .semana-marcadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .semana-navegacion a { padding: 12px 8px; font-size: 13px; gap: 6px; }
+  .semana-navegacion small { font-size: 12px; }
+  .semana-intro { align-items: flex-start; flex-direction: column; }
+  .semana-marcador { padding: 14px; font-size: 13px; }
+  .semana-marcador strong { font-size: 28px; }
+  .semana-juego-form__meta { grid-template-columns: 1fr; }
+  .semana-diaria, .semana-historico, .semana-juego, .semana-juego-form, .semana-informe { padding: 16px; }
+}
+@media print {
+  body:has(.semana-imprimible) .section-navigation,
+  .semana-imprimible > .main__head, .semana-imprimible > .semana-navegacion,
+  .semana-imprimible > [data-tour="semana.formacion"], .semana-no-imprimir { display: none !important; }
+  .main.semana-imprimible { margin: 0 !important; padding: 0 !important; width: 100%; max-width: none; overflow: visible; color: #111; }
+  .semana-informe { border: 0; box-shadow: none; padding: 0; margin: 0; background: white; color: #111; }
+  .semana-informe .h-sub, .semana-informe .label { color: #333; }
+  .semana-informe [role="region"], .semana-informe .table-scroller__viewport { overflow: visible !important; max-height: none; }
+  .semana-informe table { width: 100%; min-width: 0 !important; font-size: 12pt; }
+  .semana-informe th, .semana-informe td { white-space: normal !important; padding: 6px; position: static; }
+  .semana-informe thead { display: table-header-group; }
+  .semana-informe h3, .semana-informe h4 { break-after: avoid; }
+  .semana-informe__firmas { break-inside: avoid; }
+}
+
 @media print {
   /* Fuera todo lo que no es la hoja. El chrome de la app no se imprime en
      ninguna página: se oculta global, no solo aquí. */

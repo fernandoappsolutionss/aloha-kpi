@@ -45,7 +45,7 @@ test('guiones usan solo observar; todos los targets están presentes aun sin con
   for (const m of nuevos) for (const p of m.pasos) {
     assert.equal(p.tipo, 'mostrar')
     assert.ok(files.includes(`data-tour="${p.target}"`), p.target)
-    assert.equal(p.ruta, undefined)
+    if (p.ruta) assert.match(p.ruta, /^\/centro\/\{id\}\/semana(?:\/(condicion|acciones))?$/)
   }
   const plan = read('components/semana/PlanSemana.js')
   assert.match(plan, /data-tour="semana.formula">\s*\{sinCondicion && <p/)
@@ -88,8 +88,12 @@ test('terminar permite omisiones históricas aplicables y rechaza omisión/deep-
 })
 
 test('ambos anchors hacen scroll tras carga; no se aceptan IDs arbitrarios', () => {
-  const effect = read('app/centro/[id]/semana/page.js').match(/\/\/ Ambos destinos[^\n]*\n([\s\S]*?)\n  \}, \[cargando\]\)/)[1]
-  const run = new Function('cargando','window','document',effect)
+  const effect = read('app/centro/[id]/semana/page.js').match(/\/\/ Ambos destinos[^\n]*\n([\s\S]*?)\n  \}, \[cargando, id, seccion, router\]\)/)[1]
+  const effectFn = new Function('cargando','window','document','seccion','router','id',effect)
+  const run = (loading, window, document) => effectFn(loading, window, document, 'condicion', {}, '2')
+  const destinos = []
+  effectFn(false, { location: { hash: '#plan-batalla' } }, {}, 'avance', { replace: ruta => destinos.push(ruta) }, '2')
+  assert.deepEqual(destinos, ['/centro/2/semana/condicion#plan-batalla'])
   const vistos = []
   const document = {getElementById:id=>({scrollIntoView:()=>vistos.push(id)})}
   for (const hash of ['#plan-batalla','#semana-cuotas-title']) {
