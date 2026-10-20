@@ -7,7 +7,7 @@ import { fechaCivil, rangoSemana, semanaAbierta, sumarDias, ultimasSemanas, zona
 import { ESTADISTICAS_CENTRO } from '../../lib/estadisticas-semana/catalogo.mjs'
 import { armarSeries, armarTablero } from '../../lib/estadisticas-semana/presentacion.mjs'
 import { calcularSemanaCentro, guardarSemanaCentro, leerSerieCentros, completarSerieCentro } from '../../lib/estadisticas-semana/servicio.js'
-import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion, verificarObjetivoEn } from '../../lib/plan-semana-servicio.js'
+import { cargarPlan, asignarCondicionEn, agregarObjetivoEn, editarObjetivoEn, marcarObjetivoEn, eliminarObjetivoEn, puedeAsignarCondicion, verificarObjetivoEn, programarObjetivoHoyEn } from '../../lib/plan-semana-servicio.js'
 import { enriquecerTableroConPlanes } from '../../lib/plan-semana.mjs'
 import { lecturaCondicion } from '../../lib/condiciones/lectura.mjs'
 import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro } from '../../lib/cuotas-semana.mjs'
@@ -195,4 +195,9 @@ export async function verificarObjetivo(centroId, objetivoId, revision) {
 export async function cambiarAlineamiento(centroId, semanaFin, cambio) {
   await requireCurrentWriteCentro(centroId)
   return await cambiarAlineamientoEn(centroId, semanaFin, cambio)
+}
+
+export async function programarObjetivoHoy(centroId, objetivoId, datos) {
+  await requireCurrentWriteCentro(centroId)
+  return await programarObjetivoHoyEn(centroId, objetivoId, datos)
 }

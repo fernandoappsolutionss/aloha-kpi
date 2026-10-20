@@ -39,6 +39,7 @@ const stubs={
  export const cambiarAlineamiento=async()=>{};
  export const asignarCondicion=async(id,fin,p)=>{window.__datos.plan.plan={...window.__datos.plan.plan,condicion:p.condicion,fundamento:p.fundamento};window.__datos.plan.pasos=pasosDe(p)};
  export const agregarObjetivo=async(id,fin,p)=>{window.__datos.plan.objetivos.push({...p,id:Date.now(),hecho:false});};
+ export const programarObjetivoHoy=async()=>{};
  export const editarObjetivo=async()=>{};
  export const eliminarObjetivo=async()=>{};
  export const verificarObjetivo=async()=>{};

@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE semana_objetivos ADD COLUMN IF NOT EXISTS fecha_hoy DATE;
+ALTER TABLE semana_objetivos ADD COLUMN IF NOT EXISTS hora_hoy TIME;
+COMMIT;
