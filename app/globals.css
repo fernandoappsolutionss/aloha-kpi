@@ -2343,6 +2343,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-informe h3 { margin-top: 28px; }
 .semana-informe p, .semana-informe li { line-height: 1.65; overflow-wrap: anywhere; }
 .semana-informe__accion { border-top: 1px solid var(--border); padding: 12px 0; break-inside: avoid; }
+.semana-informe ol { list-style: decimal; padding-left: 1.5em; }
 .semana-informe__firmas { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 40px; }
 .semana-juego-form { display: grid; gap: 16px; max-width: 860px; }
 .semana-juego-form__meta { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
@@ -2364,6 +2365,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .semana-diaria, .semana-historico, .semana-juego, .semana-juego-form, .semana-informe { padding: 16px; }
 }
 @media print {
+  @page cumplimiento-semanal { size: A4; margin: 14mm; }
+  body:has(.semana-imprimible) { page: cumplimiento-semanal; }
   body:has(.semana-imprimible) .section-navigation,
   .semana-imprimible > .main__head, .semana-imprimible > .semana-navegacion,
   .semana-imprimible > [data-tour="semana.formacion"], .semana-no-imprimir { display: none !important; }
@@ -2371,7 +2374,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .semana-informe { border: 0; box-shadow: none; padding: 0; margin: 0; background: white; color: #111; }
   .semana-informe .h-sub, .semana-informe .label { color: #333; }
   .semana-informe [role="region"], .semana-informe .table-scroller__viewport { overflow: visible !important; max-height: none; }
-  .semana-informe table { width: 100%; min-width: 0 !important; font-size: 12pt; }
+  .semana-informe .table-scroller__viewport { width: 100%; min-width: 0; }
+  .semana-informe .table-scroller__hint { display: none; }
+  .semana-informe table { width: 100%; min-width: 0 !important; table-layout: fixed; font-size: 12pt; }
+  .semana-informe th:first-child { width: 40%; }
   .semana-informe th, .semana-informe td { white-space: normal !important; padding: 6px; position: static; }
   .semana-informe thead { display: table-header-group; }
   .semana-informe h3, .semana-informe h4 { break-after: avoid; }
