@@ -90,13 +90,16 @@ export default function EntrenamientoOficioAdminPage() {
       <main className="main" id="main-content" data-page-state={loading ? 'loading' : error || !data ? 'error' : 'ready'}>
         <div className="main__head">
           <div>
-            <div className="label" style={{ marginBottom: 10 }}>Gerencia · Entrenamiento de oficio</div>
-            <h1 className="h-title">Quién tiene su puesto tomado</h1>
+            <div className="label" style={{ marginBottom: 10 }}>{access.isCoordinator ? 'Coordinación · Entrenamiento de oficio' : 'Gerencia · Entrenamiento de oficio'}</div>
+            <h1 className="h-title">{access.isCoordinator ? 'Puestos de mis centros' : 'Quién tiene su puesto tomado'}</h1>
             <p className="h-sub">
               Cada celda: <b>firmados / estudiados / total</b>. Estudiado lo declara la persona con su cuestionario aprobado; firmado lo pone su jefe
               entrenador después de tomarle la maniobra. La columna <b>Cola de firmas</b> abre la pantalla donde se toma y se firma, en el centro de esa
-              persona. <Link className="tour-card__link" href="/dashboard/entrenamiento">Ver el entrenamiento del sistema (los 9 recorridos)</Link>
+              persona. <Link className="tour-card__link" href="/dashboard/entrenamiento">Ver el entrenamiento del sistema</Link>
             </p>
+            {access.isCoordinator && centroLectura && (
+              <p className="h-sub"><Link className="tour-card__link" href={`/centro/${centroLectura}/entrenamiento`}>Mi entrenamiento</Link></p>
+            )}
             {centroLectura && (data?.planes || []).length > 0 && (
               <p className="h-sub" style={{ marginTop: 4 }}>
                 Leer el entrenamiento completo, módulo por módulo:{' '}
@@ -113,7 +116,7 @@ export default function EntrenamientoOficioAdminPage() {
             )}
           </div>
           <select className="input" style={{ width: 240 }} value={centroId} onChange={(e) => setCentroId(e.target.value)} aria-label="Filtrar por centro">
-            <option value="">Todos los centros</option>
+            <option value="">{access.isCoordinator ? 'Todos mis centros' : 'Todos los centros'}</option>
             {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </div>

@@ -220,13 +220,12 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Ranking', icon: 'trophy', href: '/dashboard/ranking' },
     { label: 'Historial', icon: 'calendar', href: '/dashboard/historial' },
     ...(access.canViewAdminTraining
-      ? [{ label: 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }]
-      : tienePlan && centroDelPlan
-        ? [{ label: 'Entrenamiento', icon: 'book', href: `/centro/${centroDelPlan}/entrenamiento`, entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null }]
-        : []),
-    // Gerencia conserva la matriz del equipo. El plan propio de cada puesto
-    // se encuentra dentro del Entrenamiento de su centro.
-    ...(access.canViewOficio ? [{ label: 'Puestos de la gente', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
+      ? [{ label: esCoordinador ? 'Entrenamiento de mis centros' : 'Entrenamiento', icon: 'book', href: '/dashboard/entrenamiento' }]
+      : []),
+    ...(tienePlan && centroDelPlan
+      ? [{ label: 'Mi entrenamiento', icon: 'book', href: `/centro/${centroDelPlan}/entrenamiento`, entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null }]
+      : []),
+    ...(access.canViewOficio ? [{ label: esCoordinador ? 'Puestos de mis centros' : 'Puestos de la gente', icon: 'shield', href: '/dashboard/entrenamiento/oficio' }] : []),
   ]
   const configItems = [
     ...(access.canViewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),

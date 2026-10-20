@@ -264,3 +264,21 @@ test('loadCurrentUser trae los centros asignados del coordinador', async () => {
   assert.deepEqual(user.centros, [10, 12])
   assert.equal(user.password_hash, undefined)
 })
+
+test('matrices de entrenamiento: Master ve la red y coordinador solo sus centros vigentes', () => {
+  assert.equal(currentUser.puedeVerEntrenamientoEquipo(master), true)
+  assert.equal(currentUser.puedeVerEntrenamientoEquipo(coordinador), true)
+  assert.equal(currentUser.centrosEntrenamiento(master), null)
+  assert.deepEqual(currentUser.centrosEntrenamiento(master, 99), [99])
+  assert.deepEqual(currentUser.centrosEntrenamiento(coordinador), [10, 12])
+  assert.deepEqual(currentUser.centrosEntrenamiento(coordinador, 12), [12])
+  assert.deepEqual(currentUser.centrosEntrenamiento(sinCentros), [])
+  assert.throws(() => currentUser.centrosEntrenamiento(coordinador, 99), /No autorizado/)
+  for (const id of [0, -1, '10', [], NaN, 1.5]) {
+    assert.throws(() => currentUser.centrosEntrenamiento(coordinador, id), /inválido/)
+  }
+  for (const actor of [null, general, supervisor, admin10, asistente12, { rol: 'coach' }, { ...master, email: 'falso@aloha.invalid' }]) {
+    assert.equal(currentUser.puedeVerEntrenamientoEquipo(actor), false)
+    assert.throws(() => currentUser.centrosEntrenamiento(actor), /No autorizado/)
+  }
+})
