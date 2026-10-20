@@ -18,6 +18,8 @@ const fecha = (ts) => ts ? new Date(ts).toLocaleDateString('es-PA', { day: 'nume
 
 export default function ZohoPage() {
   const [sincronizando, setSincronizando] = useState(false)
+  const [sincronizandoVentas, setSincronizandoVentas] = useState(false)
+  const [ventas, setVentas] = useState(null)
   const [resultado, setResultado] = useState(null)
   const [estado, setEstado] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -64,6 +66,17 @@ export default function ZohoPage() {
   }
   const informe = resultado || estado?.ultimaConciliacion
   const conexion = estado?.conexion
+  async function sincronizarVentas() {
+    setSincronizandoVentas(true)
+    setVentas(null)
+    try {
+      const response = await fetch('/api/cron/cerebro-sales', { method: 'POST' })
+      const result = await response.json()
+      setVentas(result)
+    } catch {
+      setVentas({ ok: false, error: 'No se pudo confirmar la sincronización. Puedes reintentar; no duplica ventas.' })
+    } finally { setSincronizandoVentas(false) }
+  }
 
   return (
     <div className="shell">
@@ -127,6 +140,25 @@ export default function ZohoPage() {
             </>
           )}
         </div>
+        {conexion && <section className="card" aria-label="Aprendizaje de ventas" style={{ padding: 24, marginTop: 20 }}>
+          <h2>Ventas para Cerebro</h2>
+          <p>Revisa facturas y pagos de las cuatro organizaciones cada 6 horas. Solo vincula ventas a contactos comprobados del CRM.</p>
+          <button className="btn btn--primary" onClick={sincronizarVentas} disabled={sincronizandoVentas}>
+            {sincronizandoVentas ? 'Comprobando pagos…' : 'Actualizar aprendizaje de ventas'}
+          </button>
+          <p className="h-sub">Cada consulta retoma el historial pendiente. Las facturas sin contacto identificado no cuentan como ventas atribuidas a campañas.</p>
+          {ventas && <div role={ventas.ok ? 'status' : 'alert'}>
+            <p>{ventas.ok ? 'Consulta completada. El historial puede requerir más lotes.' : ventas.error || 'Consulta parcial: el avance confirmado se conserva para reintentar.'}</p>
+            {ventas.organizations && <div style={{ overflowX: 'auto' }}><table className="table">
+              <thead><tr><th>Organización</th><th>Facturas revisadas</th><th>Con contacto CRM</th><th>Con pago comprobado</th><th>Avance</th></tr></thead>
+              <tbody>{ventas.organizations.map(org => <tr key={org.organization_id}>
+                <td>{({ 667522360: 'F&F Soluciones · Panamá', 903355420: 'Altavia · Panamá', 886209250: 'V&A · Panamá', 854270088: 'FF Soluciones 2024 · Venezuela' })[org.organization_id]}</td>
+                <td>{org.documents ?? 0}</td><td>{org.linked ?? 0}</td><td>{org.paid ?? 0}</td>
+                <td>{org.error || (org.deferred ? 'Pendiente de consulta' : org.cycle_complete ? 'Recorrido completo' : `Lote ${org.page} completado`)}</td>
+              </tr>)}</tbody>
+            </table></div>}
+          </div>}
+        </section>}
         {informe && <section className="card" aria-label="Conciliación de facturas vencidas" style={{ padding: 24, marginTop: 20 }}>
           <h2>Última conciliación de cobranza</h2>
           <p>{informe.guardado ? 'Conteo guardado' : 'Revisión pendiente · conteo anterior conservado'} · {new Date(informe.fin).toLocaleString('es-PA', { timeZone: 'America/Panama' })} (Panamá)</p>
