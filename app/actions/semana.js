@@ -14,6 +14,13 @@ import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro }
 import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn, leerCompromiso, guardarCompromisoEn } from '../../lib/cuotas-semana-servicio.js'
 import { superponerCobranzaTablero } from '../../lib/estadisticas-semana/cobranza-tablero.js'
 import { cargarClasesPruebaTablero } from '../../lib/estadisticas-semana/clases-prueba-tablero.js'
+import { leerInformeSemana } from '../../lib/informe-semana-servicio.js'
+
+export async function getInformeSemana(centroId, semanaFin) {
+  const session = await requireCentroAccess(centroId)
+  if (session.rol === 'coach') throw new Error('No autorizado para este centro')
+  return await leerInformeSemana(centroId, semanaFin)
+}
 
 async function vistaCentro(centroId, session) {
   const [centro] = await sql`SELECT id, nombre, pais FROM centros WHERE id = ${centroId}`
@@ -28,7 +35,7 @@ async function vistaCentro(centroId, session) {
     metasDeSemana(abierta),
     leerCompromiso(centroId, abierta.slice(0, 7)),
   ])
-  const { filas, resultadosMes } = await completarSerieCentro(centroId, semanas, guardadas, { now })
+  const { filas, resultadosMes, avanceDiario } = await completarSerieCentro(centroId, semanas, guardadas, { now, diario: true })
   const { series: baseSeries, resumen } = armarSeries(semanas, filas)
   const { series, cuotas } = prepararCuotas({ catalogo: ESTADISTICAS_CENTRO, series: baseSeries, resumen, filasCuotas, metas, compromiso, semanaAbierta: abierta, hoy: fechaCivil(now, zonaHoraria) })
   const fechas = filas.map((fila) => fila.calculado_at).filter(Boolean).map((fecha) => new Date(fecha).getTime())
@@ -43,6 +50,7 @@ async function vistaCentro(centroId, session) {
     series,
     resumen,
     resultadosMes,
+    avanceDiario,
     fechaDatos: fechaCivil(now, zonaHoraria),
     ultimoCalculo: fechas.length ? new Date(Math.max(...fechas)).toISOString() : null,
     puedeEscribir: puedeEscribirCentro(session, centroId),

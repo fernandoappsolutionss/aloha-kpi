@@ -23,9 +23,9 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
       </div>
       <p className="semana-tarjeta__cuota"><strong>Cuota de esta semana: {mostrar(objetivo)}</strong>{cuota.estado && <span className="label"> · {cuota.estado === 'aprobada' ? 'Aprobada' : 'Propuesta'}</span>}</p>
       {meta.tipo === 'flujo' && cuota.ritmo && <div className="semana-ritmo" role="status">
-        <p>Van {mostrar(resumen.abierta)} de {mostrar(objetivo)}; a hoy deberían ir {mostrar(cuota.ritmo.esperado)}.</p>
-        <progress value={Math.min(Number(resumen.abierta), Number(objetivo))} max={Math.max(Number(objetivo), 1)} aria-label={`Ritmo de ${meta.nombre}`} />
-        <span className={cuota.ritmo.vaBien ? 'semana-ritmo--bien' : 'semana-ritmo--atras'}>{cuota.ritmo.vaBien ? 'Al ritmo' : 'Por debajo del ritmo'}</span>
+        <p>{meta.inversa ? `Van ${mostrar(resumen.abierta)}; el máximo semanal es ${mostrar(objetivo)}. Menos es mejor.` : `Van ${mostrar(resumen.abierta)} de ${mostrar(objetivo)}; a hoy deberían ir ${mostrar(cuota.ritmo.esperado)}.`}</p>
+        {!meta.inversa && <progress value={Math.min(Number(resumen.abierta), Number(objetivo))} max={Math.max(Number(objetivo), 1)} aria-label={`Ritmo de ${meta.nombre}`} />}
+        <span className={cuota.ritmo.vaBien ? 'semana-ritmo--bien' : 'semana-ritmo--atras'}>{meta.inversa ? cuota.ritmo.vaBien ? 'Dentro del límite' : 'Supera el límite' : cuota.ritmo.vaBien ? 'Al ritmo' : 'Por debajo del ritmo'}</span>
       </div>}
       {error && <p role="status" className="alert alert--error">Sin dato: {error}</p>}
       {aviso && <p className="h-sub">{aviso}</p>}
