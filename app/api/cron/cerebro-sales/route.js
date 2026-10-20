@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { cronAutorizado } from '../../../../lib/cron-auth.mjs'
 import { zohoRefreshToken } from '../../../../lib/zoho-conexion'
 import { syncCerebroSales } from '../../../../lib/cerebro-sales.mjs'
+import { requireCurrentMaster } from '../../../../lib/auth'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -29,8 +30,12 @@ export async function GET(request) {
   return run()
 }
 
-// Operational replay with the existing server-to-server identity; no browser access.
+// Replay uses either the existing service identity or a same-origin Master session.
 export async function POST(request) {
-  if (!serviceAuthorized(request)) return Response.json({ error: 'No autorizado' }, { status: 401 })
+  if (!serviceAuthorized(request)) {
+    if (request.headers.get('origin') !== new URL(request.url).origin)
+      return Response.json({ error: 'Origen no autorizado' }, { status: 403 })
+    try { await requireCurrentMaster() } catch { return Response.json({ error: 'No autorizado' }, { status: 403 }) }
+  }
   return run()
 }
