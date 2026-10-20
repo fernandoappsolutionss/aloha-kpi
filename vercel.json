@@ -3,6 +3,7 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "crons": [
+    { "path": "/api/cron/cerebro-sales", "schedule": "15 */6 * * *" },
     { "path": "/api/cron/llenado", "schedule": "0 10 * * *" },
     { "path": "/api/cron/peticiones-cleanup", "schedule": "15 11 * * *" },
     { "path": "/api/cron/cobranza-zoho", "schedule": "0 0 * * 2-6" },
