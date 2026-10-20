@@ -36,6 +36,7 @@ const stubs={
  export const guardarCompromiso=async()=>{};
  export const guardarCuotas=async(id,fin,p)=>{for(const [k,v]of Object.entries(p))window.__datos.cuotas[k]={...window.__datos.cuotas[k],cuota:v,estado:'propuesta'}};
  export const aprobarCuotas=guardarCuotas;
+ export const cambiarAlineamiento=async()=>{};
  export const asignarCondicion=async(id,fin,p)=>{window.__datos.plan.plan={...window.__datos.plan.plan,condicion:p.condicion,fundamento:p.fundamento};window.__datos.plan.pasos=pasosDe(p)};
  export const agregarObjetivo=async(id,fin,p)=>{window.__datos.plan.objetivos.push({...p,id:Date.now(),hecho:false});};
  export const editarObjetivo=async()=>{};
@@ -84,7 +85,7 @@ try{
  await page.getByLabel('Semana del juego').selectOption('2026-10-15');await page.getByText('Propuesta pendiente',{exact:true}).waitFor();check(await page.getByRole('button',{name:'Editar propuesta'}).count()===0,'Juego histórico solo lectura')
  for(const width of [390,320,1440]){await page.setViewportSize({width,height:1000});for(const s of ['','/condicion','/acciones','/cumplimiento','/juegos']){await navegar(s);check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Sin desborde ${width} ${s}`);if(width===390&&['','/condicion','/juegos'].includes(s))await page.screenshot({path:resolve(out,`movil-${s.slice(1)||'avance'}.png`),fullPage:true})}}
  for(const m of MODULOS.filter(m=>m.id.startsWith('semana-'))){for(let i=1;i<=m.pasos.length;i++){const route=rutaDePaso(m,i).replace('{id}','2');await page.evaluate(u=>window.__nav(u),route);await ready();check(await page.locator(`[data-tour="${m.pasos[i-1].target}"]`).count()===1,`${m.id} paso ${i} target presente en ${route}`)}}
- await navegar('');await page.evaluate(()=>window.__datos.plan={...window.__datos.plan,plan:{condicion:null},pasos:[]});await navegar('/condicion');check(await page.getByText('¿Qué es una condición?').count()===1,'Ayuda sin condición');check(await page.getByText('La fórmula y sus objetivos aparecerán al asignar la condición.').count()===1,'Estado inicial sin fórmula falsa')
+ await navegar('');await page.evaluate(()=>window.__datos.plan={...window.__datos.plan,plan:{condicion:null},pasos:[]});await navegar('/condicion');check(await page.getByText('¿Qué es una condición?').count()===1,'Ayuda sin condición');check(await page.getByText('Elige una condición para ver sus pasos y agregar tus objetivos.').count()===1,'Estado inicial sin fórmula falsa')
  await page.evaluate(()=>window.__falloJuego=true);await navegar('/juegos');await page.getByRole('alert').waitFor();check(await page.getByRole('button',{name:'Guardar propuesta de juego'}).count()===0,'Error de carga impide sobrescribir juego')
  check(errores.length===0,errores.join('; '));await writeFile(resolve(out,'resultado.json'),JSON.stringify({checks,errores,fuentes:'Componentes reales; datos y acciones simulados'},null,2));console.log(`${checks} comprobaciones UI PASS; PDF generado`)
 }finally{if(context)await context.close();if(browser){assert.equal(browser.contexts().length,0);await browser.close();assert.equal(browser.isConnected(),false)}await new Promise(r=>server.close(r));console.log('Navegador: pestañas/grupos propios cerrados y comprobados. Servidor propio detenido.')}

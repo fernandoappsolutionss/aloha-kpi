@@ -2969,3 +2969,23 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .poster-download__body a { overflow-wrap:anywhere; font-size:13px; padding:8px 0; }
 .survey-actions .survey-field { margin:0; min-width:100px; }
 .survey-actions .survey-field select { min-height:44px; font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px; }
+
+/* Captura directa de objetivos y oportunidades semanales. */
+.semana-formula { border-left: 4px solid var(--condicion-color); padding-left: 1rem; }
+.semana-formula > h3 { color: var(--condicion-color); }
+.semana-objetivo-rapido__fila { display: flex; align-items: center; gap: .6rem; }
+.semana-objetivo-rapido__fila .field { flex: 1; min-width: 0; }
+.semana-objetivo-rapido .semana-ayuda { margin-top: .4rem; }
+.semana-alineamiento { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.semana-alineamiento__totales { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+.semana-alineamiento__totales p > span, .semana-alineamiento__totales p > strong { display: block; }
+.semana-alineamiento__totales p > strong { font-size: 1.8rem; }
+.semana-alineamiento__partida { margin-top: 1.25rem; }
+.semana-alineamiento__form { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto; align-items: end; gap: .6rem; }
+.semana-alineamiento progress { width: 100%; accent-color: var(--aloha-lima); }
+@media (max-width: 600px) {
+  .semana-alineamiento__totales { grid-template-columns: 1fr 1fr; }
+  .semana-alineamiento__totales form { grid-column: 1 / -1; }
+  .semana-alineamiento__form { grid-template-columns: minmax(0, 1fr) 85px; }
+  .semana-alineamiento__form button { grid-column: 1 / -1; }
+}

@@ -1,14 +1,15 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CONDICIONES, colorCondicion, nombreCondicion, claveFormula } from '../../lib/condiciones/formulas.mjs'
+import { CONDICIONES, colorCondicion, nombreCondicion, claveFormula, pasosDe } from '../../lib/condiciones/formulas.mjs'
 import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo } from '../../app/actions/semana'
+import AlineamientoSemana from './AlineamientoSemana'
 import AyudaCondicion from './AyudaCondicion'
 import { ejemplosFormula } from '../../lib/condiciones/ayuda.mjs'
 import LecturaCondicion from './LecturaCondicion'
 import ArranqueSemanal from './ArranqueSemanal'
 import { calendarioPlan } from '../../lib/reunion-semanal.mjs'
-import { pasoPrevioPendiente, formulaAnteriorPendiente } from '../../lib/plan-semana.mjs'
+import { pasoPrevioPendiente, formulaAnteriorPendiente, objetivoPreparado } from '../../lib/plan-semana.mjs'
 import { updateGrowthRecommendation } from '../../app/actions/growth'
 
 const fechaInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''
@@ -29,6 +30,24 @@ function FormularioObjetivo({ centroId, semanaFin, seccion, paso = null, ejecuta
   </form>
 }
 
+function ObjetivoRapido({ centroId, semanaFin, paso, formula, formulaAnterior, fundamento, ejecutar, ocupado }) {
+  async function enviar(event) {
+    event.preventDefault()
+    const form = event.currentTarget
+    if (await ejecutar(() => agregarObjetivo(centroId, semanaFin, {
+      ...Object.fromEntries(new FormData(form)), ...formula, formulaAnterior, fundamento, seccion: 'formula', paso, rapido: true,
+    }))) form.reset()
+  }
+  return <form className="semana-objetivo-rapido" onSubmit={enviar} aria-label={`Agregar objetivo al paso ${paso + 1}`}>
+    <div className="semana-objetivo-rapido__fila"><label className="field"><span className="sr-only">Objetivo para este paso</span><input name="texto" className="input" placeholder="Objetivo para este paso" maxLength={500} required /></label><button className="btn btn--primary" type="submit" disabled={ocupado}>Agregar</button></div>
+    <details className="semana-ayuda"><summary>Responsable, fecha y evidencia esperada</summary><p className="h-sub">Si no cambias estos detalles, queda a tu nombre y con fecha de cierre de esta semana. Completa la evidencia esperada antes de registrar el resultado.</p><div className="semana-objetivo-form">
+      <label className="field"><span>Responsable</span><input name="responsable" className="input" maxLength={120} placeholder="Tú" /></label>
+      <label className="field"><span>Fecha</span><input name="fecha" className="input" type="date" /></label>
+      <label className="field"><span>Evidencia esperada</span><input name="evidencia_esperada" className="input" maxLength={1000} placeholder="Dónde comprobarás el resultado" /></label>
+    </div></details>
+  </form>
+}
+
 function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar, ocupado, bloqueo = null, anterior = null, preparar = false }) {
   const [editando, setEditando] = useState(false)
   async function guardar(event) {
@@ -43,18 +62,19 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
     </div>
     {(objetivo.responsable || objetivo.fecha) && <p className="h-sub">{objetivo.responsable || 'Sin responsable'}{objetivo.fecha ? ` · ${fechaInput(objetivo.fecha)}` : ''}</p>}
     {objetivo.seccion !== 'orden' && <p className="h-sub">Evidencia esperada: {objetivo.evidencia_esperada || 'Pendiente de completar'} · {objetivo.verificado_at ? 'Verificada por coordinación' : objetivo.hecho ? 'Realizada · pendiente de verificación' : 'Pendiente'}</p>}
+    {!objetivoPreparado(objetivo) && objetivo.seccion !== 'orden' && <p className="h-sub">Objetivo guardado. Completa sus detalles para poder registrar el resultado.</p>}
     {objetivo.origen_formula && <p className="h-sub">Origen: {objetivo.origen_formula.nombre} · cierre {objetivo.origen_formula.semanaFin} · paso {objetivo.origen_formula.paso + 1}: {objetivo.origen_formula.textoPaso}</p>}
     {bloqueo != null && !objetivo.hecho && <p className="h-sub">Completa con evidencia el paso {bloqueo} antes de realizar esta acción.</p>}
     {anterior && !objetivo.hecho && <p className="h-sub">Primero termina la fórmula anterior de {anterior.nombre}, desde el paso {anterior.paso + 1}, en Urgentes o Pendientes.</p>}
     {objetivo.evidencia_resultado && <p><strong>Resultado:</strong> {objetivo.evidencia_resultado}</p>}
     {!preparar && puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={event => { event.preventDefault(); const evidencia = new FormData(event.currentTarget).get('evidencia'); ejecutar(() => marcarObjetivo(centroId, objetivo.id, true, evidencia)) }}>
       <label className="field"><span>Evidencia del resultado</span><textarea name="evidencia" className="input" maxLength={2000} required placeholder="Qué se logró, dato obtenido y referencia para comprobarlo" /></label>
-      <button className="btn" type="submit" disabled={ocupado || bloqueo != null || Boolean(anterior)}>Registrar acción realizada</button>
+      <button className="btn" type="submit" disabled={ocupado || bloqueo != null || Boolean(anterior) || !objetivoPreparado(objetivo)}>Registrar acción realizada</button>
     </form>}
     {!preparar && puedeVerificar && objetivo.hecho && !objetivo.verificado_at && objetivo.evidencia_resultado && <button className="btn btn--primary" disabled={ocupado} onClick={() => ejecutar(() => verificarObjetivo(centroId, objetivo.id, { hechoAt: objetivo.hecho_at, evidencia: objetivo.evidencia_resultado }))}>Verificar evidencia</button>}
     {puedeEscribir && objetivo.seccion !== 'orden' && <div className="semana-objetivo__acciones">
       {!preparar && objetivo.hecho && <button className="btn" disabled={ocupado} onClick={() => ejecutar(() => marcarObjetivo(centroId, objetivo.id, false))}>Reabrir acción</button>}
-      <button type="button" className="btn" disabled={ocupado} onClick={() => setEditando((v) => !v)}>{editando ? 'Cancelar' : 'Editar'}</button>
+      <button type="button" className="btn" disabled={ocupado} onClick={() => setEditando((v) => !v)}>{editando ? 'Cancelar' : objetivoPreparado(objetivo) ? 'Editar' : 'Completar detalles'}</button>
       <button type="button" className="btn" disabled={ocupado} onClick={() => { if (window.confirm('¿Eliminar este objetivo?')) ejecutar(() => eliminarObjetivo(centroId, objetivo.id)) }}>Eliminar</button>
     </div>}
     {editando && <form className="semana-objetivo-form" onSubmit={guardar}>
@@ -68,7 +88,7 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
   </li>
 }
 
-export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh, prioridades, ajustes, vista = 'todo' }) {
+export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, puedeAsignar, puedeVerificar = false, onRefresh, prioridades, ajustes, cuotas = {}, vista = 'todo' }) {
   const [seleccion, setSeleccion] = useState(datos.plan.condicion || '')
   const [alcance, setAlcance] = useState(datos.plan.alcance_peligro || 'personal')
   const [variante, setVariante] = useState(datos.plan.variante_afluencia || 'accion')
@@ -103,9 +123,15 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   }
 
   const preparar = vista === 'condicion'
-  const ejemplo = ejemplosFormula[claveFormula({ condicion: datos.plan.condicion, alcancePeligro: datos.plan.alcance_peligro, varianteAfluencia: datos.plan.variante_afluencia })]
-  const estado = datos.estado === 'completo' ? 'Plan preparado' : datos.estado === 'sin_condicion' ? 'Pendiente de asignar condición' : `Completa acción, responsable, fecha y evidencia en el paso ${datos.pasoFaltante}`
+  const formulaGuardada = { condicion: datos.plan.condicion, alcancePeligro: datos.plan.alcance_peligro, varianteAfluencia: datos.plan.variante_afluencia }
+  const formula = vista === 'acciones' ? formulaGuardada : { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante }
+  const claveGuardada = claveFormula(formulaGuardada) || ''
+  const clave = claveFormula(formula) || ''
+  const pasos = formula.condicion ? pasosDe(formula) : []
+  const ejemplo = ejemplosFormula[clave]
+  const estado = datos.plan.condicion && !datos.plan.fundamento ? 'Condición elegida · falta explicar los datos' : datos.estado === 'completo' ? 'Plan preparado' : datos.estado === 'sin_condicion' ? 'Pendiente de asignar condición' : `Completa acción, responsable, fecha y evidencia en el paso ${datos.pasoFaltante}`
   const objetivos = datos.objetivos || []
+  const objetivosFormula = clave === claveGuardada ? objetivos.filter(o => o.seccion === 'formula') : []
   const sinCondicion = !datos.plan.condicion
   const calendario = calendarioPlan(semanaFin)
   const estrategico = datos.estrategico.map((item) => ({ ...item, ...accionesGuardadas[item.id] })).filter((item) => !['completed', 'dismissed'].includes(item.status))
@@ -115,7 +141,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     </div>
     <ArranqueSemanal ultimaCerrada={semanaFin} />
     <p className="h-sub">{datos.ejecucion?.realizadas || 0} de {datos.ejecucion?.total || 0} acciones realizadas · {datos.ejecucion?.verificadas || 0} verificadas. Preparar la fórmula no equivale a haberla ejecutado.</p>
-    {datos.plan.fundamento && <p><strong>Fundamento de la condición:</strong> {datos.plan.fundamento}</p>}
+    {datos.plan.fundamento && clave === claveGuardada && <p><strong>Fundamento de la condición:</strong> {datos.plan.fundamento}</p>}
     {error && <p role="alert" className="alert alert--error">{error}</p>}
     {mensaje && <p role="status" className="alert">{mensaje}</p>}
     {ajustes}
@@ -131,25 +157,27 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {(sinCondicion || cambiando) && (puedeAsignar ? <div className="semana-plan__selector">
       {cambiando && <p className="h-sub">Al cambiar la condición, los objetivos de la fórmula pasarán a Urgentes.</p>}
       <div className="semana-condiciones" role="group" aria-label="Elegir condición">
-        {CONDICIONES.filter((c) => c.visible || mas).map((c) => <button type="button" key={c.codigo} className={`semana-condiciones__opcion${seleccion === c.codigo ? ' semana-condiciones__opcion--activa' : ''}`} style={{ '--condicion-color': c.color }} aria-pressed={seleccion === c.codigo} onClick={() => setSeleccion(c.codigo)}>{c.nombre}</button>)}
+        {CONDICIONES.filter((c) => c.visible || mas).map((c) => <button type="button" key={c.codigo} className={`semana-condiciones__opcion${seleccion === c.codigo ? ' semana-condiciones__opcion--activa' : ''}`} style={{ '--condicion-color': c.color }} aria-pressed={seleccion === c.codigo} disabled={ocupado} onClick={() => { setSeleccion(c.codigo); if (seleccion !== c.codigo) setFundamento('') }}>{c.nombre}</button>)}
       </div>
       {!mas && <button type="button" className="btn" onClick={() => setMas(true)}>Más condiciones</button>}
-      {seleccion === 'peligro' && <fieldset className="semana-plan__variantes"><legend>Peligro</legend><label><input type="radio" name="alcance" checked={alcance === 'personal'} onChange={() => setAlcance('personal')} /> Personal</label><label><input type="radio" name="alcance" checked={alcance === 'superior'} onChange={() => setAlcance('superior')} /> Para el superior</label></fieldset>}
-      {seleccion === 'afluencia' && <fieldset className="semana-plan__variantes"><legend>Afluencia</legend><label><input type="radio" name="variante" checked={variante === 'accion'} onChange={() => setVariante('accion')} /> De acción</label><label><input type="radio" name="variante" checked={variante === 'financiera'} onChange={() => setVariante('financiera')} /> Financiera</label></fieldset>}
-      <label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los últimos cierres, por qué corresponde esta condición y qué causa debes comprobar" required /></label>
-      <div className="semana-plan__acciones"><button type="button" className="btn btn--primary" disabled={!seleccion || !fundamento.trim() || ocupado} onClick={async () => { if (await ejecutar(() => asignarCondicion(centroId, semanaFin, { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante, fundamento }))) setCambiando(false) }}>Guardar condición</button>{cambiando && <button type="button" className="btn" onClick={() => setCambiando(false)}>Cancelar</button>}</div>
+      {seleccion === 'peligro' && <fieldset className="semana-plan__variantes"><legend>Peligro</legend><label><input type="radio" name="alcance" disabled={ocupado} checked={alcance === 'personal'} onChange={() => { setAlcance('personal'); setFundamento('') }} /> Personal</label><label><input type="radio" name="alcance" disabled={ocupado} checked={alcance === 'superior'} onChange={() => { setAlcance('superior'); setFundamento('') }} /> Para el superior</label></fieldset>}
+      {seleccion === 'afluencia' && <fieldset className="semana-plan__variantes"><legend>Afluencia</legend><label><input type="radio" name="variante" disabled={ocupado} checked={variante === 'accion'} onChange={() => { setVariante('accion'); setFundamento('') }} /> De acción</label><label><input type="radio" name="variante" disabled={ocupado} checked={variante === 'financiera'} onChange={() => { setVariante('financiera'); setFundamento('') }} /> Financiera</label></fieldset>}
+      <details className="semana-ayuda"><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los últimos cierres, por qué corresponde esta condición y qué causa debes comprobar" required /></label>
+      <div className="semana-plan__acciones"><button type="button" className="btn btn--primary" disabled={!seleccion || !fundamento.trim() || ocupado} onClick={async () => { if (await ejecutar(() => asignarCondicion(centroId, semanaFin, { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante, fundamento }))) setCambiando(false) }}>Guardar condición</button>{cambiando && <button type="button" className="btn" onClick={() => { setCambiando(false); setSeleccion(datos.plan.condicion || ''); setAlcance(datos.plan.alcance_peligro || 'personal'); setVariante(datos.plan.variante_afluencia || 'accion'); setFundamento(datos.plan.fundamento || '') }}>Cancelar</button>}</div></details>
     </div> : <p className="h-sub">{puedeEscribir ? 'La condición la asigna la administradora' : 'Condición pendiente de asignación.'}</p>)}
 
+    {!sinCondicion && !cambiando && puedeAsignar && <details className="semana-ayuda"><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los cierres y por qué corresponde esta condición" /></label><button className="btn" disabled={ocupado || !fundamento.trim()} onClick={() => ejecutar(() => asignarCondicion(centroId, semanaFin, { ...formulaGuardada, fundamento }))}>Guardar fundamento</button></details>}
     </div>
     </>}
     <div data-tour="semana.formula">
-    {sinCondicion && <p className="h-sub">La fórmula y sus objetivos aparecerán al asignar la condición.</p>}
-    {!sinCondicion && <section className="semana-plan__seccion"><h3>Fórmula de {nombreCondicion(datos.plan.condicion)}{datos.plan.condicion === 'peligro' ? ` · ${datos.plan.alcance_peligro === 'superior' ? 'para el superior' : 'personal'}` : datos.plan.condicion === 'afluencia' ? ` · ${datos.plan.variante_afluencia === 'financiera' ? 'financiera' : 'de acción'}` : ''}</h3><p className="h-sub">Prepara las acciones de todos los pasos. Ejecútalas en orden: completa las del paso anterior con evidencia antes de registrar las del siguiente. Coordinación verifica después el resultado.</p>{ejemplo && <details className="semana-ayuda"><summary>Ver un ejemplo: del paso a una acción comprobable</summary><p><strong>Paso:</strong> {ejemplo[0]}</p><p><strong>Acción:</strong> {ejemplo[1]}</p><p><strong>Responsable:</strong> {ejemplo[2]} · <strong>Fecha:</strong> acuerda un día de esta semana.</p><p><strong>Evidencia:</strong> {ejemplo[4]}</p><p className="h-sub">Ejemplo de entrenamiento. No se guarda como una acción ni cuenta como realizado.</p></details>}<ol className="semana-plan__pasos">{datos.pasos.map((texto, paso) => <li key={paso}><h4>Paso {paso + 1}</h4><p>{texto}</p><p className="h-sub">{objetivos.filter(o => o.seccion === 'formula' && Number(o.paso) === paso && o.hecho).length} de {objetivos.filter(o => o.seccion === 'formula' && Number(o.paso) === paso).length} acciones realizadas</p>
-      <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} preparar={preparar} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
-      {vista !== 'acciones' && puedeEscribir && <FormularioObjetivo centroId={centroId} semanaFin={semanaFin} seccion="formula" paso={paso} ejecutar={ejecutar} ocupado={ocupado} />}
+    {!formula.condicion && <p className="h-sub">Elige una condición para ver sus pasos y agregar tus objetivos.</p>}
+    {formula.condicion && <section className="semana-plan__seccion semana-formula" style={{ '--condicion-color': colorCondicion(formula.condicion) }}><h3>Fórmula de {nombreCondicion(formula.condicion)}{formula.condicion === 'peligro' ? ` · ${formula.alcancePeligro === 'superior' ? 'para el superior' : 'personal'}` : formula.condicion === 'afluencia' ? ` · ${formula.varianteAfluencia === 'financiera' ? 'financiera' : 'de acción'}` : ''}</h3>{clave !== claveGuardada && <p className="h-sub">Al agregar el primer objetivo se guardará esta condición. Puedes explicar sus datos al preparar el plan.</p>}<p className="h-sub">Prepara las acciones de todos los pasos. Ejecútalas en orden: completa las del paso anterior con evidencia antes de registrar las del siguiente. Coordinación verifica después el resultado.</p>{ejemplo && <details className="semana-ayuda"><summary>Ver un ejemplo: del paso a una acción comprobable</summary><p><strong>Paso:</strong> {ejemplo[0]}</p><p><strong>Acción:</strong> {ejemplo[1]}</p><p><strong>Responsable:</strong> {ejemplo[2]} · <strong>Fecha:</strong> acuerda un día de esta semana.</p><p><strong>Evidencia:</strong> {ejemplo[4]}</p><p className="h-sub">Ejemplo de entrenamiento. No se guarda como una acción ni cuenta como realizado.</p></details>}<ol className="semana-plan__pasos">{pasos.map((texto, paso) => <li key={`${clave}:${paso}`}><h4>Paso {paso + 1}</h4><p>{texto}</p><p className="h-sub">{objetivosFormula.filter(o => o.seccion === 'formula' && Number(o.paso) === paso && o.hecho).length} de {objetivosFormula.filter(o => o.seccion === 'formula' && Number(o.paso) === paso).length} acciones realizadas</p>
+      <ul className="semana-plan__objetivos">{objetivosFormula.filter((o) => o.seccion === 'formula' && Number(o.paso) === paso).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} preparar={preparar} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>
+      {vista !== 'acciones' && puedeEscribir && <ObjetivoRapido centroId={centroId} semanaFin={semanaFin} paso={paso} formula={formula} formulaAnterior={claveGuardada} fundamento={fundamento} ejecutar={ejecutar} ocupado={ocupado || (clave !== claveGuardada && !puedeAsignar)} />}
     </li>)}</ol></section>}
 
     </div>
+    <AlineamientoSemana centroId={centroId} semanaFin={semanaFin} items={datos.plan.alineamiento || []} cuotas={cuotas} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />
     {!preparar && <>
     {[['urgente', 'Urgentes'], ['pendiente', 'Pendientes'], ['orden', 'Órdenes del coordinador']].map(([seccion, titulo]) => <section className="semana-plan__seccion" key={seccion}><h3>{titulo}</h3>
       <ul className="semana-plan__objetivos">{objetivos.filter((o) => o.seccion === seccion).map((o) => <Objetivo key={o.id} centroId={centroId} objetivo={o} preparar={preparar} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} bloqueo={pasoPrevioPendiente(o, objetivos)} puedeVerificar={puedeVerificar} puedeEscribir={seccion !== 'orden' && puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />)}</ul>

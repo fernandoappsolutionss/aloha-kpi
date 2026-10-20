@@ -48,7 +48,7 @@ test('guiones usan solo observar; todos los targets están presentes aun sin con
     if (p.ruta) assert.match(p.ruta, /^\/centro\/\{id\}\/semana(?:\/(condicion|acciones))?$/)
   }
   const plan = read('components/semana/PlanSemana.js')
-  assert.match(plan, /data-tour="semana.formula">\s*\{sinCondicion && <p/)
+  assert.match(plan, /data-tour="semana.formula">\s*\{!formula.condicion && <p/)
   assert.match(plan, /data-tour="semana.condicion">\s*\{!sinCondicion/)
   for (const p of ['app/centro/[id]/entrenamiento/page.js','app/centro/[id]/entrenamiento/[modulo]/page.js','components/tour/TourHost.js']) assert.match(read(p), /modulosDeRol\(/)
 })

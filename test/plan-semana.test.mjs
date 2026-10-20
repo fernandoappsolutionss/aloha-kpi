@@ -33,7 +33,8 @@ test('estado del plan', () => {
   assert.equal(estadoPlan({ condicion: null, objetivos: [] }), 'sin_condicion')
   const obj = (paso) => ({ seccion: 'formula', paso, texto: 'x', responsable:'Ana',fecha:'2026-10-07', evidencia_esperada:'Registro' })
   assert.equal(estadoPlan({ condicion: 'inexistencia', objetivos: [obj(0), obj(1), obj(2)] }), 'incompleto')
-  assert.equal(estadoPlan({ condicion: 'inexistencia', objetivos: [obj(0), obj(1), obj(2), obj(3)] }), 'completo')
+  assert.equal(estadoPlan({ condicion: 'inexistencia', objetivos: [obj(0), obj(1), obj(2), obj(3)] }), 'incompleto')
+  assert.equal(estadoPlan({ condicion: 'inexistencia', fundamento: 'Datos del cierre', objetivos: [obj(0), obj(1), obj(2), obj(3)] }), 'completo')
 })
 
 test('identifica el primer paso de fórmula sin objetivo', () => {

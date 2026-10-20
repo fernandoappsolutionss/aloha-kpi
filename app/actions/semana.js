@@ -14,6 +14,7 @@ import { prepararCuotas, evaluarCuotasCerradas, ordenarReunion, periodosCentro }
 import { leerCuotasCentros, metasDeSemana, guardarCuotasEn, agregarOrdenEn, leerCompromiso, guardarCompromisoEn } from '../../lib/cuotas-semana-servicio.js'
 import { superponerCobranzaTablero } from '../../lib/estadisticas-semana/cobranza-tablero.js'
 import { cargarClasesPruebaTablero } from '../../lib/estadisticas-semana/clases-prueba-tablero.js'
+import { cambiarAlineamientoEn } from '../../lib/alineamiento-semana-servicio.js'
 import { leerInformeSemana } from '../../lib/informe-semana-servicio.js'
 
 export async function getInformeSemana(centroId, semanaFin) {
@@ -189,4 +190,9 @@ export async function guardarCompromiso(centroId, datos) {
 export async function verificarObjetivo(centroId, objetivoId, revision) {
   const sesion = await requireCurrentCoordinacion(centroId)
   return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id, revision })
+}
+
+export async function cambiarAlineamiento(centroId, semanaFin, cambio) {
+  await requireCurrentWriteCentro(centroId)
+  return await cambiarAlineamientoEn(centroId, semanaFin, cambio)
 }

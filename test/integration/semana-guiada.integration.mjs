@@ -17,7 +17,7 @@ const propuesta = { titulo: 'Bienvenida', codigo: 'cp_asistidas', meta: 10, part
 
 before(async () => {
   await pool.query('CREATE TABLE centros (id INTEGER PRIMARY KEY, nombre TEXT, pais TEXT); CREATE TABLE usuarios (id INTEGER PRIMARY KEY)')
-  for (const name of ['2026-10-01-estadisticas-semana','2026-10-01-plan-semana','2026-10-01-cuotas-semana','2026-10-02-ruta-plan-integrado','2026-10-16-semana-continuidad','2026-10-20-semana-juegos','2026-10-20-semana-juegos']) await pool.query(readFileSync(new URL(`../../db/migrations/${name}.sql`, import.meta.url), 'utf8'))
+  for (const name of ['2026-10-01-estadisticas-semana','2026-10-01-plan-semana','2026-10-01-cuotas-semana','2026-10-02-ruta-plan-integrado','2026-10-16-semana-continuidad','2026-10-20-semana-juegos','2026-10-20-semana-alineamiento']) await pool.query(readFileSync(new URL(`../../db/migrations/${name}.sql`, import.meta.url), 'utf8'))
 })
 beforeEach(async () => {
   await pool.query('TRUNCATE centros, usuarios RESTART IDENTITY CASCADE')
