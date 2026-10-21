@@ -101,6 +101,12 @@ export default function EntrenamientoPage() {
         {veRecorridos && (
         <section aria-labelledby="ent-sistema-titulo">
         <h2 id="ent-sistema-titulo" className="ent-seccion__titulo">Cómo usar el sistema</h2>
+        {modulos.some(m => m.id === 'semana-graficas') && <section className="panel" aria-labelledby="ent-semana-actualizada">
+          <h3 id="ent-semana-actualizada">Mi semana · recorrido actualizado</h3>
+          <p>Aprende dónde va cada cosa en las cinco secciones. Puedes repasar aunque ya hayas completado el entrenamiento; conservas tu progreso y tus firmas.</p>
+          <p><Link className="btn" href={moduloHref('semana-graficas')}>Avance diario y cuotas →</Link>{modulos.some(m => m.id === 'semana-plan') && <> <Link className="btn" href={moduloHref('semana-plan')}>Fórmula, Hoy, juegos y cumplimiento →</Link></>}</p>
+          <p><Link href={`/centro/${id}/entrenamiento/oficio#actualizacion-semanal`}>Practicar con las responsabilidades de mi puesto →</Link></p>
+        </section>}
 
         {loading ? <div className="card ent-loading" role="status">Preparando tu siguiente paso…</div> : error ? (
           <div className="alert alert--error" role="alert">{error}<button type="button" className="btn" onClick={()=>setRetry(n=>n+1)}>Reintentar</button></div>

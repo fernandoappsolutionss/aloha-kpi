@@ -65,12 +65,12 @@ test('hay 14 módulos con ids únicos y en orden 1..14', () => {
   assert.deepEqual(MODULOS.map((m) => m.orden), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
 })
 
-test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos y 1-3 errores', () => {
+test('cada módulo tiene intro, inicio.ruta bajo /centro/{id}, 5-8 pasos (10 para la semana completa) y 1-3 errores', () => {
   for (const m of MODULOS) {
     assert.ok(m.titulo && m.intro?.texto, `${m.id}: falta título o intro`)
     assert.ok(Number.isInteger(m.duracionMin) && m.duracionMin > 0, `${m.id}: duracionMin`)
     assert.match(m.inicio.ruta, /^\/centro\/\{id\}/, `${m.id}: inicio.ruta`)
-    assert.ok(m.pasos.length >= 5 && m.pasos.length <= 8, `${m.id}: ${m.pasos.length} pasos`)
+    assert.ok(m.pasos.length >= 5 && m.pasos.length <= (m.id === 'semana-plan' ? 10 : 8), `${m.id}: ${m.pasos.length} pasos`)
     assert.ok(m.errores.length >= 1 && m.errores.length <= 3, `${m.id}: errores`)
   }
 })

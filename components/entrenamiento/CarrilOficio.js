@@ -119,7 +119,7 @@ export default function CarrilOficio({ centroId }) {
         <Link className="btn btn--primary" href={base}>{avance.estudiados > 0 ? 'Continuar mi oficio' : 'Ver mi puesto'} <span aria-hidden="true">→</span></Link>
       </div>
 
-      {semanal && <p className="alert"><strong>Actualización semanal {semanal.hatted < semanal.total ? 'pendiente' : 'completada'}</strong> · {semanal.hatted} de {semanal.total} módulos con maniobra firmada. <Link href={`${base}#actualizacion-semanal`}>Ver gráficas, condiciones y práctica de mi puesto →</Link></p>}
+      {semanal && <p className="alert"><strong>Actualización semanal {semanal.hatted < semanal.total ? 'pendiente' : 'completada'}</strong> · {semanal.hatted} de {semanal.total} módulos con maniobra firmada. <Link href={`${base}#actualizacion-semanal`}>Repasar Mi semana y la práctica de mi puesto →</Link></p>}
       <div className="ofi-carril__barras">
         <div>
           <div className="label">Estudiado</div>

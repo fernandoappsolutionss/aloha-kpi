@@ -334,7 +334,7 @@ export default async function OficioPage({ params, searchParams }) {
 
     {semanales.length > 0 && <section id="actualizacion-semanal" className="card" aria-labelledby="actualizacion-semanal-title" style={{ scrollMarginTop: 24 }}>
       <h2 id="actualizacion-semanal-title">Actualización semanal {pendientesSemana.length ? 'pendiente' : 'completada'}</h2>
-      <p>Lectura de estadísticas, condición, práctica de tu puesto y planificación de metas, programas y acciones. {pendientesSemana.length} de {semanales.length} módulos pendientes de estudio o maniobra firmada. Tu formación anterior conserva su progreso.</p>
+      <p>Aprende qué va en cada sección de Mi semana y qué corresponde a tu puesto: datos, condición, objetivos, Hoy, evidencia, cuotas, juegos y cumplimiento. Cada práctica respeta tus permisos. {pendientesSemana.length} de {semanales.length} módulos pendientes de estudio o maniobra firmada. Tu formación anterior conserva su progreso y firmas. Puedes repasar el contenido actualizado aunque el módulo ya esté completado.</p>
       <ul>{semanales.map((m) => <li key={m.id}><Link href={`${base}/${m.id}`}>{m.titulo}</Link></li>)}</ul>
       {recorridosSemana.length > 0 && <p>Recorridos de pantalla: {recorridosSemana.map((m, i) => <span key={m.id}>{i > 0 && ' · '}<Link href={`/centro/${id}/entrenamiento/${m.id}`}>{m.titulo}</Link></span>)}</p>}
     </section>}

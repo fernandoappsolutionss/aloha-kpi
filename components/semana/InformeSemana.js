@@ -28,7 +28,7 @@ export default function InformeSemana({ centroId, datos }) {
     cerrado: false, consultado: datos.ultimoCalculo, ...datos.plan,
     estadisticas: datos.catalogo.map(meta => { const c = datos.cuotas[meta.codigo] || {}; const valor = datos.resumen[meta.codigo]?.abierta; return { ...meta, valor, cuota: c.cuota, estadoCuota: c.estado, cumple: c.estado === 'aprobada' ? cuotaCumplida({ valor, cuota: c.cuota, inversa: meta.inversa }) : null } }) }
   const informe = semana === datos.semanaAbierta ? actual : historico?.semanaFin === semana ? historico : null
-  return <section aria-labelledby="cumplimiento-semanal-title">
+  return <section data-tour="semana.informe" aria-labelledby="cumplimiento-semanal-title">
     <div className="semana-intro semana-no-imprimir"><div><p className="label">04 · Revisa y conserva</p><h2 id="cumplimiento-semanal-title">Mi cumplimiento semanal</h2><p>Comprueba los resultados y las evidencias. Imprime o guarda un PDF para tu reunión.</p></div></div>
     <div className="semana-informe__controles semana-no-imprimir"><label className="field"><span>Semana del informe</span><select className="input" value={semana} onChange={e => setSemana(e.target.value)}>{[...datos.semanas].reverse().map(fin => <option key={fin} value={fin}>Cierre {fin}{fin === datos.semanaAbierta ? ' · En curso' : ''}</option>)}</select></label><button type="button" className="btn btn--primary" disabled={cargando || !informe} onClick={() => window.print()}>Imprimir / guardar PDF</button><Link className="btn" href={`/centro/${centroId}/cumplimiento`}>Cumplimiento mensual →</Link></div>
     {cargando && <p role="status">Cargando informe…</p>}{error && <p role="alert">{error}</p>}

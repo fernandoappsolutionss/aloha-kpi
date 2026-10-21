@@ -360,14 +360,14 @@
     "seg": 40
   },
   "oficio/of-sem-2": {
-    "hash": "b9da63bf6976",
+    "hash": "2fc89386cbe7",
     "file": "oficio/of-sem-2.mp3",
-    "seg": 54
+    "seg": 68
   },
   "oficio/of-sem-adm": {
-    "hash": "c4e13e0329e4",
+    "hash": "3b9d40fe3aac",
     "file": "oficio/of-sem-adm.mp3",
-    "seg": 51
+    "seg": 64
   },
   "oficio/of-sem-asi": {
     "hash": "e8691d6ce2b2",
@@ -380,9 +380,9 @@
     "seg": 41
   },
   "oficio/of-sem-cop": {
-    "hash": "3c531055183e",
+    "hash": "86f25448654c",
     "file": "oficio/of-sem-cop.mp3",
-    "seg": 42
+    "seg": 53
   },
   "oficio/of-sem-3": {
     "hash": "9cb7cb5c11a4",

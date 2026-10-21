@@ -27,14 +27,14 @@ test('las encuestas y el nombre KPI Mensual tienen guías naturales y grabacione
 test('solo las cinco locuciones con la meta anterior se retiran hasta regenerar',()=>{
   const manifest=JSON.parse(readFileSync(new URL('../lib/entrenamiento/audio-manifest-actualizaciones.json',import.meta.url),'utf8'))
   const afectadas=new Set(['encuestas/intro','encuestas/en-3','encuestas/en-5','cumplimiento/cu-5','cumplimiento-ayuda/encuestas_satisfaccion'])
-  // Este contrato congela las 60 locuciones previas; las 13 semanales tienen
+  // Este contrato congela las 60 locuciones previas; las 17 semanales tienen
   // su cobertura/hash obligatorio en entrenamiento-guia-audio.test.mjs.
   const semanales = new Set(['semana-graficas', 'semana-plan'])
   const clips = clipsActualizados()
   const previos = clips.filter(c => !semanales.has(c.clave.split('/')[0]) && c.clave !== 'meta/meta-6')
   assert.equal(previos.length, 60)
   const nuevos = clips.filter(c => semanales.has(c.clave.split('/')[0]))
-  assert.equal(nuevos.length, 13)
+  assert.equal(nuevos.length, 17)
   for (const clip of nuevos) assert.match(clip.file, /^actualizaciones\/semana-/)
   for(const clip of previos) {
     const entrada=manifest[clip.clave]

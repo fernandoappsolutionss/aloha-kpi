@@ -9,7 +9,7 @@ export default function AlineamientoSemana({ centroId, semanaFin, items, cuotas,
   const { alineado, hecho } = totalesAlineamiento(items, codigo)
   const cuota = cuotas[codigo]?.cuota
   const cambiar = cambio => ejecutar(() => cambiarAlineamiento(centroId, semanaFin, cambio))
-  return <section className="semana-plan__seccion semana-alineamiento" aria-labelledby="alineamiento-title">
+  return <section data-tour="semana.alineamiento" className="semana-plan__seccion semana-alineamiento" aria-labelledby="alineamiento-title">
     <h3 id="alineamiento-title">Alineamiento</h3>
     <p className="h-sub">Pon nombre a las oportunidades que harán posible tu cuota: clientes, grupos o actividades y su cantidad. Agrega cada oportunidad una sola vez. Planificar no significa que ya se logró.</p>
     <label className="field"><span>Resultado que vas a alinear</span><select className="input" value={codigo} onChange={e => setCodigo(e.target.value)} disabled={ocupado}>{Object.entries(METRICAS_ALINEAMIENTO).map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}</select></label>
