@@ -97,6 +97,6 @@ test('juego bloquea escrituras históricas y rechaza versiones desactualizadas',
 test('recorridos siguen los pasos en sus nuevas pantallas', () => {
   const plan = MODULOS.find(m => m.id === 'semana-plan')
   assert.equal(rutaDePaso(plan, 2), '/centro/{id}/semana/condicion')
-  assert.equal(rutaDePaso(plan, 4), '/centro/{id}/semana')
-  assert.equal(rutaDePaso(plan, 5), '/centro/{id}/semana/acciones')
+  assert.deepEqual(plan.pasos.map((_, i) => rutaDePaso(plan, i + 1)), ['condicion', 'condicion', 'condicion', 'condicion', '', 'condicion', 'acciones', 'juegos', 'cumplimiento', 'cumplimiento'].map(p => `/centro/{id}/semana${p ? '/' + p : ''}`))
+  assert.equal(rutaDePaso(plan, 7), '/centro/{id}/semana/acciones')
 })

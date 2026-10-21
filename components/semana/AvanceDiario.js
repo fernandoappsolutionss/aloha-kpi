@@ -11,7 +11,7 @@ export default function AvanceDiario({ datos, centroId }) {
   const cuota = datos.cuotas[codigo]?.cuota ?? datos.cuotas[codigo]?.propuesta
   const dias = filasAvanceDiario({ semanaFin: datos.semanaAbierta, hoy: datos.fechaDatos, meta, cuota, diario: datos.avanceDiario })
   const flujo = meta.tipo === 'flujo'
-  return <section className="semana-avance" aria-labelledby="avance-title">
+  return <section data-tour="semana.avance" className="semana-avance" aria-labelledby="avance-title">
     <div className="semana-intro"><div><p className="label">01 · Mira cómo vas</p><h2 id="avance-title">Tu avance, día a día</h2><p>Los resultados llegan del centro, Clases de Prueba y Zoho. Tú revisas el ritmo y decides qué hacer hoy.</p></div><Link className="btn" href={`/centro/${centroId}/semana/acciones`}>Ir a mis acciones →</Link></div>
     <div className="semana-marcadores">{datos.catalogo.map(m => {
       const c = datos.cuotas[m.codigo] || {}

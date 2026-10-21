@@ -109,7 +109,7 @@ function HoySemana({ centroId, semanaFin, hoy, objetivos, puedeEscribir, puedeVe
     const form = event.currentTarget
     if (await ejecutar(() => agregarObjetivo(centroId, semanaFin, { ...Object.fromEntries(new FormData(form)), seccion: 'pendiente', hoy: true, fechaVista: hoy }))) form.reset()
   }
-  return <section className="semana-hoy" aria-labelledby="semana-hoy-title">
+  return <section data-tour="semana.hoy" className="semana-hoy" aria-labelledby="semana-hoy-title">
     <div className="semana-hoy__cabecera"><h3 id="semana-hoy-title" tabIndex={-1}>Hoy{hoy ? ` · ${hoy}` : ''}</h3><span>{deHoy.filter(o => o.hecho).length}/{deHoy.length}</span></div>
     <p className="h-sub">Pasa con → Hoy las actividades que vas a hacer. Su resultado queda también en el plan y en tu cumplimiento. Quitar de Hoy conserva la actividad semanal.</p>
     <ul className="semana-plan__objetivos">{deHoy.map(o => <Objetivo key={o.id} centroId={centroId} objetivo={o} hoy={hoy} enHoy puedeEscribir={puedeEscribir} puedeVerificar={puedeVerificar} ejecutar={ejecutar} ocupado={ocupado} bloqueo={pasoPrevioPendiente(o, objetivos)} anterior={o.seccion === 'formula' ? formulaAnteriorPendiente(objetivos) : null} />)}</ul>

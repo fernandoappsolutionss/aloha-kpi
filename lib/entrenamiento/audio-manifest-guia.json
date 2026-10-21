@@ -1110,9 +1110,9 @@
     "seg": 24
   },
   "guia/of-sem-adm/vista": {
-    "hash": "96662945b0b3",
+    "hash": "116290b66a5e",
     "file": "guia/of-sem-adm/vista.mp3",
-    "seg": 24
+    "seg": 34
   },
   "guia/of-sem-adm/palabras": {
     "hash": "fe3904339dff",
@@ -1120,9 +1120,9 @@
     "seg": 28
   },
   "guia/of-sem-adm/cierre": {
-    "hash": "c289d078ac76",
+    "hash": "d82adab07f5e",
     "file": "guia/of-sem-adm/cierre.mp3",
-    "seg": 26
+    "seg": 41
   },
   "guia/of-sem-asi/vista": {
     "hash": "322dea0fdb11",
@@ -1165,9 +1165,9 @@
     "seg": 29
   },
   "guia/of-sem-cop/cierre": {
-    "hash": "587ef7120d06",
+    "hash": "680f6c3d38a3",
     "file": "guia/of-sem-cop/cierre.mp3",
-    "seg": 27
+    "seg": 42
   },
   "guia/of-sem-3/vista": {
     "hash": "58d8bfdb45ca",

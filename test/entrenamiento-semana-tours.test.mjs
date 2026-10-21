@@ -41,11 +41,11 @@ test('actions rechazan tour y quiz ajenos antes de SQL; aceptan solo el recorrid
 })
 
 test('guiones usan solo observar; todos los targets están presentes aun sin condición o cuotas guardadas', () => {
-  const files = ['app/centro/[id]/semana/page.js','components/semana/PlanSemana.js','components/semana/CuotasSemana.js','components/semana/TrabajoSemanal.js'].map(read).join('\n')
+  const files = ['app/centro/[id]/semana/page.js','components/semana/PlanSemana.js','components/semana/CuotasSemana.js','components/semana/TrabajoSemanal.js','components/semana/AvanceDiario.js','components/semana/AlineamientoSemana.js','components/semana/JuegosSemana.js','components/semana/InformeSemana.js'].map(read).join('\n')
   for (const m of nuevos) for (const p of m.pasos) {
     assert.equal(p.tipo, 'mostrar')
     assert.ok(files.includes(`data-tour="${p.target}"`), p.target)
-    if (p.ruta) assert.match(p.ruta, /^\/centro\/\{id\}\/semana(?:\/(condicion|acciones))?$/)
+    if (p.ruta) assert.match(p.ruta, /^\/centro\/\{id\}\/semana(?:\/(condicion|acciones|cumplimiento|juegos))?$/)
   }
   const plan = read('components/semana/PlanSemana.js')
   assert.match(plan, /data-tour="semana.formula">\s*\{!formula.condicion && <p/)
@@ -104,9 +104,9 @@ test('ambos anchors hacen scroll tras carga; no se aceptan IDs arbitrarios', () 
   assert.deepEqual(vistos,['plan-batalla','semana-cuotas-title'])
 })
 
-test('13 clips nuevos van a actualizaciones; manifest y guiones legacy no se sustituyen', () => {
+test('17 clips semanales van a actualizaciones; manifest y guiones legacy no se sustituyen', () => {
   const clips = clipsActualizados().filter(c=>c.clave.startsWith('semana-'))
-  assert.equal(clips.length,13)
+  assert.equal(clips.length,17)
   assert.equal(clipsDeTours().some(c=>c.clave.startsWith('semana-')),false)
   for (const c of clips) assert.match(c.file, /^actualizaciones\/semana-/)
   const frozen = JSON.parse(read('lib/entrenamiento/audio-manifest.json'))
