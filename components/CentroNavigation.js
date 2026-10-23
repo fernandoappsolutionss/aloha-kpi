@@ -17,18 +17,21 @@ export default function CentroNavigation({ centroId, section = 'kpi' }) {
   useEffect(() => {
     if (section !== 'entrenamiento') return
     let active = true
-    setRol(null); setFirmas(0); setError(false)
+    setError(false)
+    // `path` en las dependencias: el badge se vuelve a pedir al navegar (p. ej.
+    // tras firmar en la cola). No se resetea `rol`: sin él seccionesCentro
+    // devuelve [] y los enlaces parpadeaban en cada navegación.
     getNavigationContext().then(async (context) => {
       if (!active) return
       const role = context?.actor?.role
       setRol(role)
-      if (!isReadonlyGlobalRole(role) && rolesQueFirma(role).length) {
-        const result = await contadorFirmas(Number(centroId)).catch(() => null)
-        if (active) setFirmas(result?.n || 0)
-      }
+      const result = !isReadonlyGlobalRole(role) && rolesQueFirma(role).length
+        ? await contadorFirmas(Number(centroId)).catch(() => null)
+        : null
+      if (active) setFirmas(result?.n || 0)
     }).catch(() => { if (active) setError(true) })
     return () => { active = false }
-  }, [centroId, section])
+  }, [centroId, section, path])
 
   const links = seccionesCentro(centroId, section, rol)
   const current = links.filter(({ href }) => path === href || path.startsWith(`${href}/`))

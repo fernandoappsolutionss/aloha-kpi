@@ -15,7 +15,9 @@ import { CURSOS, BLOQUES, TITULO_BLOQUE, MODULOS_OFICIO } from '../../../../../l
 import { estudiado, esDePapel, puedeImprimirPapel, gradienteAbierto } from '../../../../../lib/entrenamiento/oficio/progreso'
 import { puertaCerrada } from '../../../../../lib/entrenamiento/oficio/guia-pasos'
 
-const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short' }) : ''
+// Server Component: sin timeZone la fecha salía en UTC (Vercel) y un quiz
+// aprobado el 23 por la noche se pintaba como "24 oct".
+const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', timeZone: 'America/Panama' }) : ''
 
 // El plan mide horas, no minutos: "395 min" no le dice a nadie cuánto es.
 // El carril de revisión ya redondeaba a horas enteras (7 h para 6 h 35), que

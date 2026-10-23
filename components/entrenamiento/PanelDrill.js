@@ -11,8 +11,10 @@
 // cuando en realidad las cuatro reescriben la misma fila.
 //
 // Recibe todo por props: no importa el catálogo ni el glosario.
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { firmarDrill, quitarFirmaDrill } from '../../app/actions/entrenamiento-oficio'
+import { useGuia } from './GuiaModulo'
 
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
 
@@ -27,6 +29,11 @@ function criteriosDe(lista) {
 }
 
 function Firma({ criterios, usuarioId, moduloId, firmadoAt, firmadoPor }) {
+  // La página de firmas es Server Component: cola, encabezado y píldoras se
+  // calculan allá. El estado local pinta solo este panel; sin refresh seguían
+  // diciendo «pendiente» después de firmar.
+  const router = useRouter()
+  const [, startTransition] = useTransition()
   const [tildados, setTildados] = useState(() => criterios.map(() => false))
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +46,7 @@ function Firma({ criterios, usuarioId, moduloId, firmadoAt, firmadoPor }) {
       const r = await firmarDrill(usuarioId, moduloId)
       if (r?.error) { setError(r.error); return }
       setFirma({ at: new Date().toISOString(), por: null })
+      startTransition(() => router.refresh())
     } catch { setError('No se pudo firmar. Recarga la página e intenta de nuevo.') } finally { setGuardando(false) }
   }
   async function quitar() {
@@ -48,6 +56,7 @@ function Firma({ criterios, usuarioId, moduloId, firmadoAt, firmadoPor }) {
       if (r?.error) { setError(r.error); return }
       setFirma({ at: null, por: null })
       setTildados(criterios.map(() => false))
+      startTransition(() => router.refresh())
     } catch { setError('No se pudo quitar la firma. Recarga la página e intenta de nuevo.') } finally { setGuardando(false) }
   }
 
@@ -111,6 +120,10 @@ function Cuerpo({ drill, numero }) {
 }
 
 export default function PanelDrill({ drills, indice, usuarioId, moduloId, moduloTitulo, firmadoAt, firmadoPor, puedoFirmar, estudiado, oficiales }) {
+  // Dentro de la guía, `hechos` ya sabe que aprobó las preguntas antes de que
+  // el servidor vuelva con `estudiado`; fuera de la guía es null y no cambia nada.
+  const guia = useGuia()
+  const yaEstudiado = estudiado || Boolean(guia?.hechos?.has('preguntas'))
   const lista = (Array.isArray(drills) ? drills : [drills]).filter(Boolean)
   if (lista.length === 0) return null
   const varios = lista.length > 1
@@ -142,7 +155,7 @@ export default function PanelDrill({ drills, indice, usuarioId, moduloId, modulo
             <>
               <span className="ent-pill ent-pill--mid">Falta que te la firmen</span>
               <p className="h-sub" style={{ margin: '8px 0 0' }}>
-                {estudiado
+                {yaEstudiado
                   ? `Ya lo estudiaste. ${quien ? `Te la toma ${quien}` : 'Pídele a tu jefe entrenador que te la tome'}; los criterios de aprobación son los que va a tildar.`
                   : `Primero estudia el módulo y responde sus preguntas; después ${quien ? `pídele a ${quien}` : 'pídele a tu jefe entrenador'} que te tome la maniobra.`}
               </p>

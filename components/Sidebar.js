@@ -205,13 +205,16 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const canViewUsersPage = access.canViewUsersPage || (access.isReadonlyGlobal && Boolean(context?.capabilities?.viewUsers))
   useEffect(() => {
     let active = true
-    setFirmas(0)
-    if (!centroDelPlan || !firmaDrills) return
-    contadorFirmas(Number(centroDelPlan))
+    if (!centroDelPlan || !firmaDrills) { setFirmas(0); return }
+    const cargar = () => contadorFirmas(Number(centroDelPlan))
       .then((r) => { if (active && r && !r.error) setFirmas(r.n) })
       .catch(() => {})
-    return () => { active = false }
-  }, [centroDelPlan, firmaDrills])
+    cargar()
+    // Se vuelve a pedir al navegar (`path`) y al volver a la pestaña: la firma
+    // pudo hacerse en la cola o en otra pestaña y el badge se quedaba viejo.
+    window.addEventListener('focus', cargar)
+    return () => { active = false; window.removeEventListener('focus', cargar) }
+  }, [centroDelPlan, firmaDrills, path])
 
   const adminItems = [
     { label: 'Panel general', icon: 'grid', href: '/dashboard' },

@@ -28,7 +28,7 @@ export default function ReunionSemanalPage() {
 
   async function ejecutar(work, confirmacion) {
     setOcupado(true); setError(''); setMensaje('')
-    try { await work(); await cargar(); setMensaje(confirmacion); return true }
+    try { const r = await work(); if (r?.error) throw new Error(r.error); await cargar(); setMensaje(confirmacion); return true }
     catch (cause) { setError(cause?.message || 'No se pudo guardar.'); return false }
     finally { setOcupado(false) }
   }

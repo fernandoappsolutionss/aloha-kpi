@@ -649,6 +649,51 @@ test('firmarDrill: permiso verificado en el servidor y con auth fresca', () => {
   assert.match(body, /MODULO_IDS_OFICIO\.has\(modulo\)/)
 })
 
+// El badge del menú decía «2 firmas» y la cola salía vacía: contadorFirmas
+// contaba filas crudas de todo módulo con maniobra y colaFirmas descartaba las
+// que ya no eran del plan del alumno. Una sola función decide qué espera firma.
+test('contadorFirmas y colaFirmas cuentan lo mismo: una función interna decide qué espera firma', () => {
+  const src = readFileSync(ACTIONS, 'utf8')
+  const limpio = sinComentarios(src)
+  const i = limpio.indexOf('async function pendientesDeFirma(firmante, centroId)')
+  assert.ok(i > 0, 'falta pendientesDeFirma')
+  assert.doesNotMatch(limpio, /export async function pendientesDeFirma/, 'es interna: no es una Server Action')
+  const helper = limpio.slice(i, limpio.indexOf('\nexport async function', i))
+  assert.match(helper, /esDelPlan\(m, a\.rol, a\.centro_id, asignacionesOficio\(a\)\)/, 'el filtro del plan vive en la función compartida')
+  assert.match(helper, /u\.email/, 'asignacionesOficio lee el email: sin él la Dirección de Caja no contaría')
+  assert.match(helper, /drill_firmado_at IS NULL/)
+  for (const nombre of ['colaFirmas', 'contadorFirmas']) {
+    const body = cuerpo(src, nombre)
+    assert.match(body, /requireCurrentOficio\(\)/, `${nombre} relee la identidad en su propio cuerpo`)
+    assert.match(body, /pendientesDeFirma\(firmante, centroId\)/, `${nombre} no lleva una copia propia del filtro`)
+  }
+  assert.doesNotMatch(cuerpo(src, 'contadorFirmas'), /COUNT\(\*\)|esDelPlan\(/, 'el badge no cuenta por su cuenta')
+})
+
+// Firmar escribía bien pero la pantalla seguía diciendo «pendiente»: la cola es
+// Server Component y nadie la volvía a pedir. Y tras «Ya lo estudié» el
+// cuestionario seguía con candado hasta que terminaba el refresh.
+test('firmar refresca la cola del servidor; la guía adelanta el candado del cuestionario y el estado de la maniobra', () => {
+  const panel = sinComentarios(readFileSync(join(ROOT, 'components/entrenamiento/PanelDrill.js'), 'utf8'))
+  assert.match(panel, /useRouter\(\)/)
+  const firma = panel.slice(panel.indexOf('function Firma('), panel.indexOf('function Cuerpo('))
+  assert.match(firma, /await firmarDrill\([\s\S]*?startTransition\(\(\) => router\.refresh\(\)\)/, 'tras firmar, la página de firmas recalcula cola y píldoras')
+  assert.match(firma, /await quitarFirmaDrill\([\s\S]*?startTransition\(\(\) => router\.refresh\(\)\)/, 'tras quitar la firma también')
+  assert.match(panel, /estudiado \|\| Boolean\(guia\?\.hechos\?\.has\('preguntas'\)\)/, 'el alumno lee «ya lo estudiaste» apenas aprueba, sin esperar el refresh')
+
+  const quiz = sinComentarios(readFileSync(join(ROOT, 'components/entrenamiento/QuizOficio.js'), 'utf8'))
+  assert.match(quiz, /const bloqueadoReal = bloqueado && !guia\?\.hechos\?\.has\('lectura'\)/)
+  assert.match(quiz, /\{bloqueadoReal \? \(/)
+  assert.doesNotMatch(quiz, /\{bloqueado \? \(/, 'el candado se pinta con el estado real, no con el prop viejo')
+
+  for (const ruta of ['components/Sidebar.js', 'components/CentroNavigation.js']) {
+    const src = sinComentarios(readFileSync(join(ROOT, ruta), 'utf8'))
+    const efecto = src.slice(src.indexOf('contadorFirmas(Number('))
+    const deps = efecto.match(/\}, \[([^\]]*)\]\)/)
+    assert.ok(deps && /\bpath\b/.test(deps[1]), `${ruta}: el badge de firmas se vuelve a pedir al navegar`)
+  }
+})
+
 test('responderQuizOficio: valida el largo contra SU quiz y el gradiente ANTES de corregir', () => {
   const body = cuerpo(readFileSync(ACTIONS, 'utf8'), 'responderQuizOficio')
   assert.match(body, /requireCurrentOficio\(\)/)

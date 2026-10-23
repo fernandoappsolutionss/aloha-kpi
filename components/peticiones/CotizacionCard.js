@@ -113,6 +113,9 @@ export default function CotizacionCard({ centroId, peticionId, quote, index, onV
       let finalState = null
       for (let attempt = 0; attempt < 40; attempt++) {
         const state = await getCotizacionUploadStatus(centroId, peticionId, prepared.cotizacionId)
+        // Sin upload_status es un fallo de la acción (runAction → { error }), no
+        // una validación pendiente: se muestra ya, en vez de sondear 20 s en vano.
+        if (state?.error && !state?.upload_status) throw new Error(state.error)
         if (state?.upload_status === 'valid') { finalState = state; break }
         if (state?.upload_status === 'invalid') throw new Error(state.error || 'El PDF no pasó la validación.')
         await new Promise((resolve) => setTimeout(resolve, 500))

@@ -80,6 +80,33 @@ test('un recordatorio vencido vuelve a pendiente pero respeta una acción pospue
   assert.equal(result.recommendations.find(item => item.kind === second.kind).status, 'postponed')
 })
 
+// recommendationState solo reconoce una decisión si su generated_for es el lunes
+// de ESTA semana (o sigue pospuesta y vigente). Por eso updateGrowthRecommendation
+// trae la fila a la semana vigente al completar/descartar: con el lunes anterior
+// la acción volvería a salir como pendiente y sin id.
+test('completar o descartar solo cuenta si la fila está en la semana vigente', () => {
+  const initial = buildGrowthPayload(input())
+  const [first, second] = initial.recommendations
+  const result = buildGrowthPayload(input(), { recommendationStates: [
+    { id: 11, kind: first.kind, status: 'completed', generated_for: '2026-08-24', completed_at: '2026-09-03T15:00:00Z' },
+    { id: 12, kind: second.kind, status: 'dismissed', generated_for: '2026-08-31' },
+  ] })
+  const stale = result.recommendations.find(item => item.kind === first.kind)
+  assert.equal(stale.status, 'pending')
+  assert.equal(stale.id, undefined)
+  const current = result.recommendations.find(item => item.kind === second.kind)
+  assert.equal(current.status, 'dismissed')
+  assert.equal(current.id, 12)
+})
+
+test('la acción trae generated_for a la semana vigente al completar o descartar', async () => {
+  const { readFileSync } = await import('node:fs')
+  const fuente = readFileSync(new URL('../app/actions/growth.js', import.meta.url), 'utf8')
+  const update = fuente.slice(fuente.indexOf('export async function updateGrowthRecommendation'))
+  assert.match(update, /GREATEST\(generated_for, \$\{week\}::date\)/)
+  assert.match(update, /NOT EXISTS/)
+})
+
 test('una decisión guardada se confirma aunque falle el recálculo posterior', async () => {
   assert.equal(typeof engine.refreshAfterRecommendationUpdate, 'function')
   const updated = { id: 1, status: 'completed' }

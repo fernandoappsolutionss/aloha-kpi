@@ -25,8 +25,8 @@ export default function CuotasSemana({ centroId, semanaFin, catalogo, resumen, c
     setOcupado(true); setError(''); setEstado('')
     let guardado = false
     try {
-      if (aprobar) await aprobarCuotas(centroId, semanaFin, payload)
-      else await guardarCuotas(centroId, semanaFin, payload)
+      const r = aprobar ? await aprobarCuotas(centroId, semanaFin, payload) : await guardarCuotas(centroId, semanaFin, payload)
+      if (r?.error) throw new Error(r.error)
       guardado = true
       editados.current.clear()
       await onRefresh()

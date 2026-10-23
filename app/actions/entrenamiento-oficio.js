@@ -508,50 +508,68 @@ export async function quitarFirmaDrill(usuarioId, modulo) {
   })
 }
 
+// Lo que espera firma, con la MISMA regla para la cola y para el badge del
+// menú: filas estudiadas y sin firmar de módulos CON maniobra que sigan en el
+// plan del alumno. El badge contaba sin ese filtro y decía «2 firmas» con la
+// cola vacía: quien cambió de puesto deja filas de módulos que ya no le aplican.
+// Trae el email porque asignacionesOficio lo lee (Dirección de Caja).
+// → { mios:[alumno…], porUsuario:{ [id]: [fila…] } }
+async function pendientesDeFirma(firmante, centroId) {
+  const roles = rolesQueFirma(firmante.rol)
+  if (roles.length === 0) return { mios: [], porUsuario: {} }
+  const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
+  const candidatos = cid
+    ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.nombre`
+    : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) ORDER BY c.nombre, u.nombre`
+  const mios = candidatos
+    .filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
+    // AGRUPADAS POR PUESTO. El SQL ordena por centro y por nombre, y a una
+    // Administradora con cuatro Coaches y una Asistente le salían las cinco
+    // tarjetas intercaladas alfabéticamente: no se puede ver de un vistazo si
+    // lo atrasado es de los Coaches o de la Asistente. El orden de los
+    // puestos no se escribe otra vez: es el de ROLES_ALUMNO.
+    .sort((a, b) => ROLES_ALUMNO.indexOf(a.rol) - ROLES_ALUMNO.indexOf(b.rol))
+  const ids = mios.map((a) => Number(a.id))
+  const conDrill = MODULOS_OFICIO.filter((m) => (m.drills || []).length > 0).map((m) => m.id)
+  const rows = ids.length && conDrill.length
+    ? await sql`
+        SELECT usuario_id, modulo, quiz_aprobado_at FROM entrenamiento_progreso
+        WHERE usuario_id = ANY(${ids}) AND modulo = ANY(${conDrill})
+          AND tour_visto_at IS NOT NULL AND quiz_aprobado_at IS NOT NULL
+          AND drill_firmado_at IS NULL
+      `
+    : []
+  const alumnos = new Map(mios.map((a) => [Number(a.id), a]))
+  const porUsuario = {}
+  for (const r of rows) {
+    const a = alumnos.get(Number(r.usuario_id))
+    const m = moduloOficio(r.modulo)
+    if (!a || !m || !esDelPlan(m, a.rol, a.centro_id, asignacionesOficio(a))) continue
+    ;(porUsuario[a.id] ||= []).push(r)
+  }
+  return { mios, porUsuario }
+}
+
 // Cola del jefe entrenador: quién tiene módulos ESTUDIADOS esperando
 // que le tomen la maniobra, y hace cuántos días.
 // → { rol, filas:[{ usuarioId, nombre, email, rol, centro, centroId, modulos:[…] }] }
 export async function colaFirmas(centroId = null) {
   return runAction('colaFirmas', async () => {
     const firmante = await requireCurrentOficio()
-    const roles = rolesQueFirma(firmante.rol)
-    if (roles.length === 0) return { rol: firmante.rol, filas: [] }
-    const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
-    const candidatos = cid
-      ? await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid})) ORDER BY c.nombre, u.nombre`
-      : await sql`SELECT u.id, u.nombre, u.email, u.rol, u.centro_id, c.nombre AS centro FROM usuarios u LEFT JOIN centros c ON c.id = u.centro_id WHERE u.rol = ANY(${roles}) ORDER BY c.nombre, u.nombre`
-    const mios = candidatos
-      .filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
-      // AGRUPADAS POR PUESTO. El SQL ordena por centro y por nombre, y a una
-      // Administradora con cuatro Coaches y una Asistente le salían las cinco
-      // tarjetas intercaladas alfabéticamente: no se puede ver de un vistazo si
-      // lo atrasado es de los Coaches o de la Asistente. El orden de los
-      // puestos no se escribe otra vez: es el de ROLES_ALUMNO.
-      .sort((a, b) => ROLES_ALUMNO.indexOf(a.rol) - ROLES_ALUMNO.indexOf(b.rol))
-    const ids = mios.map((a) => Number(a.id))
+    const { mios, porUsuario } = await pendientesDeFirma(firmante, centroId)
+    if (mios.length === 0) return { rol: firmante.rol, filas: [] }
     // EL PROGRESO DE QUIEN FIRMA, no solo el de sus alumnos. La maniobra de un
     // módulo COMPARTIDO es contenido de ese módulo —lo que va a la vista, los
     // pasos, los criterios—, y son los criterios con los que a ella se la van a
     // tomar después. Si la puerta le cierra ese módulo, aquí tampoco se lo
     // servimos: era la cuarta puerta por la que se saltaba el orden.
     const suyo = await progresoDeUsuario(firmante.id)
-    const rows = ids.length
-      ? await sql`
-          SELECT * FROM entrenamiento_progreso
-          WHERE usuario_id = ANY(${ids}) AND modulo LIKE 'of-%'
-            AND tour_visto_at IS NOT NULL AND quiz_aprobado_at IS NOT NULL
-            AND drill_firmado_at IS NULL
-        `
-      : []
-    const porUsuario = {}
-    for (const r of rows) (porUsuario[r.usuario_id] ||= []).push(r)
     const hoy = Date.now()
     const filas = []
     for (const a of mios) {
       const pendientes = (porUsuario[a.id] || [])
         .map((r) => {
-          const m = moduloOficio(r.modulo)
-          if (!m || (m.drills || []).length === 0 || !esDelPlan(m, a.rol, a.centro_id, asignacionesOficio(a))) return null
+          const m = moduloOficio(r.modulo) // ya filtrado por pendientesDeFirma
           const desde = r.quiz_aprobado_at ? new Date(r.quiz_aprobado_at) : null
           // ¿Este módulo está en MI plan y todavía no lo he estudiado? Misma
           // regla y mismos datos que la puerta de la página del módulo.
@@ -601,25 +619,8 @@ export async function colaFirmas(centroId = null) {
 export async function contadorFirmas(centroId = null) {
   return runAction('contadorFirmas', async () => {
     const firmante = await requireCurrentOficio()
-    const roles = rolesQueFirma(firmante.rol)
-    if (roles.length === 0) return { n: 0 }
-    const cid = Number.isInteger(centroId) && centroId > 0 ? centroId : null
-    const candidatos = cid
-      ? await sql`SELECT u.id, u.rol, u.centro_id FROM usuarios u WHERE u.rol = ANY(${roles}) AND (u.centro_id = ${cid} OR EXISTS (SELECT 1 FROM usuario_centros uc WHERE uc.usuario_id = u.id AND uc.centro_id = ${cid}))`
-      : await sql`SELECT u.id, u.rol, u.centro_id FROM usuarios u WHERE u.rol = ANY(${roles})`
-    const ids = candidatos
-      .filter((a) => puedeFirmar(comoFirmante(firmante), { id: Number(a.id), rol: a.rol, centroId: a.centro_id == null ? null : Number(a.centro_id) }))
-      .map((a) => Number(a.id))
-    if (!ids.length) return { n: 0 }
-    const conDrill = MODULOS_OFICIO.filter((m) => (m.drills || []).length > 0).map((m) => m.id)
-    if (!conDrill.length) return { n: 0 }
-    const rows = await sql`
-      SELECT COUNT(*)::int AS n FROM entrenamiento_progreso
-      WHERE usuario_id = ANY(${ids}) AND modulo = ANY(${conDrill})
-        AND tour_visto_at IS NOT NULL AND quiz_aprobado_at IS NOT NULL
-        AND drill_firmado_at IS NULL
-    `
-    return { n: Number(rows[0]?.n || 0) }
+    const { porUsuario } = await pendientesDeFirma(firmante, centroId)
+    return { n: Object.values(porUsuario).reduce((n, filas) => n + filas.length, 0) }
   })
 }
 

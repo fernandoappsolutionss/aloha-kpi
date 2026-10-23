@@ -15,6 +15,7 @@ import {
 import { calculateCentroGrowth } from '../../lib/growth/server'
 import { refreshAfterRecommendationUpdate } from '../../lib/growth/engine.mjs'
 import { puedeEscribirCentro } from '../../lib/current-user.mjs'
+import { fallo } from '../../lib/errores'
 
 export async function getCentroGrowth(centroId, options = {}) {
   const session = await requireCentroAccess(centroId)
@@ -141,10 +142,19 @@ export async function snoozeGrowthBriefing(centroId) {
 }
 
 export async function updateGrowthRecommendation(centroId, recommendationId, command) {
+  // Devuelve { error } en vez de lanzar: en producción Next enmascara el
+  // mensaje de un throw y el botón parece «no guardar» (lib/errores.js).
+  try {
   await requireCurrentWriteCentro(centroId)
   const id = Number(recommendationId)
   if (!Number.isInteger(id) || id <= 0) throw new Error('Recomendacion no valida')
   const status = recommendationStatusFor(command)
+  // Una acción pospuesta la semana pasada conserva su generated_for viejo. Al
+  // completarla o descartarla la traemos al lunes vigente (America/Panama, igual
+  // que calculateCentroGrowth) porque recommendationState solo reconoce esa
+  // semana: si no, la decisión se guarda pero la tarjeta reaparece pendiente.
+  // El NOT EXISTS protege la UNIQUE (centro_id, kind, generated_for).
+  const week = growthWeekStart()
 
   const [updated] = await sql`
     UPDATE growth_recommendations
@@ -154,14 +164,27 @@ export async function updateGrowthRecommendation(centroId, recommendationId, com
           WHEN ${status} = 'postponed' THEN (now() AT TIME ZONE 'America/Panama')::date + 7
           ELSE due_date
         END,
+        generated_for = CASE
+          WHEN ${status} IN ('completed', 'dismissed')
+            AND NOT EXISTS (
+              SELECT 1 FROM growth_recommendations g2
+              WHERE g2.centro_id = growth_recommendations.centro_id
+                AND g2.kind = growth_recommendations.kind
+                AND g2.generated_for = ${week}::date
+                AND g2.id <> growth_recommendations.id
+            )
+          THEN GREATEST(generated_for, ${week}::date)
+          ELSE generated_for
+        END,
         updated_at = now()
     WHERE id = ${id}
       AND centro_id = ${centroId}
       AND status IN ('pending', 'postponed')
     RETURNING id, status, due_date, completed_at
   `
-  if (!updated) throw new Error('La recomendacion ya no esta activa')
-  return refreshAfterRecommendationUpdate(updated, () => calculateCentroGrowth(centroId))
+  if (!updated) throw new Error('La recomendación ya no está activa. Recarga la ruta.')
+  return await refreshAfterRecommendationUpdate(updated, () => calculateCentroGrowth(centroId))
+  } catch (e) { return fallo('updateGrowthRecommendation', e) }
 }
 
 const adminGrowthRow = (growth, backtest) => {

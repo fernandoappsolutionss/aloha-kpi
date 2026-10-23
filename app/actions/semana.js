@@ -16,6 +16,7 @@ import { superponerCobranzaTablero } from '../../lib/estadisticas-semana/cobranz
 import { cargarClasesPruebaTablero } from '../../lib/estadisticas-semana/clases-prueba-tablero.js'
 import { cambiarAlineamientoEn } from '../../lib/alineamiento-semana-servicio.js'
 import { leerInformeSemana } from '../../lib/informe-semana-servicio.js'
+import { fallo } from '../../lib/errores.js'
 
 export async function getInformeSemana(centroId, semanaFin) {
   const session = await requireCentroAccess(centroId)
@@ -69,25 +70,33 @@ export async function getSemanaCentro(centroId) {
   return await vistaCentro(centroId, session)
 }
 
+// Las mutaciones devuelven { error } (lib/errores.js): en producción Next
+// oculta el mensaje de cualquier throw y la UI mostraría «An error occurred…».
+// Las lecturas (get*) siguen lanzando: cada pantalla que las llama ya tiene
+// su catch con mensaje propio, y varias viven fuera de /semana.
 export async function actualizarSemanaCentro(centroId) {
-  const session = await requireCurrentWriteCentro(centroId)
-  const [centro] = await sql`SELECT id, pais FROM centros WHERE id = ${centroId}`
-  if (!centro) throw new Error('Centro desconocido.')
-  const abierta = semanaAbierta(new Date(), zonaHorariaCentro(centro))
-  const resultados = await calcularSemanaCentro(centroId, abierta)
-  await guardarSemanaCentro(centroId, abierta, resultados)
-  return await vistaCentro(centroId, session)
+  try {
+    const session = await requireCurrentWriteCentro(centroId)
+    const [centro] = await sql`SELECT id, pais FROM centros WHERE id = ${centroId}`
+    if (!centro) throw new Error('Centro desconocido.')
+    const abierta = semanaAbierta(new Date(), zonaHorariaCentro(centro))
+    const resultados = await calcularSemanaCentro(centroId, abierta)
+    await guardarSemanaCentro(centroId, abierta, resultados)
+    return await vistaCentro(centroId, session)
+  } catch (e) { return fallo('actualizarSemanaCentro', e) }
 }
 
 export async function recalcularSemanaCentro(centroId, semanaFin) {
-  const session = await requireCurrentMaster()
-  rangoSemana(semanaFin)
-  const [centro] = await sql`SELECT id, pais FROM centros WHERE id = ${centroId}`
-  if (!centro) throw new Error('Centro desconocido.')
-  if (semanaFin >= fechaCivil(new Date(), zonaHorariaCentro(centro))) throw new Error('Solo se recalculan semanas cerradas.')
-  const resultados = await calcularSemanaCentro(centroId, semanaFin)
-  await guardarSemanaCentro(centroId, semanaFin, resultados, { estado: 'cerrada', forzar: true })
-  return await vistaCentro(centroId, session)
+  try {
+    const session = await requireCurrentMaster()
+    rangoSemana(semanaFin)
+    const [centro] = await sql`SELECT id, pais FROM centros WHERE id = ${centroId}`
+    if (!centro) throw new Error('Centro desconocido.')
+    if (semanaFin >= fechaCivil(new Date(), zonaHorariaCentro(centro))) throw new Error('Solo se recalculan semanas cerradas.')
+    const resultados = await calcularSemanaCentro(centroId, semanaFin)
+    await guardarSemanaCentro(centroId, semanaFin, resultados, { estado: 'cerrada', forzar: true })
+    return await vistaCentro(centroId, session)
+  } catch (e) { return fallo('recalcularSemanaCentro', e) }
 }
 
 async function cargarTablero({ incluirClasesPrueba = false } = {}) {
@@ -143,61 +152,85 @@ export async function getReunionSemanal() {
 }
 
 export async function asignarCondicion(centroId, semanaFin, datos) {
-  const sesion = await requireCurrentPuedeCerrarMes(centroId)
-  return await asignarCondicionEn(centroId, semanaFin, datos, { sesion })
+  try {
+    const sesion = await requireCurrentPuedeCerrarMes(centroId)
+    return await asignarCondicionEn(centroId, semanaFin, datos, { sesion })
+  } catch (e) { return fallo('asignarCondicion', e) }
 }
 
 export async function agregarObjetivo(centroId, semanaFin, datos) {
-  const sesion = await requireCurrentWriteCentro(centroId)
-  return await agregarObjetivoEn(centroId, semanaFin, datos, { sesion })
+  try {
+    const sesion = await requireCurrentWriteCentro(centroId)
+    return await agregarObjetivoEn(centroId, semanaFin, datos, { sesion })
+  } catch (e) { return fallo('agregarObjetivo', e) }
 }
 
 export async function editarObjetivo(centroId, objetivoId, datos) {
-  await requireCurrentWriteCentro(centroId)
-  return await editarObjetivoEn(centroId, objetivoId, datos)
+  try {
+    await requireCurrentWriteCentro(centroId)
+    return await editarObjetivoEn(centroId, objetivoId, datos)
+  } catch (e) { return fallo('editarObjetivo', e) }
 }
 
 export async function marcarObjetivo(centroId, objetivoId, hecho, evidencia) {
-  await requireCurrentWriteCentro(centroId)
-  return await marcarObjetivoEn(centroId, objetivoId, hecho, { evidencia })
+  try {
+    await requireCurrentWriteCentro(centroId)
+    return await marcarObjetivoEn(centroId, objetivoId, hecho, { evidencia })
+  } catch (e) { return fallo('marcarObjetivo', e) }
 }
 
 export async function eliminarObjetivo(centroId, objetivoId) {
-  await requireCurrentWriteCentro(centroId)
-  return await eliminarObjetivoEn(centroId, objetivoId)
+  try {
+    await requireCurrentWriteCentro(centroId)
+    return await eliminarObjetivoEn(centroId, objetivoId)
+  } catch (e) { return fallo('eliminarObjetivo', e) }
 }
 
 export async function guardarCuotas(centroId, semanaFin, cuotas) {
-  const sesion = await requireCurrentWriteCentro(centroId)
-  return await guardarCuotasEn(centroId, semanaFin, cuotas, { actorId: sesion.id })
+  try {
+    const sesion = await requireCurrentWriteCentro(centroId)
+    return await guardarCuotasEn(centroId, semanaFin, cuotas, { actorId: sesion.id })
+  } catch (e) { return fallo('guardarCuotas', e) }
 }
 
 export async function aprobarCuotas(centroId, semanaFin, cuotas) {
-  const sesion = await requireCurrentCoordinacion(centroId)
-  return await guardarCuotasEn(centroId, semanaFin, cuotas, { actorId: sesion.id, aprobar: true })
+  try {
+    const sesion = await requireCurrentCoordinacion(centroId)
+    return await guardarCuotasEn(centroId, semanaFin, cuotas, { actorId: sesion.id, aprobar: true })
+  } catch (e) { return fallo('aprobarCuotas', e) }
 }
 
 export async function agregarOrden(centroId, semanaFin, datos) {
-  const sesion = await requireCurrentCoordinacion(centroId)
-  return await agregarOrdenEn(centroId, semanaFin, datos, { actorId: sesion.id })
+  try {
+    const sesion = await requireCurrentCoordinacion(centroId)
+    return await agregarOrdenEn(centroId, semanaFin, datos, { actorId: sesion.id })
+  } catch (e) { return fallo('agregarOrden', e) }
 }
 
 export async function guardarCompromiso(centroId, datos) {
-  const sesion = await requireCurrentPuedeCerrarMes(centroId)
-  return await guardarCompromisoEn(centroId, datos, { actorId: sesion.id })
+  try {
+    const sesion = await requireCurrentPuedeCerrarMes(centroId)
+    return await guardarCompromisoEn(centroId, datos, { actorId: sesion.id })
+  } catch (e) { return fallo('guardarCompromiso', e) }
 }
 
 export async function verificarObjetivo(centroId, objetivoId, revision) {
-  const sesion = await requireCurrentCoordinacion(centroId)
-  return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id, revision })
+  try {
+    const sesion = await requireCurrentCoordinacion(centroId)
+    return await verificarObjetivoEn(centroId, objetivoId, { actorId: sesion.id, revision })
+  } catch (e) { return fallo('verificarObjetivo', e) }
 }
 
 export async function cambiarAlineamiento(centroId, semanaFin, cambio) {
-  await requireCurrentWriteCentro(centroId)
-  return await cambiarAlineamientoEn(centroId, semanaFin, cambio)
+  try {
+    await requireCurrentWriteCentro(centroId)
+    return await cambiarAlineamientoEn(centroId, semanaFin, cambio)
+  } catch (e) { return fallo('cambiarAlineamiento', e) }
 }
 
 export async function programarObjetivoHoy(centroId, objetivoId, datos) {
-  await requireCurrentWriteCentro(centroId)
-  return await programarObjetivoHoyEn(centroId, objetivoId, datos)
+  try {
+    await requireCurrentWriteCentro(centroId)
+    return await programarObjetivoHoyEn(centroId, objetivoId, datos)
+  } catch (e) { return fallo('programarObjetivoHoy', e) }
 }

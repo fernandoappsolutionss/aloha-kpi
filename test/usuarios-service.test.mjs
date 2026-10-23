@@ -726,6 +726,7 @@ test('update exige objetivo y destino dentro del alcance', async () => {
   const fx = writeFixture()
   await fx.service.update({ uid: 2 }, 8, { nombre: 'Nueva', rol: 'administradora', centro_id: 12 })
   assert.deepEqual(fx.updated, [{ id: 8, nombre: 'Nueva', rol: 'administradora', centro_id: 12 }])
+  // El usuario 8 ya está activo (password_hash): sí pierde sus enlaces al cambiar de alcance.
   assert.deepEqual(fx.invalidated, [8])
   assert.deepEqual(fx.events.slice(1, 5), ['actor:1:true', 'target:1:8', 'update:1:8', 'centers:1:8'])
   assert.ok(fx.events.indexOf('centers:1:8') < fx.events.indexOf('invalidate:1:8'))
@@ -751,7 +752,19 @@ test('update mantiene el correo inmutable y elimina relaciones N:N residuales', 
   )
   assert.deepEqual(fx.updated, [{ id: 8, nombre: 'Nueva', rol: 'asistente', centro_id: 10 }])
   assert.deepEqual(fx.coordinatorCenters, [{ userId: 8, ids: [] }])
+  // Cuenta activa: el cambio de rol sí invalida sus enlaces.
   assert.deepEqual(fx.invalidated, [8])
+})
+
+// La invitación pendiente (sin password_hash) NO se anula al corregir rol o
+// centro: el token no lleva alcance y anularlo dejaba el correo ya enviado en
+// «Este enlace ya fue usado» sin avisar a nadie.
+test('update no anula la invitación de una cuenta que aún no tiene contraseña', async () => {
+  const fx = writeFixture()
+  await fx.service.update({ uid: 2 }, 9, { nombre: 'B', rol: 'asistente', centro_id: 10 })
+  assert.deepEqual(fx.updated, [{ id: 9, nombre: 'B', rol: 'asistente', centro_id: 10 }])
+  assert.deepEqual(fx.invalidated, [])
+  assert.ok(!fx.events.some((e) => e.startsWith('invalidate:')))
 })
 
 test('coordinador no elimina; Master respeta admin_general y autoborrado', async () => {

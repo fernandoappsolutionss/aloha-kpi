@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { useParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
@@ -51,15 +51,24 @@ export default function CuadroPage() {
   const canWrite = access.canWriteOperations
   const canDelete = access.canDeleteOperations
 
+  // Revisión de la petición en curso: al cambiar mes/año rápido, la respuesta
+  // vieja que llega tarde no debe pisar la del mes que se está viendo.
+  const revisionRef = useRef(0)
   const loadData = useCallback(async () => {
+    const revision = ++revisionRef.current
+    const vigente = () => revision === revisionRef.current
     setStatus(previous => previous.startsWith('❌') ? '' : previous)
     setLoading(true)
     try {
       const [res, grps] = await Promise.all([loadCuadro(id, year, month), listarGruposActivos(id)])
+      if (!vigente()) return
       if (res.error) { setStatus('❌ ' + res.error); setData(null) }
       else setData(res)
       setGruposActivos(Array.isArray(grps) ? grps : [])
-    } catch (e) { setStatus('❌ ' + e.message); setData(null) }
+    } catch (e) {
+      if (!vigente()) return
+      setStatus('❌ ' + e.message); setData(null)
+    }
     setLoading(false)
   }, [id, year, month])
   useEffect(() => { loadData() }, [loadData])
@@ -118,6 +127,12 @@ export default function CuadroPage() {
     const g = gruposActivos.find((x) => String(x.id) === String(gid))
     return g ? 'Grupo ' + g.numero : '—'
   }
+  // El servidor adjunta grupoNumero al pedido: así el grupo se ve aunque ya esté cerrado o fusionado.
+  const grupoPedido = (p) => (p.grupoNumero ? 'Grupo ' + p.grupoNumero : numeroGrupo(p.grupo_id))
+  // Grupo del pedido en edición que ya no está activo: opción deshabilitada para que el select no quede vacío.
+  const grupoCerradoPedido = pedido.grupo_id && !gruposActivos.some((g) => String(g.id) === pedido.grupo_id)
+    ? (data?.pedidos.find((p) => p.id === pedido.id)?.grupoNumero ?? '—')
+    : null
 
   const setP = (k, v) => setPedido((prev) => ({ ...prev, [k]: v }))
 
@@ -129,7 +144,8 @@ export default function CuadroPage() {
     return <span className="pill" style={{ background: 'var(--surface-3)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>Continúa</span>
   }
 
-  if (loading) return (
+  // Shell de carga solo la primera vez: en un refetch se conserva el contenido (y el scroll).
+  if (loading && !data) return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || 'Centro'} centroId={id} />
       <main id="main-content" data-page-state="loading" className="main reports-page"><div className="empty" role="status">Cargando…</div></main>
@@ -163,7 +179,7 @@ export default function CuadroPage() {
   return (
     <div className="shell">
       <Sidebar rol="usuario" centroNombre={data?.nombre || ''} centroId={id} />
-      <main id="main-content" className="main reports-page" data-page-state={!data ? 'error' : 'ready'}>
+      <main id="main-content" className="main reports-page" data-page-state={!data ? 'error' : 'ready'} aria-busy={loading}>
         {!data && <div role="alert">No se pudo cargar el cuadro.<button type="button" className="btn" onClick={loadData}>Reintentar</button></div>}
         <div className="main__head">
           <div>
@@ -180,6 +196,7 @@ export default function CuadroPage() {
                 {[year - 1, year, year + 1].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
+            {loading && data && <span className="label" role="status">Actualizando…</span>}
             {data && (
               <span className={`pill ${cerrado ? 'pill--warn' : 'pill--ok'}`}
                 title={congelado ? `Foto congelada al cierre${data.congeladoAt ? ' (' + fmtFecha(data.congeladoAt) + ')' : ''}. Los movimientos posteriores no alteran este mes.` : undefined}>
@@ -502,7 +519,7 @@ export default function CuadroPage() {
                             {PRODUCTO_LABELS[p.producto] || p.producto}
                             {p.itinerario && <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-dim)' }}> · {p.itinerario}</span>}
                           </td>
-                          <td className="num" style={{ fontSize: 12 }}>{numeroGrupo(p.grupo_id)}</td>
+                          <td className="num" style={{ fontSize: 12 }}>{grupoPedido(p)}</td>
                           <td className="num" style={{ fontSize: 12, textAlign: 'center' }}>{p.nivel ?? '—'}</td>
                           <td className="num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text)' }}>{p.cantidad ?? 0}</td>
                           <td className="num" style={{ fontWeight: 600, color: 'var(--text)' }}>{money(p.monto)}</td>
@@ -570,6 +587,7 @@ export default function CuadroPage() {
                   <span className="label">Grupo</span>
                   <select className="input" name="grupo_id" autoComplete="off" value={pedido.grupo_id} onChange={(e) => setP('grupo_id', e.target.value)}>
                     <option value="">—</option>
+                    {grupoCerradoPedido !== null && <option value={pedido.grupo_id} disabled>Grupo {grupoCerradoPedido} (cerrado)</option>}
                     {gruposActivos.map((g) => <option key={g.id} value={String(g.id)}>Grupo {g.numero} · {g.itinerario}</option>)}
                   </select>
                 </label>
@@ -597,12 +615,12 @@ export default function CuadroPage() {
           <p>{confirmAction.type==='sync'?'Se sobrescribirán grupos activos, nuevos activos y motivos de deserción en el resumen mensual.':'Se eliminará este pedido. Esta acción no se puede deshacer.'}</p>
         </Dialog>}
         {canWrite && accionNino?.tipo === 'retirar' && (
-          <RetirarModal centroId={id} nino={accionNino.nino}
+          <RetirarModal centroId={id} nino={accionNino.nino} year={year} month={month}
             onClose={() => setAccionNino(null)}
             onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />
         )}
         {canWrite && accionNino?.tipo === 'reincorporar' && (
-          <ReincorporarModal centroId={id} nino={accionNino.nino} grupos={gruposActivos}
+          <ReincorporarModal centroId={id} nino={accionNino.nino} grupos={gruposActivos} year={year} month={month}
             onClose={() => setAccionNino(null)}
             onSaved={async (msg) => { setAccionNino(null); setStatus('✅ ' + msg); await loadData() }} />
         )}
@@ -612,20 +630,26 @@ export default function CuadroPage() {
 }
 
 // ── Modal: retirar niño desde el cuadro ──────────────────────────────────────
-function RetirarModal({ centroId, nino, onClose, onSaved }) {
+// 'YYYY-MM' → 'Mes AAAA' para los avisos de mes.
+const nombreMesYM = (ym) => `${NOMBRES_MES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`
+const ymDe = (year, month) => `${year}-${String(month).padStart(2, '0')}`
+
+function RetirarModal({ centroId, nino, year, month, onClose, onSaved }) {
   const complete = useDialogCallback(onSaved, centroId)
-  const [f, setF] = useState({ motivo: '', fecha: hoyISO(), ultimaAsistencia: '' })
+  // La última asistencia ya no se envía: el servidor la deriva de las asistencias marcadas.
+  const [f, setF] = useState({ motivo: '', fecha: hoyISO() })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  // El retiro cae en el mes de la fecha, no en el mes visto: avisar cuando difieren.
+  const mesFecha = f.fecha.slice(0, 7)
+  const otroMes = /^\d{4}-\d{2}$/.test(mesFecha) && mesFecha !== ymDe(year, month)
 
   async function save() {
     if (!f.motivo) { setErr('Selecciona el motivo del retiro.'); return }
     setSaving(true); setErr('')
     try {
-      const res = await retirarEstudiante(centroId, nino.id, {
-        motivo: f.motivo, fecha: f.fecha, ultimaAsistencia: f.ultimaAsistencia || undefined,
-      })
+      const res = await retirarEstudiante(centroId, nino.id, { motivo: f.motivo, fecha: f.fecha })
       if (res.error) { setErr(res.error); return }
       let msg = `${nino.nombre} retirado del cuadro.`
       if (res.warn) msg += ` ⚠️ ${res.warn}`
@@ -655,7 +679,17 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
           </select>
         </Field>
         <Field label="Fecha de retiro"><input type="date" name="fechaRetiro" className="input" value={f.fecha} onChange={(e) => set('fecha', e.target.value)} /></Field>
-        <Field label="Última asistencia (opcional)"><input type="date" name="ultimaAsistencia" className="input" value={f.ultimaAsistencia} onChange={(e) => set('ultimaAsistencia', e.target.value)} /></Field>
+        {nino.ultima_asistencia && (
+          <div style={{ margin: 0 }}>
+            <span className="label">Última asistencia</span>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{fmtFecha(nino.ultima_asistencia)} · se toma de las asistencias marcadas.</div>
+          </div>
+        )}
+        {otroMes && (
+          <div role="status" className="alert alert--warn" style={{ gridColumn: '1 / -1' }}>
+            Estás viendo {NOMBRES_MES[month - 1]} {year}: este retiro quedará registrado en el cuadro de {nombreMesYM(mesFecha)}.
+          </div>
+        )}
         <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
           El niño cae en las deserciones del mes de la fecha de retiro y deja de contar en “a pagar”. Si vuelve, lo reincorporas desde esta misma tabla.
         </div>
@@ -665,11 +699,14 @@ function RetirarModal({ centroId, nino, onClose, onSaved }) {
 }
 
 // ── Modal: reincorporar niño desde el cuadro ─────────────────────────────────
-function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
+function ReincorporarModal({ centroId, nino, grupos, year, month, onClose, onSaved }) {
   const complete = useDialogCallback(onSaved, centroId)
   // Por defecto vuelve a su grupo anterior, si sigue activo.
   const anterior = grupos.find((g) => String(g.id) === String(nino.grupo_id))
   const [grupoId, setGrupoId] = useState(anterior ? String(anterior.id) : '')
+  // El servidor registra la reincorporación en el mes en curso, no en el mes visto.
+  const mesActual = hoyISO().slice(0, 7)
+  const otroMes = mesActual !== ymDe(year, month)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -707,6 +744,11 @@ function ReincorporarModal({ centroId, nino, grupos, onClose, onSaved }) {
           ))}
         </select>
       </Field>
+      {otroMes && (
+        <div role="status" className="alert alert--warn" style={{ marginTop: 12 }}>
+          Estás viendo {NOMBRES_MES[month - 1]} {year}: la reincorporación se registra en el mes en curso ({nombreMesYM(mesActual)}), no en el mes que ves.
+        </div>
+      )}
       <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 'var(--r-sm)' }}>
         Cuenta como reincorporación del mes en curso y vuelve a sumar en “a pagar”.
       </div>

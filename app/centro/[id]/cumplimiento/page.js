@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, Suspense, useState, useEffect } from 'react'
+import { Fragment, Suspense, useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import EncuestasPanel from '../../../../components/encuestas/EncuestasPanel'
 import CartelDescargable from '../../../../components/carteles/CartelDescargable'
@@ -29,6 +29,10 @@ const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','A
 // prellenados, así que la pantalla enseñaba un 88% de un mes que nadie había
 // registrado nunca. Ese era el número que daba la falsa confianza.
 const VACIO = Object.fromEntries(CUMPLIMIENTO_KEYS.map((k) => [k, 'no']))
+
+// Las acciones devuelven { error } en vez de lanzar (lib/errores.js). Para el
+// contexto del trimestre un error no es un dato: se trata como ausencia.
+const sinError = (r) => (r && !r.error ? r : null)
 
 // AVISO DE DISCREPANCIA · pegado a la meta, no en una pantalla aparte.
 //
@@ -138,19 +142,34 @@ export default function CumplimientoPage() {
   // Al cambiar de trimestre/año se vuelve al primer mes y se recarga.
   function changePeriod(p) { writeStoredPeriod(p); setPeriod(p); setMes(1) }
 
+  // Guardias de versión. Cambiar de mes rápido, o el doble arranque del período
+  // (getCurrentPeriod → readStoredPeriod), deja respuestas en vuelo: sólo la
+  // última puede pintar, o Guardar escribiría casillas de otro mes. Son dos
+  // contadores porque el mes recarga más veces que el trimestre.
+  const revisionMes = useRef(0)
+  const revisionTrimestre = useRef(0)
+
   useEffect(() => { loadData() }, [mes, centroId, year, quarter])
   useEffect(() => { loadProducto() }, [centroId, year, quarter])
 
   async function loadData() {
     if (!centroId) { setLoading(false); setExiste(false); return }
+    const v = ++revisionMes.current
     setLoading(true)
     setError('')
     try {
-      const { trimestreId, vals: cargados, existe: hayFila } = await loadCumplimiento(centroId, year, quarter, mes)
-      setTrimestreId(trimestreId)
-      setExiste(Boolean(hayFila))
-      setVals(cargados || { ...VACIO })
-    } catch (e) { setError('No se pudo cargar el cumplimiento. Intenta nuevamente.') }
+      const res = await loadCumplimiento(centroId, year, quarter, mes)
+      if (v !== revisionMes.current) return
+      if (res.error) setError(res.error)
+      else {
+        setTrimestreId(res.trimestreId)
+        setExiste(Boolean(res.existe))
+        setVals(res.vals || { ...VACIO })
+      }
+    } catch (e) {
+      if (v !== revisionMes.current) return
+      setError('No se pudo cargar el cumplimiento. Intenta nuevamente.')
+    }
     setLoading(false)
   }
 
@@ -158,14 +177,16 @@ export default function CumplimientoPage() {
   // sigue sirviendo para registrar el checklist.
   async function loadProducto() {
     if (!centroId) return
+    const v = ++revisionTrimestre.current
     const [resumen, growth, disciplina, marcadas] = await Promise.all([
       getCentroResumen(centroId, year, quarter).catch(() => null),
       getCentroGrowth(centroId).catch(() => null),
       getDisciplinaTrimestre(centroId, year, quarter).catch(() => null),
       getMetasMarcadas(centroId, year, quarter).catch(() => []),
     ])
-    setDisciplinaQ(disciplina || null)
-    setMetasMarcadas(marcadas || [])
+    if (v !== revisionTrimestre.current) return
+    setDisciplinaQ(sinError(disciplina))
+    setMetasMarcadas(sinError(marcadas) || [])
     if (!resumen || resumen.error) { setProducto(null); setEstado(null); setSerie([]); return }
     // Misma normalización que el Resumen: Neon devuelve `numeric` como string.
     const metas = normalizarMetas(resumen.metas)
@@ -223,7 +244,6 @@ export default function CumplimientoPage() {
         : `✅ Guardado. Se recalcularon ${escritas} de ${CLAVES_PRODUCTO.length} metas; las otras quedaron como estaban porque todavía no se pueden juzgar.`)
       setTimeout(() => setStatus(''), escritas === CLAVES_PRODUCTO.length ? 4000 : 8000)
       loadProducto()
-      getDisciplinaTrimestre(centroId, year, quarter).then(setDisciplinaQ).catch(() => {})
     } catch (e) { setStatus('❌ Error: ' + e.message) }
     setSaving(false)
   }
@@ -361,7 +381,7 @@ export default function CumplimientoPage() {
             </p>
           </div>
 
-          {year*100+qMonths[mes-1]>=202609 && <div id="encuesta-mensual"><EncuestasPanel key={`${centroId}-${year}-${qMonths[mes-1]}`} centroId={Number(centroId)} anio={year} mes={qMonths[mes-1]} compact canWrite={canWrite} onResumen={r=>{setVals(v=>({...v,encuestas_satisfaccion:r.cumple?'si':'no'}));if(r.cumple)setExiste(true);getDisciplinaTrimestre(centroId,year,quarter).then(setDisciplinaQ).catch(()=>{})}} /></div>}
+          {year*100+qMonths[mes-1]>=202609 && <div id="encuesta-mensual"><EncuestasPanel key={`${centroId}-${year}-${qMonths[mes-1]}`} centroId={Number(centroId)} anio={year} mes={qMonths[mes-1]} compact canWrite={canWrite} onResumen={r=>{setVals(v=>({...v,encuestas_satisfaccion:r.cumple?'si':'no'}));if(r.cumple)setExiste(true);getDisciplinaTrimestre(centroId,year,quarter).then(r=>{if(sinError(r))setDisciplinaQ(r)}).catch(()=>{})}} /></div>}
           <div className="disciplina__grupos">
           {DISCIPLINA_GRUPOS.map(group => (
             <div key={group.id} className="card" style={{ padding: '16px 20px' }}>

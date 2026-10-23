@@ -27,6 +27,36 @@ const ymDe = (fecha) => {
   return { year: y, month: m }
 }
 
+// Postgres aborta las transacciones SERIALIZABLE que se cruzan (40001) o se
+// traban (40P01). Como en app/actions/estudiantes.js, se repite la transacción
+// entera hasta 3 veces y, si no alcanza, el error se dice en español.
+const REINTENTABLES = new Set(['40001', '40P01'])
+const INTENTOS_KPI = 3
+const ERROR_CRUCE = 'Otro cambio del centro se cruzó con el guardado. Intenta de nuevo.'
+const WARN_SIN_FOTO = 'El KPI se guardó sin sincronizar clases de prueba/motivos; se conservaron los últimos valores guardados.'
+
+async function conReintentoSerializable(transaccion, intentos = INTENTOS_KPI) {
+  for (let intento = 1; ; intento++) {
+    try {
+      return await transaccion()
+    } catch (e) {
+      if (!REINTENTABLES.has(e?.code)) throw e
+      if (intento >= intentos) return { error: ERROR_CRUCE }
+    }
+  }
+}
+
+// De dónde sale cada campo de resumen (clase de prueba, motivos, origen):
+// foto completa > módulo (solo motivos) > fila ya guardada (mes automático)
+// > formulario (solo meses manuales). En mes automático el cliente nunca manda.
+function origenResumen({ automaticData = null, auto = null, previa = null, config = {}, periodoAutomatico = false }) {
+  const respaldo = (k) => (periodoAutomatico ? intOr(previa?.[k]) : intOr(config[k]))
+  return {
+    resumen: (k) => (automaticData ? automaticData[k] : respaldo(k)),
+    mot: (k) => (automaticData ? automaticData[k] : auto ? auto[k] : respaldo(k)),
+  }
+}
+
 // Desde AGOSTO 2026 lo que el módulo ya sabe no se digita en el KPI: los
 // motivos salen de los retiros registrados, y los grupos activos y los nuevos
 // del mes, del propio Cuadro de Negocio. Antes de esa fecha todo se capturó a
@@ -148,7 +178,8 @@ export async function loadKpiMes(centroId, year, month) {
 
 export async function saveKpiMes(centroId, year, month, config, semanas) {
   try {
-    return await guardarKpiMes(centroId, year, month, config, semanas)
+    await requireCurrentWriteCentro(centroId)
+    return await conReintentoSerializable(() => guardarKpiMes(centroId, year, month, config, semanas))
   } catch (e) {
     return fallo('saveKpiMes', e)
   }
@@ -159,7 +190,8 @@ export async function saveKpiMes(centroId, year, month, config, semanas) {
 // `kpiAuto`   = resultado discriminado del motor semanal (g1-20): en 'auto' las
 //               filas ing/des del cliente se IGNORAN y se materializa el
 //               cálculo; en 'fallo' o pre-gate se acepta la captura manual.
-async function guardarKpiBloqueado(query, centroId, year, month, config = {}, semanas = [], automatic = null, kpiAuto = null) {
+// `estricto`  = cerrar mes: sin foto completa no hay cierre. Guardar no lo es.
+async function guardarKpiBloqueado(query, centroId, year, month, config = {}, semanas = [], automatic = null, kpiAuto = null, { estricto = false } = {}) {
   let totalDes = 0
   for (const w of semanas || []) for (const v of (w.des || [])) totalDes += intOr(v)
   const esAuto = kpiAuto?.estado === 'auto'
@@ -172,7 +204,6 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
   if (automaticData && !auto) {
     return { error: 'No se pudo leer la población operativa. Recarga el KPI antes de guardar.' }
   }
-  const mot = (k) => (automaticData ? automaticData[k] : auto ? auto[k] : intOr(config[k]))
   let ninosInicio
   let gruposActivos
   let nuevosActivos
@@ -194,12 +225,19 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
   // El embudo completo usa los ganados de las mismas clases realizadas.
   // Un formulario viejo/alterado o un override legado no puede sustituirlos.
   const periodoAutomatico = usaKpiAutomatico(year, month, 'abierto')
-  if (periodoAutomatico && !automaticData) {
-    throw new Error('No se pudieron verificar las clases de prueba. Recarga el KPI antes de guardar o cerrar el mes.')
+  const sinFoto = periodoAutomatico && !automaticData
+  let previa = null
+  if (sinFoto) {
+    // El cierre congela historial: sin foto completa no se cierra. Guardar sí
+    // pasa (cobranza, y ventas/retiros si el motor falló), pero clase de
+    // prueba/motivos/origen conservan la fila ya guardada, nunca el formulario.
+    if (estricto) throw new Error('No se pudieron verificar las clases de prueba. Recarga el KPI antes de cerrar el mes.')
+    ;[previa] = await query`SELECT * FROM resumen_mes WHERE centro_id = ${centroId} AND year = ${year} AND month = ${month}`
   }
+  const { resumen, mot } = origenResumen({ automaticData, auto, previa, config, periodoAutomatico })
   const overrideCrudo = config.cp_matriculados_override
   const cpOverride = periodoAutomatico || overrideCrudo == null || overrideCrudo === '' ? null : intOr(overrideCrudo)
-  const cpDerivado = automaticData ? automaticData.cp_matriculados : intOr(config.cp_matriculados)
+  const cpDerivado = resumen('cp_matriculados')
   const now = new Date().toISOString()
 
   await upsertWith(query, 'resumen_mes', {
@@ -209,8 +247,8 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
     grupos_activos: gruposActivos,
     meta_nuevos_mensual: intOr(config.meta_nuevos_mensual, 20),
     nuevos_activos_mes: nuevosActivos,
-    cp_invitados: automaticData ? automaticData.cp_invitados : intOr(config.cp_invitados),
-    cp_asistieron: automaticData ? automaticData.cp_asistieron : intOr(config.cp_asistieron),
+    cp_invitados: resumen('cp_invitados'),
+    cp_asistieron: resumen('cp_asistieron'),
     cp_matriculados: cpOverride ?? cpDerivado,
     cp_matriculados_override: cpOverride,
     mot_tecnica: mot('mot_tecnica'),
@@ -219,12 +257,12 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
     mot_horario: mot('mot_horario'),
     mot_graduado: mot('mot_graduado'),
     mot_otro: mot('mot_otro'),
-    orig_referido: automaticData ? automaticData.orig_referido : intOr(config.orig_referido),
-    orig_marketing: automaticData ? automaticData.orig_marketing : intOr(config.orig_marketing),
-    orig_centro: automaticData ? automaticData.orig_centro : intOr(config.orig_centro),
-    orig_activaciones: automaticData ? automaticData.orig_activaciones : intOr(config.orig_activaciones),
-    orig_medios: automaticData ? automaticData.orig_medios : intOr(config.orig_medios),
-    orig_por_clasificar: automaticData ? automaticData.orig_por_clasificar : intOr(config.orig_por_clasificar),
+    orig_referido: resumen('orig_referido'),
+    orig_marketing: resumen('orig_marketing'),
+    orig_centro: resumen('orig_centro'),
+    orig_activaciones: resumen('orig_activaciones'),
+    orig_medios: resumen('orig_medios'),
+    orig_por_clasificar: resumen('orig_por_clasificar'),
     updated_at: now,
   }, ['centro_id', 'year', 'month'])
 
@@ -243,11 +281,12 @@ async function guardarKpiBloqueado(query, centroId, year, month, config = {}, se
       updated_at: now,
     }, ['centro_id', 'year', 'month', 'semana'])
   }
-  return { ok: true }
+  return sinFoto ? { ok: true, warn: WARN_SIN_FOTO } : { ok: true }
 }
 
+// La guarda de escritura vive en saveKpiMes; aquí solo la transacción, que
+// saveKpiMes repite si Postgres la aborta por cruce.
 async function guardarKpiMes(centroId, year, month, config, semanas) {
-  await requireCurrentWriteCentro(centroId)
   return await withTransaction(async (query) => {
     const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
     if (errorMes) return { error: errorMes }
@@ -256,9 +295,9 @@ async function guardarKpiMes(centroId, year, month, config, semanas) {
     // 'auto' se ignoran las filas del cliente y se materializa el cálculo;
     // solo en 'fallo' (o pre-gate) se acepta la captura manual.
     const kpiAuto = await calcularKpiAutoMes(centroId, intOr(year), intOr(month), query)
-    // La foto de los campos de resumen (clase de prueba, motivos, origen) es
-    // debe estar completa antes de persistir el embudo automático. Si falla,
-    // guardarKpiBloqueado aborta la transacción sin aceptar cifras del cliente.
+    // Si la foto de resumen (clase de prueba, motivos, origen) no llega
+    // completa, guardarKpiBloqueado guarda igual con la última fila y avisa;
+    // nunca acepta esas cifras del cliente.
     let automatic = null
     if (usaKpiAutomatico(year, month, 'abierto')) {
       const foto = await fotoKpiAutomatica(centroId, intOr(year), intOr(month), { query })
@@ -278,7 +317,7 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
       return { error: 'Recarga el KPI antes de cerrar para tomar una fotografía completa.' }
     }
 
-    return await withTransaction(async (query) => {
+    return await conReintentoSerializable(() => withTransaction(async (query) => {
       await query`
         INSERT INTO mes_kpi (centro_id, year, month, estado, cerrado_at)
         VALUES (${centroId}, ${y}, ${m}, 'abierto', NULL)
@@ -382,7 +421,7 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
         if (foto.complete) automatic = foto
         else console.error(`[cerrarMes] resumen sin sincronizar ${y}-${m}: ${foto.error}`)
       }
-      const guardado = await guardarKpiBloqueado(query, centroId, y, m, config, semanas, automatic, kpiAuto)
+      const guardado = await guardarKpiBloqueado(query, centroId, y, m, config, semanas, automatic, kpiAuto, { estricto: true })
       if (guardado.error) return guardado
       const [resumen] = await query`
         SELECT ninos_inicio_mes, ninos_final_mes, nuevos_activos_mes
@@ -421,7 +460,7 @@ export async function cerrarMes(centroId, year, month, config, semanas) {
       }
       if (warnAuto) warns.push(warnAuto)
       return warns.length ? { ok: true, warn: warns.join(' ') } : { ok: true }
-    })
+    }))
   } catch (e) {
     return fallo('cerrarMes', e)
   }
@@ -440,7 +479,7 @@ export async function reabrirMes(centroId, year, month) {
   const m = intOr(month)
   try {
     await requireCurrentPuedeCerrarMes(centroId)
-    return await withTransaction(async (query) => {
+    return await conReintentoSerializable(() => withTransaction(async (query) => {
       const [mes] = await query`
         SELECT estado FROM mes_kpi
         WHERE centro_id = ${centroId} AND year = ${y} AND month = ${m}
@@ -473,7 +512,7 @@ export async function reabrirMes(centroId, year, month) {
         }
       }
       return { ok: true }
-    })
+    }))
   } catch (e) {
     return fallo('reabrirMes', e)
   }

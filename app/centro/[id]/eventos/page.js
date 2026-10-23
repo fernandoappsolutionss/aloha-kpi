@@ -106,7 +106,11 @@ export default function EventosPage() {
     try {
       const cfg = await eventosConfig(); setConfig(cfg)
       const [evRes, opRes] = await Promise.all([listarEventos(id), opcionesFormulario(id)])
-      if (evRes.error || opRes.error) setLoadError(evRes.error || opRes.error)
+      // Solo la lista de clases bloquea la pantalla. Las opciones del formulario
+      // (equipos y etapas del CRM) se usan dentro del modal: si fallan, se avisa
+      // sin esconder las clases que sí llegaron.
+      if (evRes.error) setLoadError(evRes.error)
+      else if (opRes.error) setStatus('❌ Las clases cargaron, pero el CRM no devolvió equipos y etapas: ' + opRes.error)
       setEvents(evRes.events || [])
       setOpts({ sales_teams: opRes.sales_teams || [], pipeline_stages: opRes.pipeline_stages || [] })
     } catch (e) { setLoadError(e.message || 'No se pudieron cargar las clases.') }
@@ -183,14 +187,18 @@ export default function EventosPage() {
     closeActionMenu()
     if (!confirm(`¿Eliminar la clase de prueba "${ev.name}"? Esta acción no se puede deshacer.`)) return
     setStatus('')
-    const res = await eliminarEvento(id, ev.id)
-    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba eliminada.'); load() }
+    try {
+      const res = await eliminarEvento(id, ev.id)
+      if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba eliminada.'); load() }
+    } catch { setStatus('❌ No se pudo eliminar la clase. Revisa tu conexión o vuelve a entrar.') }
   }
   async function onDuplicate(ev) {
     if (!canWrite) return
     closeActionMenu(); setStatus('')
-    const res = await duplicarEvento(id, ev.id)
-    if (res.error) setStatus('❌ ' + res.error); else { setStatus('✅ Clase de prueba duplicada (queda en borrador).'); load() }
+    try {
+      const res = await duplicarEvento(id, ev.id)
+      if (res.error) setStatus('❌ ' + res.error); else { setStatus(res.warn ? '✅ Clase de prueba duplicada (queda en borrador). ' + res.warn : '✅ Clase de prueba duplicada (queda en borrador).'); load() }
+    } catch { setStatus('❌ No se pudo duplicar la clase. Revisa tu conexión o vuelve a entrar.') }
   }
   function copy(text, msg) {
     closeActionMenu()
@@ -599,6 +607,9 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
   const mobileCards=useMobileCards()
   const [regs, setRegs] = useState(null)
   const [status, setStatus] = useState('')
+  // Error de CARGA aparte del de las acciones: antes cualquier "❌" (hasta la
+  // validación de un nombre vacío) borraba la tabla de registrados de pantalla.
+  const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(null)
   const [showInv, setShowInv] = useState(false)
   const [inv, setInv] = useState({ first_name: '', last_name: '', email: '', phone: '' })
@@ -610,35 +621,44 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
   const load = useCallback(async () => {
     try {
       const res = await listarRegistros(centroId, eventId)
-      if (res.error) {setStatus('❌ ' + res.error);setRegs([]);return}
-      setStatus('');setRegs(res.registrations || [])
-    } catch {setStatus('❌ No se pudieron cargar los registros.');setRegs([])}
+      if (res.error) {setLoadError(res.error);setRegs([]);return}
+      setLoadError('');setRegs(res.registrations || [])
+    } catch {setLoadError('No se pudieron cargar los registros.');setRegs([])}
   }, [centroId, eventId])
   useEffect(() => { load() }, [load])
 
+  // Las tres acciones liberan SIEMPRE su botón: sin el finally, una promesa
+  // rechazada (sesión vencida, excepción del CRM) dejaba la fila gris y muda.
+  const ERROR_RED = '❌ No se pudo guardar. Revisa tu conexión o vuelve a entrar.'
   async function setAsist(reg, attended) {
     if (!canWrite) return
-    setBusy(reg.id + 'a')
-    const res = await marcarAsistencia(centroId, eventId, reg.id, attended)
-    if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
-    setBusy(null)
+    setBusy(reg.id + 'a'); setStatus('')
+    try {
+      const res = await marcarAsistencia(centroId, eventId, reg.id, attended)
+      if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
+    } catch { setStatus(ERROR_RED) }
+    finally { setBusy(null) }
   }
   async function setPagoR(reg, paid) {
     if (!canWrite) return
-    setBusy(reg.id + 'p')
-    const res = await marcarPago(centroId, eventId, reg.id, paid)
-    if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
-    setBusy(null)
+    setBusy(reg.id + 'p'); setStatus('')
+    try {
+      const res = await marcarPago(centroId, eventId, reg.id, paid)
+      if (res.error) setStatus('❌ ' + res.error); else { await load(); onChange && onChange() }
+    } catch { setStatus(ERROR_RED) }
+    finally { setBusy(null) }
   }
   async function addInv(e) {
     e.preventDefault()
     if (!canWrite) return
     if (!inv.first_name.trim()) { setStatus('❌ El nombre es requerido.'); return }
     setSaving(true); setStatus('')
-    const res = await agregarInvitado(centroId, eventId, inv)
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setInv({ first_name: '', last_name: '', email: '', phone: '' }); setShowInv(false); await load(); onChange && onChange() }
-    setSaving(false)
+    try {
+      const res = await agregarInvitado(centroId, eventId, inv)
+      if (res.error) setStatus('❌ ' + res.error)
+      else { setInv({ first_name: '', last_name: '', email: '', phone: '' }); setShowInv(false); await load(); onChange && onChange() }
+    } catch { setStatus(ERROR_RED) }
+    finally { setSaving(false) }
   }
 
   return (
@@ -647,6 +667,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
         <span className="label">Registrados {regs ? `(${regs.length})` : ''}</span>
         {canWrite && <button className="btn btn--primary" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setShowInv((v) => !v)}>{showInv ? '✕ Cancelar' : '+ Agregar invitado'}</button>}
       </div>
+      {loadError && <div role="alert" className="alert alert--error" style={{ marginBottom: 10 }}>{loadError} <button type="button" className="btn" onClick={load}>Reintentar</button></div>}
       {status && (
         <div role={status.includes('❌') ? 'alert' : 'status'} className={`alert${status.includes('❌') ? ' alert--error' : ''}`}
           style={status.includes('❌') ? { marginBottom: 10 } : { marginBottom: 10, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>
@@ -662,7 +683,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
         </form>
       )}
       {regs === null ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Cargando…</div>
-        : status.includes('❌') ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
+        : loadError ? null : regs.length === 0 ? <div role="status" style={{ color: 'var(--text-dim)', fontSize: 12, padding: 8 }}>Sin registros todavía.</div>
           : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={canWrite ? <>
             <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
             <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button ref={node => inscribirTriggerRef(node, r.id)} type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
@@ -728,7 +749,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
         <InscribirModal centroId={centroId} reg={inscribir} grupoId={grupoId} fechaClase={fechaClase}
           returnFocusRef={inscribirReturnFocusRef}
           onClose={() => setInscribir(null)}
-          onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg) }} />
+          onSaved={(msg) => { setInscribir(null); setStatus('✅ ' + msg); load(); onChange && onChange() }} />
       )}
     </div>
   )
