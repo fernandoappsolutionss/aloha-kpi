@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  aceptaInscripciones,
   LINEA_APROBACION,
   SEMANA_LIMITE_NUEVOS,
   fechaLimiteNuevos,
@@ -430,4 +431,18 @@ test('la extension manual manda incluso en nivel avanzado', () => {
   assert.equal(v.abierta, true)
   assert.equal(v.fechaLimite, '2026-09-15')
   assert.equal(v.razon, 'extendida')
+})
+
+// Caso Samuel Perdomo, G28 Kids: iniciado 29/09, referencia 20/10, abierto 24/10.
+test('la apertura manual permite inscribir después del inicio y de la referencia de llenado', () => {
+  const g = grupoTiny({ itinerario: 'KIDS', itinerario_clases: {
+    nivel: 1, fecha_inicio: '2026-09-29', semanas: [semana('2', 'clase', ['2026-10-20'])],
+  } })
+  assert.equal(ventanaNuevos(g, '2026-10-24').abierta, false)
+  assert.equal(aceptaInscripciones(g), true)
+  assert.equal(aceptaInscripciones({ ...g, inscripcion_abierta: false }), false)
+  assert.equal(aceptaInscripciones({ ...g, estado: 'cerrado' }), false)
+  assert.equal(aceptaInscripciones({ ...g, estado: 'fusionado' }), false)
+  assert.equal(aceptaInscripciones(null), false)
+  assert.equal(aceptaInscripciones({ ...g, inscripcion_abierta: null }), true)
 })

@@ -88,9 +88,9 @@ test('palanca manual cerrada = 0 cupos (regla de siempre, intacta)', () => {
   assert.equal(nuevo.cupos_disponibles, 0)
 })
 
-test('FÓRMULA NUEVA: ventana de nuevos vencida = 0 cupos aunque la palanca esté abierta', () => {
+test('inscripción abierta conserva cupos aunque venza la ventana recomendada', () => {
   const p = armarAlohaGroupPayload(grupoNuevo(), opciones({ hoyIso: '2026-09-24' })) // límite fue el 23
-  assert.equal(p.cupos_disponibles, 0)
+  assert.equal(p.cupos_disponibles, 4)
   assert.equal(p.fecha_limite_nuevos, '2026-09-23') // el vendedor ve POR QUÉ no hay cupo
   assert.equal(p.ritmo_semanal_necesario, null) // vencida: ya no hay ritmo que pedir
 })

@@ -81,11 +81,11 @@ test('pantalla angosta: el banner ✅/❌ se repite dentro de la cabecera del sh
   assert.match(head, /\{sheet && <StatusAlert status=\{status\}/)
 })
 
-test('Editar niño sin grupo: deshabilita con la regla de niños NUEVOS (ventanaNuevos), traslado solo por palanca', () => {
+test('Editar niño sin grupo e inscripción respetan la apertura manual', () => {
   const modal = componente('EstudianteModal')
   assert.match(modal, /const primeraColocacion = est\.grupo_id == null/)
   assert.match(modal, /ventanaNuevos\(g, hoyISO\(\)\)/)
-  assert.match(modal, /const permitido = primeraColocacion \? !!v\?\.abierta : g\.inscripcion_abierta !== false/)
+  assert.match(modal, /const permitido = aceptaInscripciones\(g\)/)
   assert.match(modal, /primeraColocacion \? marcaNoAcepta\(v\) : ' · 🔒 cerrado'/)
   // Misma marca que en Inscribir niño.
   assert.match(componente('InscribirModal'), /const marca = permitido \? '' : marcaNoAcepta\(v\)/)

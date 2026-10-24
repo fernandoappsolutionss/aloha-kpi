@@ -64,8 +64,8 @@ test('con ventana vigente acepta; el día del límite todavía acepta', () => {
   assert.equal(aceptaNuevosEnSelector(grupoSelector(), '2026-10-07'), true)
 })
 
-test('ventana vencida = no acepta', () => {
-  assert.equal(aceptaNuevosEnSelector(grupoSelector(), '2026-10-08'), false)
+test('inscripción abierta acepta aunque la ventana recomendada haya vencido', () => {
+  assert.equal(aceptaNuevosEnSelector(grupoSelector(), '2026-10-08'), true)
 })
 
 test('sin fecha límite (exento o sin itinerario válido) se falla ABIERTO', () => {
@@ -83,11 +83,11 @@ test('cerrado por nivel avanzado: fecha null pero NO es exento — el selector n
   // Sin la razón, ese null se leía como "sin límite" y el vendedor escogía un
   // grupo que el server rechaza al guardar (desajuste UI↔server).
   const veterano = grupoSelector({ nivel: 10, fechaLimiteNuevos: null, razonLimiteNuevos: 'nivel_avanzado' })
-  assert.equal(aceptaNuevosEnSelector(veterano, '2026-08-10'), false)
+  assert.equal(aceptaNuevosEnSelector(veterano, '2026-08-10'), true)
   // Con extensión manual vuelve a tener fecha y razón null: sí acepta.
   const extendido = grupoSelector({ nivel: 10, fechaLimiteNuevos: '2026-09-15', razonLimiteNuevos: null })
   assert.equal(aceptaNuevosEnSelector(extendido, '2026-08-10'), true)
-  assert.equal(aceptaNuevosEnSelector(extendido, '2026-09-16'), false)
+  assert.equal(aceptaNuevosEnSelector(extendido, '2026-09-16'), true)
 })
 
 // --- ordenarPorLimiteNuevos ---
@@ -113,14 +113,14 @@ test('el orden es estable entre grupos sin fecha', () => {
 test('la opción muestra grupo, itinerario, cupos, cierre y días que faltan', () => {
   assert.equal(
     etiquetaGrupoSelector(grupoSelector(), '2026-09-30'),
-    'Grupo 3 · TINY · 4 cupos · cierra 7 oct · faltan 7 días'
+    'Grupo 3 · TINY · 4 cupos · referencia de llenado 7 oct · faltan 7 días'
   )
 })
 
 test('singular: 1 cupo y falta 1 día; el día del límite dice último día', () => {
   const g = grupoSelector({ cupos: 1 })
-  assert.equal(etiquetaGrupoSelector(g, '2026-10-06'), 'Grupo 3 · TINY · 1 cupo · cierra 7 oct · falta 1 día')
-  assert.equal(etiquetaGrupoSelector(g, '2026-10-07'), 'Grupo 3 · TINY · 1 cupo · cierra 7 oct · último día')
+  assert.equal(etiquetaGrupoSelector(g, '2026-10-06'), 'Grupo 3 · TINY · 1 cupo · referencia de llenado 7 oct · falta 1 día')
+  assert.equal(etiquetaGrupoSelector(g, '2026-10-07'), 'Grupo 3 · TINY · 1 cupo · referencia de llenado 7 oct · referencia hoy')
 })
 
 test('exento (sin fecha límite): la etiqueta no inventa un cierre', () => {

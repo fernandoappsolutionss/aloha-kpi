@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES, esOrigenVenta, fechaIso10, requiereOrigenVenta } from '../lib/operaciones.js'
-import { ventanaNuevos } from '../lib/llenado.mjs'
+import { aceptaInscripciones, ventanaNuevos } from '../lib/llenado.mjs'
 import { colocacionInvalida } from '../lib/colocacion.mjs'
 import { anclaDeAlta } from '../lib/retiros.mjs'
 import {
@@ -73,7 +73,7 @@ function acciones({ fichas = [], grupo = GRUPO, fallas = [], sesion = { uid: 7, 
     },
     ITINERARIOS, NIVEL_MAX, ORIGENES, esOrigenVenta, fechaIso10, requiereOrigenVenta,
     hoyISO: () => HOY,
-    ventanaNuevos, colocacionInvalida, anclaDeAlta,
+    aceptaInscripciones, ventanaNuevos, colocacionInvalida, anclaDeAlta,
     bloquearMesesEditables: async () => { llamadas.meses++; return null },
     // Copia al realm del test: los arrays nacidos en el vm no son deepStrictEqual.
     encolarSyncCrm: async (ids, motivo) => { llamadas.outbox.push({ ids: [...ids], motivo }) },
@@ -403,7 +403,7 @@ test('app/actions/estudiantes.js importa la búsqueda y la orquestación desde l
 test('reincorporado sin ficha entra en grupo avanzado sin generar venta', async () => {
   const avanzado = { ...GRUPO, fecha_inicio_clases: '2026-04-18', itinerario_clases: { nivel: 2 } }
   const nuevo = acciones({ grupo: avanzado })
-  assert.match((await nuevo.inscribirEstudiante(5, ALTA)).error, /NUEVOS/)
+  assert.equal((await nuevo.inscribirEstudiante(5, ALTA)).ok, true)
   const vuelta = acciones({ grupo: avanzado })
   assert.equal((await vuelta.inscribirEstudiante(5, { ...ALTA, origen: 'reincorporado', origen_venta: null })).ok, true)
   const [evento] = insertsDe(vuelta.escrituras, 'estudiante_eventos')
@@ -422,4 +422,23 @@ test('reservar un cupo pendiente no inicia el nivel del niño', async () => {
   const a = acciones({ grupo: { ...GRUPO, inicio_pendiente: true, fecha_inicio_clases: null } })
   assert.equal((await a.inscribirEstudiante(5, ALTA)).ok, true)
   assert.equal(insertsDe(a.escrituras, 'estudiantes')[0].values[10], null)
+})
+
+test('alta desde clase de prueba permite un grupo iniciado con ventana vencida y apertura manual', async () => {
+  const grupo = { ...GRUPO, itinerario_clases: { nivel: 1, semanas: [
+    { tipo: 'clase', corto: '4', fechas: ['2026-09-23'] },
+  ] } }
+  assert.equal(ventanaNuevos(grupo, HOY).abierta, false)
+  const a = acciones({ grupo })
+  const res = await a.inscribirEstudiante(5, ALTA)
+  assert.ok(!res.error, res.error)
+  assert.equal(insertsDe(a.escrituras, 'estudiantes').length, 1)
+  assert.equal(a.llamadas.transacciones, 1)
+})
+
+test('alta en un grupo cerrado manualmente se rechaza sin escrituras', async () => {
+  const a = acciones({ grupo: { ...GRUPO, inscripcion_abierta: false } })
+  const res = await a.inscribirEstudiante(5, ALTA)
+  assert.match(res.error, /cerrado a inscripciones/)
+  assert.equal(a.escrituras.length, 0)
 })
