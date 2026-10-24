@@ -103,7 +103,7 @@ export async function prepareR8Receipt() {
   const { calculateCentroGrowth } = await import('../../../lib/growth/server.js')
   const { growthWeekStart } = await import('../../../lib/growth/notifications.mjs')
   const growth = await calculateCentroGrowth(3)
-  await r8Transaction(query => query('INSERT INTO growth_notification_receipts(usuario_id,snapshot_id,week_start,shown_at,acknowledged_at) VALUES($1,$2,$3,now(),now()) ON CONFLICT(usuario_id,week_start) DO NOTHING', [R8_IDS.user,growth.snapshotId,growthWeekStart()]))
+  await r8Transaction(query => query('INSERT INTO growth_notification_receipts(usuario_id,centro_id,snapshot_id,week_start,shown_at,acknowledged_at) VALUES($1,3,$2,$3,now(),now()) ON CONFLICT(usuario_id,centro_id,week_start) DO NOTHING', [R8_IDS.user,growth.snapshotId,growthWeekStart()]))
 }
 export async function setR8BriefingVisible(visible) {
   await readR8Manifest()

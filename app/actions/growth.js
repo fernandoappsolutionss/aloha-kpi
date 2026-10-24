@@ -65,18 +65,18 @@ export async function getGrowthBriefing(centroId) {
   let [receipt] = await sql`
     SELECT id, shown_at, acknowledged_at, snoozed_until
     FROM growth_notification_receipts
-    WHERE usuario_id = ${session.uid} AND week_start = ${weekStart}
+    WHERE usuario_id = ${session.uid} AND centro_id = ${centroId} AND week_start = ${weekStart}
     LIMIT 1
   `
 
   if (!receipt) {
     const [created] = await sql`
       INSERT INTO growth_notification_receipts (
-        usuario_id, snapshot_id, week_start, shown_at
+        usuario_id, centro_id, snapshot_id, week_start, shown_at
       ) VALUES (
-        ${session.uid}, ${growth.snapshotId}, ${weekStart}, NULL
+        ${session.uid}, ${centroId}, ${growth.snapshotId}, ${weekStart}, NULL
       )
-      ON CONFLICT (usuario_id, week_start) DO NOTHING
+      ON CONFLICT (usuario_id, centro_id, week_start) DO NOTHING
       RETURNING id, shown_at, acknowledged_at, snoozed_until
     `
     if (created) {
@@ -87,7 +87,7 @@ export async function getGrowthBriefing(centroId) {
       [receipt] = await sql`
         SELECT id, shown_at, acknowledged_at, snoozed_until
         FROM growth_notification_receipts
-        WHERE usuario_id = ${session.uid} AND week_start = ${weekStart}
+        WHERE usuario_id = ${session.uid} AND centro_id = ${centroId} AND week_start = ${weekStart}
         LIMIT 1
       `
     }
@@ -113,7 +113,7 @@ export async function markGrowthBriefingShown(centroId) {
     SET shown_at = now(),
         snoozed_until = CASE WHEN snoozed_until <= now() THEN NULL ELSE snoozed_until END,
         updated_at = now()
-    WHERE usuario_id = ${session.uid} AND week_start = ${weekStart}
+    WHERE usuario_id = ${session.uid} AND centro_id = ${centroId} AND week_start = ${weekStart}
   `
   return { ok: true }
 }
@@ -124,7 +124,7 @@ export async function acknowledgeGrowthBriefing(centroId) {
   await sql`
     UPDATE growth_notification_receipts
     SET acknowledged_at = now(), snoozed_until = NULL, updated_at = now()
-    WHERE usuario_id = ${session.uid} AND week_start = ${weekStart}
+    WHERE usuario_id = ${session.uid} AND centro_id = ${centroId} AND week_start = ${weekStart}
   `
   return { ok: true }
 }
@@ -136,7 +136,7 @@ export async function snoozeGrowthBriefing(centroId) {
   await sql`
     UPDATE growth_notification_receipts
     SET snoozed_until = ${snoozedUntil}, acknowledged_at = NULL, updated_at = now()
-    WHERE usuario_id = ${session.uid} AND week_start = ${weekStart}
+    WHERE usuario_id = ${session.uid} AND centro_id = ${centroId} AND week_start = ${weekStart}
   `
   return { ok: true, snoozedUntil }
 }

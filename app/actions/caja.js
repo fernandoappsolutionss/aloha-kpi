@@ -35,9 +35,9 @@ export async function getCaja() {
     const cargarBase = Promise.all([listarCuentas(), listarBaldes()]).then(async ([cuentas, baldes]) => {
       const lineaBase = cuentas.find((c) => c.tipo === 'linea_credito')?.base_fecha
       const desde = [sumarDias(hoy, -150), baldes.map((b) => b.vigente_desde).sort()[0], lineaBase].filter(Boolean).sort()[0]
-      return [cuentas, baldes, await movimientosDesde(desde)]
+      return [cuentas, baldes, await movimientosDesde(desde), desde]
     })
-    const [[cuentas, baldes, movs], compromisos, ajustes, pendientes] = await Promise.all([
+    const [[cuentas, baldes, movs, desdeMovimientos], compromisos, ajustes, pendientes] = await Promise.all([
       cargarBase, listarCompromisos(), listarAjustes(lunesDe(hoy)), porClasificar(),
     ])
     const linea = cuentas.find((c) => c.tipo === 'linea_credito')
@@ -65,7 +65,7 @@ export async function getCaja() {
       resumen[empresa] = { saldoHoy, perfil, baldesEstado, balde: baldesEmpresa.at(-1) || null }
     }
     curvas.consolidado = consolidar(curvas.altavia, curvas.ff)
-    return { hoy, cuentas, curvas, resumen, lineaDisponible, lineaUsada: usada, compromisos, pendientes, clases: CLASES }
+    return { hoy, cuentas, curvas, resumen, lineaDisponible, lineaUsada: usada, compromisos, pendientes, movimientos: movs, movimientosDesde: desdeMovimientos, clases: CLASES }
   } catch (e) { return fallo(e) }
 }
 
@@ -94,6 +94,7 @@ export async function previsualizarExtracto(formData) {
       total: movimientos.length, nuevos: nuevos.length, duplicados: movimientos.length - nuevos.length,
       porClasificar: nuevos.filter((m) => m.clase === 'por_clasificar').length,
       desde: fechas[0] || null, hasta: fechas.at(-1) || null,
+      movimientos: movimientos.map(m => ({ fecha: m.fecha, monto: m.monto, memo: m.memo, clase: m.clase, duplicado: existentes.has(m.fitid) })),
     }
   } catch (e) { return fallo(e) }
 }

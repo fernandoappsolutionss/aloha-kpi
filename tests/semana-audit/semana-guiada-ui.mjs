@@ -37,6 +37,7 @@ const stubs={
  export const guardarCuotas=async(id,fin,p)=>{for(const [k,v]of Object.entries(p))window.__datos.cuotas[k]={...window.__datos.cuotas[k],cuota:v,estado:'propuesta'}};
  export const aprobarCuotas=guardarCuotas;
  export const cambiarAlineamiento=async()=>{};
+ export const adjuntarEvidencia=async()=>({ok:true});
  export const asignarCondicion=async(id,fin,p)=>{window.__datos.plan.plan={...window.__datos.plan.plan,condicion:p.condicion,fundamento:p.fundamento};window.__datos.plan.pasos=pasosDe(p)};
  export const agregarObjetivo=async(id,fin,p)=>{window.__datos.plan.objetivos.push({...p,id:Date.now(),hecho:false});};
  export const programarObjetivoHoy=async()=>{};
@@ -65,7 +66,7 @@ try{
  check(await page.locator('.semana-diaria tbody tr').count()===7,'Siete días')
  check((await page.locator('.semana-diaria tbody tr').last().textContent()).includes('Por venir'),'Futuro identificado')
  await page.getByRole('button',{name:/Retiros.*Máximo/}).click();check((await page.locator('.semana-diaria').textContent()).includes('Dentro del límite'),'Inversa correcta')
- await page.locator('.semana-ajustes > summary').click();await page.getByRole('spinbutton',{name:'Cuota de Nuevos inscritos',exact:true}).fill('9');await page.getByRole('button',{name:'Guardar cuotas',exact:true}).click();await page.getByText('Cuotas guardadas para aprobación.').waitFor();check(await page.evaluate(()=>window.__datos.cuotas.nuevos_inscritos.cuota)===9,'Guardado de cuota')
+ await page.getByRole('spinbutton',{name:'Cuota de Nuevos inscritos',exact:true}).fill('9');await page.getByRole('button',{name:'Guardar cuotas',exact:true}).click();await page.getByText('Cuotas guardadas para aprobación.').waitFor();check(await page.evaluate(()=>window.__datos.cuotas.nuevos_inscritos.cuota)===9,'Guardado de cuota')
  await page.locator('.semana-ajustes > summary').click();await page.screenshot({path:resolve(out,'avance-escritorio.png'),fullPage:true})
  await navegar('/condicion');check(await page.getByText('Fórmula de Normal',{exact:true}).count()===1,'Fórmula titulada')
  check(await page.getByRole('button',{name:'Registrar acción realizada'}).count()===0,'Preparación separada de ejecución')

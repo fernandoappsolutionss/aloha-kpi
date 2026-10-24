@@ -16,6 +16,7 @@ import { superponerCobranzaTablero } from '../../lib/estadisticas-semana/cobranz
 import { cargarClasesPruebaTablero } from '../../lib/estadisticas-semana/clases-prueba-tablero.js'
 import { cambiarAlineamientoEn } from '../../lib/alineamiento-semana-servicio.js'
 import { leerInformeSemana } from '../../lib/informe-semana-servicio.js'
+import { guardarEvidenciaEn } from '../../lib/semana-evidencias-servicio.js'
 import { fallo } from '../../lib/errores.js'
 
 export async function getInformeSemana(centroId, semanaFin) {
@@ -233,4 +234,11 @@ export async function programarObjetivoHoy(centroId, objetivoId, datos) {
     await requireCurrentWriteCentro(centroId)
     return await programarObjetivoHoyEn(centroId, objetivoId, datos)
   } catch (e) { return fallo('programarObjetivoHoy', e) }
+}
+
+export async function adjuntarEvidencia(centroId, objetivoId, formData) {
+  try {
+    const sesion = await requireCurrentWriteCentro(centroId)
+    return await guardarEvidenciaEn(centroId, objetivoId, formData?.get?.('archivo'), sesion.id)
+  } catch (e) { return fallo('adjuntarEvidencia', e) }
 }

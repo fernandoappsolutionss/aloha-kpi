@@ -6,6 +6,7 @@ import { getCaja } from '../../actions/caja'
 import { CurvaCaja } from '../../../components/caja/CurvaCaja'
 import { ImportarExtracto } from '../../../components/caja/ImportarExtracto'
 import { BandejaClasificar } from '../../../components/caja/BandejaClasificar'
+import MovimientosCaja from '../../../components/caja/MovimientosCaja'
 import { Compromisos } from '../../../components/caja/Compromisos'
 import { DireccionCaja } from '../../../components/caja/DireccionCaja'
 import { usd, fechaCorta, EMPRESAS } from '../../../components/caja/formato'
@@ -104,6 +105,7 @@ export default function CajaPage() {
           {empresa !== 'consolidado' && <DireccionCaja key={`direccion-${empresa}`} empresa={empresa} datos={datos} onCambio={cargar} />}
           <CurvaCaja key={`curva-${empresa}`} empresa={empresa} curva={datos.curvas[empresa]} clases={datos.clases} onCambio={cargar} />
           <ImportarExtracto onCambio={cargar} />
+          <MovimientosCaja key={`movimientos-${empresa}`} movimientos={datos.movimientos?.filter(m => empresa === 'consolidado' || m.empresa === empresa)} desde={datos.movimientosDesde} clases={datos.clases} />
           <BandejaClasificar pendientes={datos.pendientes.filter((p) => empresa === 'consolidado' || p.empresa === empresa)} clases={datos.clases} onCambio={cargar} />
           {empresa !== 'consolidado' && <Compromisos key={`compromisos-${empresa}`} empresa={empresa} compromisos={datos.compromisos} clases={datos.clases} onCambio={cargar} />}
         </>}

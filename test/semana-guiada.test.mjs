@@ -74,6 +74,7 @@ test('informe histórico consulta el plan que se ejecutó esa semana, sin arrast
     if (q.includes('FROM semana_planes')) { assert.equal(v[1], '2026-10-08'); return [{ id: 5, condicion: 'normal' }] }
     if (q.includes('FROM semana_objetivos')) { assert.deepEqual(v, [5]); return [] }
     if (q.includes('FROM estadisticas_semana')) return [{ codigo: 'nuevos_inscritos', valor: 0, estado: 'cerrada' }, { codigo: 'retiros', valor: 0, estado: 'abierta' }]
+    if (q.includes('FROM semana_evidencias')) return []
     if (q.includes('FROM semana_cuotas')) return [{ codigo: 'nuevos_inscritos', cuota: 0, estado: 'aprobada' }, { codigo: 'retiros', cuota: 2, estado: 'propuesta' }]
     throw new Error(q)
   }
@@ -97,6 +98,6 @@ test('juego bloquea escrituras históricas y rechaza versiones desactualizadas',
 test('recorridos siguen los pasos en sus nuevas pantallas', () => {
   const plan = MODULOS.find(m => m.id === 'semana-plan')
   assert.equal(rutaDePaso(plan, 2), '/centro/{id}/semana/condicion')
-  assert.deepEqual(plan.pasos.map((_, i) => rutaDePaso(plan, i + 1)), ['condicion', 'condicion', 'condicion', 'condicion', '', 'condicion', 'acciones', 'juegos', 'cumplimiento', 'cumplimiento'].map(p => `/centro/{id}/semana${p ? '/' + p : ''}`))
+  assert.deepEqual(plan.pasos.map((_, i) => rutaDePaso(plan, i + 1)), ['condicion', 'condicion', 'condicion', 'acciones', '', 'acciones', 'acciones', 'juegos', 'cumplimiento', 'cumplimiento'].map(p => `/centro/{id}/semana${p ? '/' + p : ''}`))
   assert.equal(rutaDePaso(plan, 7), '/centro/{id}/semana/acciones')
 })

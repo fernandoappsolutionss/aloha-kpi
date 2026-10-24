@@ -681,6 +681,7 @@ CREATE INDEX IF NOT EXISTS idx_growth_recommendations_active
 
 CREATE TABLE IF NOT EXISTS growth_notification_receipts (
   id BIGSERIAL PRIMARY KEY,
+  centro_id INTEGER NOT NULL REFERENCES centros(id) ON DELETE CASCADE,
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   snapshot_id BIGINT NOT NULL REFERENCES growth_snapshots(id) ON DELETE CASCADE,
   week_start DATE NOT NULL,
@@ -689,7 +690,7 @@ CREATE TABLE IF NOT EXISTS growth_notification_receipts (
   snoozed_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (usuario_id, week_start)
+  CONSTRAINT growth_receipts_usuario_centro_semana UNIQUE (usuario_id, centro_id, week_start)
 );
 CREATE INDEX IF NOT EXISTS idx_growth_receipts_usuario
   ON growth_notification_receipts(usuario_id, week_start DESC);

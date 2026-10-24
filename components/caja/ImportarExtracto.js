@@ -1,6 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { previsualizarExtracto, confirmarExtracto } from '../../app/actions/caja'
+import TableScroller from '../TableScroller'
 import { usd, usdExacto, fechaCorta } from './formato'
 
 // St. Georges: el resumen del PDF no cuadra con la suma del detalle. El saldo se
@@ -88,6 +89,7 @@ export function ImportarExtracto({ onCambio }) {
             <b>{vista.cuenta}</b> · {fechaCorta(vista.desde)} → {fechaCorta(vista.hasta)} · saldo del banco {vista.saldo ? `${usd(vista.saldo.monto)} al ${fechaCorta(vista.saldo.fecha)}` : '—'}
           </p>
           <p>{vista.nuevos} nuevos · {vista.duplicados} ya cargados · {vista.porClasificar} quedarán por clasificar.</p>
+          <details><summary>Revisar los {vista.total} movimientos del archivo</summary><TableScroller label="Detalle del extracto"><table className="table"><thead><tr><th>Fecha</th><th>Detalle</th><th>Monto</th><th>Clasificación</th><th>Importación</th></tr></thead><tbody>{vista.movimientos?.map((m, i) => <tr key={i}><td>{fechaCorta(m.fecha)}</td><td>{m.memo}</td><td>{usdExacto(m.monto)}</td><td>{m.clase.replaceAll('_', ' ')}</td><td>{m.duplicado ? 'Ya cargado' : 'Nuevo'}</td></tr>)}</tbody></table></TableScroller></details>
           <AvisoDescuadre descuadre={vista.descuadre} />
           <button className="btn btn--primary" type="button" onClick={guardar} disabled={ocupado || (vista.nuevos === 0 && !soloSaldo)}>
             {soloSaldo ? 'Guardar solo el saldo del banco' : `Guardar ${vista.nuevos} movimientos`}
