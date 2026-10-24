@@ -12,6 +12,9 @@ import { useGuia } from './GuiaModulo'
 
 export default function QuizOficio({ moduloId, preguntas, minimo, yaAprobado, tieneDrill, hrefGlosario, bloqueado, motivoBloqueo }) {
   const guia = useGuia()
+  // `bloqueado` lo calculó el servidor; tras «Ya lo estudié» la guía ya tiene
+  // la lectura hecha y el candado viejo seguía pintado hasta acabar el refresh.
+  const bloqueadoReal = bloqueado && !guia?.hechos?.has('lectura')
   const total = preguntas.length
   const [sel, setSel] = useState(() => preguntas.map(() => null))
   const [resultado, setResultado] = useState(null)
@@ -41,7 +44,7 @@ export default function QuizOficio({ moduloId, preguntas, minimo, yaAprobado, ti
         Necesitas {minimo} de {total} correctas. Puedes volver a intentarlo cuantas veces quieras: aquí no se reprueba, se vuelve a estudiar.
       </p>
 
-      {bloqueado ? (
+      {bloqueadoReal ? (
         <div className="alert alert--warn" role="note">{motivoBloqueo || 'Antes de responder este módulo tienes que estudiar el anterior.'}</div>
       ) : (
         <>

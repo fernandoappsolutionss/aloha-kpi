@@ -9,6 +9,7 @@ import { hoyISO } from '../../lib/operaciones'
 import { ventanaNuevos } from '../../lib/llenado.mjs'
 import { mesClase, resumirClases } from '../../lib/clases-prueba.mjs'
 import { validarEventosCrm } from '../../lib/kpi-auto-server.js'
+import { fallo } from '../../lib/errores'
 
 export async function eventosConfig() {
   return { configured: crmConfigured(), baseUrl: crmBaseUrl() }
@@ -16,18 +17,21 @@ export async function eventosConfig() {
 
 // Opciones del formulario (equipos de venta + etapas de pipeline) de la cuenta del centro.
 export async function opcionesFormulario(centroId) {
+  try {
   await requireCentroAccess(centroId)
   const accountId = crmAccountForCentro(centroId)
   if (!accountId) return { sales_teams: [], pipeline_stages: [] }
   const res = await crmCall('form_options', { account_id: accountId })
   if (res.error) return { error: res.error, sales_teams: [], pipeline_stages: [] }
   return { sales_teams: res.sales_teams || [], pipeline_stages: res.pipeline_stages || [] }
+  } catch (e) { return fallo('opcionesFormulario', e) }
 }
 
 // Eventos creados por este centro (espejo Neon → datos vivos del CRM, con stats).
 // Cada evento sale enriquecido con su grupo por aperturar (si está vinculado):
 // evento.grupo = { id, numero, horarioTexto, cupos } — una consulta agregada, sin N+1.
 export async function listarEventos(centroId) {
+  try {
   await requireCentroAccess(centroId)
   const rows = await sql`SELECT crm_event_id, grupo_id FROM centro_eventos WHERE centro_id = ${centroId} ORDER BY created_at DESC`
   const ids = rows.map((r) => r.crm_event_id)
@@ -78,6 +82,7 @@ export async function listarEventos(centroId) {
     return { ...ev, grupo: (gid && gruposPorId.get(String(gid))) || null }
   })
   return { events }
+  } catch (e) { return fallo('listarEventos', e) }
 }
 
 // Campos del evento que aceptamos del cliente (se pasan tal cual al CRM).
@@ -135,6 +140,7 @@ async function grupoValido(centroId, grupoId, conservarId = null) {
 }
 
 export async function crearEvento(centroId, data) {
+  try {
   const s = await requireCurrentWriteCentro(centroId)
   const accountId = crmAccountForCentro(centroId)
   if (!accountId) return { error: 'Este centro no tiene cuenta de CRM asignada.' }
@@ -152,6 +158,7 @@ export async function crearEvento(centroId, data) {
     ON CONFLICT (crm_event_id) DO NOTHING
   `
   return { ok: true, event: ev }
+  } catch (e) { return fallo('crearEvento', e) }
 }
 
 async function eventoDelCentro(centroId, eventId) {
@@ -160,6 +167,7 @@ async function eventoDelCentro(centroId, eventId) {
 }
 
 export async function actualizarEvento(centroId, eventId, data) {
+  try {
   await requireCurrentWriteCentro(centroId)
   // El vínculo actual se lee junto con la pertenencia: si el grupo del evento
   // ya no acepta nuevos pero el formulario lo CONSERVA tal cual, se permite
@@ -185,18 +193,22 @@ export async function actualizarEvento(centroId, eventId, data) {
     await sql`UPDATE centro_eventos SET grupo_id = ${grupoId} WHERE crm_event_id = ${eventId}`
   }
   return { ok: true, event: res.event }
+  } catch (e) { return fallo('actualizarEvento', e) }
 }
 
 export async function eliminarEvento(centroId, eventId) {
+  try {
   await requireCurrentPuedeEliminar(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('delete_event', { event_id: eventId })
   if (res.error) return { error: res.error }
   await sql`DELETE FROM centro_eventos WHERE crm_event_id = ${eventId}`
   return { ok: true }
+  } catch (e) { return fallo('eliminarEvento', e) }
 }
 
 export async function duplicarEvento(centroId, eventId) {
+  try {
   const s = await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const accountId = crmAccountForCentro(centroId)
@@ -226,17 +238,21 @@ export async function duplicarEvento(centroId, eventId) {
     }
   }
   return { ok: true, event: ev }
+  } catch (e) { return fallo('duplicarEvento', e) }
 }
 
 export async function listarRegistros(centroId, eventId) {
+  try {
   await requireCentroAccess(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.', registrations: [] }
   const res = await crmCall('list_registrations', { event_id: eventId })
   if (res.error) return { error: res.error, registrations: [] }
   return { registrations: res.registrations || [] }
+  } catch (e) { return fallo('listarRegistros', e) }
 }
 
 export async function agregarInvitado(centroId, eventId, data) {
+  try {
   await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   if (!data?.first_name?.trim()) return { error: 'El nombre es requerido.' }
@@ -250,9 +266,11 @@ export async function agregarInvitado(centroId, eventId, data) {
   })
   if (res.error) return { error: res.error }
   return { ok: true, registration: res.registration }
+  } catch (e) { return fallo('agregarInvitado', e) }
 }
 
 export async function marcarAsistencia(centroId, eventId, registrationId, attended) {
+  try {
   await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
@@ -261,9 +279,11 @@ export async function marcarAsistencia(centroId, eventId, registrationId, attend
   })
   if (res.error) return { error: res.error }
   return { ok: true, registration: res.registration }
+  } catch (e) { return fallo('marcarAsistencia', e) }
 }
 
 export async function marcarPago(centroId, eventId, registrationId, paid) {
+  try {
   await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
   const res = await crmCall('update_registration', {
@@ -272,4 +292,5 @@ export async function marcarPago(centroId, eventId, registrationId, paid) {
   })
   if (res.error) return { error: res.error }
   return { ok: true, registration: res.registration }
+  } catch (e) { return fallo('marcarPago', e) }
 }

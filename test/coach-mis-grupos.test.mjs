@@ -48,6 +48,23 @@ test('un grupo sin niños nunca queda pendiente', () => {
   assert.equal(g.clasesPendientes, 0)
 })
 
+// Un niño retirado o trasladado conserva sus filas en asistencias (la acción
+// trae todas las del grupo). Si sumaran, 1 activo marcado + 1 retirado marcado
+// = 2 ≥ 2 y la clase saldría completa aunque Beto siga sin marca.
+test('la marca de un niño que ya no está en el grupo no completa la clase', () => {
+  const [g] = presentarMisGrupos({
+    hoy: '2026-09-04',
+    grupos: [grupo({ asistencias: [
+      { estudiante_id: 1, fecha: '2026-09-03', estado: 'presente' },
+      { estudiante_id: 3, fecha: '2026-09-03', estado: 'presente' },
+    ] })],
+  })
+  const clase = g.clases.find((c) => c.fecha === '2026-09-03')
+  assert.equal(clase.marcadas, 1)
+  assert.equal(clase.estado, 'pendiente')
+  assert.equal(g.clasesPendientes, 2)
+})
+
 test('sin token no se inventa link de asistencia', () => {
   const [g] = presentarMisGrupos({ grupos: [grupo({ token: null })], hoy: '2026-09-04' })
   assert.equal(g.linkAsistencia, null)

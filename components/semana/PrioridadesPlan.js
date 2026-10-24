@@ -35,6 +35,7 @@ export default function PrioridadesPlan({ centroId, recommendations = [], histor
     let guardado = false
     try {
       const updated = await updateGrowthRecommendation(centroId, recommendationId, command)
+      if (updated?.error) throw new Error(updated.error)
       guardado = true
       setGuardadas(prev => ({ ...prev, [recommendationId]: { status: updated.status, due_date: updated.due_date } }))
       await onRefresh()

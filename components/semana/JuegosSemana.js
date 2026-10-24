@@ -28,8 +28,10 @@ export default function JuegosSemana({ datos, centroId }) {
   }, [centroId, semana, historico, intento])
   async function ejecutar(work) {
     setOcupado(true); setError(''); setMensaje('')
-    try { setJuego(await work()); setEditar(false); setMensaje('Juego guardado. Su estado se muestra debajo.') }
-    catch (e) { setError(e?.message || 'No se pudo guardar el juego.'); setFalloCarga(true) }
+    try { const r = await work(); if (r?.error) throw new Error(r.error); setJuego(r); setEditar(false); setMensaje('Juego guardado. Su estado se muestra debajo.') }
+    // Solo el error: `falloCarga` es del useEffect de carga. Marcarlo aquí
+    // escondía la tarjeta y el formulario con todo lo escrito.
+    catch (e) { setError(e?.message || 'No se pudo guardar el juego.') }
     finally { setOcupado(false) }
   }
   const meta = juego && datos.catalogo.find(m => m.codigo === juego.codigo)

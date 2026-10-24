@@ -15,7 +15,9 @@ export default function CompromisoMensual({ centroId, datos, siguienteNivel, onR
     let guardado = false
     setOcupado(true); setError(''); setMensaje('')
     try {
-      await guardarCompromiso(centroId, { periodo, metas, diagnostico: form.get('diagnostico') }); guardado = true
+      const r = await guardarCompromiso(centroId, { periodo, metas, diagnostico: form.get('diagnostico') })
+      if (r?.error) throw new Error(r.error)
+      guardado = true
       await onRefresh(); setMensaje('Meta mensual guardada. Revisa las propuestas semanales y solicita aprobación.')
     } catch (cause) { setError(guardado ? 'La meta se guardó; recarga para ver las propuestas sin repetir el guardado.' : cause.message) }
     finally { setOcupado(false) }

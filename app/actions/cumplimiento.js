@@ -1,6 +1,7 @@
 'use server'
 import { sql, upsert } from '../../lib/db'
 import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
+import { fallo } from '../../lib/errores'
 import { alcancePanel } from '../../lib/alcance'
 import { CUMPLIMIENTO_KEYS, disciplinaPct } from '../../lib/checklist'
 import { CLAVES_PRODUCTO, clavesDisciplina } from '../../lib/discrepancias-metas.mjs'
@@ -24,31 +25,37 @@ async function ensureTrimestre(centroId, anio, trimestre) {
 }
 
 export async function loadCumplimiento(centroId, anio, trimestre, mes) {
-  await requireCentroAccess(centroId)
-  const [trimestreRow] = await sql`SELECT id FROM trimestres WHERE centro_id = ${centroId} AND anio = ${anio} AND trimestre = ${trimestre}`
-  if (!trimestreRow) return { trimestreId: null, existe: false, vals: null }
-  const trimestreId = trimestreRow.id
-  const [row] = await sql`SELECT * FROM cumplimiento WHERE trimestre_id = ${trimestreId} AND mes = ${mes}`
-  // `existe` es el que mata el 88% fantasma: un mes SIN fila no es un mes con
-  // 29 de 33 criterios cumplidos, es un mes sin registrar. La UI lo dibuja como
-  // tal y el % del trimestre no lo cuenta en el denominador.
-  if (!row) return { trimestreId, existe: false, vals: null }
-  const vals = {}
-  for (const k of CUMPLIMIENTO_KEYS) vals[k] = row[k] || 'no'
-  return { trimestreId, existe: true, vals }
+  // Nunca `throw`: en producción Next enmascara el mensaje (lib/errores.js).
+  try {
+    await requireCentroAccess(centroId)
+    const [trimestreRow] = await sql`SELECT id FROM trimestres WHERE centro_id = ${centroId} AND anio = ${anio} AND trimestre = ${trimestre}`
+    if (!trimestreRow) return { trimestreId: null, existe: false, vals: null }
+    const trimestreId = trimestreRow.id
+    const [row] = await sql`SELECT * FROM cumplimiento WHERE trimestre_id = ${trimestreId} AND mes = ${mes}`
+    // `existe` es el que mata el 88% fantasma: un mes SIN fila no es un mes con
+    // 29 de 33 criterios cumplidos, es un mes sin registrar. La UI lo dibuja como
+    // tal y el % del trimestre no lo cuenta en el denominador.
+    if (!row) return { trimestreId, existe: false, vals: null }
+    const vals = {}
+    for (const k of CUMPLIMIENTO_KEYS) vals[k] = row[k] || 'no'
+    return { trimestreId, existe: true, vals }
+  } catch (e) { return fallo('loadCumplimiento', e) }
 }
 
 // Marcador 2 del trimestre: disciplina ponderada + cuántos meses hay realmente
 // registrados. El denominador viaja siempre con el porcentaje para que
 // "Disciplina 100%" no pueda leerse sin su "2 de 3 meses registrados".
 export async function getDisciplinaTrimestre(centroId, anio, trimestre) {
-  await requireCentroAccess(centroId)
-  const rows = await sql`
-    SELECT cu.* FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
-    WHERE t.centro_id = ${centroId} AND t.anio = ${anio} AND t.trimestre = ${trimestre}
-    ORDER BY cu.mes
-  `
-  return { ...disciplinaPct(rows), mesesRegistradosLista: rows.map((r) => Number(r.mes)) }
+  // Nunca `throw`: en producción Next enmascara el mensaje (lib/errores.js).
+  try {
+    await requireCentroAccess(centroId)
+    const rows = await sql`
+      SELECT cu.* FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
+      WHERE t.centro_id = ${centroId} AND t.anio = ${anio} AND t.trimestre = ${trimestre}
+      ORDER BY cu.mes
+    `
+    return { ...disciplinaPct(rows), mesesRegistradosLista: rows.map((r) => Number(r.mes)) }
+  } catch (e) { return fallo('getDisciplinaTrimestre', e) }
 }
 
 // ── LO QUE HAY GUARDADO EN LAS 3 METAS DE RESULTADO ─────────────────────────
@@ -57,14 +64,17 @@ export async function getDisciplinaTrimestre(centroId, anio, trimestre) {
 // que nadie marcó. Es la fuente "registro" de la comparación; la fuente
 // "cálculo" la pone lib/marcadores.mjs.
 export async function getMetasMarcadas(centroId, anio, trimestre) {
-  await requireCentroAccess(centroId)
-  const rows = await sql`
-    SELECT cu.mes, cu.meta_nuevos_ingresos, cu.meta_desercion, cu.meta_cobranza
-    FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
-    WHERE t.centro_id = ${centroId} AND t.anio = ${anio} AND t.trimestre = ${trimestre}
-    ORDER BY cu.mes
-  `
-  return rows.map((r) => ({ ...r, mes: Number(r.mes) }))
+  // Nunca `throw`: en producción Next enmascara el mensaje (lib/errores.js).
+  try {
+    await requireCentroAccess(centroId)
+    const rows = await sql`
+      SELECT cu.mes, cu.meta_nuevos_ingresos, cu.meta_desercion, cu.meta_cobranza
+      FROM cumplimiento cu JOIN trimestres t ON t.id = cu.trimestre_id
+      WHERE t.centro_id = ${centroId} AND t.anio = ${anio} AND t.trimestre = ${trimestre}
+      ORDER BY cu.mes
+    `
+    return rows.map((r) => ({ ...r, mes: Number(r.mes) }))
+  } catch (e) { return fallo('getMetasMarcadas', e) }
 }
 
 // Lo mismo para TODOS los centros del alcance del panel: una sola consulta,
@@ -168,28 +178,31 @@ async function metasCalculadas(centroId, anio, trimestre) {
 // reporta hasta que se corrija. Un valor viejo visible es mejor que un valor
 // nuevo inventado.
 export async function saveCumplimiento(centroId, anio, trimestre, mes, incoming) {
-  await requireCurrentWriteCentro(centroId)
-  const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
-  const row = { trimestre_id: trimestreId, mes }
-  for (const k of CLAVES_DISCIPLINA) {
-    // Desde septiembre la encuesta se deriva de evidencia. El trigger de BD
-    // también impide que un cliente antiguo o un guardado concurrente la falsee.
-    if (k === 'encuestas_satisfaccion' && Number(anio)*100 + (Number(trimestre)-1)*3 + Number(mes) >= 202609) continue
-    row[k] = incoming?.[k] === 'si' ? 'si' : 'no'
-  }
-
-  let producto = null
+  // Nunca `throw`: en producción Next enmascara el mensaje (lib/errores.js).
   try {
-    producto = await metasCalculadas(centroId, anio, trimestre)
-  } catch (e) {
-    console.error(`[saveCumplimiento] no se pudieron calcular las metas de ${centroId} ${anio}-Q${trimestre}:`, e)
-  }
-  for (const k of CLAVES_PRODUCTO) if (producto?.[k]) row[k] = producto[k]
+    await requireCurrentWriteCentro(centroId)
+    const trimestreId = await ensureTrimestre(centroId, anio, trimestre)
+    const row = { trimestre_id: trimestreId, mes }
+    for (const k of CLAVES_DISCIPLINA) {
+      // Desde septiembre la encuesta se deriva de evidencia. El trigger de BD
+      // también impide que un cliente antiguo o un guardado concurrente la falsee.
+      if (k === 'encuestas_satisfaccion' && Number(anio)*100 + (Number(trimestre)-1)*3 + Number(mes) >= 202609) continue
+      row[k] = incoming?.[k] === 'si' ? 'si' : 'no'
+    }
 
-  row.updated_at = new Date().toISOString()
-  await upsert('cumplimiento', row, ['trimestre_id', 'mes'])
-  // `metasEscritas` deja ver en la UI cuáles se derivaron y cuáles quedaron
-  // como estaban: guardar no puede parecer que confirmó una meta que el
-  // sistema no pudo juzgar.
-  return { ok: true, metasEscritas: CLAVES_PRODUCTO.filter((k) => producto?.[k]) }
+    let producto = null
+    try {
+      producto = await metasCalculadas(centroId, anio, trimestre)
+    } catch (e) {
+      console.error(`[saveCumplimiento] no se pudieron calcular las metas de ${centroId} ${anio}-Q${trimestre}:`, e)
+    }
+    for (const k of CLAVES_PRODUCTO) if (producto?.[k]) row[k] = producto[k]
+
+    row.updated_at = new Date().toISOString()
+    await upsert('cumplimiento', row, ['trimestre_id', 'mes'])
+    // `metasEscritas` deja ver en la UI cuáles se derivaron y cuáles quedaron
+    // como estaban: guardar no puede parecer que confirmó una meta que el
+    // sistema no pudo juzgar.
+    return { ok: true, metasEscritas: CLAVES_PRODUCTO.filter((k) => producto?.[k]) }
+  } catch (e) { return fallo('saveCumplimiento', e) }
 }

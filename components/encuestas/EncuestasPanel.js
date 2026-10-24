@@ -34,18 +34,23 @@ export default function EncuestasPanel({centroId,anio,mes,compact=false,onResume
     try {
       const c=await preparar(),url=p?`${base()}/encuesta/${c.token}?p=${p.token}`:`${base()}/encuesta/centro/${c.token_permanente}`
       if(v!==revision.current)return
+      let copiado=true
       if(tipo==='qr') {
         const archivo=await prepararCartel({tipo:'encuesta',centro:data.centro.nombre,centroId,enlace:url,formato})
         if(v!==revision.current)return
         descargarArchivo(archivo.blob,archivo.nombre)
       } else {
         setLinkManual(url)
-        try {await navigator.clipboard.writeText(url)} catch {throw new Error('El navegador no permitió copiar. Usa el enlace visible y vuelve a pulsar Copiar enlace cuando esté permitido.')}
+        // El portapapeles NO condiciona el registro: en Safari/iPhone writeText
+        // falla tras un await de red y el mes se quedaba sin compartida_at aunque
+        // el enlace sí se compartiera a mano. Se intenta aquí (antes de otro
+        // viaje al servidor, que mataría la activación del gesto) y se sigue.
+        try {await navigator.clipboard.writeText(url)} catch {copiado=false}
       }
       const r=await registrarDifusionEncuesta(centroId,c.id,tipo)
       if(r.error)throw new Error(`El recurso está listo, pero no se registró la difusión: ${r.error}`)
       if(v!==revision.current)return
-      setStatus(tipo==='qr'?'Cartel PDF descargado y registrado. Imprime a tamaño real: el mismo QR abre la encuesta vigente cada mes.':p?'Enlace individual copiado. Compártelo solo con su representante; es válido este mes.':'Enlace permanente copiado y difusión del mes registrada. Compártelo por mensaje directo con cada representante.')
+      setStatus(tipo==='qr'?'Cartel PDF descargado y registrado. Imprime a tamaño real: el mismo QR abre la encuesta vigente cada mes.':!copiado?'Difusión del mes registrada. El navegador no permitió copiar: usa el enlace visible de arriba y compártelo.':p?'Enlace individual copiado. Compártelo solo con su representante; es válido este mes.':'Enlace permanente copiado y difusión del mes registrada. Compártelo por mensaje directo con cada representante.')
       await cargar(v)
     } catch(e){if(v===revision.current)setError(e.message)} finally{if(v===revision.current)setBusy(false)}
   }

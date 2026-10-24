@@ -145,7 +145,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   async function ejecutar(work) {
     setOcupado(true); setError(''); setMensaje('')
     let guardado = false
-    try { await work(); guardado = true; await onRefresh(); return true }
+    try { const r = await work(); if (r?.error) throw new Error(r.error); guardado = true; await onRefresh(); return true }
     catch (e) { setError(guardado ? 'Los cambios se guardaron. No se pudo actualizar la vista; recarga sin repetir la acción.' : e?.message || 'No se pudo guardar el plan.'); return false }
     finally { setOcupado(false) }
   }
@@ -153,6 +153,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
   async function seguirAccion(item, command) {
     await ejecutar(async () => {
       const result = await updateGrowthRecommendation(centroId, item.id, command)
+      if (result?.error) throw new Error(result.error)
       setAccionesGuardadas((previas) => ({ ...previas, [item.id]: { status: result.status, due_date: result.due_date } }))
       setMensaje(result.refreshError || (command === 'complete' ? 'Tarea realizada. El resultado se verificará con las próximas estadísticas.' : command === 'postpone' ? 'Acción pospuesta siete días en Ruta de Nivel y en el plan.' : 'Acción descartada en Ruta de Nivel y en el plan.'))
     })
@@ -198,8 +199,13 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
       {!mas && <button type="button" className="btn" onClick={() => setMas(true)}>Más condiciones</button>}
       {seleccion === 'peligro' && <fieldset className="semana-plan__variantes"><legend>Peligro</legend><label><input type="radio" name="alcance" disabled={ocupado} checked={alcance === 'personal'} onChange={() => { setAlcance('personal'); setFundamento('') }} /> Personal</label><label><input type="radio" name="alcance" disabled={ocupado} checked={alcance === 'superior'} onChange={() => { setAlcance('superior'); setFundamento('') }} /> Para el superior</label></fieldset>}
       {seleccion === 'afluencia' && <fieldset className="semana-plan__variantes"><legend>Afluencia</legend><label><input type="radio" name="variante" disabled={ocupado} checked={variante === 'accion'} onChange={() => { setVariante('accion'); setFundamento('') }} /> De acción</label><label><input type="radio" name="variante" disabled={ocupado} checked={variante === 'financiera'} onChange={() => { setVariante('financiera'); setFundamento('') }} /> Financiera</label></fieldset>}
-      <details className="semana-ayuda"><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los últimos cierres, por qué corresponde esta condición y qué causa debes comprobar" required /></label>
-      <div className="semana-plan__acciones"><button type="button" className="btn btn--primary" disabled={!seleccion || !fundamento.trim() || ocupado} onClick={async () => { if (await ejecutar(() => asignarCondicion(centroId, semanaFin, { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante, fundamento }))) setCambiando(false) }}>Guardar condición</button>{cambiando && <button type="button" className="btn" onClick={() => { setCambiando(false); setSeleccion(datos.plan.condicion || ''); setAlcance(datos.plan.alcance_peligro || 'personal'); setVariante(datos.plan.variante_afluencia || 'accion'); setFundamento(datos.plan.fundamento || '') }}>Cancelar</button>}</div></details>
+      {/* Elegir la condición solo la marca en pantalla: se guarda con el botón de
+          abajo. Antes ese botón vivía en un <details> plegado y la gente se iba
+          creyendo que ya había quedado. Con una condición elegida el bloque se
+          abre solo y dice qué falta. */}
+      {seleccion && !fundamento.trim() && <p className="h-sub semana-plan__pendiente" role="status">Condición elegida, todavía sin guardar: escribe el fundamento y pulsa «Guardar condición».</p>}
+      <details className="semana-ayuda" open={Boolean(seleccion)}><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los últimos cierres, por qué corresponde esta condición y qué causa debes comprobar" required /></label>
+      <div className="semana-plan__acciones"><button type="button" className="btn btn--primary" disabled={!seleccion || !fundamento.trim() || ocupado} onClick={async () => { if (await ejecutar(() => asignarCondicion(centroId, semanaFin, { condicion: seleccion, alcancePeligro: alcance, varianteAfluencia: variante, fundamento }))) { setCambiando(false); setMensaje('Condición guardada.') } }}>Guardar condición</button>{cambiando && <button type="button" className="btn" onClick={() => { setCambiando(false); setSeleccion(datos.plan.condicion || ''); setAlcance(datos.plan.alcance_peligro || 'personal'); setVariante(datos.plan.variante_afluencia || 'accion'); setFundamento(datos.plan.fundamento || '') }}>Cancelar</button>}</div></details>
     </div> : <p className="h-sub">{puedeEscribir ? 'La condición la asigna la administradora' : 'Condición pendiente de asignación.'}</p>)}
 
     {!sinCondicion && !cambiando && puedeAsignar && <details className="semana-ayuda"><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los cierres y por qué corresponde esta condición" /></label><button className="btn" disabled={ocupado || !fundamento.trim()} onClick={() => ejecutar(() => asignarCondicion(centroId, semanaFin, { ...formulaGuardada, fundamento }))}>Guardar fundamento</button></details>}

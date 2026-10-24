@@ -312,7 +312,7 @@ export default function UsuariosClient({ initialData }) {
               <input id="users-email" name="email" type="email" autoComplete="email" spellCheck={false} required className="input" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} disabled={disabled || Boolean(editing)} />
             </div>
             <div className="field"><label className="label" htmlFor="users-role">Rol</label>
-              <select id="users-role" name="rol" required className="input" value={form.rol} onChange={event => setForm({ ...form, rol: event.target.value, nombre: '', coach_id: '', centro_id: initialData.centers.length === 1 ? initialData.centers[0].id : form.centro_id, centros: [] })} disabled={disabled}>
+              <select id="users-role" name="rol" required className="input" value={form.rol} onChange={event => setForm({ ...form, rol: event.target.value, ...(editing ? {} : { nombre: '', coach_id: '' }), centro_id: initialData.centers.length === 1 ? initialData.centers[0].id : form.centro_id, centros: [] })} disabled={disabled}>
                 {assignableRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}
               </select>
               <p className="h-sub">{ROLES[form.rol]?.help}</p>

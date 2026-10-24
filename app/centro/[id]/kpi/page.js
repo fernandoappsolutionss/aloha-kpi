@@ -158,13 +158,19 @@ export default function KPIPage() {
   }
 
   async function handleSave() {
-    if (!access.canWriteOperations) { setStatus('❌ Tu usuario está en modo consulta.'); return }
+    // Permiso sin resolver no es «modo consulta»: se está comprobando o falló.
+    if (access.loading) { setStatus('Comprobando tu permiso… vuelve a pulsar Guardar en un momento.'); return }
+    if (!access.canWriteOperations) {
+      setStatus(access.error ? '❌ No se pudo comprobar tu permiso. Pulsa «Reintentar permisos» y vuelve a guardar.' : '❌ Tu usuario está en modo consulta.')
+      return
+    }
     if (mesEstado === 'cerrado') { setStatus('❌ Este mes está cerrado. No se puede editar.'); return }
     setSaving(true); setStatus('')
     try {
       const res = await saveKpiMes(id, year, month, config, semanas)
       if (res.error) throw new Error(res.error)
-      setStatus('✅ KPI de ' + NOMBRES_MES[month-1] + ' ' + year + ' guardado.')
+      // El servidor avisa cuando guardó sin la foto automática (res.warn).
+      setStatus('✅ KPI de ' + NOMBRES_MES[month-1] + ' ' + year + ' guardado.' + (res.warn ? ' ⚠️ ' + res.warn : ''))
       setSaving(false)
       return true
     } catch(e) { setStatus('❌ Error: ' + e.message) }
@@ -245,6 +251,9 @@ export default function KPIPage() {
   const automatic = autoSync?.ok === true
   const syncFailed = autoSync?.ok === false
   const autoPeriod = automatic
+  // En mes automático abierto el servidor nunca toma clase de prueba, motivos
+  // ni origen del formulario (ni con la sincronización caída): no se editan.
+  const resumenAutomatico = usaKpiAutomatico(year, month, mesEstado)
 
   const kpiRow = (tipo, label, semIdx) => {
     const s = semanas[semIdx], dias = s[tipo]
@@ -312,8 +321,10 @@ export default function KPIPage() {
                   </button>
                 )
             ) : (
-              readOnly ? (
-                <span className="label" style={{ color: 'var(--text-faint)' }}>Modo consulta — sin edición operativa</span>
+              access.loading ? (
+                <button disabled className="btn btn--primary">Comprobando permiso…</button>
+              ) : readOnly ? (
+                <span className="label" style={{ color: 'var(--text-faint)' }}>{access.error ? 'Permiso sin comprobar' : 'Modo consulta — sin edición operativa'}</span>
               ) : <>
                 <button onClick={handleSave} disabled={saving} className="btn btn--primary" data-tour="kpi.guardar">
                   {saving ? 'Guardando…' : 'Guardar'}
@@ -339,6 +350,12 @@ export default function KPIPage() {
             Modo consulta global: puedes revisar el KPI y cambiar periodo, sin guardar ni cerrar el mes.
           </div>
         )}
+        {access.error && !access.loading && (
+          <div role="alert" className="alert alert--error" style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>No se pudo comprobar tu permiso, así que el KPI se muestra en modo consulta.</span>
+            <button onClick={() => access.reload()} className="btn">Reintentar permisos</button>
+          </div>
+        )}
 
         {locked && cierreDocumental && (
           <div className="alert" style={{ display: 'block', marginBottom: 16, overflowWrap: 'anywhere' }}>
@@ -359,7 +376,7 @@ export default function KPIPage() {
 
         {!locked && syncFailed && (
           <div role="alert" className="alert alert--error" style={{ marginBottom: 16 }}>
-            {autoSync.error || 'No se pudo sincronizar el KPI.'} Clase de prueba, motivos y origen comercial quedan con los últimos valores guardados: revísalos antes de guardar.
+            {autoSync.error || 'No se pudo sincronizar el KPI.'} Clase de prueba, motivos y origen comercial se quedan con los últimos valores guardados y no se editan aquí; cobranza (y ventas/retiros si el cálculo automático falló) sí se guardan.
           </div>
         )}
 
@@ -516,9 +533,9 @@ export default function KPIPage() {
         {/* Clase de prueba / Motivos / Origen */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 16, marginBottom: 20 }}>
           {[
-            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:autoPeriod, source:automatic ? 'Los tres indicadores corresponden a las clases de este mes que ya comenzaron. Invitados incluye todos sus registros; Matriculados cuenta los registros con negocio ganado en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
-            {title:'Motivo Deserción', accent:'var(--bad)', auto:autoPeriod || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
-            {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:autoPeriod, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
+            {title:'Clase de Prueba', accent:'var(--ts-green)', auto:resumenAutomatico, source:automatic ? 'Los tres indicadores corresponden a las clases de este mes que ya comenzaron. Invitados incluye todos sus registros; Matriculados cuenta los registros con negocio ganado en el CRM.' : locked ? 'Foto del mes cerrado. Las clases pueden tener cambios posteriores al cierre.' : 'Última foto guardada; sincronización pendiente.', fields:[['Invitados','cp_invitados'],['Asistieron','cp_asistieron'],['Matriculados','cp_matriculados']]},
+            {title:'Motivo Deserción', accent:'var(--bad)', auto:resumenAutomatico || !!motivosAuto, source:automatic ? 'Datos sincronizados desde los retiros registrados.' : syncFailed ? 'Última foto guardada; sincronización pendiente.' : '', fields:[['Técnica','mot_tecnica'],['Pérdida de clase','mot_perdida_clase'],['Económico','mot_economico'],['Horario','mot_horario'],['Graduado 🎓','mot_graduado'],['Otro','mot_otro']]},
+            {title:'Origen Nuevos Ingresos', accent:'var(--ok)', auto:resumenAutomatico, source:automatic ? 'Datos sincronizados desde las inscripciones.' : 'Última foto guardada; sincronización pendiente.', fields:[['Referido','orig_referido'],['Marketing','orig_marketing'],['Centro','orig_centro'],['Activaciones','orig_activaciones'],['Medios','orig_medios'],['Por clasificar','orig_por_clasificar']]},
           ].map(({title,accent,fields,auto,source}) => (
             <div key={title} className="panel">
               <div className="panel__head" style={{ padding: '12px 16px', borderTop: `2px solid ${accent}` }}>

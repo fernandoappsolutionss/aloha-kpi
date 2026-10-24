@@ -37,7 +37,7 @@ export default function SemanaPage({ seccion = 'avance' }) {
   async function actualizar() {
     const turno = ++solicitud.current
     setActualizando(true); setError('')
-    try { const result = await actualizarSemanaCentro(id); if (turno === solicitud.current) setDatos(result) }
+    try { const result = await actualizarSemanaCentro(id); if (turno === solicitud.current) { if (result?.error) setError(result.error); else setDatos(result) } }
     catch { if (turno === solicitud.current) setError('No se pudo actualizar la semana. Intenta de nuevo.') }
     finally { if (turno === solicitud.current) setActualizando(false) }
   }

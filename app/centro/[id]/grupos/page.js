@@ -36,7 +36,7 @@ import {
   CIERRE_MIN, SLOT_MIN, DIAS_OPERATIVOS, aperturaDe, aHora, aHora12, aMinutos, calendarioDia,
   sinSalonDia, inventarioSemanal, coachesLibresEn, bloquesQueCaben, ventanaVendible, KINDER_INICIO,
 } from '../../../../lib/inventario'
-import { atractivoDe, recomendacionesApertura, inicioVendible, unidadParaHueco, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
+import { atractivoDe, recomendacionesApertura, GUIA_FRANJAS_DIFICILES } from '../../../../lib/atractivo'
 import { estadoModelo, unidadesLibres, slotsDelDia, RESUMEN_MODELO } from '../../../../lib/modelo'
 import { reservasComoGrupos, diasConPrueba, ROLES_RESERVA, ROL_LABEL, ROL_PIDE_COACH } from '../../../../lib/reservas'
 import { sugerenciaReserva, guardarReserva, eliminarReserva } from '../../../actions/reservas'
@@ -51,6 +51,41 @@ import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
 import TableScroller from '../../../../components/TableScroller'
 import Dialog, { ModalPortal, useModalLayer, useDialogCallback } from '../../../../components/Dialog'
 import CoincidenciasFicha, { ConfirmarFichaNueva, tituloCoincidencias } from '../../../../components/CoincidenciasFicha'
+
+// Si una Server Action LANZA (red caída, sesión vencida, 40001 sin traducir en
+// grupos.js), el {error} nunca llega en `res`: sin esto el rechazo quedaba
+// mudo y el botón en "Guardando…". Pinta un ❌ legible, recarga para mostrar
+// el estado real y devuelve null para que el caller corte. El busy se libera
+// en el `finally` de cada caller, no aquí.
+async function conFallo(fn, setStatus, recarga) {
+  try { return await fn() }
+  catch (e) {
+    setStatus('❌ No se pudo guardar: ' + (e?.message || 'revisa tu conexión o vuelve a entrar'))
+    recarga?.()
+    return null
+  }
+}
+
+// Banner de resultado (✅/❌). Vive en <main> y, cuando el detalle se abre
+// como panel deslizante (<1180px), también en su cabecera: el portal deja
+// <main> inert y oscurecido detrás y el {error} de la acción no se veía.
+function StatusAlert({ status, style }) {
+  if (!status) return null
+  const isError = status.includes('❌')
+  const texto = status.replace(/^[❌✅]\s*/, '')
+  return (
+    <div role={isError ? 'alert' : 'status'} className={`alert${isError ? ' alert--error' : ''}`}
+      style={{ marginBottom: 16, ...(isError ? {} : { background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }), ...style }}>{texto}</div>
+  )
+}
+
+// Marca del <option> de un grupo que NO acepta a un niño NUEVO (misma en
+// Inscribir y en Editar niño); la razón sale de ventanaNuevos.
+function marcaNoAcepta(v) {
+  if (v?.razon === 'palanca_cerrada') return ' · 🔒 cerrado'
+  if (v?.razon === 'vencida') return ' · ventana de nuevos vencida'
+  return ' · cerrado a nuevos'
+}
 
 // Pill por estado de grupo (claves de groupStatus en lib/fusiones).
 const ESTADO_PILL = { estable: 'pill--ok', bajo: 'pill--bad', online: 'pill--warn', kinder: 'pill--warn', base: 'pill--warn', cerrado: 'pill--bad', fusionado: 'pill--warn' }
@@ -502,7 +537,8 @@ export default function GruposPage() {
     // se recarga para mostrar el estado real — nunca se pisa en silencio.
     const abiertaVista = g.inscripcion_abierta !== false
     if (abiertaVista && !confirm(`¿Cerrar las inscripciones del grupo ${g.numero}? Ya no entra nadie (ni inscripción, ni reincorporación, ni fusión) y ventas verá 0 cupos.`)) return
-    const res = await setInscripcionAbierta(id, g.id, !abiertaVista, abiertaVista)
+    const res = await conFallo(() => setInscripcionAbierta(id, g.id, !abiertaVista, abiertaVista), setStatus, refresca)
+    if (!res) return
     if (res.error) { setStatus('❌ ' + res.error); refresca(); return }
     setStatus(res.abierta ? `✅ Grupo ${g.numero} abierto: en llenado.` : `🔒 Grupo ${g.numero} cerrado a inscripciones.`)
     refresca()
@@ -512,7 +548,8 @@ export default function GruposPage() {
   // se aplicó, para que el bloque Llenado cierre su mini-formulario.
   async function onExtenderVentana(g, fecha) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return false }
-    const res = await extenderVentanaLlenado(id, g.id, fecha)
+    const res = await conFallo(() => extenderVentanaLlenado(id, g.id, fecha), setStatus, refresca)
+    if (!res) return false
     if (res.error) { setStatus('❌ ' + res.error); return false }
     setStatus(fecha
       ? `✅ Ventana de nuevos del grupo ${g.numero} extendida hasta el ${res.hasta}.`
@@ -523,14 +560,16 @@ export default function GruposPage() {
   async function onCerrarGrupo(g) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Cerrar el grupo ${g.numero}? Deja de contar en la rentabilidad del centro.`)) return
-    const res = await cerrarGrupo(id, g.id)
+    const res = await conFallo(() => cerrarGrupo(id, g.id), setStatus, refresca)
+    if (!res) return
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ Grupo ${g.numero} cerrado.`); setOpenId(null); refresca() }
   }
   async function onReabrirGrupo(g) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Reabrir el grupo ${g.numero}?`)) return
-    const res = await reabrirGrupo(id, g.id)
+    const res = await conFallo(() => reabrirGrupo(id, g.id), setStatus, refresca)
+    if (!res) return
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ Grupo ${g.numero} reabierto.`); refresca() }
   }
@@ -542,13 +581,15 @@ export default function GruposPage() {
   async function onGraduar(e) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Graduar a ${e.nombre}? Pasa de TINY 10 a KIDS nivel 5 (regla del manual).`)) return
-    const res = await graduarTiny(id, e.id)
+    const res = await conFallo(() => graduarTiny(id, e.id), setStatus, refresca)
+    if (!res) return
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} graduado 🎓 — ahora es KIDS nivel 5.`); refresca() }
   }
   async function onRevertirBaja(e) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
-    const res = await revertirBajaPotencial(id, e.id)
+    const res = await conFallo(() => revertirBajaPotencial(id, e.id), setStatus, refresca)
+    if (!res) return
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ ${e.nombre} sigue activo.`); refresca() }
   }
@@ -557,7 +598,8 @@ export default function GruposPage() {
   async function onCancelarRetiro(e) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     if (!confirm(`¿Cancelar el retiro programado de ${e.nombre} (efectivo el ${fmtDia(e.retiro_programado_para)})? Vuelve a su estado anterior y el sistema ya no lo retira.`)) return
-    const res = await cancelarRetiroProgramado(id, e.id)
+    const res = await conFallo(() => cancelarRetiroProgramado(id, e.id), setStatus, refresca)
+    if (!res) return
     if (res.error) setStatus('❌ ' + res.error)
     else { setStatus(`✅ Retiro programado de ${e.nombre} cancelado: queda ${res.estado === 'activo' ? 'activo' : 'en baja potencial (alerta manual)'}.`); refresca() }
   }
@@ -567,7 +609,9 @@ export default function GruposPage() {
     let msg = `✅ ${est.nombre} retirado.`
     if (res.warn) msg += ` ⚠️ ${res.warn}`
     if (res.grupoVacio && est.grupo_id && confirm(`El grupo ${res.grupoVacio} quedó sin niños. El manual indica cerrarlo para no afectar la rentabilidad. ¿Cerrarlo ahora?`)) {
-      const rc = await cerrarGrupo(id, est.grupo_id)
+      // El retiro YA se guardó: si el cierre lanza, igual hay que recargar.
+      const rc = await conFallo(() => cerrarGrupo(id, est.grupo_id), setStatus, refresca)
+      if (!rc) return
       msg = rc.error ? '❌ ' + rc.error : `✅ ${est.nombre} retirado y grupo ${res.grupoVacio} cerrado.`
     }
     setStatus(msg)
@@ -579,19 +623,24 @@ export default function GruposPage() {
     if (!confirm(`¿Fusionar el grupo ${from.numero} (${n} niños) con el grupo ${to.numero}? Los ${n} niños pasan al grupo ${to.numero}.`)) return
     const key = `${from.id}-${to.id}`
     setBusyFusion(key)
-    const res = await aplicarFusion(id, { deGrupoId: from.id, aGrupoId: to.id, estudianteIds: from.estudiantes.map((e) => e.id) })
-    setBusyFusion(null)
-    if (res.error) setStatus('❌ ' + res.error)
-    else {
-      setStatus(res.cerrado ? `✅ Grupo ${from.numero} fusionado y cerrado. Los niños pasaron al grupo ${to.numero}.` : `✅ Fusión aplicada: los niños pasaron al grupo ${to.numero}.`)
-      setOrigenId(null)
-      refresca()
+    try {
+      const res = await conFallo(() => aplicarFusion(id, { deGrupoId: from.id, aGrupoId: to.id, estudianteIds: from.estudiantes.map((e) => e.id) }), setStatus, refresca)
+      if (!res) return
+      if (res.error) setStatus('❌ ' + res.error)
+      else {
+        setStatus(res.cerrado ? `✅ Grupo ${from.numero} fusionado y cerrado. Los niños pasaron al grupo ${to.numero}.` : `✅ Fusión aplicada: los niños pasaron al grupo ${to.numero}.`)
+        setOrigenId(null)
+        refresca()
+      }
+    } finally {
+      setBusyFusion(null)
     }
   }
 
   async function onLinkCoach(g) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
-    const res = await linkCoach(id, g.id)
+    const res = await conFallo(() => linkCoach(id, g.id), setStatus)
+    if (!res) return
     if (res.error) { setStatus('❌ ' + res.error); return }
     const url = `${window.location.origin}${res.path}`
     try {
@@ -642,8 +691,6 @@ export default function GruposPage() {
 
   if (loadError) return <div className="shell"><Sidebar rol="usuario" centroId={id} /><main id="main-content" className="main operations-page" data-page-state="error"><h1>Grupos</h1><div role="alert" className="alert alert--error">{loadError}</div><Link className="btn" href={`/centro/${id}`}>Volver al centro</Link></main></div>
 
-  const isError = status.includes('❌')
-  const statusText = status.replace(/^[❌✅]\s*/, '')
   const okProm = prom.sinK >= metas.gpnMin
   const CARDS = [
     { l: 'Prom. niños/grupo (sin Kinder)', v: prom.sinK.toFixed(1), c: okProm ? 'var(--ok)' : 'var(--bad)', s: `${Math.round(prom.pctMeta)}% de la meta (${metas.gpnMin})`, sc: okProm ? 'var(--ok)' : 'var(--bad)' },
@@ -676,10 +723,7 @@ export default function GruposPage() {
           </div>
         )}
 
-        {status && (
-          <div role={isError ? "alert" : "status"} className={`alert${isError ? ' alert--error' : ''}`}
-            style={isError ? { marginBottom: 16 } : { marginBottom: 16, background: 'var(--ok-bg)', border: '1px solid var(--ok-line)', color: 'var(--ok-text)' }}>{statusText}</div>
-        )}
+        <StatusAlert status={status} />
 
         {/* KPI cards (siempre visibles) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(158px,1fr))', gap: 12, marginBottom: 20 }}>
@@ -912,6 +956,7 @@ export default function GruposPage() {
           acciones={acciones}
           asistenciaMes={data?.asistenciaMes || {}}
           canWrite={canWrite}
+          status={status}
           vista={detalleVistas[String(abierto.id)] || 'ninos'}
           onVistaChange={(vista) => setDetalleVistas((prev) => ({ ...prev, [String(abierto.id)]: vista }))}
           onClose={() => setOpenId(null)}
@@ -1115,7 +1160,7 @@ function AccionesNino({ e, acciones, asis, canWrite = true }) {
   )
 }
 
-function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, canWrite = true, vista, onVistaChange, onClose }) {
+function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, canWrite = true, status, vista, onVistaChange, onClose }) {
   const closeRef = useRef(null)
   const { layerRef, surfaceRef, onBackdropPointerDown } = useModalLayer({
     open: true,
@@ -1134,6 +1179,7 @@ function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, canWrite = tr
           acciones={acciones}
           asistenciaMes={asistenciaMes}
           canWrite={canWrite}
+          status={status}
           vista={vista}
           onVistaChange={onVistaChange}
           sheet
@@ -1150,7 +1196,7 @@ function GrupoSheet({ centroId, g, metas, acciones, asistenciaMes, canWrite = tr
 // ── Detalle de un grupo: roster y acciones por niño ──────────────────────────
 // Vive al lado de la lista (sticky) o como panel deslizante en pantallas
 // angostas: la cabecera con las acciones queda fija y solo el listado hace scroll.
-function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWrite = true, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
+function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWrite = true, status, sheet, onCerrarPanel, vista: controlledVista, onVistaChange, surfaceRef, titleId, closeRef }) {
   const useCards = useNarrow(767)
   const [localVista, setLocalVista] = useState('ninos')
   const vista = controlledVista || localVista
@@ -1227,6 +1273,9 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWri
             <button className="btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => acciones.reabrir(g)}>Reabrir</button>
           ))}
         </div>
+        {/* Como panel deslizante, <main> (y su banner) queda inert detrás del
+            backdrop: el resultado de la acción se repite aquí, a la vista. */}
+        {sheet && <StatusAlert status={status} style={{ marginTop: 12, marginBottom: 0 }} />}
         {/* Dos vistas del grupo: su gente y el itinerario del nivel que cursa */}
         <div className="grp-seg" role="tablist">
           <button role="tab" aria-selected={vista === 'ninos'} className={`grp-seg__btn${vista === 'ninos' ? ' grp-seg__btn--on' : ''}`} data-tour="grupo.tab-ninos" onClick={() => setVista('ninos')}>
@@ -1385,9 +1434,12 @@ function BloqueLlenado({ g, ll, canWrite = true, onExtender }) {
 
   async function guardar(fecha) {
     setGuardando(true)
-    const ok = await onExtender(fecha)
-    setGuardando(false)
-    if (ok) { setExtiendo(false); setFechaExt('') }
+    try {
+      const ok = await onExtender(fecha)
+      if (ok) { setExtiendo(false); setFechaExt('') }
+    } finally {
+      setGuardando(false) // nunca dejar el botón en "Guardando…"
+    }
   }
 
   return (
@@ -2030,24 +2082,14 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
     if (!reservaDia) return
     if (!canDelete) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBorrando(true)
-    const res = await eliminarReserva(centroId, reservaDia.id)
-    setBorrando(false)
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(`✅ Clase de prueba del ${DIAS[dia].toLowerCase()} eliminada — ese día vuelve a la parrilla normal.`); onChanged() }
-  }
-
-  const clickHueco = (salon, h) => {
-    if (!canWrite) return
-    // Primero intenta encajar una unidad del modelo (p. ej. el par Lun+Mié
-    // completo); si no cabe ninguna, cae al bloque libre en hora vendible.
-    const unidad = unidadParaHueco(grupos, salones, dia, salon.id, h)
-    if (unidad) {
-      onAbrirGrupo({ horarios: unidad.sesiones.map((ses) => ({ dia: ses.dia, hora_inicio: aHora(ses.inicio), hora_fin: aHora(ses.fin), salon_id: String(ses.salon_id) })) })
-      return
+    try {
+      const res = await conFallo(() => eliminarReserva(centroId, reservaDia.id), setStatus, onChanged)
+      if (!res) return
+      if (res.error) setStatus('❌ ' + res.error)
+      else { setStatus(`✅ Clase de prueba del ${DIAS[dia].toLowerCase()} eliminada — ese día vuelve a la parrilla normal.`); onChanged() }
+    } finally {
+      setBorrando(false)
     }
-    const ini = inicioVendible(dia, h)
-    const dur = h.fin - ini >= 120 ? 120 : 60
-    onAbrirGrupo({ dia, hora_inicio: aHora(ini), hora_fin: aHora(ini + dur), salon_id: String(salon.id) })
   }
 
   if (!salones.filter((s) => s.activo).length) return (
@@ -2306,21 +2348,27 @@ function TabHorarios({ centroId, grupos, coaches, salones, retirados, reservas, 
               {slots.map((sl) => {
                 const { at, libres, subTexto, esKinder, descripcion } = sl
                 const corto = sl.fin - sl.inicio <= 60
+                // El texto de arriba promete "toca un bloque verde para aperturar
+                // ahí"; el clic se perdió al cambiar los huecos por la parrilla del
+                // modelo (#39). Botón real (R10: nada de div con onClick), mismo
+                // payload que la tarjeta accesible de la lista.
+                const Bloque = canWrite ? 'button' : 'div'
                 return (
-                  <div key={`s-${sl.inicio}`}
+                  <Bloque key={`s-${sl.inicio}`}
                     title={descripcion}
+                    {...(canWrite ? { type: 'button', 'aria-label': `Aperturar grupo ${aHora12(sl.inicio)}–${aHora12(sl.fin)}${esKinder ? ' en Zona Kinder' : ''}`, onClick: () => onAbrirGrupo({ horarios: sl.horarios, itinerario: esKinder ? 'KINDER' : undefined }) } : {})}
                     style={{
                       position: 'absolute', left: 4, right: 4, top: topDe(sl.inicio) + 1, height: topDe(sl.fin) - topDe(sl.inicio) - 2,
                       background: esKinder ? 'var(--warn-bg)' : 'var(--ok-bg)', border: `1.5px dashed ${esKinder ? 'var(--warn-line)' : 'var(--ok-line)'}`, borderRadius: 'var(--r-sm)',
                       color: esKinder ? 'var(--warn)' : 'var(--ok)', fontSize: 13, fontWeight: 600, cursor: canWrite ? 'pointer' : 'default', padding: 3, overflow: 'hidden',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, font: 'inherit', fontFamily: 'inherit',
                     }}>
                     <span className="num" style={{ whiteSpace: 'nowrap' }}>＋ {aHora12(sl.inicio)}–{aHora12(sl.fin)}</span>
                     {esKinder
                       ? <span style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>Zona Kinder</span>
                       : <span style={{ fontWeight: 600, fontSize: 13, color: ETIQUETA_COLOR[at.etiqueta], whiteSpace: 'nowrap' }}>{ETIQUETA_EMOJI[at.etiqueta]}{at.etiqueta}</span>}
                     {!corto && <span style={{ fontWeight: 500, fontSize: 13, whiteSpace: 'nowrap' }}>{subTexto} · {libres.length} coach libre{libres.length === 1 ? '' : 's'}</span>}
-                  </div>
+                  </Bloque>
                 )
               })}
             </div>
@@ -2493,18 +2541,26 @@ function TabCoaches({ centroId, coaches, salones, grupos, reservas, onChanged, s
   async function onToggleCoach(c) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBusy('c' + c.id)
-    const res = await toggleCoach(centroId, c.id, !c.activo)
-    setBusy(null)
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(`✅ Coach ${c.nombre} ${c.activo ? 'desactivado' : 'activado'}.`); onChanged() }
+    try {
+      const res = await conFallo(() => toggleCoach(centroId, c.id, !c.activo), setStatus, onChanged)
+      if (!res) return
+      if (res.error) setStatus('❌ ' + res.error)
+      else { setStatus(`✅ Coach ${c.nombre} ${c.activo ? 'desactivado' : 'activado'}.`); onChanged() }
+    } finally {
+      setBusy(null)
+    }
   }
   async function onToggleSalon(s) {
     if (!canWrite) { setStatus('❌ Tu usuario está en modo consulta.'); return }
     setBusy('s' + s.id)
-    const res = await toggleSalon(centroId, s.id, !s.activo)
-    setBusy(null)
-    if (res.error) setStatus('❌ ' + res.error)
-    else { setStatus(`✅ Salón ${s.nombre} ${s.activo ? 'desactivado' : 'activado'}.`); onChanged() }
+    try {
+      const res = await conFallo(() => toggleSalon(centroId, s.id, !s.activo), setStatus, onChanged)
+      if (!res) return
+      if (res.error) setStatus('❌ ' + res.error)
+      else { setStatus(`✅ Salón ${s.nombre} ${s.activo ? 'desactivado' : 'activado'}.`); onChanged() }
+    } finally {
+      setBusy(null)
+    }
   }
 
   return (
@@ -3046,7 +3102,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
             {activos.map((g) => {
               const v = ventanaPorId.get(String(g.id))
               const permitido = esReincorporacion ? g.inscripcion_abierta !== false : v?.abierta
-              const marca = permitido ? '' : v?.razon === 'palanca_cerrada' ? ' · 🔒 cerrado' : v?.razon === 'vencida' ? ' · ventana de nuevos vencida' : ''
+              const marca = permitido ? '' : marcaNoAcepta(v)
               return <option key={g.id} value={g.id} disabled={!permitido}>Grupo {g.numero} · {g.itinerario}{marca}</option>
             })}
           </select>
@@ -3101,6 +3157,12 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo' || String(g.id) === String(est.grupo_id))
+  // (g2-6) Sin grupo actual, el server trata la colocación como niño NUEVO
+  // (grupoAceptaNinosNuevos: palanca + ventana del manual + nivel); con grupo
+  // es un traslado y solo manda la palanca. El select refleja la misma regla
+  // que el server para no ofrecer un grupo que luego rechaza.
+  const primeraColocacion = est.grupo_id == null
+  const ventanaPorId = primeraColocacion ? new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoyISO())])) : null
   // Cierre EFECTIVO vigente (override ?? derivado, resuelto por el server en
   // est.plan.cierre; los no enriquecidos —sin grupo— caen al override crudo).
   const cierreVigente = cierreNino(est)
@@ -3150,7 +3212,12 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
         <Field label="Grupo (mover de grupo)">
           <select name="grupo_id" className="input" value={f.grupo_id} onChange={(e) => set('grupo_id', e.target.value)}>
             <option value="">Sin grupo</option>
-            {activos.map((g) => <option key={g.id} value={g.id} disabled={g.inscripcion_abierta === false}>Grupo {g.numero} · {g.itinerario}{g.inscripcion_abierta === false ? ' · 🔒 cerrado' : ''}</option>)}
+            {activos.map((g) => {
+              const v = ventanaPorId?.get(String(g.id))
+              const permitido = primeraColocacion ? !!v?.abierta : g.inscripcion_abierta !== false
+              const marca = permitido ? '' : primeraColocacion ? marcaNoAcepta(v) : ' · 🔒 cerrado'
+              return <option key={g.id} value={g.id} disabled={!permitido}>Grupo {g.numero} · {g.itinerario}{marca}</option>
+            })}
           </select>
         </Field>
         <Field label="Origen comercial">
