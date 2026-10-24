@@ -30,7 +30,7 @@ function cargarAcciones(file, stubs) {
   return new Function(...nombres, `${body}\nreturn { ${exportadas.join(', ')} }`)(...args)
 }
 
-const MUTANTES_SEMANA = ['actualizarSemanaCentro', 'recalcularSemanaCentro', 'asignarCondicion', 'agregarObjetivo', 'editarObjetivo', 'marcarObjetivo', 'eliminarObjetivo', 'guardarCuotas', 'aprobarCuotas', 'agregarOrden', 'guardarCompromiso', 'verificarObjetivo', 'cambiarAlineamiento', 'programarObjetivoHoy']
+const MUTANTES_SEMANA = ['adjuntarEvidencia', 'actualizarSemanaCentro', 'recalcularSemanaCentro', 'asignarCondicion', 'agregarObjetivo', 'editarObjetivo', 'marcarObjetivo', 'eliminarObjetivo', 'guardarCuotas', 'aprobarCuotas', 'agregarOrden', 'guardarCompromiso', 'verificarObjetivo', 'cambiarAlineamiento', 'programarObjetivoHoy']
 const LECTURAS_SEMANA = ['getInformeSemana', 'getSemanaCentro', 'getTableroSemanal', 'getReunionSemanal']
 const MUTANTES_JUEGOS = ['guardarJuegoSemana', 'aprobarJuegoSemana']
 const LECTURAS_JUEGOS = ['getJuegoSemana']
@@ -92,7 +92,7 @@ test('guardarJuegoSemana devuelve { error } cuando el rol no puede proponer', as
 
 test('los clientes tratan { error } como fallo y muestran el mensaje del servidor', () => {
   const plan = read('components/semana/PlanSemana.js')
-  assert.match(plan, /async function ejecutar\(work\) \{[\s\S]*?const r = await work\(\); if \(r\?\.error\) throw new Error\(r\.error\)/)
+  assert.match(plan, /async function ejecutar\(work, confirmacion = [^\n]+?\) \{[\s\S]*?const r = await work\(\); if \(r\?\.error\) throw new Error\(r\.error\)/)
   assert.match(plan, /e\?\.message \|\| 'No se pudo guardar el plan\.'/)
   const cuotas = read('components/semana/CuotasSemana.js')
   assert.match(cuotas, /const r = aprobar \? await aprobarCuotas\(centroId, semanaFin, payload\) : await guardarCuotas\(centroId, semanaFin, payload\)\n\s*if \(r\?\.error\) throw new Error\(r\.error\)/)
@@ -110,9 +110,9 @@ test('los clientes tratan { error } como fallo y muestran el mensaje del servido
 })
 
 test('PlanSemana.ejecutar muestra el mensaje del servidor y no refresca si la acción devuelve { error }', async () => {
-  const body = read('components/semana/PlanSemana.js').match(/async function ejecutar\(work\) \{([\s\S]*?)\n  \}\n/)[1]
+  const body = read('components/semana/PlanSemana.js').match(/async function ejecutar\(work, confirmacion = [^\n]+?\) \{([\s\S]*?)\n  \}\n/)[1]
   const estado = { error: null, refrescos: 0 }
-  const ejecutar = new Function('setOcupado', 'setError', 'setMensaje', 'onRefresh', `return async function ejecutar(work) {${body}\n}`)(
+  const ejecutar = new Function('setOcupado', 'setError', 'setMensaje', 'onRefresh', `return async function ejecutar(work, confirmacion = 'Guardado') {${body}\n}`)(
     () => {}, (m) => { estado.error = m }, () => {}, async () => { estado.refrescos++ })
   assert.equal(await ejecutar(async () => ({ error: 'Las cuotas solo se guardan para la semana abierta.' })), false)
   assert.equal(estado.error, 'Las cuotas solo se guardan para la semana abierta.')

@@ -32,6 +32,7 @@ function memoria() {
       return []
     }
     if (sql.includes('UPDATE semana_planes') && sql.includes('pendientes_copiados_at')) { const plan = [...planes.values()].find(p=>p.id === values[0]); plan.pendientes_copiados_at = HOY; plan.arrastre_version=1; return [] }
+    if (sql.includes('FROM semana_evidencias')) return []
     if (sql.includes('FROM growth_recommendations')) return []
     if (sql.includes('FROM estadisticas_semana')) return ['2026-09-03', '2026-09-10', '2026-09-17', FIN].map((semana_fin, i) => ({ semana_fin, valor: 100 + i, estado: 'cerrada' }))
     if (sql.includes('FROM centros')) return [{ pais: 'PA' }]
@@ -96,6 +97,7 @@ test('agregar objetivo vuelve a validar el paso bajo bloqueo del plan', async ()
     if (sql.includes('INSERT INTO semana_planes')) return []
     if (sql.includes('FROM semana_planes') && sql.includes('FOR UPDATE')) return [{ id: 2, condicion: ++locks === 1 ? 'normal' : 'cambio_poder', pendientes_copiados_at: HOY, arrastre_version: 1 }]
     if (sql.includes('FROM semana_objetivos')) return []
+    if (sql.includes('FROM semana_evidencias')) return []
     if (sql.includes('FROM growth_recommendations')) return []
     if (sql.includes('FROM estadisticas_semana')) return []
     if (sql.includes('FROM centros')) return [{ pais: 'PA' }]

@@ -68,3 +68,11 @@ test('fórmula asignada exige fundamento y objetivos de cada paso para cerrar',(
  assert.throws(()=>validarRitual('cerrar_viernes',d,contexto),/cada paso/)
  d.acciones=Array.from({length:5},(_,n)=>({...d.acciones[0],id:'qa-'+n,paso:n+1}));validarRitual('cerrar_viernes',d,contexto)
 })
+
+
+test('transferencia al socio se coordina como acción sin convertirla en un segundo gasto', () => {
+  const p = base(); p.documento.acciones[0].tipo = 'dueno'
+  const validado = validarPlanCaja(p, null, carmen, hoy)
+  assert.equal(validado.acciones[0].aprobacion, 'facultad_actual')
+  assert.equal(validado.acciones[0].monto, 100)
+})

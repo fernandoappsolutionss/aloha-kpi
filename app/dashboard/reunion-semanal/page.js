@@ -52,6 +52,11 @@ export default function ReunionSemanalPage() {
     <Sidebar rol="admin_general" />
     <main id="main-content" className="main operations-page semana-reunion" data-page-state={cargando ? 'loading' : error && !datos ? 'error' : 'ready'}>
       <div className="main__head"><div><p className="label">Panel · Semana de cierre</p><h1 className="h-title">Reunión semanal</h1><p className="h-sub">Primero el centro que más creció. Al que va abajo se le pide su plan.</p></div></div>
+      <section className="panel" style={{ padding: 20 }} aria-label="Procedimiento de la reunión">
+        <h2>Recorrido de la reunión</h2>
+        <ol><li>Revisar los resultados del último jueves y el origen de cada cifra.</li><li>La administradora guarda la condición y su fundamento en Condición y fórmula.</li><li>Revisar las cinco cuotas y aprobar los valores acordados.</li><li>Abrir el plan y revisar acciones, responsables, fechas y evidencia esperada.</li><li>Durante la semana, registrar resultados en Mis acciones; coordinación verifica la evidencia.</li></ol>
+        <p>«Plan preparado» indica que están completos sus datos; no es una aprobación del resultado. La aprobación de cuotas y la verificación de acciones se registran por separado.</p>
+      </section>
       {cargando && <p role="status">Cargando reunión…</p>}
       {error && <p role="alert" className="alert alert--error">{error} <button type="button" className="btn" onClick={cargar}>Reintentar</button></p>}
       {mensaje && <p role="status" className="alert">{mensaje}</p>}
@@ -63,6 +68,7 @@ export default function ReunionSemanalPage() {
           <p className="h-sub">Cierre observado: {centro.ultimaCerrada} · Plan: {centro.desde} al {centro.hasta}{centro.preparacion ? ' · Preparación' : ''}</p>
           <div className="semana-reunion__estado"><CondicionSemanal condicion={centro.condicion} lectura={centro.lectura} /><span className={centro.plazoVencido && centro.estadoPlan !== 'completo' ? 'semana-plan--vencido' : ''}>Estado del plan: {estados[centro.estadoPlan] || 'Pendiente'}{centro.plazoVencido && centro.estadoPlan !== 'completo' ? ' · Plazo vencido' : ''}</span></div><LecturaCondicion lectura={centro.lectura} />
           {centro.discrepancia && <p role="alert" className="alert alert--error">La condición asignada está por encima de la referencia automática. Revisa los datos y el fundamento antes de decidir.</p>}
+          <div className="semana-cuotas__acciones"><Link className="btn" href={`/centro/${centro.id}/semana/condicion`}>Revisar condición y plan</Link><Link className="btn" href={`/centro/${centro.id}/semana/acciones`}>Revisar acciones y evidencias</Link><Link className="btn" href={`/centro/${centro.id}/semana#semana-cuotas-title`}>Editar cuotas</Link></div>
           <h3>Cuotas de la semana abierta · cierre {centro.semanaAbierta}</h3>
           <ul className="semana-reunion__cuotas">{datos.catalogo.map((meta) => <li key={meta.codigo}><span>{meta.nombre}</span><strong>{mostrar(centro.cuotas[meta.codigo]?.cuota ?? centro.cuotas[meta.codigo]?.propuesta)}</strong><span className="label">{centro.cuotas[meta.codigo]?.estado === 'aprobada' ? 'Aprobada' : centro.cuotas[meta.codigo]?.cuota != null ? 'Propuesta' : 'Sugerida'}</span></li>)}</ul>
           {centro.puedeAprobar && <div className="semana-reunion__acciones"><button className="btn btn--primary" type="button" disabled={ocupado || !datos.catalogo.some((meta) => centro.cuotas[meta.codigo]?.cuota != null || centro.cuotas[meta.codigo]?.propuesta != null)} onClick={() => aprobar(centro)}>Aprobar cuotas</button></div>}

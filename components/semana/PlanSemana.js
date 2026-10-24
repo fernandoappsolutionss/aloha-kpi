@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CONDICIONES, colorCondicion, nombreCondicion, claveFormula, pasosDe } from '../../lib/condiciones/formulas.mjs'
-import { asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo, programarObjetivoHoy } from '../../app/actions/semana'
+import { adjuntarEvidencia, asignarCondicion, agregarObjetivo, editarObjetivo, marcarObjetivo, eliminarObjetivo, verificarObjetivo, programarObjetivoHoy } from '../../app/actions/semana'
 import AlineamientoSemana from './AlineamientoSemana'
 import AyudaCondicion from './AyudaCondicion'
 import { ejemplosFormula } from '../../lib/condiciones/ayuda.mjs'
@@ -36,7 +36,7 @@ function ObjetivoRapido({ centroId, semanaFin, paso, formula, formulaAnterior, f
     const form = event.currentTarget
     if (await ejecutar(() => agregarObjetivo(centroId, semanaFin, {
       ...Object.fromEntries(new FormData(form)), ...formula, formulaAnterior, fundamento, seccion: 'formula', paso, rapido: true,
-    }))) form.reset()
+    }), 'Objetivo guardado en este paso. Lo encontrarás también en Mis acciones para registrar el resultado.')) form.reset()
   }
   return <form className="semana-objetivo-rapido" onSubmit={enviar} aria-label={`Agregar objetivo al paso ${paso + 1}`}>
     <div className="semana-objetivo-rapido__fila"><label className="field"><span className="sr-only">Objetivo para este paso</span><input name="texto" className="input" placeholder="Objetivo para este paso" maxLength={500} required /></label><button className="btn btn--primary" type="submit" disabled={ocupado}>Agregar</button></div>
@@ -74,6 +74,11 @@ function Objetivo({ centroId, objetivo, puedeEscribir, puedeVerificar, ejecutar,
     {anterior && !objetivo.hecho && <p className="h-sub">Primero termina la fórmula anterior de {anterior.nombre}, desde el paso {anterior.paso + 1}, en Urgentes o Pendientes.</p>}
     {!enHoy && objetivo.fecha_hoy && <p className="h-sub">{programadoHoy ? 'En Hoy' : `Programada el ${fechaInput(objetivo.fecha_hoy)}`}{objetivo.hora_hoy && ` · ${String(objetivo.hora_hoy).slice(0, 5)}`}</p>}
     {enHoy && <p className="label">{objetivo.seccion === 'formula' ? `Fórmula · paso ${Number(objetivo.paso) + 1}` : objetivo.seccion === 'urgente' ? 'Urgente' : 'Pendiente de la semana'}</p>}
+    {objetivo.adjunto && <p><a className="operations-link" href={`/api/semana/evidencias/${objetivo.id}`}>Descargar evidencia: {objetivo.adjunto.nombre}</a></p>}
+    {!preparar && puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={async event => {
+      event.preventDefault(); const form = event.currentTarget
+      if (await ejecutar(() => adjuntarEvidencia(centroId, objetivo.id, new FormData(form)), 'Adjunto guardado en esta acción. Completa el resultado y registra la acción realizada.')) form.reset()
+    }}><label className="field"><span>Adjuntar evidencia (PDF, PNG o JPG, hasta 2 MB)</span><input name="archivo" type="file" accept=".pdf,.png,.jpg,.jpeg" required disabled={ocupado} /></label><button className="btn" type="submit" disabled={ocupado}>Guardar adjunto</button></form>}
     {objetivo.evidencia_resultado && <p><strong>Resultado:</strong> {objetivo.evidencia_resultado}</p>}
     {!preparar && puedeEscribir && objetivo.seccion !== 'orden' && !objetivo.hecho && <form onSubmit={event => { event.preventDefault(); const evidencia = new FormData(event.currentTarget).get('evidencia'); ejecutar(() => marcarObjetivo(centroId, objetivo.id, true, evidencia)) }}>
       <label className="field"><span>Evidencia del resultado</span><textarea name="evidencia" className="input" maxLength={2000} required placeholder="Qué se logró, dato obtenido y referencia para comprobarlo" /></label>
@@ -142,10 +147,10 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     setCambiando(false)
   }, [datos.plan.condicion, datos.plan.alcance_peligro, datos.plan.variante_afluencia])
 
-  async function ejecutar(work) {
+  async function ejecutar(work, confirmacion = 'Cambios guardados.') {
     setOcupado(true); setError(''); setMensaje('')
     let guardado = false
-    try { const r = await work(); if (r?.error) throw new Error(r.error); guardado = true; await onRefresh(); return true }
+    try { const r = await work(); if (r?.error) throw new Error(r.error); guardado = true; await onRefresh(); setMensaje(confirmacion); return true }
     catch (e) { setError(guardado ? 'Los cambios se guardaron. No se pudo actualizar la vista; recarga sin repetir la acción.' : e?.message || 'No se pudo guardar el plan.'); return false }
     finally { setOcupado(false) }
   }
@@ -211,8 +216,9 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     {!sinCondicion && !cambiando && puedeAsignar && <details className="semana-ayuda"><summary>Explicar y guardar la condición</summary><label className="field"><span>Datos y razonamiento de la condición</span><textarea className="input" value={fundamento} onChange={e => setFundamento(e.target.value)} maxLength={2000} placeholder="Qué muestran los cierres y por qué corresponde esta condición" /></label><button className="btn" disabled={ocupado || !fundamento.trim()} onClick={() => ejecutar(() => asignarCondicion(centroId, semanaFin, { ...formulaGuardada, fundamento }))}>Guardar fundamento</button></details>}
     </div>
     </>}
+    {preparar && <p className="h-sub">Las acciones guardadas aparecen debajo de su paso. <Link className="btn" href={`/centro/${centroId}/semana/acciones`}>Ir a Mis acciones y evidencias</Link></p>}
     <div className="semana-plan__trabajo">
-    <HoySemana centroId={centroId} semanaFin={semanaFin} hoy={datos.hoy} objetivos={objetivos} puedeEscribir={puedeEscribir} puedeVerificar={puedeVerificar} ejecutar={ejecutar} ocupado={ocupado} />
+    {!preparar && <HoySemana centroId={centroId} semanaFin={semanaFin} hoy={datos.hoy} objetivos={objetivos} puedeEscribir={puedeEscribir} puedeVerificar={puedeVerificar} ejecutar={ejecutar} ocupado={ocupado} />}
     <div className="semana-plan__planificacion">
     <div data-tour="semana.formula">
     {!formula.condicion && <p className="h-sub">Elige una condición para ver sus pasos y agregar tus objetivos.</p>}
@@ -222,7 +228,7 @@ export default function PlanSemana({ centroId, semanaFin, datos, puedeEscribir, 
     </li>)}</ol></section>}
 
     </div>
-    <AlineamientoSemana centroId={centroId} semanaFin={semanaFin} items={datos.plan.alineamiento || []} cuotas={cuotas} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />
+    {!preparar && <AlineamientoSemana centroId={centroId} semanaFin={semanaFin} items={datos.plan.alineamiento || []} cuotas={cuotas} puedeEscribir={puedeEscribir} ejecutar={ejecutar} ocupado={ocupado} />}
     </div>
     </div>
     {!preparar && <>

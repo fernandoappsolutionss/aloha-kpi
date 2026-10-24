@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { cargarDireccionCaja, guardarDireccionCaja } from '../../app/actions/caja-direccion'
-import { CHECKS_VIERNES, CHECKS_LUNES, TIPOS_ACCION, ES_EXCEPCION, CONDICIONES_CAJA, calidadCaja, diagnosticoCaja, viernesCiclo } from '../../lib/caja/direccion.mjs'
+import { CHECKS_VIERNES, AYUDA_VIERNES, CHECKS_LUNES, TIPOS_ACCION, ES_EXCEPCION, CONDICIONES_CAJA, calidadCaja, diagnosticoCaja, viernesCiclo } from '../../lib/caja/direccion.mjs'
 import { FORMULAS } from '../../lib/condiciones/formulas.mjs'
 import { lunesDe } from '../../lib/caja/semanas.mjs'
 import { usd, fechaCorta } from './formato'
@@ -76,6 +76,10 @@ export function DireccionCaja({ empresa, datos, onCambio }) {
         {riesgos.every(s=>s.semaforo==='verde'&&!s.caida)&&<p>Sin semanas bajo el piso ni caídas en esta proyección. Verifica también la integridad de los datos.</p>}
       </div>
     </details>
+    <details style={{marginTop:16}}><summary><strong>Cómo coordinar la transferencia al socio</strong></summary>
+      <ol><li>Comprueba «Dueño por separar» en el resumen de la empresa y contrasta lo ya transferido en Movimientos importados.</li><li>Agrega una acción «Coordinar transferencia al socio / dueño» con monto, responsable, fecha y referencia del acuerdo.</li><li>La persona autorizada realiza la transferencia en el banco. Esta plataforma registra el seguimiento; no mueve dinero.</li><li>Importa el extracto y clasifica la salida como Dueño. Registra el comprobante y el resultado en la acción.</li></ol>
+      <p>No lo agregues como otro pago programado: la curva ya separa esta participación. Cambios de porcentaje o excepciones requieren acuerdo de Master.</p>
+    </details>
     <hr/>
     <label style={estiloCampo}>Viernes de referencia del plan<input className="input" type="date" value={ciclo} max={datos.hoy} disabled={ocupado} onChange={e=>setCiclo(e.target.value)}/></label>
     {estado?.ciclos.length>0&&<p>Ciclos guardados: {estado.ciclos.map(c=><button className="btn" key={c.ciclo} onClick={()=>setCiclo(c.ciclo)} disabled={ocupado}>{fechaCorta(c.ciclo)}</button>)}</p>}
@@ -86,8 +90,8 @@ export function DireccionCaja({ empresa, datos, onCambio }) {
       <p>Cierre: {estado.plan?.cierre_at?new Date(estado.plan.cierre_at).toLocaleString('es-PA',{timeZone:'America/Panama'}):'pendiente'} · Revisión del lunes: {estado.plan?.lunes_at?'registrada':'pendiente'}. Horarios de Panamá.</p>
       {!estado.puedeEditar&&<p>Consulta. Carmen y Master registran el plan y los rituales.</p>}
       <fieldset disabled={!estado.puedeEditar||ocupado} style={{border:0,padding:0,minWidth:0,display:'grid',gap:16}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
-          {[[CHECKS_VIERNES,'viernes','Cierre del viernes'],[CHECKS_LUNES,'lunes','Revisión del lunes']].map(([checks,k,t])=><div key={k}><h3>{t}</h3>{Object.entries(checks).map(([id,label])=><label key={id} style={{display:'flex',gap:8,alignItems:'start',marginBottom:10}}><input type="checkbox" checked={!!doc[k][id]} onChange={e=>editar(k,{...doc[k],[id]:e.target.checked})}/>{label}</label>)}</div>)}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,240px),1fr))',gap:16}}>
+          {[[CHECKS_VIERNES,'viernes','Cierre del viernes'],[CHECKS_LUNES,'lunes','Revisión del lunes']].map(([checks,k,t])=><div key={k}><h3>{t}</h3>{Object.entries(checks).map(([id,label])=><label key={id} style={{display:'flex',gap:8,alignItems:'start',marginBottom:10}}><input type="checkbox" checked={!!doc[k][id]} onChange={e=>editar(k,{...doc[k],[id]:e.target.checked})}/><span>{label}{k === 'viernes' && <small style={{display:'block',marginTop:4}}>{AYUDA_VIERNES[id]}</small>}</span></label>)}</div>)}
         </div>
         <label style={estiloCampo}>Soportes y conciliación<textarea className="input" rows={3} maxLength={4000} value={doc.soportes} onChange={e=>editar('soportes',e.target.value)} placeholder="Archivo importado, cuenta, fecha de corte, saldo contrastado y referencia del comprobante. Sube el extracto en Subir extracto; aquí deja sus referencias."/></label>
         <label style={estiloCampo}>Condición sustentada en estadísticas reales<select className="input" value={doc.condicion} onChange={e=>{editar('condicion',e.target.value);setDoc(d=>({...d,acciones:d.acciones.map(a=>({...a,paso:0}))}))}}>{CONDICIONES_CAJA.map(c=><option key={c} value={c}>{nombreCondicion(c)}</option>)}</select></label>
@@ -96,7 +100,7 @@ export function DireccionCaja({ empresa, datos, onCambio }) {
         <h3>Plan de batalla · cobros, costos y decisiones</h3>
         <p>Impacto esperado de cada acción, sin sumarlo automáticamente a la curva. Un ahorro elimina gasto; una reprogramación solo cambia la fecha y exige acuerdo. Usa el mismo pago una sola vez. Nuevos compromisos, fuera de presupuesto y crédito requieren aprobación de Master.</p>
         {doc.acciones.map((a,i)=><fieldset key={a.id} style={{border:'1px solid var(--line)',padding:16,minWidth:0,display:'grid',gap:10}}><legend>Acción {i+1}</legend>
-          <label style={estiloCampo}>Tipo<select className="input" value={a.tipo} onChange={e=>accion(a.id,'tipo',e.target.value)}>{Object.entries(TIPOS_ACCION).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label>
+          <label style={estiloCampo}>Tipo<select aria-label="Tipo" className="input" value={a.tipo} onChange={e=>accion(a.id,'tipo',e.target.value)}>{Object.entries(TIPOS_ACCION).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label>
           <label style={estiloCampo}>Resultado concreto<textarea className="input" value={a.objetivo} maxLength={600} onChange={e=>accion(a.id,'objetivo',e.target.value)}/></label>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
             <label style={estiloCampo}>Responsable<input className="input" value={a.responsable} maxLength={120} onChange={e=>accion(a.id,'responsable',e.target.value)}/></label>

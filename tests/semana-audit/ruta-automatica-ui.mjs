@@ -40,6 +40,10 @@ const stubs = {
     export const guardarCompromiso=async(id,datos)=>{window.__writes.push(['meta',datos]);window.__weekly.compromiso=datos};
     export const guardarCuotas=async(id,fin,datos)=>{window.__writes.push(['cuotas',datos]);for(const [codigo,cuota] of Object.entries(datos))window.__weekly.cuotas[codigo]={...window.__weekly.cuotas[codigo],cuota,estado:'propuesta'}};
     export const aprobarCuotas=guardarCuotas;
+    export const cambiarAlineamiento=async()=>{};
+    export const programarObjetivoHoy=async()=>{};
+    export const getInformeSemana=async()=>({});
+    export const adjuntarEvidencia=async()=>({ok:true});
     export const asignarCondicion=async()=>{};
     export const agregarObjetivo=async()=>{};
     export const editarObjetivo=async()=>{};
@@ -47,6 +51,7 @@ const stubs = {
     export const eliminarObjetivo=async()=>{};
     export const verificarObjetivo=async()=>{};
   `,
+  juegos:`export const getJuegoSemana=async()=>null;export const guardarJuegoSemana=async()=>{};export const aprobarJuegoSemana=async()=>{};`,
   growth:`
     export const getCentroGrowth=async()=>{if(window.__falloRecarga)throw new Error('Recarga simulada falló');return structuredClone(window.__growth)};
     export const updateGrowthRecommendation=async(centro,id,command)=>{
@@ -57,8 +62,8 @@ const stubs = {
   `,
 }
 await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import Route from './app/centro/[id]/ruta-nivel/page.js';createRoot(document.getElementById('root')).render(<Route/>);`,resolveDir:root,loader:'jsx'},outfile:resolve(out,'app.js'),bundle:true,loader:{'.js':'jsx'},jsx:'automatic',define:{'process.env.NODE_ENV':'"development"'},plugins:[{name:'acciones-qa',setup(b){
-  b.onResolve({filter:/next\/navigation|next\/link|components\/Sidebar|actions\/semana|actions\/growth/},args=>{
-    const key=args.path.includes('navigation')?'navigation':args.path==='next/link'?'link':args.path.includes('Sidebar')?'sidebar':args.path.includes('semana')?'semana':'growth';return {path:key,namespace:'qa'}
+  b.onResolve({filter:/next\/navigation|next\/link|components\/Sidebar|actions\/semana|actions\/growth|actions\/juegos-semana/},args=>{
+    const key=args.path.includes('navigation')?'navigation':args.path==='next/link'?'link':args.path.includes('Sidebar')?'sidebar':args.path.includes('juegos-semana')?'juegos':args.path.includes('semana')?'semana':'growth';return {path:key,namespace:'qa'}
   });
   b.onLoad({filter:/.*/,namespace:'qa'},args=>({contents:stubs[args.path],loader:'jsx',resolveDir:root}))
 }}]})
@@ -83,11 +88,10 @@ try {
   check((await page.locator('#resultados-mes dd').allTextContents()).join(',')==='100,6,0,23,16','Cinco resultados automáticos')
   check(await page.locator('#plan-batalla #actions-title').count()===1,'Prioridades únicas dentro del plan')
   check(await page.locator('#actions-title').count()===1,'Sin duplicación de prioridades')
-  check(await page.locator('.semana-ajustes').getAttribute('open')===null,'Edición opcional plegada')
+  check(await page.locator('.semana-ajustes').getAttribute('open')!==null,'Cuotas visibles al entrar')
   await page.locator('#resultados-mes').screenshot({path:resolve(out,'resultados.png')})
   await page.locator('.semana-prioridades').screenshot({path:resolve(out,'prioridades.png')})
   const summary=page.locator('.semana-ajustes > summary')
-  await summary.click()
   check(await page.getByRole('button',{name:'Guardar meta mensual'}).isVisible(),'Editor de metas accesible')
   await page.getByRole('spinbutton',{name:'Cuota de Nuevos inscritos',exact:true}).fill('12')
   await page.locator('[aria-label^="Seguimiento de"]').first().getByRole('button',{name:'Posponer 7 días'}).click()
@@ -114,6 +118,9 @@ try {
   check(errores.length===0,errores.join('; '))
   await writeFile(resolve(out,'verificacion.json'),JSON.stringify({checks,errores,datos:'ficticios',acciones:'simuladas'},null,2))
   console.log(`${checks} comprobaciones de interfaz PASS; datos ficticios, componentes reales.`)
+} catch (error) {
+  console.error('Errores de página:', errores)
+  throw error
 } finally {
   if(context)await context.close()
   if(browser){assert.equal(browser.contexts().length,0);await browser.close();assert.equal(browser.isConnected(),false)}
