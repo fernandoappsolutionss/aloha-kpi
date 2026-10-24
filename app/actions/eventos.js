@@ -5,8 +5,7 @@ import { crmCall, crmAccountForCentro, crmConfigured, crmBaseUrl } from '../../l
 import { armarAlohaGroup } from '../../lib/cupos-sync'
 import { encolarSyncCrm } from '../../lib/llenado-service'
 import { NINOS_POR_GRUPO_MODELO, horarioTextoDe } from '../../lib/modelo'
-import { hoyISO } from '../../lib/operaciones'
-import { ventanaNuevos } from '../../lib/llenado.mjs'
+import { aceptaInscripciones } from '../../lib/llenado.mjs'
 import { mesClase, resumirClases } from '../../lib/clases-prueba.mjs'
 import { validarEventosCrm } from '../../lib/kpi-auto-server.js'
 import { fallo } from '../../lib/errores'
@@ -110,31 +109,15 @@ function pickEvent(data, accountId) {
   }
 }
 
-// (Diseño 2026-08-08, defecto 9) Valida el grupo por aperturar del formulario:
-// del centro, activo y ABIERTO a niños nuevos — vincular una clase de prueba
-// es apuntarle niños NUEVOS al grupo, así que al CREAR o CAMBIAR el vínculo
-// aplica la misma ventana derivada que grupoAceptaNinosNuevos en
-// app/actions/estudiantes.js (réplica local sobre lib/llenado: un 'use server'
-// solo exporta actions). null = sin grupo. `conservarId`: al EDITAR sin
-// cambiar el vínculo se conserva aunque el grupo ya se haya cerrado a nuevos
-// — nunca se desvincula en silencio; la UI lo muestra como opción
-// deshabilitada con el aviso "cerrado a nuevos — reasignar".
+// Crear o cambiar el vínculo requiere grupo activo del centro e inscripción abierta.
+// Al editar sin cambiar el vínculo se conserva el grupo actual.
 async function grupoValido(centroId, grupoId, conservarId = null) {
   if (!grupoId) return { grupoId: null }
   const [g] = await sql`SELECT * FROM grupos WHERE id = ${grupoId} AND centro_id = ${centroId}`
   if (!g || g.estado !== 'activo') return { error: 'El grupo no está activo o no pertenece a este centro.' }
   if (conservarId != null && String(grupoId) === String(conservarId)) return { grupoId: g.id }
-  const v = ventanaNuevos(g, hoyISO())
-  if (!v.abierta) {
-    if (v.razon === 'palanca_cerrada') {
-      return { error: `El grupo ${g.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones antes de vincularlo.` }
-    }
-    // Sin fecha límite que mostrar (el llenado del grupo ya pasó): mensaje
-    // propio en vez del "venció el null" que salía por la rama de abajo.
-    if (v.razon === 'nivel_avanzado') {
-      return { error: `El grupo ${g.numero} ya no acepta niños NUEVOS: su llenado fue en el arranque y hoy va en un nivel más adelantado. Extiende la ventana desde Grupos y Fusiones o vincula un grupo en llenado.` }
-    }
-    return { error: `El grupo ${g.numero} ya no acepta niños NUEVOS: su ventana venció el ${v.fechaLimite} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana desde Grupos y Fusiones o vincula el grupo de la próxima inducción.` }
+  if (!aceptaInscripciones(g)) {
+    return { error: `El grupo ${g.numero} está cerrado a inscripciones. Ábrelo en Grupos y Fusiones antes de vincularlo.` }
   }
   return { grupoId: g.id }
 }

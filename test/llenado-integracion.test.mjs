@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import { fingerprintLlenado } from '../lib/llenado-outbox.mjs'
-import { ventanaNuevos, ordenarPorCierreLlenado, fechaLimiteNuevos } from '../lib/llenado.mjs'
+import { aceptaInscripciones, ventanaNuevos, ordenarPorCierreLlenado, fechaLimiteNuevos } from '../lib/llenado.mjs'
 import { aceptaNuevosEnSelector, ordenarPorLimiteNuevos } from '../lib/colocacion.mjs'
 import { armarAlohaGroupPayload } from '../lib/cupos-payload.mjs'
 
@@ -149,12 +149,12 @@ test('CRM viejo y nuevo leen el MISMO payload: proyección de 6 claves intacta +
   assert.deepEqual(Object.keys(payload).sort(), [...CLAVES_VIEJAS, ...CLAVES_NUEVAS].sort())
 })
 
-test('al vencer la ventana, para el CRM viejo solo se mueve cupos_disponibles (a 0)', () => {
+test('al vencer la referencia de llenado, el CRM conserva los cupos si la inscripción sigue abierta', () => {
   const args = { horario: 'h', cuposTotal: 14, metaApertura: 6, gpnMin: 8, ahoraIso: 'T' }
   const antes = armarAlohaGroupPayload(grupoTiny({ numero: 1, centro: 'C', ninos: 5 }), { ...args, hoyIso: '2026-09-23' })
   const despues = armarAlohaGroupPayload(grupoTiny({ numero: 1, centro: 'C', ninos: 5 }), { ...args, hoyIso: '2026-09-24' })
   assert.equal(antes.cupos_disponibles, 9) // el día del límite todavía entra
-  assert.equal(despues.cupos_disponibles, 0) // fórmula nueva (g2-5): ventana vencida = 0
+  assert.equal(despues.cupos_disponibles, 9) // fórmula nueva (g2-5): ventana vencida = 0
   for (const k of ['numero', 'centro', 'horario', 'cupos_total', 'actualizado_at']) {
     assert.deepEqual(despues[k], antes[k])
   }
@@ -263,20 +263,20 @@ test('selector ≡ server: la razón viaja en el payload y nadie ofrece lo que e
     ['veterano con extensión vencida', veteranoNivel10({ llenado_extendido_hasta: '2026-08-01' })],
   ]
   for (const [nombre, g] of casos) {
-    const server = ventanaNuevos(g, hoy).abierta
+    const server = aceptaInscripciones(g)
     const cliente = aceptaNuevosEnSelector(proyectarParaSelector(g), hoy)
     assert.equal(cliente, server, `${nombre}: el selector dice ${cliente} y el server ${server}`)
   }
 })
 
-test('selector: el veterano de nivel 10 no se ordena como exento — ni siquiera entra a la lista', () => {
+test('selector: incluye grupos avanzados con inscripciones abiertas', () => {
   const hoy = '2026-08-10'
   const grupos = [conLimite(10, '2026-09-30'), veteranoNivel10(), grupoTiny({ id: 50, itinerario: 'KINDER' })]
     .map(proyectarParaSelector)
   const abiertos = ordenarPorLimiteNuevos(grupos.filter((g) => aceptaNuevosEnSelector(g, hoy)))
-  assert.deepEqual(abiertos.map((g) => g.id), [10, 50]) // el 22 (nivel 10) no se ofrece
+  assert.deepEqual(abiertos.map((g) => g.id), [10, 22, 50]) // el 22 (nivel 10) no se ofrece
   // Y su etiqueta jamás se pinta como un exento con cupos libres.
-  assert.equal(abiertos.some((g) => g.id === 22), false)
+  assert.equal(abiertos.some((g) => g.id === 22), true)
 })
 
 // =============================================================================

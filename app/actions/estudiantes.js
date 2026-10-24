@@ -3,7 +3,7 @@ import { sql, withTransaction } from '../../lib/db'
 import { requireCentroAccess, requireCurrentWriteCentro } from '../../lib/auth'
 import { isMaster } from '../../lib/current-user.mjs'
 import { ITINERARIOS, NIVEL_MAX, ORIGENES, MOTIVOS_RETIRO, STATUS_PLATAFORMA, esOrigenVenta, hoyISO, fechaIso10, requiereOrigenVenta } from '../../lib/operaciones'
-import { ventanaNuevos } from '../../lib/llenado.mjs'
+import { aceptaInscripciones } from '../../lib/llenado.mjs'
 import { colocacionInvalida } from '../../lib/colocacion.mjs'
 import { encolarSyncCrm } from '../../lib/llenado-service'
 import { bloquearMesesEditables } from '../../lib/mes-kpi'
@@ -49,45 +49,18 @@ const itinerarioVigenteDe = (v) => {
   return v
 }
 
-// (Diseño 2026-08-08) Qué bloquea cada cosa — el manual habla de NIÑOS NUEVOS:
-// - grupoAceptaNinosNuevos: palanca manual ∧ ventana derivada de nuevos
-//   abierta (TINY hasta la semana 4 del libro, KIDS hasta la 2, sobre el nivel
-//   VIGENTE del itinerario; KINDER y sin-itinerario exentos;
-//   llenado_extendido_hasta la extiende con rastro). La usan el alta nueva —
-//   incluida la colocación desde clase de prueba, que entra por
-//   inscribirEstudiante — y la PRIMERA colocación de un niño sin grupo (g2-6).
-// - grupoAceptaMovimientos: SOLO la palanca. Reincorporar y el cambio de grupo
-//   interno no son niños nuevos — el cierre automático de ventana jamás frena
-//   un movimiento (pedido explícito de Fernando; la fusión aplica el mismo
-//   criterio al destino en app/actions/grupos.js).
-// Ambas reciben el grupo ya leído y devuelven mensaje de error o null.
-function grupoAceptaNinosNuevos(grupo, hoy = hoyISO()) {
-  const v = ventanaNuevos(grupo, hoy)
-  if (v.abierta) return null
-  if (v.razon === 'no_activo') return 'El grupo no está activo.'
-  if (v.razon === 'palanca_cerrada') {
-    return `El grupo ${grupo.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones si tiene cupo.`
-  }
-  // Cerrado por nivel avanzado no tiene fecha límite que mostrar: decir
-  // "venció el null" era el mensaje que salía antes de esta rama.
-  if (v.razon === 'nivel_avanzado') {
-    return `El grupo ${grupo.numero} ya no acepta niños NUEVOS: su llenado fue en el arranque y hoy va en un nivel más adelantado. Extiende la ventana desde Grupos y Fusiones (queda registrado) o coloca al niño en un grupo en llenado.`
-  }
-  return `El grupo ${grupo.numero} ya no acepta niños NUEVOS: su ventana venció el ${v.fechaLimite} (manual: Tiny hasta la semana 4 del libro, Kids hasta la 2). Extiende la ventana desde Grupos y Fusiones o apunta la venta a la inducción del próximo nivel.`
-}
-
+// Altas y movimientos respetan la apertura manual, también en grupos iniciados.
 function grupoAceptaMovimientos(grupo) {
   if (!grupo || grupo.estado !== 'activo') return 'El grupo no está activo o no pertenece a este centro.'
-  if (grupo.inscripcion_abierta === false) {
+  if (!aceptaInscripciones(grupo)) {
     return `El grupo ${grupo.numero} está cerrado a inscripciones: ya no entra nadie. Ábrelo de nuevo en Grupos y Fusiones si tiene cupo.`
   }
   return null
 }
 
-// El grupo completo del centro (las validaciones de ventana necesitan
-// itinerario_clases y llenado_extendido_hasta). null si no pertenece.
+// El grupo completo del centro. null si no pertenece.
 // Con el `query` de una transacción interactiva (lib/db.js withTransaction) y
-// `bloquear`, la fila queda tomada hasta el COMMIT: así el gate de ventana se
+// `bloquear`, la fila queda tomada hasta el COMMIT: así la apertura se
 // evalúa sobre un grupo que nadie puede cerrar mientras se escribe el alta.
 async function grupoDe(centroId, grupoId, query = sql, { bloquear = false } = {}) {
   const filas = bloquear
@@ -224,8 +197,8 @@ export async function inscribirEstudiante(centroId, data) {
     if (!g) return { error: 'El grupo no pertenece a este centro.' }
     // Prechequeo con mensaje amable; la garantía real la da el gate atómico
     // de abajo, que relee el MISMO grupo con FOR UPDATE dentro de la
-    // transacción (incluido el override llenado_extendido_hasta).
-    const err = esReincorporacion ? grupoAceptaMovimientos(g) : grupoAceptaNinosNuevos(g, hoy)
+    // transacción, incluida su apertura manual.
+    const err = grupoAceptaMovimientos(g)
     if (err) return { error: err }
     // (Defecto 10) Matriz de colocación: la misma regla que frena una fusión
     // frena la colocación del niño nuevo (réplica de lib/fusiones.js:130-148
@@ -282,9 +255,8 @@ export async function inscribirEstudiante(centroId, data) {
           const errorMes = await bloquearMesesEditables(query, centroId, [{ year, month }])
           if (errorMes) return { error: errorMes }
           if (!g) return { error: 'El grupo no pertenece a este centro.' }
-          // Ventana de niños NUEVOS + palanca, sobre la fila ya bloqueada. Límite
-          // nulo (KINDER o itinerario legacy) = exento: nunca cerrar a ciegas.
-          const errorGrupo = esReincorporacion ? grupoAceptaMovimientos(g) : grupoAceptaNinosNuevos(g, hoy)
+          // La apertura se relee sobre la fila bloqueada antes de escribir.
+          const errorGrupo = grupoAceptaMovimientos(g)
           if (errorGrupo) return { error: errorGrupo }
           const errorColocacion = colocacionInvalida({ itinerario, nivel }, g.itinerario)
           if (errorColocacion) return { error: errorColocacion }
@@ -547,10 +519,9 @@ export async function actualizarEstudiante(centroId, id, data) {
       return { error: ERROR_CARRERA }
     }
 
-    // Gates del destino sobre la fila BLOQUEADA: primera colocación = niño
-    // nuevo (ventana completa); traslado real = movimiento (solo palanca).
+    // Altas y traslados validan la apertura del destino sobre la fila bloqueada.
     if (cambiaGrupo && grupoId) {
-      const errorGrupo = tuvoGrupo ? grupoAceptaMovimientos(destino) : grupoAceptaNinosNuevos(destino, hoy)
+      const errorGrupo = grupoAceptaMovimientos(destino)
       if (errorGrupo) return { error: errorGrupo }
       // (Defecto 10) Matriz de colocación, igual que en inscribirEstudiante:
       // se valida con el itinerario/nivel que el niño tendrá TRAS esta edición.

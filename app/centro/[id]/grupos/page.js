@@ -45,7 +45,7 @@ import { generarItinerario } from '../../../../lib/itinerario'
 // aula y para el niño); el modal del plan individual se abre desde el chip.
 import { LineaTiempoPlan, NotasPlan, ProgresoPlan, PlanNinoModal, mesDe } from '../../../../components/PlanNino'
 import { posicionPlanNino } from '../../../../lib/plan-nino.mjs'
-import { ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
+import { aceptaInscripciones, ventanaNuevos, ritmoLlenado, sugerenciasLlenado, ordenarPorCierreLlenado, SEMANA_LIMITE_NUEVOS } from '../../../../lib/llenado.mjs'
 import { grupoIniciado, fingerprintPlanGrupo, cohorteDeTransicion } from '../../../../lib/plan-grupo.mjs'
 import { fechaPublicacion } from '../../../../lib/fecha-publicacion.mjs'
 import TableScroller from '../../../../components/TableScroller'
@@ -280,39 +280,10 @@ function motivoNoAceptaNuevos(v) {
   return ''
 }
 
-// Chip de llenado del panel — 4 estados (diseño 2026-08-08 + regla del
-// 2026-08-10): verde = en llenado (con la fecha en que cierra a nuevos si el
-// manual la fija), ámbar = ventana del manual vencida o grupo ya pasado de
-// nivel (los movimientos internos SÍ siguen entrando), rojo = palanca manual
-// cerrada (no entra nadie).
-function ChipLlenado({ v, programa, nivel }) {
-  if (v.razon === 'palanca_cerrada') {
-    return <span className="pill pill--bad" title="Cerrado a inscripciones: ya no entra nadie (ni inscripción, ni reincorporación, ni fusión). Ventas ve 0 cupos."><span className="dot" />🔒 Inscripciones cerradas</span>
-  }
-  // (2026-08-10) El llenado es del ARRANQUE del grupo: del nivel 2 en adelante
-  // no entran niños nuevos aunque el itinerario se acabe de regenerar. Sin
-  // esta rama el panel pintaba "En llenado · acepta niños nuevos" a un grupo
-  // en nivel 10 (Calle 50 G22) que el server rechaza al guardar.
-  if (v.razon === 'nivel_avanzado') {
-    return (
-      <span className="pill pill--warn" title="El llenado de este grupo ya pasó: la ventana de niños nuevos es del arranque (nivel 1) y este grupo va más adelantado. Reincorporaciones, cambios de grupo y fusiones sí entran; para un niño NUEVO hay que extender la ventana a mano (queda registrado y vence solo).">
-        <span className="dot" />Cerrado a nuevos{Number.isFinite(Number(nivel)) ? ` (va en nivel ${Number(nivel)})` : ' (grupo ya pasado de nivel)'}
-      </span>
-    )
-  }
-  if (v.razon === 'vencida') {
-    const sem = SEMANA_LIMITE_NUEVOS[String(programa || '').toUpperCase()]
-    return (
-      <span className="pill pill--warn" title={`Ya no acepta niños NUEVOS: la ventana del manual venció el ${fmtDia(v.fechaLimite)}. Reincorporaciones, cambios de grupo y fusiones sí entran; al pasar de nivel la ventana se reabre sola.`}>
-        <span className="dot" />Cerrado a nuevos (manual{sem ? ` · semana ${sem}` : ''})
-      </span>
-    )
-  }
-  return (
-    <span className="pill pill--ok" title="En llenado: acepta niños nuevos y se puede colocar en las clases de prueba.">
-      <span className="dot" />En llenado{v.fechaLimite ? ` · cierra ${fmtDia(v.fechaLimite)}` : ''}
-    </span>
-  )
+// La apertura manual es la autorización efectiva; el ritmo conserva su referencia.
+function ChipLlenado({ v }) {
+  const abierta = v.razon !== 'palanca_cerrada' && v.razon !== 'no_activo'
+  return <span className={`pill ${abierta ? 'pill--ok' : 'pill--bad'}`} title={abierta ? 'Acepta inscripciones aunque las clases ya hayan comenzado.' : 'Abre las inscripciones para incorporar niños.'}><span className="dot" />{abierta ? 'Inscripciones abiertas' : '🔒 Inscripciones cerradas'}</span>
 }
 
 export default function GruposPage() {
@@ -436,7 +407,7 @@ export default function GruposPage() {
     // Cerrados a nuevos: activos donde un niño NUEVO ya no entra — palanca
     // manual cerrada o ventana del manual vencida (los movimientos internos
     // sí siguen entrando mientras la palanca esté abierta).
-    if (f === 'cerradosNuevos') return g.estado === 'activo' && !ventanaNuevos(g, hoy).abierta
+    if (f === 'cerradosNuevos') return g.estado === 'activo' && !aceptaInscripciones(g)
     return g.estado !== 'activo'
   }
   // Secuencia ÚNICA de la lista (diseño 2026-08-08, defecto 12): base = el
@@ -1210,7 +1181,7 @@ function GrupoDetalle({ centroId, g, metas, acciones, asistenciaMes = {}, canWri
   // cliente con lib/llenado.mjs — alimenta el chip, el botón de inscribir y
   // el bloque Llenado. Solo tiene sentido en grupos activos.
   const ll = activo ? llenadoDe(g, metas, hoyISO()) : null
-  const aceptaNuevos = !!ll?.ventana?.abierta
+  const aceptaNuevos = aceptaInscripciones(g)
   const it = g.itinerario_clases
   const posAula = it ? posicionPlanNino(it, hoyISO()) : null
   const TILES = [
@@ -1453,7 +1424,7 @@ function BloqueLlenado({ g, ll, canWrite = true, onExtender }) {
         {r.faltan > 0 ? <> · faltan <b className="num" style={{ color: 'var(--warn)' }}>{r.faltan}</b></> : ' · meta cumplida'}
         {r.diasParaInicio != null && <> · el nivel inicia en <b className="num" style={{ color: 'var(--text)' }}>{r.diasParaInicio} día{r.diasParaInicio === 1 ? '' : 's'}</b></>}
         {v.fechaLimite
-          ? <> · acepta nuevos hasta el <b className="num" style={{ color: v.razon === 'vencida' ? 'var(--bad)' : 'var(--text)' }}>{fmtDia(v.fechaLimite)}</b>{v.razon === 'extendida' ? ' (ventana extendida)' : ''}</>
+          ? <> · referencia de llenado: <b className="num" style={{ color: v.razon === 'vencida' ? 'var(--bad)' : 'var(--text)' }}>{fmtDia(v.fechaLimite)}</b>{v.razon === 'extendida' ? ' (ventana extendida)' : ''}</>
           : v.razon === 'nivel_avanzado'
             // Sin fecha límite NO es sinónimo de exento: aquí está cerrado.
             ? <> · <b style={{ color: 'var(--warn)' }}>cerrado a niños nuevos</b>: el llenado fue en el arranque y el grupo ya va en nivel <b className="num" style={{ color: 'var(--text)' }}>{Number(g.itinerario_clases?.nivel) || '—'}</b></>
@@ -3006,8 +2977,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
   const [confirmacion, setConfirmacion] = useState({ motivo: '', nota: '' })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo')
-  // La ventana limita niños nuevos; una reincorporación conserva el gate
-  // de grupo activo y de cierre manual, igual que la Server Action.
+  // Altas y reincorporaciones respetan grupo activo y apertura manual.
   const esReincorporacion = f.origen === 'reincorporado'
   const hoy = hoyISO()
   const ventanaPorId = new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoy)]))
@@ -3101,7 +3071,7 @@ function InscribirModal({ centroId, grupos, grupoPrefill, onClose, onSaved, onAb
             <option value="">{esReincorporacion ? 'Seleccionar grupo' : 'Sin grupo'}</option>
             {activos.map((g) => {
               const v = ventanaPorId.get(String(g.id))
-              const permitido = esReincorporacion ? g.inscripcion_abierta !== false : v?.abierta
+              const permitido = aceptaInscripciones(g)
               const marca = permitido ? '' : marcaNoAcepta(v)
               return <option key={g.id} value={g.id} disabled={!permitido}>Grupo {g.numero} · {g.itinerario}{marca}</option>
             })}
@@ -3157,10 +3127,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
   const [err, setErr] = useState('')
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const activos = grupos.filter((g) => g.estado === 'activo' || String(g.id) === String(est.grupo_id))
-  // (g2-6) Sin grupo actual, el server trata la colocación como niño NUEVO
-  // (grupoAceptaNinosNuevos: palanca + ventana del manual + nivel); con grupo
-  // es un traslado y solo manda la palanca. El select refleja la misma regla
-  // que el server para no ofrecer un grupo que luego rechaza.
+  // Primera colocación y traslado respetan la misma apertura que el servidor.
   const primeraColocacion = est.grupo_id == null
   const ventanaPorId = primeraColocacion ? new Map(activos.map((g) => [String(g.id), ventanaNuevos(g, hoyISO())])) : null
   // Cierre EFECTIVO vigente (override ?? derivado, resuelto por el server en
@@ -3214,7 +3181,7 @@ function EstudianteModal({ centroId, est, grupos, onClose, onSaved }) {
             <option value="">Sin grupo</option>
             {activos.map((g) => {
               const v = ventanaPorId?.get(String(g.id))
-              const permitido = primeraColocacion ? !!v?.abierta : g.inscripcion_abierta !== false
+              const permitido = aceptaInscripciones(g)
               const marca = permitido ? '' : primeraColocacion ? marcaNoAcepta(v) : ' · 🔒 cerrado'
               return <option key={g.id} value={g.id} disabled={!permitido}>Grupo {g.numero} · {g.itinerario}{marca}</option>
             })}
