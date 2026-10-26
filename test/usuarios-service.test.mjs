@@ -7,6 +7,9 @@ import { usuariosDeliveryForRuntime } from '../lib/usuarios-delivery.mjs'
 
 const { createUsuariosService } = usuariosServiceModule
 
+// Relativa al reloj real para que no caduque: una fecha clavada tumbó estos tests el 2026-09-10.
+const BLOQUEO_FUTURO = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
 const coord = { id: 2, rol: 'coordinador', centros: [10, 12], password_hash: 'hash' }
 const masterActor = { id: 1, email: 'fperez@teamsolutionss.com', rol: 'admin_master', centros: [], password_hash: 'hash' }
 const generalActor = { id: 3, email: 'general@aloha.invalid', rol: 'admin_general', centros: [], password_hash: 'hash' }
@@ -373,8 +376,7 @@ test('General y supervisor consultan usuarios solo lectura', async () => {
   }
 })
 
-test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Master', async (t) => {
-  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
+test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Master', async () => {
   const masterRow = {
     id: 1,
     nombre: 'Fernando',
@@ -395,7 +397,7 @@ test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Maste
     centros: [],
     centros_nombres: [],
     activo: true,
-    blocked_until: '2026-09-10T05:00:00.000Z',
+    blocked_until: BLOQUEO_FUTURO,
   }
   const result = await createUsuariosService({ repo: readRepo(masterActor, [masterRow, blockedRow]) }).pageData({ uid: 1 })
   assert.equal(result.actor.role, 'admin_master')
@@ -406,26 +408,25 @@ test('Master lista usuarios con bloqueo visible sin hacer asignable el rol Maste
   assert.equal(result.users[0].actions.edit, false)
   assert.equal(result.users[0].actions.delete, false)
   assert.equal(result.users[0].actions.block, false)
-  assert.equal(result.users[1].blockedUntil, '2026-09-10T05:00:00.000Z')
+  assert.equal(result.users[1].blockedUntil, BLOQUEO_FUTURO)
   assert.equal(result.users[1].actions.unblock, true)
 })
 
-test('Master bloquea y desbloquea usuario con auditoria transaccional', async (t) => {
-  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
+test('Master bloquea y desbloquea usuario con auditoria transaccional', async () => {
   const fx = writeFixture({ actor: masterActor })
   const result = await fx.service.blockUser(
     { uid: 1 },
     8,
-    { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: 'Corte temporal solicitado' },
+    { blockedUntil: BLOQUEO_FUTURO, motivo: 'Corte temporal solicitado' },
   )
-  assert.deepEqual(result, { ok: true, blockedUntil: '2026-09-10T05:00:00.000Z' })
-  assert.deepEqual(fx.blocked, [{ id: 8, blockedUntil: '2026-09-10T05:00:00.000Z' }])
+  assert.deepEqual(result, { ok: true, blockedUntil: BLOQUEO_FUTURO })
+  assert.deepEqual(fx.blocked, [{ id: 8, blockedUntil: BLOQUEO_FUTURO }])
   assert.deepEqual(fx.audit, [{
     actorId: 1,
     userId: 8,
     action: 'block',
     previousBlockedUntil: null,
-    newBlockedUntil: '2026-09-10T05:00:00.000Z',
+    newBlockedUntil: BLOQUEO_FUTURO,
     motivo: 'Corte temporal solicitado',
   }])
 
@@ -436,12 +437,11 @@ test('Master bloquea y desbloquea usuario con auditoria transaccional', async (t
   assert.equal(fx.audit.at(-1).motivo, 'Fin del corte')
 })
 
-test('bloqueo niega auto-bloqueo, Master y fechas pasadas sin escribir', async (t) => {
-  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-07T12:00:00Z') })
+test('bloqueo niega auto-bloqueo, Master y fechas pasadas sin escribir', async () => {
   for (const [usuarioId, input, pattern] of [
-    [1, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: 'x' }, /propia cuenta/],
+    [1, { blockedUntil: BLOQUEO_FUTURO, motivo: 'x' }, /propia cuenta/],
     [8, { blockedUntil: '2026-09-01T05:00:00.000Z', motivo: 'x' }, /futura/],
-    [8, { blockedUntil: '2026-09-10T05:00:00.000Z', motivo: ' ' }, /motivo/],
+    [8, { blockedUntil: BLOQUEO_FUTURO, motivo: ' ' }, /motivo/],
   ]) {
     const fx = writeFixture({ actor: masterActor })
     await assert.rejects(() => fx.service.blockUser({ uid: 1 }, usuarioId, input), pattern)
