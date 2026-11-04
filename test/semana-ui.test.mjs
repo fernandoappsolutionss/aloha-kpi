@@ -10,7 +10,7 @@ test('gráfica semanal usa SVG accesible y modelo puro', () => {
   assert.match(source, /modeloGrafica\(/)
   assert.match(source, /role="img"/)
   assert.match(source, /aria-label=/)
-  assert.doesNotMatch(source, /<title>/)
+  assert.match(source, /<title>/)
   assert.match(source, /Sin datos todavía/)
 })
 
