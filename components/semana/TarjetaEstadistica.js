@@ -2,7 +2,7 @@ import GraficaSemanal from './GraficaSemanal'
 
 const mostrar = (valor) => valor == null ? 'Sin dato' : Number(valor).toLocaleString('es-PA')
 
-export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuota = {}, principal = false }) {
+export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuota = {}, principal = false, centroId, ultimaCerrada }) {
   const delta = resumen.delta
   const mejora = delta == null || delta === 0 ? null : meta.inversa ? delta < 0 : delta > 0
   const error = serie.at(-1)?.detalle?.error
@@ -10,6 +10,7 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
   const reconstruida = serie.some(punto => punto.detalle?.reconstruida)
   const pendientes = serie.filter(punto => punto.detalle?.conciliacionPendiente)
   const objetivo = cuota.cuota ?? cuota.propuesta
+  const cierres = serie.filter(p => ultimaCerrada && p.semanaFin <= ultimaCerrada).slice(-2)
   return (
     <section className={`card semana-tarjeta${principal ? ' semana-tarjeta--principal' : ''}`}>
       <div className="semana-tarjeta__head">
@@ -19,8 +20,9 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
       <div className="semana-tarjeta__valores">
         <div><span className="label">En curso</span><strong>{mostrar(resumen.abierta)}</strong></div>
         <div><span className="label">Última cerrada</span><strong>{mostrar(resumen.cerrada)}</strong></div>
-        <div><span className="label">Cambio anterior</span><strong style={{ color: mejora == null ? 'var(--text-dim)' : mejora ? 'var(--ok)' : 'var(--bad)' }}>{delta == null ? 'Sin dato' : `${delta > 0 ? '↑ +' : delta < 0 ? '↓ ' : '→ '}${delta}`}</strong></div>
+        <div><span className="label">Cambio entre cierres</span><strong style={{ color: mejora == null ? 'var(--text-dim)' : mejora ? 'var(--ok)' : 'var(--bad)' }}>{delta == null ? 'Sin dato' : `${delta > 0 ? '↑ +' : delta < 0 ? '↓ ' : '→ '}${delta}`}</strong></div>
       </div>
+      {cierres.length === 2 && <p className="h-sub">Cierres comparados: {cierres[0].semanaFin} ({mostrar(cierres[0].valor)}) → {cierres[1].semanaFin} ({mostrar(cierres[1].valor)}). La semana en curso es provisional.</p>}
       <p className="semana-tarjeta__cuota"><strong>Cuota de esta semana: {mostrar(objetivo)}</strong>{cuota.estado && <span className="label"> · {cuota.estado === 'aprobada' ? 'Aprobada' : 'Propuesta'}</span>}</p>
       {meta.tipo === 'flujo' && cuota.ritmo && <div className="semana-ritmo" role="status">
         <p>{meta.inversa ? `Van ${mostrar(resumen.abierta)}; el máximo semanal es ${mostrar(objetivo)}. Menos es mejor.` : `Van ${mostrar(resumen.abierta)} de ${mostrar(objetivo)}; a hoy deberían ir ${mostrar(cuota.ritmo.esperado)}.`}</p>
@@ -37,7 +39,7 @@ export default function TarjetaEstadistica({ meta, serie = [], resumen = {}, cuo
           <strong>{punto.semanaFin}</strong>: {mostrar(punto.detalle.rango?.minimo)}–{mostrar(punto.detalle.rango?.maximo)} {meta.unidad}. {punto.detalle.error}
         </li>)}</ul>
       </details>}
-      <GraficaSemanal puntos={serie} inversa={meta.inversa} unidad={meta.unidad} titulo={meta.nombre} />
+      <GraficaSemanal puntos={serie} inversa={meta.inversa} unidad={meta.unidad} titulo={meta.nombre} ultimaCerrada={ultimaCerrada} storageKey={centroId == null ? undefined : `aloha:escala-semanal:${centroId}:${meta.codigo}`} />
       <p className="h-sub semana-tarjeta__fuente">Fuente: {meta.fuente}</p>
     </section>
   )

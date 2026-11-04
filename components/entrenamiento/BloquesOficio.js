@@ -115,7 +115,7 @@ export default function BloquesOficio({ bloques, terminos, centroId }) {
           case 'grafica':
             return <figure key={i} style={{ margin: '24px 0' }}>
               <figcaption><strong>{b.titulo}</strong><p>{b.texto}</p></figcaption>
-              <GraficaSemanal titulo={b.titulo} puntos={b.puntos} inversa={b.inversa} unidad={b.unidad} />
+              <GraficaSemanal titulo={b.titulo} puntos={b.puntos} inversa={b.inversa} unidad={b.unidad} ultimaCerrada={b.ultimaCerrada} />
               <Tabla bloque={{ encabezados: ['Cierre', 'Valor', 'Cuota aprobada'], filas: b.puntos.map((p) => [p.semanaFin, p.valor == null ? 'Sin dato' : `${p.valor} ${b.unidad}`, p.cuota == null ? 'Sin cuota aprobada en este ejemplo' : String(p.cuota)]) }} />
             </figure>
           case 'enlaces':

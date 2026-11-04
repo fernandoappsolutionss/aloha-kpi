@@ -79,7 +79,7 @@ export default function TableroSemanal() {
           <p>Las cifras suman los centros con datos en cada fecha. Los centros sin datos no se cuentan como cero ni impiden ver la suma disponible. La gráfica conjunta solo une fechas con datos de todos los centros.</p>
           <ul>{cobertura.map(p => <li key={p.semanaFin}>{fecha(p.semanaFin)}{p.semanaFin > datos.ultimaCerrada ? ' (abierta)' : ''}: {p.incompleta ? 'suma disponible' : 'total'} {mostrar(p.subtotal)} · {p.disponibles}/{p.total} centros{p.incompleta && ` · sin datos: ${p.faltantes.join(', ')}`}</li>)}</ul>
         </details>}
-        {cobertura.some(p => p.valor != null) && <GraficaSemanal puntos={cobertura} titulo="Total de niños activos de todos los centros con cobertura completa" unidad="niños" />}
+        {cobertura.some(p => p.valor != null) && <GraficaSemanal ultimaCerrada={datos.ultimaCerrada} puntos={cobertura} titulo="Total de niños activos de todos los centros con cobertura completa" unidad="niños" />}
         <TableScroller label="Estadísticas semanales por centro" stickyFirstColumn>
           <table className="table semana-tablero__tabla">
             <caption className="sr-only">Estadísticas semanales por centro</caption>

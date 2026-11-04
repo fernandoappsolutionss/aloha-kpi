@@ -1580,6 +1580,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .semana-ritmo--bien { color: var(--ok-text); }
 .semana-ritmo--atras { color: var(--bad-text); }
 .semana-grafica { display: block; max-width: 100%; height: auto; }
+.semana-grid.semana-grid--graficas { grid-template-columns: minmax(0,1fr); }
+.semana-grafica--hca { max-width: none; width: 100%; min-width: 820px; }
+.semana-grafica__eje { fill: var(--text-dim); font-size: 13px; }
+.semana-grafica__valor { fill: var(--text); font-size: 15px; font-weight: 700; paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; }
+.semana-grafica__estado { fill: var(--text-dim); font-size: 12px; }
+.semana-grafica__lectura { font-size: 13px; color: var(--text-dim); margin: 20px 0 8px; }
+.semana-grafica__opcion { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 12px 0; }
+.semana-grafica-hca .table-scroller__viewport { width: 100%; }
+.semana-grafica-hca .chart-data { margin-top: 12px; }
+.semana-grafica-hca .hca-monthly__scale { padding-block: 12px; }
 .semana-tablero { margin-bottom: 24px; }
 .semana-tablero__contenido { padding: 16px; min-width: 0; }
 .semana-tablero__tabla { min-width: 900px; }
