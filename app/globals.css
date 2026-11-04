@@ -3015,3 +3015,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .semana-hoy, .semana-plan__planificacion { grid-column: 1; grid-row: auto; }
   .semana-hoy { position: static; max-height: none; }
 }
+
+/* Revisión concreta desde las alertas: conserva legibilidad en móvil. */
+.revision-datos__section { padding: 20px; margin: 16px 0; }
+.revision-datos__section h2 { font-size: 1.15rem; margin-bottom: 16px; }
+.revision-datos__section p { line-height: 1.6; margin: 12px 0; }
+.revision-datos__section summary { cursor: pointer; font-weight: 700; }
+.revision-datos__totales { display: flex; flex-wrap: wrap; gap: 24px; }
+.revision-datos__totales dd { font-size: 2rem; font-weight: 700; margin: 8px 0; }
+.revision-datos__section td, .revision-datos__section th { white-space: normal; }
+[data-revision-focus="true"] { outline: 3px solid var(--blue, #2457cb); outline-offset: 4px; scroll-margin-top: 24px; }

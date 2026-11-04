@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect, useCallback, useRef, useMemo, Children } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Children, Suspense } from 'react'
 import { parseSalonCapacity, roomCapacitySummary } from '../../../../lib/salon-capacidad.mjs'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import OperationalCard from '../../../../components/OperationalCard'
 import DetalleRecurso, { promedioTexto } from '../../../../components/coach/DetalleRecurso'
@@ -287,7 +287,12 @@ function ChipLlenado({ v }) {
 }
 
 export default function GruposPage() {
+  return <Suspense fallback={<p role="status">Cargando ficha…</p>}><GruposContent /></Suspense>
+}
+
+function GruposContent() {
   const { id } = useParams()
+  const query = useSearchParams()
   const access = useCurrentAccess()
   const canWrite = access.canWriteOperations
   const canDelete = access.canDeleteOperations
@@ -331,15 +336,22 @@ export default function GruposPage() {
   const [verPlan, setVerPlan] = useState(null) // { nino, grupo } — plan individual del niño (R3)
   const planReturnFocusRef = useRef(null)
 
+  const loadSequence = useRef(0)
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     try {
       const res = await loadOperaciones(id)
+      if (sequence !== loadSequence.current) return
       if (res.error) { setLoadError(res.error); setLoading(false); return }
-      setData(res); setLoadError('')
-    } catch (e) { setLoadError(e.message || 'No se pudo cargar la operación.') }
+      setData({ ...res, _centroId: String(id) }); setLoadError('')
+    } catch (e) { if (sequence !== loadSequence.current) return; setLoadError(e.message || 'No se pudo cargar la operación.') }
     setLoading(false)
   }, [id])
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    setData(null); setLoading(true); setEditEst(null); setReincEst(null); setVerPlan(null)
+    load()
+    return () => { loadSequence.current++ }
+  }, [load])
 
   useEffect(() => {
     // fusLoading NO va en las deps ni en el guard: setearlo aquí re-dispararía
@@ -371,19 +383,29 @@ export default function GruposPage() {
     if (nino.estado === 'retirado') setReincEst(nino)
     else setEditEst(nino)
   }
-  // ?ficha=<id>: una sola vez, cuando la operación ya cargó y se puede editar.
-  // Se quita de la URL al abrirla: recargar o volver atrás no reabre el modal.
-  const fichaPedida = useRef(false)
+  // Los enlaces de revisión abren el editor o itinerario concreto. Nunca
+  // convierten una consulta de un retirado en una reincorporación.
+  const fichaPedida = useRef('')
   useEffect(() => {
-    if (!data || !canWrite || fichaPedida.current) return
-    fichaPedida.current = true
+    const fichaId = query.get('ficha'), accion = query.get('accion')
+    if (!fichaId) { fichaPedida.current = ''; return }
+    if (!data || data._centroId !== String(id) || access.loading) return
+    const key = `${id}:${fichaId}:${accion || ''}`
+    if (fichaPedida.current === key) return
+    fichaPedida.current = key
+    const todos = [...data.grupos.flatMap(g => g.estudiantes || []), ...(data.sinGrupo || []), ...(data.retirados || [])]
+    const nino = todos.find(e => String(e.id) === fichaId)
+    if (!nino) { setStatus('❌ La ficha del enlace no está disponible en este centro. No se abrió otra ficha.'); return }
+    if (accion === 'plan') {
+      setVerPlan({ nino, grupo: data.grupos.find(g => String(g.id) === String(nino.grupo_id)) || null })
+    } else if (!canWrite) {
+      setStatus(`Modo consulta: ${nino.nombre}. Necesitas permiso de edición para corregir la ficha.`)
+    } else if (accion === 'editar') setEditEst(nino)
+    else abrirFicha(fichaId)
     const url = new URL(window.location.href)
-    const fichaId = url.searchParams.get('ficha')
-    if (!fichaId) return
-    url.searchParams.delete('ficha')
+    url.searchParams.delete('ficha'); url.searchParams.delete('accion')
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-    abrirFicha(fichaId)
-  }, [data, canWrite])
+  }, [data, canWrite, access.loading, query, id])
 
   const metas = data?.metas || { gpnMin: 8, cupoMax: 15 }
   const grupos = data?.grupos || []

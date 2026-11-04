@@ -38,7 +38,8 @@ test('enrollment warning distinguishes individual linkage from the monthly acqui
   assert.match(aviso.accion, /clase de prueba/)
   assert.match(aviso.accion, /canal de captación/)
   assert.deepEqual(aviso.items, ['Septiembre 2026'])
-  assert.equal(aviso.donde.href, '/centro/6/grupos')
+  assert.equal(aviso.donde.href, '/centro/6/revision-datos?problema=cp_classification_incomplete&periodo=2026-09')
+  assert.equal(aviso.enlaces[0].href, aviso.donde.href)
   assert.equal(aviso.bloquea, true)
 })
 

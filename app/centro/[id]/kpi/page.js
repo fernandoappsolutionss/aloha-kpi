@@ -1,12 +1,12 @@
 'use client'
 import Link from 'next/link'
 import { usaKpiAutomatico } from '../../../../lib/kpi-auto.mjs'
-import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import TableScroller from '../../../../components/TableScroller'
 import RevisionHistorica from '../../../../components/RevisionHistorica'
 import OperationalCard from '../../../../components/OperationalCard'
 import { useCurrentAccess } from '../../../../components/useCurrentAccess'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import Sidebar from '../../../../components/Sidebar'
 import CentroNavigation from '../../../../components/CentroNavigation'
 import { loadKpiMes, saveKpiMes, cerrarMes, reabrirMes } from '../../../actions/kpi'
@@ -30,7 +30,13 @@ const calcRes = (tipo, dias) => {
 const emptyW = () => ({ cob:['','','','',''], des:['','','','',''], ing:['','','','',''] })
 
 export default function KPIPage() {
+  return <Suspense fallback={<p role="status">Cargando mes…</p>}><KPIContent /></Suspense>
+}
+
+function KPIContent() {
   const { id } = useParams()
+  const query = useSearchParams()
+  const [loadedPeriod, setLoadedPeriod] = useState('')
   const now = new Date()
   const access = useCurrentAccess()
   const [year, setYear] = useState(now.getFullYear())
@@ -62,22 +68,23 @@ export default function KPIPage() {
   // advertencia; null = mes cerrado o anterior al gate (todo manual).
   const [kpiAuto, setKpiAuto] = useState(null)
 
-  // Mes por enlace: /centro/3/kpi?year=2026&month=8 abre agosto directamente.
-  // Lo usa la alerta de higiene de datos, que nombra el mes que falta cerrar —
-  // decirle a alguien "cierra agosto" y dejarlo buscando el selector es la
-  // diferencia entre una tarea y un reclamo.
-  // ponytail: se lee de window.location en vez de useSearchParams (techo: no
-  // reacciona si el query cambia sin recargar, cosa que hoy no ocurre; salida:
-  // useSearchParams el día que la página se envuelva en un Suspense propio —
-  // hoy ese hook obligaría a un boundary sólo para esto).
+  // Cambiar el periodo del enlace también funciona sin desmontar la página.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const query = new URLSearchParams(window.location.search)
-    const y = Number(query.get('year'))
-    const m = Number(query.get('month'))
+    const y = Number(query.get('year')), m = Number(query.get('month'))
     if (Number.isInteger(y) && y >= 2000 && y <= 2999) setYear(y)
     if (Number.isInteger(m) && m >= 1 && m <= 12) setMonth(m)
-  }, [])
+  }, [query])
+
+  useEffect(() => {
+    const section = query.get('revision')
+    if (loading || loadedPeriod !== `${id}-${year}-${month}` || !['ventas', 'saldo'].includes(section)
+      || year !== Number(query.get('year')) || month !== Number(query.get('month'))) return
+    const target = document.getElementById(`kpi-${section}`)
+    if (!target) return
+    target.dataset.revisionFocus = 'true'
+    target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'start' })
+    return () => { delete target.dataset.revisionFocus }
+  }, [loading, loadedPeriod, id, year, month, query])
 
   const loadData = useCallback(async () => {
     const sequence = ++loadSequence.current
@@ -95,6 +102,7 @@ export default function KPIPage() {
       return
     }
     if (sequence !== loadSequence.current) return
+    setLoadedPeriod(`${id}-${year}-${month}`)
     const { centroNombre: cNombre, estado, resumen: res, semanas: kpi, historial: hist, cierreAnterior: cierrePrevio, inicioArrastrado: arr, motivosAuto: mAuto, kpiAuto: kAuto, autoSync: sync } = datos
     setCentroNombre(cNombre || '')
     const estadoActual = estado || 'abierto'
@@ -412,7 +420,7 @@ export default function KPIPage() {
         </div>
 
         {/* Config del mes */}
-        <div className="card" style={{ padding: 18, marginBottom: 16 }} data-tour="kpi.config">
+        <div id="kpi-saldo" tabIndex={-1} className="card" style={{ padding: 18, marginBottom: 16 }} data-tour="kpi.config">
           <h3 className="label" style={{ marginBottom: 14 }}>Configuración — {NOMBRES_MES[month-1]} {year}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14 }}>
             {[['Niños inicio mes','ninos_inicio'],['Grupos activos','grupos_activos'],['Meta ingresos venta (mensual)','meta_nuevos_mensual']].map(([lbl,key]) => (
@@ -493,6 +501,10 @@ export default function KPIPage() {
         )}
 
         <p className="h-sub">Las cuotas de cada semana se fijan en la pestaña <Link href={`/centro/${id}/semana`}>Semana</Link>.</p>
+        <div id="kpi-ventas" tabIndex={-1}>
+          <h2>Ventas y resultados semanales · {NOMBRES_MES[month - 1]} {year}</h2>
+          {query.get('revision') === 'ventas' && <p>Revisa los ingresos de cada semana contra las fichas del mes. {locked ? 'El mes está cerrado; para corregirlo, usa Reabrir mes con los permisos correspondientes.' : ''} <Link href={`/centro/${id}/revision-datos?problema=cp_classification_incomplete&periodo=${year}-${String(month).padStart(2, '0')}`}>Volver a las inscripciones →</Link></p>}
+        </div>
         {/* Tabla KPI semanal */}
         <div className="panel desktop-only" style={{ marginBottom: 20 }}>
           <TableScroller label="KPI semanal">
