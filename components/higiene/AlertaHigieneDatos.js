@@ -46,7 +46,8 @@ function Items({ punto }) {
       <ul className="higiene__meses">
         {punto.enlaces.map((enlace) => (
           <li key={enlace.href + enlace.texto}>
-            <Link className="higiene__mes" href={enlace.href}>{enlace.texto}</Link>
+            <Link className="higiene__mes" href={enlace.href}>{enlace.texto} →</Link>
+            {enlace.detalle && <p>{enlace.detalle}</p>}
           </li>
         ))}
       </ul>

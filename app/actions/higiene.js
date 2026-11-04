@@ -17,6 +17,15 @@
 import { requireCentroAccess } from '../../lib/auth'
 import { sql } from '../../lib/db'
 import { buildGrowthRoster } from '../../lib/growth/roster.mjs'
+import { loadGrowthInputs } from '../../lib/growth/server'
+import { buildRevisionDatos } from '../../lib/revision-datos.mjs'
+
+export async function getRevisionDatos(centroId, options = {}) {
+  await requireCentroAccess(centroId)
+  const input = await loadGrowthInputs(Number(centroId))
+  if (!input.center) throw new Error('Centro no disponible')
+  return buildRevisionDatos(input, options)
+}
 
 const iso10 = (valor) => {
   if (!valor) return null
