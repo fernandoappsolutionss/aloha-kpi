@@ -48,9 +48,9 @@ export default function ReferidosCentroPage() {
     try {
       const r = await canjearSaldo(id, abierto.miembro.id, { monto: abierto.monto, nota: abierto.nota, claveOp: abierto.clave })
       if (r?.error) { setAviso(r.error); return }
-      setAviso(`Canje registrado. Saldo nuevo: ${centavos(r.saldo)}. Recuerda aplicar el descuento en la factura.`)
       await cargar()
       await abrir({ ...abierto.miembro, saldo_cent: r.saldo })
+      setAviso(`Canje registrado. Saldo nuevo: ${centavos(r.saldo)}. Recuerda aplicar el descuento en la factura.`)
     } finally { setGuardando(false) }
   }
 
@@ -59,9 +59,9 @@ export default function ReferidosCentroPage() {
     try {
       const r = await ajustarSaldo(id, abierto.miembro.id, { monto: abierto.monto, nota: abierto.nota, sentido, claveOp: abierto.clave })
       if (r?.error) { setAviso(r.error); return }
-      setAviso(`Ajuste registrado. Saldo nuevo: ${centavos(r.saldo)}.`)
       await cargar()
       await abrir({ ...abierto.miembro, saldo_cent: r.saldo })
+      setAviso(`Ajuste registrado. Saldo nuevo: ${centavos(r.saldo)}.`)
     } finally { setGuardando(false) }
   }
 
