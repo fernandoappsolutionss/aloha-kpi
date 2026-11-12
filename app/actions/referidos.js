@@ -58,7 +58,7 @@ export async function detalleMiembro(centroId, miembroId) {
     const movimientos = await sql`
       SELECT mv.tipo, mv.monto_cent, mv.nota, mv.created_at, c.nombre AS centro
       FROM referidos_movimientos mv LEFT JOIN centros c ON c.id = mv.centro_id
-      WHERE mv.miembro_id = ${id} ORDER BY mv.id DESC LIMIT 50`
+      WHERE mv.miembro_id = ${id} AND mv.monto_cent <> 0 ORDER BY mv.id DESC LIMIT 50`
     const suyos = await sql`SELECT nombre, created_at FROM referidos_miembros WHERE referidor_id = ${id} ORDER BY id DESC LIMIT 50`
     return { movimientos, referidos: suyos }
   } catch (e) { return fallo('detalleMiembro', e) }
@@ -98,7 +98,7 @@ export async function resumenReferidos() {
       FROM referidos_miembros m GROUP BY 1`
     const dinero = await sql`
       SELECT m.crm_account_id AS cuenta,
-        COALESCE(SUM(mv.monto_cent) FILTER (WHERE mv.tipo LIKE 'bono%' OR mv.tipo = 'reverso'), 0)::int AS emitido_cent,
+        COALESCE(SUM(mv.monto_cent) FILTER (WHERE mv.tipo LIKE 'bono%' OR mv.tipo IN ('reverso', 'vencimiento')), 0)::int AS emitido_cent,
         COALESCE(-SUM(mv.monto_cent) FILTER (WHERE mv.tipo = 'canje'), 0)::int AS canjeado_cent,
         COALESCE(SUM(mv.monto_cent), 0)::int AS pendiente_cent
       FROM referidos_movimientos mv JOIN referidos_miembros m ON m.id = mv.miembro_id GROUP BY 1`
@@ -122,16 +122,20 @@ export async function guardarConfigReferidos(cuenta, data = {}) {
       return texto === '' || Number(texto) === 0 ? 0 : aCentavos(texto)
     })
     if (montos.some((m) => m === null)) return { error: 'Los montos van en dólares, con hasta dos decimales.' }
+    const venceTexto = String(data.vence_dias ?? '').trim()
+    if (venceTexto !== '' && !/^\d{1,3}$/.test(venceTexto)) return { error: 'Los días para usar el bono van en números enteros (vacío = no vence).' }
+    const vence = venceTexto === '' ? null : Number(venceTexto)
     const desde = data.activo_desde || null
     if (desde && !/^\d{4}-\d{2}-\d{2}$/.test(desde)) return { error: 'Fecha inválida.' }
     const activo = Boolean(data.activo)
     if (activo && !desde) return { error: 'Para encender, elige desde qué fecha de clase se paga.' }
     await sql`
-      INSERT INTO referidos_config (crm_account_id, activo, activo_desde, bono_clase_prueba_cent, bono_referido_asiste_cent, bono_referido_inscrito_cent, updated_by, updated_at)
-      VALUES (${cuenta}, ${activo}, ${desde}, ${montos[0]}, ${montos[1]}, ${montos[2]}, ${sesion?.uid ?? null}, now())
+      INSERT INTO referidos_config (crm_account_id, activo, activo_desde, bono_clase_prueba_cent, bono_referido_asiste_cent, bono_referido_inscrito_cent, bono_clase_prueba_vence_dias, updated_by, updated_at)
+      VALUES (${cuenta}, ${activo}, ${desde}, ${montos[0]}, ${montos[1]}, ${montos[2]}, ${vence}, ${sesion?.uid ?? null}, now())
       ON CONFLICT (crm_account_id) DO UPDATE SET activo = EXCLUDED.activo, activo_desde = EXCLUDED.activo_desde,
         bono_clase_prueba_cent = EXCLUDED.bono_clase_prueba_cent, bono_referido_asiste_cent = EXCLUDED.bono_referido_asiste_cent,
-        bono_referido_inscrito_cent = EXCLUDED.bono_referido_inscrito_cent, updated_by = EXCLUDED.updated_by, updated_at = now()`
+        bono_referido_inscrito_cent = EXCLUDED.bono_referido_inscrito_cent,
+        bono_clase_prueba_vence_dias = EXCLUDED.bono_clase_prueba_vence_dias, updated_by = EXCLUDED.updated_by, updated_at = now()`
     return { ok: true }
   } catch (e) { return fallo('guardarConfigReferidos', e) }
 }

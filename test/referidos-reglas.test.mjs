@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   CUENTA_PA, CUENTA_VE, CODIGO_RE, aCentavos, claseElegible, codigoDeRegistro, decidirAtribucion,
-  deltaConcepto, generarCodigo, normalizarTelefono,
+  claseVencida, deltaConcepto, generarCodigo, normalizarTelefono, restoPorBono,
 } from '../lib/referidos/reglas.mjs'
 
 test('teléfono: misma identidad con o sin prefijo de país', () => {
@@ -88,4 +88,29 @@ test('monto escrito a centavos', () => {
   assert.equal(aCentavos('0'), null)
   assert.equal(aCentavos('-5'), null)
   assert.equal(aCentavos('1.234'), null)
+})
+
+test('vencimiento del bono de clase de prueba', () => {
+  const ahora = new Date('2026-11-13T03:00:00Z') // 12-nov 10 p. m. en Panamá
+  assert.equal(claseVencida('2026-11-12T20:00:00Z', 0, 'America/Panama', ahora), false, 'el día de la clase todavía sirve')
+  assert.equal(claseVencida('2026-11-11T20:00:00Z', 0, 'America/Panama', ahora), true)
+  assert.equal(claseVencida('2026-11-11T20:00:00Z', 1, 'America/Panama', ahora), false)
+  assert.equal(claseVencida('2026-11-01T20:00:00Z', null, 'America/Panama', ahora), false, 'sin plazo no vence')
+  // Vencido: solo vale la parte usada (bono + vencimiento), también al re-marcar la asistencia.
+  const base = { clase: 'cp', elegible: true, config: { bono_clase_prueba_cent: 1000 }, congelado: 1000, vencidoCent: -600 }
+  assert.equal(deltaConcepto({ ...base, cumple: true, asentado: 400 }), 0)
+  assert.equal(deltaConcepto({ ...base, cumple: false, asentado: 400 }), -400)
+  assert.equal(deltaConcepto({ ...base, cumple: true, asentado: 0 }), 400)
+})
+
+test('reparto de canjes entre bonos: cada canje se cuenta una sola vez', () => {
+  const mv = (tipo, monto_cent, concepto = null) => ({ tipo, monto_cent, concepto })
+  // Bono A → canje → bono B: el canje fue de A; B queda entero.
+  assert.deepEqual([...restoPorBono([mv('bono_clase_prueba', 1000, 'cp:a'), mv('canje', -1000), mv('bono_clase_prueba', 1000, 'cp:b')])],
+    [['cp:a', 0], ['cp:b', 1000]])
+  // A ya cerrado: el saldo de referidos que entra después no toca a B ni lo paga un canje viejo.
+  assert.deepEqual([...restoPorBono([mv('bono_clase_prueba', 1000, 'cp:a'), mv('canje', -1000), mv('bono_clase_prueba', 1000, 'cp:b'),
+    mv('vencimiento', 0, 'cp:a'), mv('bono_referido_inscrito', 2500, 'ref_inscrito:m9'), mv('canje', -500)])], [['cp:b', 500]])
+  // Un canje mayor que el bono: el resto sale del saldo que no vence.
+  assert.deepEqual([...restoPorBono([mv('ajuste', 2500), mv('bono_clase_prueba', 1000, 'cp:a'), mv('canje', -3000)])], [['cp:a', 0]])
 })

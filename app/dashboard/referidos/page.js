@@ -29,7 +29,7 @@ export default function ReferidosGerenciaPage() {
     try {
       const r = await guardarConfigReferidos(cuenta, {
         activo: f.get('activo') === 'on', activo_desde: f.get('activo_desde'),
-        bono_clase_prueba: f.get('bono_clase_prueba'), bono_referido_asiste: f.get('bono_referido_asiste'), bono_referido_inscrito: f.get('bono_referido_inscrito'),
+        bono_clase_prueba: f.get('bono_clase_prueba'), bono_referido_asiste: f.get('bono_referido_asiste'), bono_referido_inscrito: f.get('bono_referido_inscrito'), vence_dias: f.get('vence_dias'),
       })
       avisar(cuenta, r?.error || 'Guardado. Los bonos nuevos usan estos montos; los ya entregados no cambian.')
       if (!r?.error) await cargar()
@@ -64,7 +64,7 @@ export default function ReferidosGerenciaPage() {
             </div>
             <div className="kpi-grid" style={{ marginTop: 16 }}>
               {[['Familias con tarjeta', c.miembros, `${c.tarjetas_abiertas} la abrieron`], ['Familias referidas', c.referidos, 'con referidor confirmado'],
-                ['Saldo emitido', centavos(c.emitido_cent), 'bonos menos reversos'], ['Saldo canjeado', centavos(c.canjeado_cent), 'descontado en mensualidades'],
+                ['Saldo emitido', centavos(c.emitido_cent), 'bonos menos reversos y vencidos'], ['Saldo canjeado', centavos(c.canjeado_cent), 'descontado en mensualidades'],
                 ['Saldo pendiente', centavos(c.pendiente_cent), 'deuda con las familias']].map(([titulo, valor, sub]) => (
                 <div className="kpi" key={titulo}><div className="kpi__top"><span className="label">{titulo}</span></div><div className="kpi__value">{valor}</div><div className="kpi__sub">{sub}</div></div>
               ))}
@@ -75,11 +75,14 @@ export default function ReferidosGerenciaPage() {
             </p>
             {datos.esMaster && (
               <form onSubmit={(e) => guardar(e, c.cuenta)} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end', marginTop: 18 }}>
-                {[['bono_clase_prueba', 'Por ir a clase de prueba', c.config?.bono_clase_prueba_cent], ['bono_referido_asiste', 'Al que refirió: su invitado asistió', c.config?.bono_referido_asiste_cent],
-                  ['bono_referido_inscrito', 'Al que refirió: su invitado se inscribió', c.config?.bono_referido_inscrito_cent]].map(([name, etiqueta, valor]) => (
+                {[['bono_clase_prueba', 'Por ir a clase de prueba', c.config?.bono_clase_prueba_cent ?? 1000], ['bono_referido_asiste', 'Al que refirió: su invitado asistió', c.config?.bono_referido_asiste_cent ?? 0],
+                  ['bono_referido_inscrito', 'Al que refirió: su invitado se inscribió', c.config?.bono_referido_inscrito_cent ?? 2500]].map(([name, etiqueta, valor]) => (
                   <label className="field" key={name}><span className="label">{etiqueta} (USD)</span>
                     <input className="input" name={name} inputMode="decimal" defaultValue={dolares(valor)} style={{ width: 150 }} /></label>
                 ))}
+                <label className="field"><span className="label">Días para usar el de clase de prueba</span>
+                  <input className="input" name="vence_dias" inputMode="numeric" title="0 = solo el día de la clase; vacío = no vence" placeholder="no vence"
+                    defaultValue={c.config ? (c.config.bono_clase_prueba_vence_dias ?? '') : 0} style={{ width: 150 }} /></label>
                 <label className="field"><span className="label">Paga clases desde</span>
                   <input className="input" type="date" name="activo_desde" defaultValue={c.config?.activo_desde ? String(c.config.activo_desde).slice(0, 10) : ''} /></label>
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, minHeight: 44 }}>

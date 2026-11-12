@@ -65,8 +65,8 @@ const inscribir = (id, event_id, phone, extra = {}) => {
 const miembro = async (telefonoNorm) => (await sql`SELECT * FROM referidos_miembros WHERE telefono_norm = ${telefonoNorm}`)[0]
 const saldo = async (id) => (await sql`SELECT COALESCE(SUM(monto_cent),0)::int AS s FROM referidos_movimientos WHERE miembro_id = ${id}`)[0].s
 const activar = (montos = {}) => sql`
-  INSERT INTO referidos_config (crm_account_id, activo, activo_desde, bono_clase_prueba_cent, bono_referido_asiste_cent, bono_referido_inscrito_cent)
-  VALUES (${CUENTA_PA}, true, '2026-11-01', ${montos.cp ?? 500}, ${montos.asiste ?? 300}, ${montos.inscrito ?? 1000})`
+  INSERT INTO referidos_config (crm_account_id, activo, activo_desde, bono_clase_prueba_cent, bono_referido_asiste_cent, bono_referido_inscrito_cent, bono_clase_prueba_vence_dias)
+  VALUES (${CUENTA_PA}, true, '2026-11-01', ${montos.cp ?? 500}, ${montos.asiste ?? 300}, ${montos.inscrito ?? 1000}, ${montos.vence ?? null})`
 
 before(async () => {
   await pool.query(readFileSync(new URL('../../db/migrations/2026-11-12-referidos.sql', import.meta.url), 'utf8'))
@@ -288,4 +288,44 @@ test('paginación del CRM: recorre todas las páginas y certifica por ids único
   const r = await servicio.importarEvento(e)
   assert.equal(r.inscritos, 1203)
   assert.equal(r.certificado, true)
+})
+
+test('bono de clase de prueba que vence el día de la clase: se retira lo no canjeado, nunca el saldo de referidos', async () => {
+  await activar({ cp: 1000, vence: 0 })
+  const hoy = evento('hoy', new Date().toISOString())
+  const viejo = evento('viejo', new Date(Date.now() - 3 * 86400000).toISOString())
+  inscribir('h1', 'hoy', '61110001', { attendance_status: 'attended' })
+  inscribir('h2', 'hoy', '61110001', { attendance_status: 'attended' }) // hermano, misma familia
+  inscribir('s1', 'hoy', '61110002', { attendance_status: 'attended' })
+  inscribir('t1', 'viejo', '61110003', { attendance_status: 'attended' }) // asistencia marcada tarde
+  await servicio.importarEvento(hoy); await servicio.importarEvento(viejo); await servicio.acreditar(CUENTA_PA)
+  const [familia, sola, tarde] = [await miembro('50761110001'), await miembro('50761110002'), await miembro('50761110003')]
+  assert.equal(await saldo(familia.id), 2000)
+  assert.equal(await saldo(tarde.id), 0, 'un bono no nace vencido')
+  await servicio.moverSaldo({ miembroId: familia.id, tipo: 'canje', montoCent: 1000, nota: 'INV-1', claveOp: randomUUID(), centroId })
+  await servicio.moverSaldo({ miembroId: sola.id, tipo: 'ajuste', montoCent: 2500, nota: 'referido', claveOp: randomUUID() })
+  await servicio.acreditar(CUENTA_PA)
+  assert.equal(await saldo(familia.id), 1000, 'el mismo día no vence')
+
+  await sql`UPDATE referidos_registros SET clase_fecha = now() - interval '2 days' WHERE crm_event_id = 'hoy'`
+  // Vencido por fecha y el cron aún no pasó: no se puede canjear.
+  const tardio = await servicio.moverSaldo({ miembroId: familia.id, tipo: 'canje', montoCent: 1000, nota: 'INV-2', claveOp: randomUUID(), centroId })
+  assert.match(tardio.error, /Saldo insuficiente/)
+  await servicio.acreditar(CUENTA_PA); await servicio.acreditar(CUENTA_PA)
+  assert.equal(await saldo(familia.id), 0, 'dos bonos, un canje: vence solo uno')
+  assert.equal(await saldo(sola.id), 2500, 'el saldo que no es de clase de prueba no vence')
+  assert.equal((await sql`SELECT COUNT(*)::int AS n FROM referidos_movimientos WHERE tipo = 'vencimiento'`)[0].n, 3, 'un cierre por bono, también el usado entero')
+  assert.equal((await sql`SELECT COALESCE(SUM(monto_cent), 0)::int AS s FROM referidos_movimientos WHERE tipo = 'vencimiento'`)[0].s, -2000)
+
+  // Saldo de referidos que entra después no se lo come un cierre viejo.
+  await servicio.moverSaldo({ miembroId: familia.id, tipo: 'ajuste', montoCent: 2500, nota: 'referido', claveOp: randomUUID() })
+  await servicio.acreditar(CUENTA_PA)
+  assert.equal(await saldo(familia.id), 2500)
+
+  // Desmarcar y volver a marcar la asistencia tras vencer: se revierte y vuelve solo lo usado.
+  const quitar = async (id, estado) => { await sql`UPDATE referidos_registros SET estado = ${estado} WHERE crm_registration_id = ${id}`; await servicio.acreditar(CUENTA_PA) }
+  await quitar('s1', 'no_show'); assert.equal(await saldo(sola.id), 2500)
+  await quitar('s1', 'attended'); assert.equal(await saldo(sola.id), 2500, 'venció entero: no vuelve nada')
+  await quitar('h1', 'no_show'); assert.equal(await saldo(familia.id), 1500, 'h1 se usó en el canje: se revierte')
+  await quitar('h1', 'attended'); assert.equal(await saldo(familia.id), 2500, 'y vuelve exactamente lo usado')
 })

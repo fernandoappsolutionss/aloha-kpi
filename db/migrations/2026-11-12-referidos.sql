@@ -6,9 +6,11 @@ CREATE TABLE IF NOT EXISTS referidos_config (
   crm_account_id TEXT PRIMARY KEY,
   activo BOOLEAN NOT NULL DEFAULT false,
   activo_desde DATE,
-  bono_clase_prueba_cent INTEGER NOT NULL DEFAULT 0 CHECK (bono_clase_prueba_cent >= 0),
+  bono_clase_prueba_cent INTEGER NOT NULL DEFAULT 1000 CHECK (bono_clase_prueba_cent >= 0),
   bono_referido_asiste_cent INTEGER NOT NULL DEFAULT 0 CHECK (bono_referido_asiste_cent >= 0),
-  bono_referido_inscrito_cent INTEGER NOT NULL DEFAULT 0 CHECK (bono_referido_inscrito_cent >= 0),
+  bono_referido_inscrito_cent INTEGER NOT NULL DEFAULT 2500 CHECK (bono_referido_inscrito_cent >= 0),
+  -- Días para usar el bono de clase de prueba: 0 = solo el día de la clase; NULL = no vence.
+  bono_clase_prueba_vence_dias INTEGER DEFAULT 0 CHECK (bono_clase_prueba_vence_dias >= 0),
   -- Carga histórica de TODA la cuenta terminada y certificada contra el total del CRM.
   cobertura_completa_at TIMESTAMPTZ,
   updated_by INTEGER,
@@ -63,8 +65,10 @@ CREATE INDEX IF NOT EXISTS idx_referidos_registros_miembro ON referidos_registro
 CREATE TABLE IF NOT EXISTS referidos_movimientos (
   id SERIAL PRIMARY KEY,
   miembro_id INTEGER NOT NULL REFERENCES referidos_miembros(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('bono_clase_prueba','bono_referido_asiste','bono_referido_inscrito','reverso','canje','ajuste')),
-  monto_cent INTEGER NOT NULL CHECK (monto_cent <> 0),
+  tipo TEXT NOT NULL CHECK (tipo IN ('bono_clase_prueba','bono_referido_asiste','bono_referido_inscrito','reverso','vencimiento','canje','ajuste')),
+  -- Un vencimiento en 0 es la marca de cierre de un bono que se usó entero.
+  monto_cent INTEGER NOT NULL,
+  CHECK (monto_cent <> 0 OR tipo = 'vencimiento'),
   concepto TEXT,
   clave TEXT NOT NULL UNIQUE,
   centro_id INTEGER REFERENCES centros(id) ON DELETE SET NULL,

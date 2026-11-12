@@ -11,7 +11,7 @@ export const metadata = { title: 'Tu tarjeta ALOHA', robots: { index: false, fol
 
 const TIPOS = {
   bono_clase_prueba: 'Clase de prueba', bono_referido_asiste: 'Tu invitado fue a su clase',
-  bono_referido_inscrito: 'Tu invitado se inscribió', reverso: 'Corrección', canje: 'Canje en mensualidad', ajuste: 'Ajuste',
+  bono_referido_inscrito: 'Tu invitado se inscribió', reverso: 'Corrección', vencimiento: 'Venció sin usar', canje: 'Canje en mensualidad', ajuste: 'Ajuste',
 }
 const fecha = (v) => new Date(v).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', timeZone: 'America/Panama' })
 

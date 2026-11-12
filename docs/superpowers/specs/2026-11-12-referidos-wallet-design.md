@@ -189,3 +189,12 @@ Construido según la v4, con estas diferencias deliberadas:
 - La carga histórica guarda la última importación certificada de cada evento (`referidos_eventos`) para reanudarse.
 
 Sin probar (no hay con qué): instalación y actualización del pase en un iPhone y un Android reales (faltan certificado de Pass Type ID y emisor de Google), la pantalla de inscritos contra el CRM real, y la landing del CRM en navegador.
+
+## 10. Montos y vencimiento (Fernando, 12-nov)
+
+- Por defecto: US$10 por asistir a clase de prueba, US$0 al que refirió cuando su invitado asiste, US$25 al que refirió cuando su invitado se inscribe (compra). Los tres se cambian en Gerencia → Referidos.
+- El bono de clase de prueba **vence**: `bono_clase_prueba_vence_dias` (0 = solo el día de la clase, en hora del país; vacío = no vence). El saldo ganado por referir no vence.
+- Un bono de clase de prueba no nace ya vencido: asistencia marcada después del plazo, o carga histórica, no acredita.
+- Al pasar el plazo se cierra el bono con un movimiento `vencimiento` bajo el mismo concepto `cp:<registro>` por lo no canjeado (en 0 si se usó entero: es la marca de cierre, única por `clave`). Lo hace `vencerMiembro`, con la fila del miembro bloqueada, desde el cron (`acreditar`) **y desde `moverSaldo` antes de validar el saldo**: lo vencido no se canjea aunque el cron no haya pasado.
+- Reparto (`restoPorBono`, puro): se recorre el libro del miembro en orden; cada canje se descuenta una sola vez, primero del bono abierto más antiguo que ya existía en ese momento, y lo demás del saldo que no vence. Nunca se retira más que el saldo.
+- Cerrado el bono vale solo su parte usada (bono + vencimiento): si se desmarca la asistencia se revierte esa parte y si se vuelve a marcar regresa esa misma parte.

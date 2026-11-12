@@ -9,7 +9,7 @@ import { getCentroNombre } from '../../../actions/centros'
 import { ajustarSaldo, canjearSaldo, detalleMiembro, listarMiembros, reemitirTarjeta } from '../../../actions/referidos'
 import { centavos } from '../../../../lib/referidos/reglas.mjs'
 
-const TIPOS = { bono_clase_prueba: 'Clase de prueba', bono_referido_asiste: 'Referido asistió', bono_referido_inscrito: 'Referido inscrito', reverso: 'Reverso', canje: 'Canje', ajuste: 'Ajuste' }
+const TIPOS = { bono_clase_prueba: 'Clase de prueba', bono_referido_asiste: 'Referido asistió', bono_referido_inscrito: 'Referido inscrito', reverso: 'Reverso', vencimiento: 'Vencido', canje: 'Canje', ajuste: 'Ajuste' }
 const fecha = (v) => new Date(v).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Panama' })
 // Clave de la operación: nace al abrir el formulario; un doble clic o un
 // reintento no descuenta dos veces.
