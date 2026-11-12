@@ -233,6 +233,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
   const configItems = [
     ...(access.canViewZoho ? [{ label: 'Conexión Zoho', icon: 'doc', href: '/dashboard/zoho' }] : []),
     ...(access.canViewCaja ? [{ label: 'Curva 13 · Caja', icon: 'sheet', href: '/dashboard/caja' }] : []),
+    ...(access.isMaster || access.isReadonlyGlobal ? [{ label: 'Referidos', icon: 'users', href: '/dashboard/referidos' }] : []),
     ...(canViewCentersPage ? [{ label: 'Gestión centros', icon: 'building', href: '/dashboard/centros' }] : []),
     ...(canViewUsersPage ? [{ label: 'Usuarios', icon: 'users', href: '/dashboard/usuarios' }] : []),
   ]
@@ -243,6 +244,7 @@ export default function Sidebar({ rol, centroNombre, centroId }) {
     { label: 'Grupos y Fusiones', icon: 'groups', href: `/centro/${centroId}/grupos`, tour: 'nav.grupos' },
     { label: 'Cuadro de Negocio', icon: 'sheet', href: `/centro/${centroId}/cuadro`, tour: 'nav.cuadro' },
     { label: 'Clases de Prueba', icon: 'calendar', href: `/centro/${centroId}/eventos`, tour: 'nav.eventos' },
+    { label: 'Referidos', icon: 'users', href: `/centro/${centroId}/referidos` },
     { label: 'Entrenamiento', icon: 'book', href: `/centro/${centroId}/entrenamiento`, tour: 'nav.entrenamiento', entrenamiento: true, badge: firmas > 0 ? `${firmas} firmas` : null },
   ]
   // El Coach solo alcanza sus grupos y el árbol de entrenamiento (lo encierra

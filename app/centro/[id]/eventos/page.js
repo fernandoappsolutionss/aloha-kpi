@@ -18,6 +18,7 @@ import { NINOS_POR_GRUPO_MODELO } from '../../../../lib/modelo'
 import { AVISO_CERRADO_A_NUEVOS, aceptaNuevosEnSelector, colocacionInvalida, etiquetaGrupoSelector, ordenarPorLimiteNuevos } from '../../../../lib/colocacion.mjs'
 import Dialog, { useDialogCallback } from '../../../../components/Dialog'
 import TableScroller from '../../../../components/TableScroller'
+import TarjetaBoton, { EtiquetaReferido } from '../../../../components/referidos/TarjetaBoton'
 import { mesClase, mesAnterior, filtrarClasesPorMes, filtrarClasesPorMomento, resumirClases } from '../../../../lib/clases-prueba.mjs'
 import { normalizeQuestion } from '../../../../lib/registration-questions.mjs'
 
@@ -687,6 +688,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
           : mobileCards ? <div className="operational-list">{regs.map(r=><OperationalCard key={r.id} title={[r.first_name,r.last_name].filter(Boolean).join(' ')} fields={[{label:'Teléfono',value:r.phone?<a href={`tel:${r.phone.replace(/[^\d+]/g,'')}`}>{r.phone}</a>:'Sin teléfono'},{label:'Correo',value:r.email||'—'},{label:'Quién lo registró',value:origenDeRegistro(r).nombre},{label:'Pago',value:r.payment_status==='paid'?'Pagado':r.payment_status==='waived'?'Gratis':'Pendiente'},{label:'Asistencia',value:r.attendance_status==='attended'?'Asistió':r.attendance_status==='no_show'?'No vino':r.attendance_status==='cancelled'?'Cancelado':'Pendiente'}]} actions={canWrite ? <>
             <button type="button" className="btn" disabled={busy===r.id+'p'} onClick={()=>setPagoR(r,r.payment_status!=='paid')}>{r.payment_status==='paid'?'Quitar pago':'Marcar pago'}</button>
             <button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,true)}>Asistió</button><button type="button" className="btn" disabled={busy===r.id+'a'} onClick={()=>setAsist(r,false)}>No vino</button><button ref={node => inscribirTriggerRef(node, r.id)} type="button" className="btn" onClick={()=>{setStatus('');setInscribir(r)}}>Inscribir</button>
+            <TarjetaBoton token={r.referidos?.token} nombre={r.first_name} telefono={r.phone}/>
           </> : null}/>)}</div> : (
             <TableScroller label="Inscritos en la clase"><table className="table" style={{ background: 'var(--surface)' }}>
               <thead><tr>{['Nombre', 'Teléfono / correo', 'Quién lo registró', 'Pago', 'Asistencia', ''].map((h, i) => <th key={i} data-actions={!h || undefined}>{h || 'Acciones'}</th>)}</tr></thead>
@@ -696,7 +698,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
                   const tel = (r.phone || '').trim()
                   return (
                   <tr key={r.id} style={{ cursor: 'default' }}>
-                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>{[r.first_name, r.last_name].filter(Boolean).join(' ')}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>{[r.first_name, r.last_name].filter(Boolean).join(' ')}<EtiquetaReferido referidos={r.referidos}/></td>
                     {/* Telefono PRIMERO: es por donde se le da seguimiento al lead.
                         Antes la celda era `email || phone`, asi que a quien tenia
                         correo no se le veia nunca el numero. */}
@@ -738,6 +740,7 @@ function Registrations({ centroId, eventId, grupoId, fechaClase, canWrite = true
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {canWrite && <button ref={node => inscribirTriggerRef(node, r.id)} onClick={() => { setStatus(''); setInscribir(r) }} className="btn" style={{ padding: '4px 10px', fontSize: 12 }}>Inscribir</button>}
+                      {canWrite && <span style={{ marginLeft: 6 }}><TarjetaBoton token={r.referidos?.token} nombre={r.first_name} telefono={r.phone}/></span>}
                     </td>
                   </tr>
                   )
@@ -794,7 +797,7 @@ function InscribirModal({ centroId, reg, grupoId, fechaClase, onClose, onSaved, 
   const nombreReg = [reg.first_name, reg.last_name].filter(Boolean).join(' ')
   const [f, setF] = useState({
     nombre: nombreReg, itinerario: 'TINY', nivel: 1, grupo_id: grupoId ? String(grupoId) : '',
-    origen_venta: '', representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
+    origen_venta: reg.referidos?.referidor ? 'referido' : '', representante: nombreReg, telefono: reg.phone || '', correo: reg.email || '',
     // La venta se cierra en la clase, pero el centro la registra días después:
     // por defecto el día de la clase (nunca futuro), editable.
     fecha: fechaClase && fechaClase <= hoyISO() ? fechaClase : hoyISO(),

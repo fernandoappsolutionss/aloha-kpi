@@ -9,6 +9,34 @@ import { aceptaInscripciones } from '../../lib/llenado.mjs'
 import { mesClase, resumirClases } from '../../lib/clases-prueba.mjs'
 import { validarEventosCrm } from '../../lib/kpi-auto-server.js'
 import { fallo } from '../../lib/errores'
+import { after } from 'next/server'
+import { reconciliarEvento } from '../../lib/referidos'
+
+// Referidos: lo que el KPI sabe de cada inscripción (tarjeta y quién la refirió).
+async function referidosDeEvento(eventId) {
+  try {
+    const filas = await sql`
+      SELECT r.crm_registration_id, r.miembro_id, m.token, m.codigo, ref.nombre AS referidor
+      FROM referidos_registros r
+      LEFT JOIN referidos_miembros m ON m.id = r.miembro_id
+      LEFT JOIN referidos_miembros ref ON ref.id = m.referidor_id AND m.referido_por_registration_id IS NOT NULL
+      WHERE r.crm_event_id = ${eventId}`
+    return new Map(filas.map((f) => [f.crm_registration_id, f]))
+  } catch (e) {
+    console.error('[referidos] referidosDeEvento', e)
+    return new Map()
+  }
+}
+
+// La inscripción tiene que ser de ESTE evento (ya validado como del centro):
+// marcar asistencia genera dinero, no se acepta un id suelto de otro centro.
+async function registroDelEvento(eventId, registrationId) {
+  const res = await crmCall('list_registrations', { event_id: eventId })
+  if (res.error) return { error: res.error }
+  return (res.registrations || []).some((r) => String(r.id) === String(registrationId))
+    ? { ok: true }
+    : { error: 'La inscripción no pertenece a esta clase de prueba.' }
+}
 
 export async function eventosConfig() {
   return { configured: crmConfigured(), baseUrl: crmBaseUrl() }
@@ -228,9 +256,14 @@ export async function listarRegistros(centroId, eventId) {
   try {
   await requireCentroAccess(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.', registrations: [] }
-  const res = await crmCall('list_registrations', { event_id: eventId })
+  const [res] = await Promise.all([crmCall('list_registrations', { event_id: eventId }), reconciliarEvento(eventId)])
   if (res.error) return { error: res.error, registrations: [] }
-  return { registrations: res.registrations || [] }
+  const ref = await referidosDeEvento(eventId)
+  const registrations = (res.registrations || []).map((r) => {
+    const f = ref.get(String(r.id))
+    return { ...r, referidos: f ? { token: f.token, codigo: f.codigo, referidor: f.referidor, sinTelefono: !f.miembro_id } : null }
+  })
+  return { registrations }
   } catch (e) { return fallo('listarRegistros', e) }
 }
 
@@ -256,11 +289,14 @@ export async function marcarAsistencia(centroId, eventId, registrationId, attend
   try {
   await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
+  const pertenece = await registroDelEvento(eventId, registrationId)
+  if (pertenece.error) return { error: pertenece.error }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,
     attendance_status: attended ? 'attended' : 'no_show',
   })
   if (res.error) return { error: res.error }
+  after(() => reconciliarEvento(eventId))
   return { ok: true, registration: res.registration }
   } catch (e) { return fallo('marcarAsistencia', e) }
 }
@@ -269,6 +305,8 @@ export async function marcarPago(centroId, eventId, registrationId, paid) {
   try {
   await requireCurrentWriteCentro(centroId)
   if (!(await eventoDelCentro(centroId, eventId))) return { error: 'La clase de prueba no pertenece a este centro.' }
+  const pertenece = await registroDelEvento(eventId, registrationId)
+  if (pertenece.error) return { error: pertenece.error }
   const res = await crmCall('update_registration', {
     registration_id: registrationId,
     payment_status: paid ? 'paid' : 'pending',

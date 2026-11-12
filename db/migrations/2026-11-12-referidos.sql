@@ -88,6 +88,12 @@ CREATE TABLE IF NOT EXISTS referidos_google_bajas (
   hecho_at TIMESTAMPTZ
 );
 
+-- Última importación certificada de cada evento (la carga histórica se reanuda).
+CREATE TABLE IF NOT EXISTS referidos_eventos (
+  crm_event_id TEXT PRIMARY KEY,
+  certificado_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Límite de /tarjeta/alta compartido entre instancias.
 CREATE TABLE IF NOT EXISTS referidos_intentos (
   ip TEXT NOT NULL,

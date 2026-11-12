@@ -73,7 +73,7 @@ before(async () => {
 })
 beforeEach(async () => {
   await pool.query(`TRUNCATE referidos_movimientos, referidos_registros, referidos_apple_dispositivos, referidos_google_bajas,
-    referidos_intentos, referidos_config, referidos_miembros RESTART IDENTITY CASCADE`)
+    referidos_intentos, referidos_eventos, referidos_config, referidos_miembros RESTART IDENTITY CASCADE`)
   await pool.query(`DELETE FROM centros WHERE nombre = 'Centro referidos'`)
   centroId = (await sql`INSERT INTO centros (nombre) VALUES ('Centro referidos') RETURNING id`)[0].id
   eventos = []; registros = []; crmConTotal = true
@@ -133,14 +133,14 @@ test('referido completo: asiste, se inscribe, se anula la matrícula tras un can
   const rb = inscribir('rb', 'ev2', '62222222', { referral_code: a.codigo, registered_at: '2026-11-05T10:00:00Z' })
   // Autorreferido: A se inscribe otra vez con su propio código.
   inscribir('ra2', 'ev2', '61111111', { referral_code: a.codigo, registered_at: '2026-11-06T10:00:00Z' })
-  await servicio.correrCuenta(CUENTA_PA, { desdeDias: null })
+  await servicio.correrCuenta(CUENTA_PA, { desdeDias: 400 })
   const b = await miembro('50762222222')
   assert.equal(b.referidor_id, a.id)
   assert.equal((await miembro('50761111111')).referidor_id, null)
   assert.equal(await saldo(a.id), 500, 'inscribirse no paga')
 
   rb.attendance_status = 'attended'
-  await servicio.correrCuenta(CUENTA_PA, { desdeDias: null })
+  await servicio.correrCuenta(CUENTA_PA, { desdeDias: 400 })
   assert.equal(await saldo(a.id), 800)
   assert.equal(await saldo(b.id), 500)
 
@@ -195,9 +195,18 @@ test('CRM sin total (sin certificar) o corrida parcial: no marca cobertura ni ci
   assert.equal((await sql`SELECT cobertura_completa_at FROM referidos_config`)[0].cobertura_completa_at, null)
   assert.equal((await miembro('50761234567')).atribucion_cerrada, false)
   crmConTotal = true
+  // Carga histórica cortada por tiempo: tampoco; al reanudar, completa.
+  evento('ev2', '2026-11-11T15:00:00Z')
+  let vueltas = 0
+  assert.equal((await servicio.correrCuenta(CUENTA_PA, { desdeDias: null, hasta: () => vueltas++ >= 1 })).completo, false)
   // Cobertura parcial (ventana de 45 días) tampoco la marca.
   await servicio.correrCuenta(CUENTA_PA, { desdeDias: 45 })
   assert.equal((await sql`SELECT cobertura_completa_at FROM referidos_config`)[0].cobertura_completa_at, null)
+  await sql`DELETE FROM referidos_eventos WHERE crm_event_id = 'ev2'`
+  const reanudada = await servicio.correrCuenta(CUENTA_PA, { desdeDias: null })
+  assert.equal(reanudada.completo, true)
+  assert.equal(reanudada.importados, 1, 'solo importa lo que faltaba')
+  assert.ok((await sql`SELECT cobertura_completa_at FROM referidos_config`)[0].cobertura_completa_at)
 })
 
 test('canjes concurrentes y clave repetida: nunca saldo negativo ni doble descuento', async () => {

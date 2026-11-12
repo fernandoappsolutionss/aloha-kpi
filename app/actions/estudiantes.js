@@ -25,6 +25,7 @@ import {
   registroEnFichaAnulada,
 } from '../../lib/ficha-existente.mjs'
 import { vincularFichaExistenteCon } from '../../lib/ficha-existente-service.mjs'
+import { anotarAltaNueva } from '../../lib/referidos/servicio.mjs'
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 const intOr = (v, d = 0) => {
@@ -273,6 +274,8 @@ export async function inscribirEstudiante(centroId, data) {
             ${data?.telefono?.trim() || null}, ${data?.notas?.trim() || null}, ${now})
           RETURNING id
         `
+        // Referidos: evidencia de ficha NUEVA para este registro, en la misma transacción.
+        await anotarAltaNueva(query, { crmRegistrationId: crmAlta, estudianteId: e.id, centroId: Number(centroId) })
         if (grupoId) {
           // Evento de VENTA canónico (g1-17): origen copiado atómicamente del alta.
           // Si el centro confirmó que es OTRO niño pese a fichas parecidas, el
