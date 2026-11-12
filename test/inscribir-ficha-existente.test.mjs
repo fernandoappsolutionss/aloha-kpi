@@ -79,6 +79,7 @@ function acciones({ fichas = [], grupo = GRUPO, fallas = [], sesion = { uid: 7, 
     encolarSyncCrm: async (ids, motivo) => { llamadas.outbox.push({ ids: [...ids], motivo }) },
     buscarFichasCoincidentes, coincidenciasParaPantalla, decidirAlta, leerConfirmacionFichaNueva, mensajeFichaExistente,
     registroEnFichaAnulada, vincularFichaExistenteCon,
+    anotarAltaNueva: async () => {},
   }
   const exportadas = vm.runInNewContext(`${source}\n;({ inscribirEstudiante, vincularFichaExistente, reincorporarEstudiante })`, contexto)
   return { ...exportadas, escrituras, orden, llamadas }

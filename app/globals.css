@@ -3015,3 +3015,26 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   .semana-hoy, .semana-plan__planificacion { grid-column: 1; grid-row: auto; }
   .semana-hoy { position: static; max-height: none; }
 }
+
+/* ── Tarjeta pública de referidos (/tarjeta/<token>) ───────────────────── */
+.tarjeta { max-width: 420px; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 16px; align-items: stretch; color: #00556D; background: #FBFAF8; min-height: 100vh; font-family: var(--font-aloha-stack); }
+.tarjeta__logo { width: 160px; height: auto; margin: 4px auto 4px; }
+.tarjeta__caja { background: #fff; border: 1px solid #49B439; border-radius: 20px; padding: 22px 20px; text-align: center; }
+.tarjeta__etiqueta { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #49B439; }
+.tarjeta__saldo { font-size: 56px; font-weight: 700; line-height: 1.05; color: #1A3C6A; }
+.tarjeta__saldo--deuda { color: #B3261E; }
+.tarjeta__nombre { font-size: 17px; margin-top: 4px; }
+.tarjeta__qr { width: 200px; margin: 20px auto 8px; }
+.tarjeta__qr svg { width: 100%; height: auto; display: block; }
+.tarjeta__codigo { font-size: 14px; letter-spacing: 0.18em; }
+.tarjeta__cta { display: block; width: 100%; margin-top: 18px; min-height: 52px; border: 0; border-radius: 999px; background: #BBE529; color: #00556D; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; }
+.tarjeta__cta:hover { background: #E6FF2B; }
+.tarjeta__wallets { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.tarjeta__wallet { display: block; min-height: 48px; line-height: 48px; border-radius: 999px; background: #000; color: #fff; text-decoration: none; font-size: 15px; }
+.tarjeta__titulo { font-size: 24px; color: #1A3C6A; margin-bottom: 10px; }
+.tarjeta__subtitulo { font-size: 18px; color: #1A3C6A; margin-bottom: 8px; }
+.tarjeta__texto { font-size: 15px; line-height: 1.5; text-align: left; }
+.tarjeta__texto + .tarjeta__texto { margin-top: 8px; }
+.tarjeta__movimientos { list-style: none; text-align: left; font-size: 14px; }
+.tarjeta__movimientos li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #E7E4DC; }
+.tarjeta__movimientos li:last-child { border-bottom: 0; }

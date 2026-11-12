@@ -10,6 +10,7 @@ import { colocacionInvalida } from '../../lib/colocacion.mjs'
 import { anclaDeAlta } from '../../lib/retiros.mjs'
 import * as fichaExistente from '../../lib/ficha-existente.mjs'
 import { vincularFichaExistenteCon } from '../../lib/ficha-existente-service.mjs'
+import { anotarAltaNueva } from '../../lib/referidos/servicio.mjs'
 
 // lib/mes-kpi.js importa './db' sin extensión (estilo Next): Node lo resuelve
 // con el loader del repo, registrado antes de importarlo.
@@ -74,6 +75,7 @@ const { inscribirEstudiante } = vm.runInNewContext(`${fuente}\n;({ inscribirEstu
   encolarSyncCrm: async (ids, motivo, query) => query`SELECT crm_event_id, grupo_id FROM centro_eventos WHERE grupo_id = ANY(${ids}::int[])`,
   ...fichaExistente,
   vincularFichaExistenteCon,
+  anotarAltaNueva,
 })
 
 // Nombres solo con letras: la normalización borra los dígitos.
