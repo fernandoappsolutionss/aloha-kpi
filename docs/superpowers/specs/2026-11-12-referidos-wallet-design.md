@@ -176,3 +176,16 @@ Cada fase: `npm test`, `next build`, revisión en navegador a 390 / 760 / 1440 p
 ## 8. Validación
 
 ChatGPT Astra (`gpt-6-astra`, sesión Codex `01a1cf5e-14e2-79d0-9616-630cbd6e8e32`): ronda 1 NO-GO (8 bloqueantes), ronda 2 NO-GO (4), ronda 3 NO-GO (1), **ronda 4 GO** sobre esta v4. Menores que quedan para la construcción: paginación por ids únicos con orden estable; el botón de Google espera o pide reintento si el bloqueo está ocupado; lista persistente de objetos de Google por desactivar; «pierde acceso» = deja de recibir información actualizada (no borra lo ya descargado).
+
+## 9. Lo construido frente al plan (12-nov)
+
+Construido según la v4, con estas diferencias deliberadas:
+
+- **Bonos al referidor por familia, no por inscripción**: `ref_asiste` y `ref_inscrito` se pagan una vez por miembro referido y cuenta cualquiera de sus inscripciones (si la familia no fue a la primera clase y vuelve a inscribirse sin el QR, el que la refirió igual cobra).
+- **Conversión y anulación de matrícula las recoge el cron diario**: el alta del alumno solo deja la evidencia (`alta_nueva_estudiante_id`, misma transacción). No se tocaron `actualizarEstudiante` ni la anulación; el bono al referidor ya dependía del cron para cerrar la atribución.
+- **Sin botón «Reconciliar»**: abrir los inscritos de la clase ya reconcilia ese evento.
+- **Sin exportación a Excel** de enlaces: la entrega es el filtro «Tarjeta sin abrir» con el botón Tarjeta por fila.
+- **Etiqueta de actualización de Apple** = `version` (entero) en vez de `actualizado_at`.
+- La carga histórica guarda la última importación certificada de cada evento (`referidos_eventos`) para reanudarse.
+
+Sin probar (no hay con qué): instalación y actualización del pase en un iPhone y un Android reales (faltan certificado de Pass Type ID y emisor de Google), la pantalla de inscritos contra el CRM real, y la landing del CRM en navegador.
