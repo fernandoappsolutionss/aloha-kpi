@@ -14,6 +14,8 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrate:encuestas": "node scripts/migrate-encuestas.mjs",
     "db:migrate:caja": "node scripts/migrate-caja.mjs",
+    "db:migrate:referidos": "node scripts/migrate-referidos.mjs",
+    "test:referidos:db": "node --test --test-concurrency=1 test/integration/referidos.integration.mjs",
     "test:encuestas:db": "node --test --test-concurrency=1 test/integration/encuestas.integration.mjs",
     "entrenamiento:audio:actualizaciones": "node scripts/entrenamiento-audio-actualizaciones.mjs",
     "db:seed": "node scripts/seed.mjs",
