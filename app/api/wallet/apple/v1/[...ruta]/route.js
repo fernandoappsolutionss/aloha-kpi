@@ -70,4 +70,6 @@ async function manejar(request, { params }) {
   return vacio(404)
 }
 
-export { manejar as GET, manejar as POST, manejar as DELETE }
+export async function GET(request, contexto) { return manejar(request, contexto) }
+export async function POST(request, contexto) { return manejar(request, contexto) }
+export async function DELETE(request, contexto) { return manejar(request, contexto) }
