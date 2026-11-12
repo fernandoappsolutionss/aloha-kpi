@@ -26,6 +26,7 @@ export default async function TarjetaPage({ params }) {
     <main className="tarjeta" id="main-content">
       <img className="tarjeta__logo" src="/aloha/lockup.png" alt="ALOHA Mental Arithmetic" width="200" height="91" />
       <section className="tarjeta__caja" aria-label="Tu tarjeta">
+        <img className="tarjeta__mono" src="/aloha/mono.png" alt="" width="280" height="228" />
         <p className="tarjeta__etiqueta">Tu saldo</p>
         <p className={`tarjeta__saldo${m.saldo_cent < 0 ? ' tarjeta__saldo--deuda' : ''}`}>{centavos(m.saldo_cent)}</p>
         <p className="tarjeta__nombre">{m.nombre || 'Familia ALOHA'}</p>
